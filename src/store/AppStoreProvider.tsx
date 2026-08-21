@@ -1,6 +1,7 @@
 ﻿import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
 import type { Appointment, AppointmentStatus, AppointmentType } from "../types/appointment";
 import type { HotelBooking, HotelBookingStatus } from "../types/booking";
+import type { MedicalRecord } from "../types/medicalRecord";
 import type { Notification } from "../types/notification";
 import type { Owner } from "../types/owner";
 import type { Pet } from "../types/pet";
@@ -11,14 +12,16 @@ type AppStoreProviderProps = { children: ReactNode };
 
 type CreateHotelBookingInput = { petId: string; checkIn: string; checkOut: string; roomType: HotelBooking["roomType"]; serviceKeys: HotelBooking["serviceKeys"]; ownerNote?: string };
 type CreateAppointmentInput = { petId: string; type: AppointmentType; serviceName: string; date: string; time: string; doctorId?: string; ownerNote?: string };
+type CreateMedicalRecordInput = Omit<MedicalRecord, "id" | "ownerId" | "createdAt" | "updatedAt">;
 
-type AppState = { currentOwnerId: string; owners: Owner[]; pets: Pet[]; appointments: Appointment[]; hotelBookings: HotelBooking[]; notifications: Notification[] };
+type AppState = { currentOwnerId: string; owners: Owner[]; pets: Pet[]; appointments: Appointment[]; medicalRecords: MedicalRecord[]; hotelBookings: HotelBooking[]; notifications: Notification[] };
 
 type AppAction =
   | { type: "CREATE_HOTEL_BOOKING"; payload: CreateHotelBookingInput }
   | { type: "UPDATE_HOTEL_BOOKING_STATUS"; payload: { bookingId: string; status: HotelBookingStatus; internalNote?: string } }
   | { type: "CREATE_APPOINTMENT"; payload: CreateAppointmentInput }
   | { type: "UPDATE_APPOINTMENT_STATUS"; payload: { appointmentId: string; status: AppointmentStatus; internalNote?: string } }
+  | { type: "CREATE_MEDICAL_RECORD"; payload: CreateMedicalRecordInput }
   | { type: "MARK_NOTIFICATION_READ"; payload: { notificationId: string } }
   | { type: "MARK_ALL_NOTIFICATIONS_READ" };
 
@@ -29,6 +32,7 @@ type AppStoreValue = AppState & {
   updateHotelBookingStatus: (bookingId: string, status: HotelBookingStatus, internalNote?: string) => void;
   createAppointment: (input: CreateAppointmentInput) => void;
   updateAppointmentStatus: (appointmentId: string, status: AppointmentStatus, internalNote?: string) => void;
+  createMedicalRecord: (input: CreateMedicalRecordInput) => void;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
 };
@@ -47,6 +51,10 @@ const initialState: AppState = {
   appointments: [
     { id: "appointment_1", petId: "pet_mochi", ownerId: "owner_1", doctorId: "doctor_mai", type: "general_checkup", serviceName: "Khám tổng quát", clinicName: "Bệnh viện Thú y Mỹ Đình", date: "2026-11-02", time: "09:00", status: "confirmed", createdBy: "owner", createdAt: now, updatedAt: now },
     { id: "appointment_2", petId: "pet_yuki", ownerId: "owner_1", doctorId: "doctor_sato", type: "vaccination", serviceName: "Tiêm phòng", clinicName: "Bệnh viện Thú y Mỹ Đình", date: "2026-11-03", time: "10:30", status: "pending", ownerNote: "Ưu tiên buổi sáng.", createdBy: "owner", createdAt: now, updatedAt: now },
+  ],
+  medicalRecords: [
+    { id: "record_1", petId: "pet_mochi", ownerId: "owner_1", appointmentId: "appointment_1", doctorName: "Bs. Mai Nguyễn", visitDate: "2026-10-28", title: "Annual Checkup & Vaccination", symptoms: "Khám định kỳ, không có triệu chứng bất thường.", diagnosis: "Sức khỏe ổn định, cân nặng phù hợp giống Shiba Inu.", treatment: "Tiêm vaccine nhắc lại và tư vấn dinh dưỡng.", medications: "Vitamin tổng hợp 7 ngày", vaccineName: "DHPPi + Lepto", followUpDate: "2027-04-28", weightKg: 8.4, temperatureC: 38.2, heartRateBpm: 92, createdAt: now, updatedAt: now },
+    { id: "record_2", petId: "pet_yuki", ownerId: "owner_1", doctorName: "Dr. Kenji Sato", visitDate: "2026-10-14", title: "Dermatology Consult", symptoms: "Ngứa nhẹ sau khi đổi thức ăn.", diagnosis: "Nghi dị ứng protein bò.", treatment: "Ngưng thức ăn chứa bò, theo dõi da trong 14 ngày.", medications: "Sữa tắm dịu nhẹ 2 lần/tuần", followUpDate: "2026-11-14", weightKg: 7.2, temperatureC: 38.4, heartRateBpm: 96, createdAt: now, updatedAt: now },
   ],
   hotelBookings: [
     { id: "booking_1", petId: "pet_yuki", ownerId: "owner_1", checkIn: "2026-11-10", checkOut: "2026-11-13", nights: 3, roomType: "deluxe", serviceKeys: ["special_diet"], totalAmount: 20100, status: "pending", ownerNote: "Yuki cần chế độ ăn ít muối.", dailyCareNoteIds: [], createdAt: now, updatedAt: now },
@@ -75,11 +83,24 @@ function bookingNotification(booking: HotelBooking, status: HotelBookingStatus):
   return null;
 }
 
+function medicalRecordNotification(record: MedicalRecord): Notification {
+  const createdAt = new Date().toISOString();
+  return { id: createId("noti"), recipientOwnerId: record.ownerId, type: "medical_record_updated", title: "Hồ sơ y tế mới đã được cập nhật", message: `Bác sĩ đã cập nhật hồ sơ ${record.title} ngày ${record.visitDate}. Bạn có thể xem chi tiết trong mục Medical Records.`, status: "sent", relatedAppointmentId: record.appointmentId, relatedPetId: record.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
+}
+
 function normalizeState(state: AppState): AppState {
-  return { ...initialState, ...state, appointments: state.appointments ?? initialState.appointments, hotelBookings: state.hotelBookings ?? initialState.hotelBookings, notifications: state.notifications ?? initialState.notifications };
+  return { ...initialState, ...state, appointments: state.appointments ?? initialState.appointments, medicalRecords: state.medicalRecords ?? initialState.medicalRecords, hotelBookings: state.hotelBookings ?? initialState.hotelBookings, notifications: state.notifications ?? initialState.notifications };
 }
 
 function appStoreReducer(state: AppState, action: AppAction): AppState {
+  if (action.type === "CREATE_MEDICAL_RECORD") {
+    const pet = state.pets.find((item) => item.id === action.payload.petId);
+    const createdAt = new Date().toISOString();
+    const record: MedicalRecord = { ...action.payload, id: createId("record"), ownerId: pet?.ownerId ?? state.currentOwnerId, createdAt, updatedAt: createdAt };
+    const updatedAppointments = record.appointmentId ? state.appointments.map((appointment) => appointment.id === record.appointmentId ? { ...appointment, status: "completed" as const, updatedAt: createdAt } : appointment) : state.appointments;
+    return { ...state, appointments: updatedAppointments, medicalRecords: [record, ...state.medicalRecords], notifications: [medicalRecordNotification(record), ...state.notifications] };
+  }
+
   if (action.type === "CREATE_APPOINTMENT") {
     const pet = state.pets.find((item) => item.id === action.payload.petId);
     const createdAt = new Date().toISOString();
@@ -126,7 +147,7 @@ export function AppStoreProvider({ children }: AppStoreProviderProps) {
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }, [state]);
   const value = useMemo<AppStoreValue>(() => {
     const currentOwner = state.owners.find((owner) => owner.id === state.currentOwnerId) ?? state.owners[0];
-    return { ...state, currentOwner, ownerPets: state.pets.filter((pet) => pet.ownerId === state.currentOwnerId), createHotelBooking: (input) => dispatch({ type: "CREATE_HOTEL_BOOKING", payload: input }), updateHotelBookingStatus: (bookingId, status, internalNote) => dispatch({ type: "UPDATE_HOTEL_BOOKING_STATUS", payload: { bookingId, status, internalNote } }), createAppointment: (input) => dispatch({ type: "CREATE_APPOINTMENT", payload: input }), updateAppointmentStatus: (appointmentId, status, internalNote) => dispatch({ type: "UPDATE_APPOINTMENT_STATUS", payload: { appointmentId, status, internalNote } }), markNotificationRead: (notificationId) => dispatch({ type: "MARK_NOTIFICATION_READ", payload: { notificationId } }), markAllNotificationsRead: () => dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ" }) };
+    return { ...state, currentOwner, ownerPets: state.pets.filter((pet) => pet.ownerId === state.currentOwnerId), createHotelBooking: (input) => dispatch({ type: "CREATE_HOTEL_BOOKING", payload: input }), updateHotelBookingStatus: (bookingId, status, internalNote) => dispatch({ type: "UPDATE_HOTEL_BOOKING_STATUS", payload: { bookingId, status, internalNote } }), createAppointment: (input) => dispatch({ type: "CREATE_APPOINTMENT", payload: input }), updateAppointmentStatus: (appointmentId, status, internalNote) => dispatch({ type: "UPDATE_APPOINTMENT_STATUS", payload: { appointmentId, status, internalNote } }), createMedicalRecord: (input) => dispatch({ type: "CREATE_MEDICAL_RECORD", payload: input }), markNotificationRead: (notificationId) => dispatch({ type: "MARK_NOTIFICATION_READ", payload: { notificationId } }), markAllNotificationsRead: () => dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ" }) };
   }, [state]);
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
 }
