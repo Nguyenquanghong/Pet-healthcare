@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
+﻿import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
+import type { Appointment, AppointmentStatus, AppointmentType } from "../types/appointment";
 import type { HotelBooking, HotelBookingStatus } from "../types/booking";
 import type { Notification } from "../types/notification";
 import type { Owner } from "../types/owner";
@@ -6,30 +7,18 @@ import type { Pet } from "../types/pet";
 import { calculateBookingTotal, calculateNights } from "../utils/bookingCalculator";
 import { createId } from "../utils/id";
 
-type AppStoreProviderProps = {
-  children: ReactNode;
-};
+type AppStoreProviderProps = { children: ReactNode };
 
-type CreateHotelBookingInput = {
-  petId: string;
-  checkIn: string;
-  checkOut: string;
-  roomType: HotelBooking["roomType"];
-  serviceKeys: HotelBooking["serviceKeys"];
-  ownerNote?: string;
-};
+type CreateHotelBookingInput = { petId: string; checkIn: string; checkOut: string; roomType: HotelBooking["roomType"]; serviceKeys: HotelBooking["serviceKeys"]; ownerNote?: string };
+type CreateAppointmentInput = { petId: string; type: AppointmentType; serviceName: string; date: string; time: string; doctorId?: string; ownerNote?: string };
 
-type AppState = {
-  currentOwnerId: string;
-  owners: Owner[];
-  pets: Pet[];
-  hotelBookings: HotelBooking[];
-  notifications: Notification[];
-};
+type AppState = { currentOwnerId: string; owners: Owner[]; pets: Pet[]; appointments: Appointment[]; hotelBookings: HotelBooking[]; notifications: Notification[] };
 
 type AppAction =
   | { type: "CREATE_HOTEL_BOOKING"; payload: CreateHotelBookingInput }
   | { type: "UPDATE_HOTEL_BOOKING_STATUS"; payload: { bookingId: string; status: HotelBookingStatus; internalNote?: string } }
+  | { type: "CREATE_APPOINTMENT"; payload: CreateAppointmentInput }
+  | { type: "UPDATE_APPOINTMENT_STATUS"; payload: { appointmentId: string; status: AppointmentStatus; internalNote?: string } }
   | { type: "MARK_NOTIFICATION_READ"; payload: { notificationId: string } }
   | { type: "MARK_ALL_NOTIFICATIONS_READ" };
 
@@ -38,6 +27,8 @@ type AppStoreValue = AppState & {
   ownerPets: Pet[];
   createHotelBooking: (input: CreateHotelBookingInput) => void;
   updateHotelBookingStatus: (bookingId: string, status: HotelBookingStatus, internalNote?: string) => void;
+  createAppointment: (input: CreateAppointmentInput) => void;
+  updateAppointmentStatus: (appointmentId: string, status: AppointmentStatus, internalNote?: string) => void;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
 };
@@ -53,25 +44,55 @@ const initialState: AppState = {
     { id: "pet_yuki", ownerId: "owner_1", name: "Yuki", species: "dog", breed: "Shiba Inu", gender: "female", ageLabel: "1 tuổi", weightKg: 7.2, microchipId: "JP-2026-YUKI", healthStatus: "stable", allergies: ["Thịt bò"] },
     { id: "pet_sashimi", ownerId: "owner_2", name: "Sashimi", species: "cat", breed: "Scottish Fold", gender: "female", ageLabel: "1 tuổi", weightKg: 4.1, healthStatus: "vaccination_due" },
   ],
+  appointments: [
+    { id: "appointment_1", petId: "pet_mochi", ownerId: "owner_1", doctorId: "doctor_mai", type: "general_checkup", serviceName: "Khám tổng quát", clinicName: "Bệnh viện Thú y Mỹ Đình", date: "2026-11-02", time: "09:00", status: "confirmed", createdBy: "owner", createdAt: now, updatedAt: now },
+    { id: "appointment_2", petId: "pet_yuki", ownerId: "owner_1", doctorId: "doctor_sato", type: "vaccination", serviceName: "Tiêm phòng", clinicName: "Bệnh viện Thú y Mỹ Đình", date: "2026-11-03", time: "10:30", status: "pending", ownerNote: "Ưu tiên buổi sáng.", createdBy: "owner", createdAt: now, updatedAt: now },
+  ],
   hotelBookings: [
     { id: "booking_1", petId: "pet_yuki", ownerId: "owner_1", checkIn: "2026-11-10", checkOut: "2026-11-13", nights: 3, roomType: "deluxe", serviceKeys: ["special_diet"], totalAmount: 20100, status: "pending", ownerNote: "Yuki cần chế độ ăn ít muối.", dailyCareNoteIds: [], createdAt: now, updatedAt: now },
     { id: "booking_2", petId: "pet_mochi", ownerId: "owner_1", checkIn: "2026-11-18", checkOut: "2026-11-20", nights: 2, roomType: "standard", serviceKeys: ["daily_walk"], totalAmount: 7600, status: "confirmed", dailyCareNoteIds: [], createdAt: now, updatedAt: now },
   ],
   notifications: [
-    { id: "noti_1", recipientOwnerId: "owner_1", type: "appointment_reminder", title: "Nhắc lịch khám", message: "Mochi có lịch khám vào 09:00 ngày mai tại Bệnh viện Thú y Mỹ Đình.", status: "sent", relatedPetId: "pet_mochi", createdAt: now, sentAt: now },
-    { id: "noti_2", recipientOwnerId: "owner_1", type: "vaccination_reminder", title: "Nhắc tiêm phòng", message: "Sashimi cần tiêm phòng nhắc lại trong tuần này.", status: "sent", relatedPetId: "pet_sashimi", createdAt: now, sentAt: now },
+    { id: "noti_1", recipientOwnerId: "owner_1", type: "appointment_reminder", title: "Nhắc lịch khám", message: "Mochi có lịch khám vào 09:00 ngày mai tại Bệnh viện Thú y Mỹ Đình.", status: "sent", relatedPetId: "pet_mochi", relatedAppointmentId: "appointment_1", createdAt: now, sentAt: now },
+    { id: "noti_2", recipientOwnerId: "owner_1", type: "vaccination_reminder", title: "Nhắc tiêm phòng", message: "Yuki cần tiêm phòng nhắc lại trong tuần này.", status: "sent", relatedPetId: "pet_yuki", createdAt: now, sentAt: now },
   ],
 };
 
 const AppStoreContext = createContext<AppStoreValue | null>(null);
 
-function createBookingNotification(booking: HotelBooking, status: HotelBookingStatus): Notification | null {
-  if (status === "confirmed") return { id: createId("noti"), recipientOwnerId: booking.ownerId, type: "hotel_booking_confirmed", title: "Hotel booking đã được xác nhận", message: `Yêu cầu lưu trú từ ${booking.checkIn} đến ${booking.checkOut} đã được bệnh viện xác nhận.`, status: "sent", relatedBookingId: booking.id, relatedPetId: booking.petId, sentByStaffId: "staff_admin", createdAt: new Date().toISOString(), sentAt: new Date().toISOString() };
-  if (status === "rejected") return { id: createId("noti"), recipientOwnerId: booking.ownerId, type: "general", title: "Hotel booking bị từ chối", message: `Yêu cầu lưu trú từ ${booking.checkIn} đến ${booking.checkOut} chưa thể xác nhận. Vui lòng chọn ngày/phòng khác.`, status: "sent", relatedBookingId: booking.id, relatedPetId: booking.petId, sentByStaffId: "staff_admin", createdAt: new Date().toISOString(), sentAt: new Date().toISOString() };
+function appointmentNotification(appointment: Appointment, status: AppointmentStatus): Notification | null {
+  const createdAt = new Date().toISOString();
+  if (status === "confirmed") return { id: createId("noti"), recipientOwnerId: appointment.ownerId, type: "appointment_confirmed", title: "Lịch khám đã được xác nhận", message: `Lịch ${appointment.serviceName} lúc ${appointment.time} ngày ${appointment.date} đã được xác nhận.`, status: "sent", relatedAppointmentId: appointment.id, relatedPetId: appointment.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
+  if (status === "cancelled") return { id: createId("noti"), recipientOwnerId: appointment.ownerId, type: "appointment_cancelled", title: "Lịch khám đã bị hủy", message: `Lịch ${appointment.serviceName} ngày ${appointment.date} chưa thể thực hiện. Vui lòng chọn thời gian khác.`, status: "sent", relatedAppointmentId: appointment.id, relatedPetId: appointment.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
+  if (status === "completed") return { id: createId("noti"), recipientOwnerId: appointment.ownerId, type: "medical_record_updated", title: "Lịch khám đã hoàn thành", message: `Lịch khám ${appointment.serviceName} đã hoàn thành. Hồ sơ y tế sẽ được cập nhật.`, status: "sent", relatedAppointmentId: appointment.id, relatedPetId: appointment.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
   return null;
 }
 
+function bookingNotification(booking: HotelBooking, status: HotelBookingStatus): Notification | null {
+  const createdAt = new Date().toISOString();
+  if (status === "confirmed") return { id: createId("noti"), recipientOwnerId: booking.ownerId, type: "hotel_booking_confirmed", title: "Hotel booking đã được xác nhận", message: `Yêu cầu lưu trú từ ${booking.checkIn} đến ${booking.checkOut} đã được bệnh viện xác nhận.`, status: "sent", relatedBookingId: booking.id, relatedPetId: booking.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
+  if (status === "rejected") return { id: createId("noti"), recipientOwnerId: booking.ownerId, type: "general", title: "Hotel booking bị từ chối", message: `Yêu cầu lưu trú từ ${booking.checkIn} đến ${booking.checkOut} chưa thể xác nhận. Vui lòng chọn ngày/phòng khác.`, status: "sent", relatedBookingId: booking.id, relatedPetId: booking.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
+  return null;
+}
+
+function normalizeState(state: AppState): AppState {
+  return { ...initialState, ...state, appointments: state.appointments ?? initialState.appointments, hotelBookings: state.hotelBookings ?? initialState.hotelBookings, notifications: state.notifications ?? initialState.notifications };
+}
+
 function appStoreReducer(state: AppState, action: AppAction): AppState {
+  if (action.type === "CREATE_APPOINTMENT") {
+    const pet = state.pets.find((item) => item.id === action.payload.petId);
+    const createdAt = new Date().toISOString();
+    const appointment: Appointment = { id: createId("appointment"), petId: action.payload.petId, ownerId: pet?.ownerId ?? state.currentOwnerId, doctorId: action.payload.doctorId, type: action.payload.type, serviceName: action.payload.serviceName, clinicName: "Bệnh viện Thú y Mỹ Đình", date: action.payload.date, time: action.payload.time, status: "pending", ownerNote: action.payload.ownerNote, createdBy: "owner", createdAt, updatedAt: createdAt };
+    const notification: Notification = { id: createId("noti"), recipientOwnerId: appointment.ownerId, type: "appointment_reminder", title: "Đã gửi yêu cầu đặt lịch", message: `Lịch ${appointment.serviceName} lúc ${appointment.time} ngày ${appointment.date} đang chờ xác nhận.`, status: "sent", relatedAppointmentId: appointment.id, relatedPetId: appointment.petId, createdAt, sentAt: createdAt };
+    return { ...state, appointments: [appointment, ...state.appointments], notifications: [notification, ...state.notifications] };
+  }
+  if (action.type === "UPDATE_APPOINTMENT_STATUS") {
+    let changed: Appointment | undefined;
+    const appointments = state.appointments.map((item) => item.id === action.payload.appointmentId ? (changed = { ...item, status: action.payload.status, internalNote: action.payload.internalNote, updatedAt: new Date().toISOString() }) : item);
+    const notification = changed ? appointmentNotification(changed, action.payload.status) : null;
+    return { ...state, appointments, notifications: notification ? [notification, ...state.notifications] : state.notifications };
+  }
   if (action.type === "CREATE_HOTEL_BOOKING") {
     const pet = state.pets.find((item) => item.id === action.payload.petId);
     const nights = Math.max(calculateNights(action.payload.checkIn, action.payload.checkOut), 1);
@@ -80,18 +101,12 @@ function appStoreReducer(state: AppState, action: AppAction): AppState {
     const notification: Notification = { id: createId("noti"), recipientOwnerId: booking.ownerId, type: "hotel_booking_created", title: "Đã gửi yêu cầu hotel booking", message: `Yêu cầu lưu trú ${nights} đêm đang chờ bệnh viện xác nhận.`, status: "sent", relatedBookingId: booking.id, relatedPetId: booking.petId, createdAt, sentAt: createdAt };
     return { ...state, hotelBookings: [booking, ...state.hotelBookings], notifications: [notification, ...state.notifications] };
   }
-
   if (action.type === "UPDATE_HOTEL_BOOKING_STATUS") {
-    let changedBooking: HotelBooking | undefined;
-    const hotelBookings = state.hotelBookings.map((booking) => {
-      if (booking.id !== action.payload.bookingId) return booking;
-      changedBooking = { ...booking, status: action.payload.status, internalNote: action.payload.internalNote, updatedAt: new Date().toISOString() };
-      return changedBooking;
-    });
-    const notification = changedBooking ? createBookingNotification(changedBooking, action.payload.status) : null;
+    let changed: HotelBooking | undefined;
+    const hotelBookings = state.hotelBookings.map((item) => item.id === action.payload.bookingId ? (changed = { ...item, status: action.payload.status, internalNote: action.payload.internalNote, updatedAt: new Date().toISOString() }) : item);
+    const notification = changed ? bookingNotification(changed, action.payload.status) : null;
     return { ...state, hotelBookings, notifications: notification ? [notification, ...state.notifications] : state.notifications };
   }
-
   if (action.type === "MARK_NOTIFICATION_READ") return { ...state, notifications: state.notifications.map((item) => item.id === action.payload.notificationId ? { ...item, status: "read" } : item) };
   if (action.type === "MARK_ALL_NOTIFICATIONS_READ") return { ...state, notifications: state.notifications.map((item) => item.recipientOwnerId === state.currentOwnerId ? { ...item, status: "read" } : item) };
   return state;
@@ -100,7 +115,7 @@ function appStoreReducer(state: AppState, action: AppAction): AppState {
 function loadInitialState() {
   try {
     const persisted = localStorage.getItem(STORAGE_KEY);
-    return persisted ? JSON.parse(persisted) as AppState : initialState;
+    return persisted ? normalizeState(JSON.parse(persisted) as AppState) : initialState;
   } catch {
     return initialState;
   }
@@ -108,24 +123,11 @@ function loadInitialState() {
 
 export function AppStoreProvider({ children }: AppStoreProviderProps) {
   const [state, dispatch] = useReducer(appStoreReducer, undefined, loadInitialState);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
-
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }, [state]);
   const value = useMemo<AppStoreValue>(() => {
     const currentOwner = state.owners.find((owner) => owner.id === state.currentOwnerId) ?? state.owners[0];
-    return {
-      ...state,
-      currentOwner,
-      ownerPets: state.pets.filter((pet) => pet.ownerId === state.currentOwnerId),
-      createHotelBooking: (input) => dispatch({ type: "CREATE_HOTEL_BOOKING", payload: input }),
-      updateHotelBookingStatus: (bookingId, status, internalNote) => dispatch({ type: "UPDATE_HOTEL_BOOKING_STATUS", payload: { bookingId, status, internalNote } }),
-      markNotificationRead: (notificationId) => dispatch({ type: "MARK_NOTIFICATION_READ", payload: { notificationId } }),
-      markAllNotificationsRead: () => dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ" }),
-    };
+    return { ...state, currentOwner, ownerPets: state.pets.filter((pet) => pet.ownerId === state.currentOwnerId), createHotelBooking: (input) => dispatch({ type: "CREATE_HOTEL_BOOKING", payload: input }), updateHotelBookingStatus: (bookingId, status, internalNote) => dispatch({ type: "UPDATE_HOTEL_BOOKING_STATUS", payload: { bookingId, status, internalNote } }), createAppointment: (input) => dispatch({ type: "CREATE_APPOINTMENT", payload: input }), updateAppointmentStatus: (appointmentId, status, internalNote) => dispatch({ type: "UPDATE_APPOINTMENT_STATUS", payload: { appointmentId, status, internalNote } }), markNotificationRead: (notificationId) => dispatch({ type: "MARK_NOTIFICATION_READ", payload: { notificationId } }), markAllNotificationsRead: () => dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ" }) };
   }, [state]);
-
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
 }
 
