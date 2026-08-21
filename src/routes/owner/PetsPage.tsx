@@ -1,0 +1,8 @@
+import { AppLayout } from "../../components/layout/AppLayout";
+import { RecordList } from "../../components/shared/RecordList";
+import { Card } from "../../components/ui/Card";
+import { StatusBadge } from "../../components/ui/StatusBadge";
+
+export function PetsPage() {
+  return <AppLayout type="owner" title="Hồ sơ thú cưng thông minh"><div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]"><Card><div className="grid gap-6 md:grid-cols-[180px_1fr]"><div className="grid h-44 place-items-center rounded-3xl bg-gradient-to-br from-amber-100 to-cyan-100 text-6xl">🐕</div><div><p className="text-sm text-slate-500">Microchip ID: JP-2026-MAX-8842</p><h2 className="mt-2 text-4xl font-black">Maximus</h2><p className="text-slate-600">Golden Retriever · Male · 4 Years</p><div className="mt-5 flex flex-wrap gap-2"><StatusBadge>Ổn định</StatusBadge><StatusBadge>Đã triệt sản</StatusBadge></div></div></div></Card><Card title="Smart QR Token"><div className="mx-auto grid h-40 w-40 place-items-center rounded-2xl border-8 border-slate-900 bg-white text-4xl">QR</div><p className="mt-4 text-center text-sm text-slate-500">Public mode cho thông tin khẩn cấp.</p></Card><Card title="Digital Health Record"><RecordList /></Card><Card title="Cloud Imaging"><div className="grid grid-cols-2 gap-3"><div className="h-28 rounded-xl bg-slate-100" /><div className="h-28 rounded-xl bg-slate-100" /></div></Card></div></AppLayout>;
+}
