@@ -6,7 +6,7 @@ import { useAppStore } from "../../../store/AppStoreProvider";
 export function AdminSidebar() {
   const navigate = useNavigate();
   const { logout, notifications } = useAppStore();
-  const unreadCount = notifications.filter(n => n.status === "sent").length;
+  const unreadCount = notifications.filter((n) => n.recipientRole === "admin" && n.status === "sent").length;
 
   const handleLogout = () => {
     logout();
@@ -23,15 +23,6 @@ export function AdminSidebar() {
           <div>
             <div className="text-base font-extrabold tracking-wide">NIPPON PET CARE</div>
             <div className="text-xs text-slate-400">Hospital Admin</div>
-          </div>
-        </div>
-        <div className="mt-5 flex items-center gap-3 rounded-xl bg-white/5 p-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/30 text-sm font-bold text-aqua">
-            BS
-          </div>
-          <div>
-            <p className="text-sm font-semibold">Bs. Mai Nguyễn</p>
-            <p className="text-xs text-slate-400">Bác sĩ thú y</p>
           </div>
         </div>
       </div>
@@ -66,7 +57,17 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <div className="mt-auto">
+      {/* Bottom: Staff profile + Logout */}
+      <div className="mt-auto space-y-2">
+        <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3 ring-1 ring-white/5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/30 text-sm font-bold text-aqua">
+            BS
+          </div>
+          <div>
+            <p className="text-sm font-semibold">Bs. Mai Nguyễn</p>
+            <p className="text-xs text-slate-400">Bác sĩ thú y</p>
+          </div>
+        </div>
         <button
           type="button"
           onClick={handleLogout}

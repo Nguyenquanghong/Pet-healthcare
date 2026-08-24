@@ -26,7 +26,7 @@ export function AdminDashboardPage() {
   const todayAppointments = appointments.filter(a => a.date === today || a.status === "confirmed" || a.status === "pending");
   const pendingAppointments = appointments.filter(a => a.status === "pending");
   const pendingBookings = hotelBookings.filter(b => b.status === "pending");
-  const checkedInBookings = hotelBookings.filter(b => b.status === "checked_in");
+  const checkedInBookings = hotelBookings.filter(b => b.status === "in_stay");
   const unreadNotifications = notifications.filter(n => n.status === "sent").length;
 
   return (

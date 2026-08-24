@@ -8,7 +8,7 @@ interface AdminTopbarProps {
 
 export function AdminTopbar({ title }: AdminTopbarProps) {
   const { notifications } = useAppStore();
-  const unreadCount = notifications.filter(n => n.status === "sent").length;
+  const unreadCount = notifications.filter((n) => n.recipientRole === "admin" && n.status === "sent").length;
 
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200 bg-white/90 px-5 py-4 backdrop-blur lg:px-8">
@@ -23,14 +23,18 @@ export function AdminTopbar({ title }: AdminTopbarProps) {
         <div className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-500 md:flex">
           <Search size={16} />
           <input
+            id="admin-topbar-search"
             type="text"
             placeholder="Tìm kiếm..."
+            aria-label="Tìm kiếm quản trị"
             className="bg-transparent outline-none text-sm w-40 lg:w-56"
           />
         </div>
 
         <NavLink
+          id="admin-topbar-bell"
           to="/admin/notifications"
+          aria-label="Thông báo quản trị"
           className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-colors"
         >
           <Bell size={18} />

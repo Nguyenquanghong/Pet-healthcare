@@ -1,5 +1,5 @@
 export type HotelRoomType = "standard" | "deluxe";
-export type HotelBookingStatus = "pending" | "confirmed" | "rejected" | "checked_in" | "in_stay" | "checked_out" | "cancelled";
+export type HotelBookingStatus = "pending" | "confirmed" | "in_stay" | "checked_out" | "rejected" | "cancelled";
 export type HotelServiceKey = "grooming_spa" | "special_diet" | "video_call" | "daily_walk" | "medicine_support";
 
 export type HotelBooking = {

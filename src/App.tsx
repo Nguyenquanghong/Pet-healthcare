@@ -1,17 +1,18 @@
-﻿import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { Card } from "./components/ui/Card";
 import { useAppStore } from "./store/AppStoreProvider";
 import { AdminAppointmentsPage } from "./routes/admin/AdminAppointmentsPage";
+import { AdminAnalyticsPage } from "./routes/admin/AdminAnalyticsPage";
+import { AdminBillingPage } from "./routes/admin/AdminBillingPage";
 import { AdminDashboardPage } from "./routes/admin/AdminDashboardPage";
 import { AdminHotelBookingsPage } from "./routes/admin/AdminHotelBookingsPage";
 import { AdminMedicalRecordsPage } from "./routes/admin/AdminMedicalRecordsPage";
 import { AdminNotificationsPage } from "./routes/admin/AdminNotificationsPage";
 import { AdminPetsPage } from "./routes/admin/AdminPetsPage";
+import { AdminSettingsPage } from "./routes/admin/AdminSettingsPage";
 import { AdminLoginPage } from "./routes/auth/AdminLoginPage";
 import { LandingPage } from "./routes/auth/LandingPage";
 import { OwnerLoginPage } from "./routes/auth/OwnerLoginPage";
-import { AdminLayout } from "./components/layout/admin/AdminLayout";
 import { AppointmentsPage } from "./routes/owner/AppointmentsPage";
 import { DashboardPage } from "./routes/owner/DashboardPage";
 import { HotelBookingPage } from "./routes/owner/HotelBookingPage";
@@ -19,6 +20,7 @@ import { MedicalRecordsPage } from "./routes/owner/MedicalRecordsPage";
 import { NotificationsPage } from "./routes/owner/NotificationsPage";
 import { OwnerRegisterPage } from "./routes/owner/OwnerRegisterPage";
 import { PetsPage } from "./routes/owner/PetsPage";
+import { PetRescuePage } from "./routes/public/PetRescuePage";
 
 function OwnerOnly({ children }: { children: ReactNode }) {
   const { authRole } = useAppStore();
@@ -36,6 +38,8 @@ export function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<OwnerLoginPage />} />
       <Route path="/register" element={<OwnerRegisterPage />} />
+      <Route path="/rescue/:petId" element={<PetRescuePage />} />
+      <Route path="/pet/:petId" element={<Navigate to="/rescue/:petId" replace />} />
       <Route path="/owner" element={<Navigate to="/owner/dashboard" replace />} />
       <Route path="/owner/dashboard" element={<OwnerOnly><DashboardPage /></OwnerOnly>} />
       <Route path="/owner/pets" element={<OwnerOnly><PetsPage /></OwnerOnly>} />
@@ -51,7 +55,9 @@ export function App() {
       <Route path="/admin/medical-records" element={<AdminOnly><AdminMedicalRecordsPage /></AdminOnly>} />
       <Route path="/admin/hotel-bookings" element={<AdminOnly><AdminHotelBookingsPage /></AdminOnly>} />
       <Route path="/admin/notifications" element={<AdminOnly><AdminNotificationsPage /></AdminOnly>} />
-      <Route path="/admin/settings" element={<AdminOnly><AdminLayout title="Settings"><Card>Settings placeholder</Card></AdminLayout></AdminOnly>} />
+      <Route path="/admin/analytics" element={<AdminOnly><AdminAnalyticsPage /></AdminOnly>} />
+      <Route path="/admin/billing" element={<AdminOnly><AdminBillingPage /></AdminOnly>} />
+      <Route path="/admin/settings" element={<AdminOnly><AdminSettingsPage /></AdminOnly>} />
       <Route path="/pets" element={<Navigate to="/owner/pets" replace />} />
       <Route path="/medical-records" element={<Navigate to="/owner/medical-records" replace />} />
       <Route path="/appointments" element={<Navigate to="/owner/appointments" replace />} />

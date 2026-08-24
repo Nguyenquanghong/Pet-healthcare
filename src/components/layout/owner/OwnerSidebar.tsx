@@ -5,55 +5,95 @@ import { useAppStore } from "../../../store/AppStoreProvider";
 
 export function OwnerSidebar() {
   const navigate = useNavigate();
-  const { logout } = useAppStore();
+  const { logout, notifications, currentOwnerId, currentOwner } = useAppStore();
+  const unreadCount = notifications.filter(
+    (n) => n.recipientOwnerId === currentOwnerId && n.status === "sent"
+  ).length;
 
   const handleLogout = () => {
     logout();
     navigate("/", { replace: true });
   };
 
+  // Initials from owner full name
+  const initials = currentOwner?.fullName
+    ? currentOwner.fullName
+        .split(" ")
+        .slice(-2)
+        .map((w) => w[0])
+        .join("")
+        .toUpperCase()
+    : "ON";
+
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-primary px-4 py-3 text-white shadow-[0_18px_45px_rgba(0,63,112,0.18)] lg:px-8">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-3 xl:grid-cols-[280px_minmax(0,1fr)_140px] xl:items-center">
-        <div className="flex items-center justify-between gap-3 xl:justify-start">
-          <div>
-            <div className="text-lg font-extrabold leading-tight tracking-wide sm:text-xl">NIPPON PET CARE</div>
-            <div className="mt-0.5 text-[11px] font-medium text-cyan-100 sm:text-xs">Công Nghệ Nhật Bản</div>
+    <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col bg-primary p-5 text-white shadow-2xl lg:flex">
+      {/* Brand */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 font-extrabold text-white text-sm tracking-wide ring-1 ring-white/20">
+            NPC
           </div>
-          <div className="flex h-8 shrink-0 items-center rounded-full bg-white/12 px-4 text-[11px] font-bold text-cyan-50 ring-1 ring-white/10">Owner Portal</div>
+          <div>
+            <div className="text-base font-extrabold tracking-wide">NIPPON PET CARE</div>
+            <div className="text-xs text-cyan-200">Chủ thú cưng</div>
+          </div>
         </div>
 
-        <nav className="flex gap-2 overflow-x-auto pb-1 xl:justify-center xl:overflow-visible xl:pb-0">
-          {ownerNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/owner/dashboard"}
-                className={({ isActive }) =>
-                  `flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl px-3.5 text-[13px] font-bold transition xl:px-4 ${
-                    isActive
-                      ? "bg-aqua text-primary shadow-soft"
-                      : "text-white/82 hover:bg-white/10 hover:text-white"
-                  }`
-                }
-              >
-                <Icon size={18} />
-                <span className="whitespace-nowrap">{item.label}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
+      </div>
 
+      {/* Navigation */}
+      <nav className="flex-1 space-y-1">
+        {ownerNav.map((item) => {
+          const Icon = item.icon;
+          const isNotif = item.to === "/owner/notifications";
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/owner/dashboard"}
+              className={({ isActive }) =>
+                `flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
+                  isActive
+                    ? "bg-white/20 text-white shadow-soft ring-1 ring-white/20"
+                    : "text-cyan-100/80 hover:bg-white/10 hover:text-white"
+                }`
+              }
+            >
+              <span className="flex items-center gap-3">
+                <Icon size={18} />
+                {item.label}
+              </span>
+              {isNotif && unreadCount > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
+      </nav>
+
+      {/* Bottom: Owner profile + Logout */}
+      <div className="mt-auto space-y-2">
+        <div className="flex items-center gap-3 rounded-xl bg-white/10 p-3 ring-1 ring-white/10">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-aqua/30 text-sm font-bold text-aqua ring-1 ring-aqua/30">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{currentOwner?.fullName ?? "Chủ nuôi"}</p>
+            <p className="text-xs text-cyan-200">{currentOwner?.phone ?? ""}</p>
+          </div>
+        </div>
         <button
           type="button"
+          id="owner-sidebar-logout"
           onClick={handleLogout}
-          className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-white/12 px-4 text-[13px] font-bold transition hover:bg-white/20 xl:w-full"
+          aria-label="Đăng xuất tài khoản"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-center text-sm font-semibold text-cyan-100 ring-1 ring-white/10 transition hover:bg-white/20 hover:text-white"
         >
           <LogOut size={16} /> Đăng xuất
         </button>
       </div>
-    </header>
+    </aside>
   );
 }

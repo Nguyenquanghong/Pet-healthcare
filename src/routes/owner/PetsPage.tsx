@@ -296,7 +296,7 @@ export function PetsPage() {
           </div>
 
           <div className="space-y-6">
-            <SmartQrToken />
+            <SmartQrToken pet={selectedPet} />
             {selectedPet.notes && (
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Ghi chú chăm sóc</p>

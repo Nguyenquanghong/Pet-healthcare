@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import type { Appointment, AppointmentStatus, AppointmentType } from "../types/appointment";
-import type { HotelBooking, HotelBookingStatus } from "../types/booking";
+import type { DailyCareNote, HotelBooking, HotelBookingStatus } from "../types/booking";
 import type { MedicalRecord } from "../types/medicalRecord";
 import type { Notification } from "../types/notification";
 import type { Owner } from "../types/owner";
@@ -12,13 +12,33 @@ type AppStoreProviderProps = { children: ReactNode };
 
 type CreateHotelBookingInput = { petId: string; checkIn: string; checkOut: string; roomType: HotelBooking["roomType"]; serviceKeys: HotelBooking["serviceKeys"]; ownerNote?: string };
 type CreateAppointmentInput = { petId: string; type: AppointmentType; serviceName: string; date: string; time: string; doctorId?: string; ownerNote?: string };
+type RescheduleAppointmentInput = { date: string; time: string; ownerNote?: string };
 type CreateMedicalRecordInput = Omit<MedicalRecord, "id" | "ownerId" | "createdAt" | "updatedAt">;
+type UpdateMedicalRecordInput = Partial<Omit<MedicalRecord, "id" | "ownerId" | "createdAt">>;
 type RegisterOwnerInput = Omit<Owner, "id" | "petIds">;
 type CreatePetInput = Omit<Pet, "id" | "ownerId">;
 type UpdatePetInput = Partial<Omit<Pet, "id" | "ownerId">>;
 type AuthRole = "owner" | "admin" | null;
 
-type AppState = { authRole: AuthRole; currentOwnerId: string; owners: Owner[]; pets: Pet[]; appointments: Appointment[]; medicalRecords: MedicalRecord[]; hotelBookings: HotelBooking[]; notifications: Notification[] };
+type AddDailyCareNoteInput = {
+  bookingId: string;
+  note: string;
+  eatingStatus?: "good" | "normal" | "poor";
+  mood?: "happy" | "calm" | "anxious" | "tired";
+  visibleToOwner?: boolean;
+};
+
+type AppState = {
+  authRole: AuthRole;
+  currentOwnerId: string;
+  owners: Owner[];
+  pets: Pet[];
+  appointments: Appointment[];
+  medicalRecords: MedicalRecord[];
+  hotelBookings: HotelBooking[];
+  dailyCareNotes: DailyCareNote[];
+  notifications: Notification[];
+};
 
 type AppAction =
   | { type: "REGISTER_OWNER"; payload: RegisterOwnerInput }
@@ -29,16 +49,26 @@ type AppAction =
   | { type: "UPDATE_PET"; payload: { petId: string; input: UpdatePetInput } }
   | { type: "CREATE_HOTEL_BOOKING"; payload: CreateHotelBookingInput }
   | { type: "UPDATE_HOTEL_BOOKING_STATUS"; payload: { bookingId: string; status: HotelBookingStatus; internalNote?: string } }
-  | { type: "ADD_DAILY_CARE_NOTE"; payload: { bookingId: string; note: string } }
+  | { type: "UPDATE_HOTEL_BOOKING_INTERNAL_NOTE"; payload: { bookingId: string; internalNote: string } }
+  | { type: "CANCEL_HOTEL_BOOKING"; payload: { bookingId: string; ownerNote?: string } }
+  | { type: "ADD_DAILY_CARE_NOTE"; payload: AddDailyCareNoteInput }
   | { type: "CREATE_APPOINTMENT"; payload: CreateAppointmentInput }
+  | { type: "CANCEL_APPOINTMENT"; payload: { appointmentId: string; ownerNote?: string } }
+  | { type: "RESCHEDULE_APPOINTMENT"; payload: { appointmentId: string; input: RescheduleAppointmentInput } }
   | { type: "UPDATE_APPOINTMENT_STATUS"; payload: { appointmentId: string; status: AppointmentStatus; internalNote?: string } }
+  | { type: "UPDATE_APPOINTMENT_INTERNAL_NOTE"; payload: { appointmentId: string; internalNote: string } }
   | { type: "SEND_REMINDER"; payload: { appointmentId: string } }
   | { type: "CREATE_MEDICAL_RECORD"; payload: CreateMedicalRecordInput }
+  | { type: "UPDATE_MEDICAL_RECORD"; payload: { recordId: string; input: UpdateMedicalRecordInput } }
+  | { type: "DELETE_MEDICAL_RECORD"; payload: { recordId: string } }
   | { type: "MARK_NOTIFICATION_READ"; payload: { notificationId: string } }
   | { type: "MARK_ALL_NOTIFICATIONS_READ" }
-  | { type: "SEND_CUSTOM_NOTIFICATION"; payload: { recipientOwnerId: string; title: string; message: string } };
+  | { type: "DELETE_NOTIFICATION"; payload: { notificationId: string } }
+  | { type: "SEND_CUSTOM_NOTIFICATION"; payload: { recipientOwnerId: string; title: string; message: string } }
+  | { type: "RESET_STORE_DATA" };
 
 type AppStoreValue = AppState & {
+  isLoading: boolean;
   currentOwner: Owner;
   ownerPets: Pet[];
   loginOwner: (phone: string) => boolean;
@@ -49,14 +79,28 @@ type AppStoreValue = AppState & {
   updatePet: (petId: string, input: UpdatePetInput) => void;
   createHotelBooking: (input: CreateHotelBookingInput) => void;
   updateHotelBookingStatus: (bookingId: string, status: HotelBookingStatus, internalNote?: string) => void;
-  addDailyCareNote: (bookingId: string, note: string) => void;
+  updateHotelBookingInternalNote: (bookingId: string, internalNote: string) => void;
+  cancelHotelBooking: (bookingId: string, ownerNote?: string) => void;
+  addDailyCareNote: (
+    bookingId: string,
+    note: string,
+    eatingStatus?: "good" | "normal" | "poor",
+    mood?: "happy" | "calm" | "anxious" | "tired"
+  ) => void;
   createAppointment: (input: CreateAppointmentInput) => void;
+  cancelAppointment: (appointmentId: string, ownerNote?: string) => void;
+  rescheduleAppointment: (appointmentId: string, input: RescheduleAppointmentInput) => void;
   updateAppointmentStatus: (appointmentId: string, status: AppointmentStatus, internalNote?: string) => void;
+  updateAppointmentInternalNote: (appointmentId: string, internalNote: string) => void;
   sendReminder: (appointmentId: string) => void;
   createMedicalRecord: (input: CreateMedicalRecordInput) => void;
+  updateMedicalRecord: (recordId: string, input: UpdateMedicalRecordInput) => void;
+  deleteMedicalRecord: (recordId: string) => void;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
+  deleteNotification: (notificationId: string) => void;
   sendCustomNotification: (recipientOwnerId: string, title: string, message: string) => void;
+  resetStoreData: () => void;
 };
 
 const STORAGE_KEY = "niponeto_app_state";
@@ -81,11 +125,25 @@ const initialState: AppState = {
   ],
   hotelBookings: [
     { id: "booking_1", petId: "pet_yuki", ownerId: "owner_1", checkIn: "2026-11-10", checkOut: "2026-11-13", nights: 3, roomType: "deluxe", serviceKeys: ["special_diet"], totalAmount: 20100, status: "pending", ownerNote: "Yuki cần chế độ ăn ít muối.", dailyCareNoteIds: [], createdAt: now, updatedAt: now },
-    { id: "booking_2", petId: "pet_mochi", ownerId: "owner_1", checkIn: "2026-11-18", checkOut: "2026-11-20", nights: 2, roomType: "standard", serviceKeys: ["daily_walk"], totalAmount: 7600, status: "confirmed", dailyCareNoteIds: [], createdAt: now, updatedAt: now },
+    { id: "booking_2", petId: "pet_mochi", ownerId: "owner_1", checkIn: "2026-11-18", checkOut: "2026-11-20", nights: 2, roomType: "standard", serviceKeys: ["daily_walk"], totalAmount: 7600, status: "in_stay", dailyCareNoteIds: ["note_1"], createdAt: now, updatedAt: now },
+  ],
+  dailyCareNotes: [
+    {
+      id: "note_1",
+      bookingId: "booking_2",
+      date: "2026-11-19",
+      eatingStatus: "good",
+      mood: "happy",
+      note: "Bé Mochi hôm nay ăn ngon miệng, đi dạo 30 phút trong sân vườn và rất hợp tác.",
+      visibleToOwner: true,
+      createdByStaffId: "staff_admin",
+      createdAt: now,
+    },
   ],
   notifications: [
-    { id: "noti_1", recipientOwnerId: "owner_1", type: "appointment_reminder", title: "Nhắc lịch khám", message: "Mochi có lịch khám vào 09:00 ngày mai tại Bệnh viện Thú y Mỹ Đình.", status: "sent", relatedPetId: "pet_mochi", relatedAppointmentId: "appointment_1", createdAt: now, sentAt: now },
-    { id: "noti_2", recipientOwnerId: "owner_1", type: "vaccination_reminder", title: "Nhắc tiêm phòng", message: "Yuki cần tiêm phòng nhắc lại trong tuần này.", status: "sent", relatedPetId: "pet_yuki", createdAt: now, sentAt: now },
+    { id: "noti_1", recipientOwnerId: "owner_1", recipientRole: "owner", type: "appointment_reminder", title: "Nhắc lịch khám", message: "Mochi có lịch khám vào 09:00 ngày mai tại Bệnh viện Thú y Mỹ Đình.", status: "sent", actionUrl: "/owner/appointments", relatedPetId: "pet_mochi", relatedAppointmentId: "appointment_1", createdAt: now, sentAt: now },
+    { id: "noti_2", recipientOwnerId: "owner_1", recipientRole: "owner", type: "vaccination_reminder", title: "Nhắc tiêm phòng", message: "Yuki cần tiêm phòng nhắc lại trong tuần này.", status: "sent", actionUrl: "/owner/appointments", relatedPetId: "pet_yuki", createdAt: now, sentAt: now },
+    { id: "noti_3", recipientRole: "admin", type: "appointment_created", title: "Lịch khám mới", message: "Yuki (Chủ nuôi: Nguyễn Văn A) vừa đặt lịch tiêm phòng lúc 10:30 ngày 2026-11-03.", status: "sent", actionUrl: "/admin/appointments", relatedPetId: "pet_yuki", relatedAppointmentId: "appointment_2", createdAt: now, sentAt: now },
   ],
 };
 
@@ -93,39 +151,203 @@ const AppStoreContext = createContext<AppStoreValue | null>(null);
 
 function appointmentNotification(appointment: Appointment, status: AppointmentStatus): Notification | null {
   const createdAt = new Date().toISOString();
-  if (status === "confirmed") return { id: createId("noti"), recipientOwnerId: appointment.ownerId, type: "appointment_confirmed", title: "Lịch khám đã được xác nhận", message: `Lịch ${appointment.serviceName} lúc ${appointment.time} ngày ${appointment.date} đã được xác nhận.`, status: "sent", relatedAppointmentId: appointment.id, relatedPetId: appointment.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
-  if (status === "cancelled") return { id: createId("noti"), recipientOwnerId: appointment.ownerId, type: "appointment_cancelled", title: "Lịch khám đã bị hủy", message: `Lịch ${appointment.serviceName} ngày ${appointment.date} chưa thể thực hiện. Vui lòng chọn thời gian khác.`, status: "sent", relatedAppointmentId: appointment.id, relatedPetId: appointment.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
-  if (status === "completed") return { id: createId("noti"), recipientOwnerId: appointment.ownerId, type: "medical_record_updated", title: "Lịch khám đã hoàn thành", message: `Lịch khám ${appointment.serviceName} đã hoàn thành. Hồ sơ y tế sẽ được cập nhật.`, status: "sent", relatedAppointmentId: appointment.id, relatedPetId: appointment.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
+  if (status === "confirmed")
+    return {
+      id: createId("noti"),
+      recipientOwnerId: appointment.ownerId,
+      recipientRole: "owner",
+      type: "appointment_confirmed",
+      title: "Lịch khám đã được xác nhận",
+      message: `Lịch ${appointment.serviceName} lúc ${appointment.time} ngày ${appointment.date} đã được xác nhận.`,
+      status: "sent",
+      actionUrl: "/owner/appointments",
+      relatedAppointmentId: appointment.id,
+      relatedPetId: appointment.petId,
+      sentByStaffId: "staff_admin",
+      createdAt,
+      sentAt: createdAt,
+    };
+  if (status === "cancelled")
+    return {
+      id: createId("noti"),
+      recipientOwnerId: appointment.ownerId,
+      recipientRole: "owner",
+      type: "appointment_cancelled",
+      title: "Lịch khám đã bị hủy",
+      message: `Lịch ${appointment.serviceName} ngày ${appointment.date} đã được hủy.`,
+      status: "sent",
+      actionUrl: "/owner/appointments",
+      relatedAppointmentId: appointment.id,
+      relatedPetId: appointment.petId,
+      sentByStaffId: "staff_admin",
+      createdAt,
+      sentAt: createdAt,
+    };
+  if (status === "completed")
+    return {
+      id: createId("noti"),
+      recipientOwnerId: appointment.ownerId,
+      recipientRole: "owner",
+      type: "medical_record_updated",
+      title: "Lịch khám đã hoàn thành",
+      message: `Lịch khám ${appointment.serviceName} đã hoàn thành. Hồ sơ y tế sẽ được cập nhật.`,
+      status: "sent",
+      actionUrl: "/owner/medical-records",
+      relatedAppointmentId: appointment.id,
+      relatedPetId: appointment.petId,
+      sentByStaffId: "staff_admin",
+      createdAt,
+      sentAt: createdAt,
+    };
   return null;
 }
 
 function bookingNotification(booking: HotelBooking, status: HotelBookingStatus): Notification | null {
   const createdAt = new Date().toISOString();
-  if (status === "confirmed") return { id: createId("noti"), recipientOwnerId: booking.ownerId, type: "hotel_booking_confirmed", title: "Hotel booking đã được xác nhận", message: `Yêu cầu lưu trú từ ${booking.checkIn} đến ${booking.checkOut} đã được bệnh viện xác nhận.`, status: "sent", relatedBookingId: booking.id, relatedPetId: booking.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
-  if (status === "rejected") return { id: createId("noti"), recipientOwnerId: booking.ownerId, type: "general", title: "Hotel booking bị từ chối", message: `Yêu cầu lưu trú từ ${booking.checkIn} đến ${booking.checkOut} chưa thể xác nhận. Vui lòng chọn ngày/phòng khác.`, status: "sent", relatedBookingId: booking.id, relatedPetId: booking.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
+  if (status === "confirmed")
+    return {
+      id: createId("noti"),
+      recipientOwnerId: booking.ownerId,
+      recipientRole: "owner",
+      type: "hotel_booking_confirmed",
+      title: "Hotel booking đã được xác nhận",
+      message: `Yêu cầu lưu trú từ ${booking.checkIn} đến ${booking.checkOut} đã được bệnh viện xác nhận.`,
+      status: "sent",
+      actionUrl: "/owner/hotel-booking",
+      relatedBookingId: booking.id,
+      relatedPetId: booking.petId,
+      sentByStaffId: "staff_admin",
+      createdAt,
+      sentAt: createdAt,
+    };
+  if (status === "rejected")
+    return {
+      id: createId("noti"),
+      recipientOwnerId: booking.ownerId,
+      recipientRole: "owner",
+      type: "general",
+      title: "Hotel booking bị từ chối",
+      message: `Yêu cầu lưu trú từ ${booking.checkIn} đến ${booking.checkOut} chưa thể xác nhận. Vui lòng chọn ngày/phòng khác.`,
+      status: "sent",
+      actionUrl: "/owner/hotel-booking",
+      relatedBookingId: booking.id,
+      relatedPetId: booking.petId,
+      sentByStaffId: "staff_admin",
+      createdAt,
+      sentAt: createdAt,
+    };
+  if (status === "cancelled")
+    return {
+      id: createId("noti"),
+      recipientOwnerId: booking.ownerId,
+      recipientRole: "owner",
+      type: "hotel_booking_cancelled",
+      title: "Hotel booking đã hủy",
+      message: `Yêu cầu lưu trú từ ${booking.checkIn} đến ${booking.checkOut} đã được hủy.`,
+      status: "sent",
+      actionUrl: "/owner/hotel-booking",
+      relatedBookingId: booking.id,
+      relatedPetId: booking.petId,
+      sentByStaffId: "staff_admin",
+      createdAt,
+      sentAt: createdAt,
+    };
+  if (status === "in_stay")
+    return {
+      id: createId("noti"),
+      recipientOwnerId: booking.ownerId,
+      recipientRole: "owner",
+      type: "general",
+      title: "Thú cưng đã nhận phòng",
+      message: `Thú cưng đã check-in khách sạn thành công và đang được chăm sóc chu đáo.`,
+      status: "sent",
+      actionUrl: "/owner/hotel-booking",
+      relatedBookingId: booking.id,
+      relatedPetId: booking.petId,
+      sentByStaffId: "staff_admin",
+      createdAt,
+      sentAt: createdAt,
+    };
+  if (status === "checked_out")
+    return {
+      id: createId("noti"),
+      recipientOwnerId: booking.ownerId,
+      recipientRole: "owner",
+      type: "hotel_checked_out",
+      title: "Hoàn tất lưu trú khách sạn",
+      message: `Thú cưng đã hoàn tất kỳ lưu trú và được bàn giao cho chủ nuôi. Cảm ơn bạn đã tin tưởng dịch vụ!`,
+      status: "sent",
+      actionUrl: "/owner/hotel-booking",
+      relatedBookingId: booking.id,
+      relatedPetId: booking.petId,
+      sentByStaffId: "staff_admin",
+      createdAt,
+      sentAt: createdAt,
+    };
   return null;
 }
 
 function medicalRecordNotification(record: MedicalRecord): Notification {
   const createdAt = new Date().toISOString();
-  return { id: createId("noti"), recipientOwnerId: record.ownerId, type: "medical_record_updated", title: "Hồ sơ y tế mới đã được cập nhật", message: `Bác sĩ đã cập nhật hồ sơ ${record.title} ngày ${record.visitDate}. Bạn có thể xem chi tiết trong mục Medical Records.`, status: "sent", relatedAppointmentId: record.appointmentId, relatedPetId: record.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
+  return {
+    id: createId("noti"),
+    recipientOwnerId: record.ownerId,
+    recipientRole: "owner",
+    type: "medical_record_updated",
+    title: "Hồ sơ y tế mới đã được cập nhật",
+    message: `Bác sĩ đã cập nhật hồ sơ ${record.title} ngày ${record.visitDate}. Bạn có thể xem chi tiết trong mục Bệnh án.`,
+    status: "sent",
+    actionUrl: "/owner/medical-records",
+    relatedAppointmentId: record.appointmentId,
+    relatedPetId: record.petId,
+    sentByStaffId: "staff_admin",
+    createdAt,
+    sentAt: createdAt,
+  };
 }
 
 function normalizeState(state: AppState): AppState {
-  return { ...initialState, ...state, appointments: state.appointments ?? initialState.appointments, medicalRecords: state.medicalRecords ?? initialState.medicalRecords, hotelBookings: state.hotelBookings ?? initialState.hotelBookings, notifications: state.notifications ?? initialState.notifications };
+  const rawBookings = (state.hotelBookings ?? initialState.hotelBookings) as (HotelBooking | { status: string })[];
+  const normalizedBookings: HotelBooking[] = rawBookings.map((b) => {
+    let status: HotelBookingStatus = b.status as HotelBookingStatus;
+    if ((b.status as string) === "checked_in") status = "in_stay";
+    if ((b.status as string) === "completed") status = "checked_out";
+    return {
+      ...(b as HotelBooking),
+      status,
+      dailyCareNoteIds: (b as HotelBooking).dailyCareNoteIds ?? [],
+    };
+  });
+
+  return {
+    ...initialState,
+    ...state,
+    appointments: state.appointments ?? initialState.appointments,
+    medicalRecords: state.medicalRecords ?? initialState.medicalRecords,
+    hotelBookings: normalizedBookings,
+    dailyCareNotes: state.dailyCareNotes ?? initialState.dailyCareNotes ?? [],
+    notifications: state.notifications ?? initialState.notifications,
+  };
 }
 
 function appStoreReducer(state: AppState, action: AppAction): AppState {
+  if (action.type === "RESET_STORE_DATA") {
+    localStorage.removeItem(STORAGE_KEY);
+    return initialState;
+  }
+
   if (action.type === "REGISTER_OWNER") {
     const owner: Owner = { id: createId("owner"), ...action.payload, petIds: [] };
     const createdAt = new Date().toISOString();
     const notification: Notification = {
       id: createId("noti"),
       recipientOwnerId: owner.id,
+      recipientRole: "owner",
       type: "general",
       title: "Chào mừng đến với Nippon Pet Care",
       message: "Tài khoản chủ nuôi của bạn đã được tạo. Bạn có thể cập nhật hồ sơ thú cưng và đặt lịch dịch vụ ngay bây giờ.",
       status: "sent",
+      actionUrl: "/owner/dashboard",
       createdAt,
       sentAt: createdAt,
     };
@@ -164,63 +386,447 @@ function appStoreReducer(state: AppState, action: AppAction): AppState {
     const pet = state.pets.find((item) => item.id === action.payload.petId);
     const createdAt = new Date().toISOString();
     const record: MedicalRecord = { ...action.payload, id: createId("record"), ownerId: pet?.ownerId ?? state.currentOwnerId, createdAt, updatedAt: createdAt };
-    const updatedAppointments = record.appointmentId ? state.appointments.map((appointment) => appointment.id === record.appointmentId ? { ...appointment, status: "completed" as const, updatedAt: createdAt } : appointment) : state.appointments;
+    const updatedAppointments = record.appointmentId
+      ? state.appointments.map((appointment) =>
+          appointment.id === record.appointmentId ? { ...appointment, status: "completed" as const, updatedAt: createdAt } : appointment
+        )
+      : state.appointments;
     return { ...state, appointments: updatedAppointments, medicalRecords: [record, ...state.medicalRecords], notifications: [medicalRecordNotification(record), ...state.notifications] };
+  }
+
+  if (action.type === "UPDATE_MEDICAL_RECORD") {
+    const createdAt = new Date().toISOString();
+    const medicalRecords = state.medicalRecords.map((item) =>
+      item.id === action.payload.recordId
+        ? { ...item, ...action.payload.input, updatedAt: createdAt }
+        : item
+    );
+    return { ...state, medicalRecords };
+  }
+
+  if (action.type === "DELETE_MEDICAL_RECORD") {
+    return {
+      ...state,
+      medicalRecords: state.medicalRecords.filter((item) => item.id !== action.payload.recordId),
+    };
   }
 
   if (action.type === "CREATE_APPOINTMENT") {
     const pet = state.pets.find((item) => item.id === action.payload.petId);
+    const owner = state.owners.find((item) => item.id === (pet?.ownerId ?? state.currentOwnerId));
     const createdAt = new Date().toISOString();
-    const appointment: Appointment = { id: createId("appointment"), petId: action.payload.petId, ownerId: pet?.ownerId ?? state.currentOwnerId, doctorId: action.payload.doctorId, type: action.payload.type, serviceName: action.payload.serviceName, clinicName: "Bệnh viện Thú y Mỹ Đình", date: action.payload.date, time: action.payload.time, status: "pending", ownerNote: action.payload.ownerNote, createdBy: "owner", createdAt, updatedAt: createdAt };
-    const notification: Notification = { id: createId("noti"), recipientOwnerId: appointment.ownerId, type: "appointment_reminder", title: "Đã gửi yêu cầu đặt lịch", message: `Lịch ${appointment.serviceName} lúc ${appointment.time} ngày ${appointment.date} đang chờ xác nhận.`, status: "sent", relatedAppointmentId: appointment.id, relatedPetId: appointment.petId, createdAt, sentAt: createdAt };
-    return { ...state, appointments: [appointment, ...state.appointments], notifications: [notification, ...state.notifications] };
+    const appointment: Appointment = {
+      id: createId("appointment"),
+      petId: action.payload.petId,
+      ownerId: pet?.ownerId ?? state.currentOwnerId,
+      doctorId: action.payload.doctorId,
+      type: action.payload.type,
+      serviceName: action.payload.serviceName,
+      clinicName: "Bệnh viện Thú y Mỹ Đình",
+      date: action.payload.date,
+      time: action.payload.time,
+      status: "pending",
+      ownerNote: action.payload.ownerNote,
+      createdBy: "owner",
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    const ownerNotification: Notification = {
+      id: createId("noti"),
+      recipientOwnerId: appointment.ownerId,
+      recipientRole: "owner",
+      type: "appointment_created",
+      title: "Đã gửi yêu cầu đặt lịch",
+      message: `Lịch ${appointment.serviceName} lúc ${appointment.time} ngày ${appointment.date} đang chờ xác nhận.`,
+      status: "sent",
+      actionUrl: "/owner/appointments",
+      relatedAppointmentId: appointment.id,
+      relatedPetId: appointment.petId,
+      createdAt,
+      sentAt: createdAt,
+    };
+
+    const adminNotification: Notification = {
+      id: createId("noti"),
+      recipientRole: "admin",
+      type: "appointment_created",
+      title: "Lịch khám mới",
+      message: `Bệnh nhân ${pet?.name ?? "Pet"} (Chủ: ${owner?.fullName ?? "Khách hàng"}) vừa đặt lịch ${appointment.serviceName} ngày ${appointment.date} lúc ${appointment.time}.`,
+      status: "sent",
+      actionUrl: "/admin/appointments",
+      relatedAppointmentId: appointment.id,
+      relatedPetId: appointment.petId,
+      createdAt,
+      sentAt: createdAt,
+    };
+
+    return {
+      ...state,
+      appointments: [appointment, ...state.appointments],
+      notifications: [adminNotification, ownerNotification, ...state.notifications],
+    };
   }
+
+  if (action.type === "CANCEL_APPOINTMENT") {
+    const appointment = state.appointments.find((item) => item.id === action.payload.appointmentId);
+    if (!appointment || !["pending", "confirmed"].includes(appointment.status)) return state;
+    const pet = state.pets.find((item) => item.id === appointment.petId);
+    const createdAt = new Date().toISOString();
+    const updatedAppointments = state.appointments.map((item) =>
+      item.id === action.payload.appointmentId
+        ? {
+            ...item,
+            status: "cancelled" as const,
+            ownerNote: action.payload.ownerNote ? `${item.ownerNote ? `${item.ownerNote} | ` : ""}Lý do hủy: ${action.payload.ownerNote}` : item.ownerNote,
+            updatedAt: createdAt,
+          }
+        : item
+    );
+
+    const ownerNoti: Notification = {
+      id: createId("noti"),
+      recipientOwnerId: appointment.ownerId,
+      recipientRole: "owner",
+      type: "appointment_cancelled",
+      title: "Lịch khám đã hủy",
+      message: `Bạn đã hủy lịch ${appointment.serviceName} ngày ${appointment.date} thành công.`,
+      status: "sent",
+      actionUrl: "/owner/appointments",
+      relatedAppointmentId: appointment.id,
+      relatedPetId: appointment.petId,
+      createdAt,
+      sentAt: createdAt,
+    };
+
+    const adminNoti: Notification = {
+      id: createId("noti"),
+      recipientRole: "admin",
+      type: "appointment_cancelled",
+      title: "Lịch khám bị hủy",
+      message: `Lịch ${appointment.serviceName} của ${pet?.name ?? "Pet"} ngày ${appointment.date} vừa bị hủy.`,
+      status: "sent",
+      actionUrl: "/admin/appointments",
+      relatedAppointmentId: appointment.id,
+      relatedPetId: appointment.petId,
+      createdAt,
+      sentAt: createdAt,
+    };
+
+    return { ...state, appointments: updatedAppointments, notifications: [adminNoti, ownerNoti, ...state.notifications] };
+  }
+
+  if (action.type === "RESCHEDULE_APPOINTMENT") {
+    const appointment = state.appointments.find((item) => item.id === action.payload.appointmentId);
+    if (!appointment || !["pending", "confirmed"].includes(appointment.status)) return state;
+    const pet = state.pets.find((item) => item.id === appointment.petId);
+    const createdAt = new Date().toISOString();
+    const updatedAppointments = state.appointments.map((item) =>
+      item.id === action.payload.appointmentId
+        ? {
+            ...item,
+            date: action.payload.input.date,
+            time: action.payload.input.time,
+            status: "pending" as const,
+            ownerNote: action.payload.input.ownerNote ? action.payload.input.ownerNote : item.ownerNote,
+            updatedAt: createdAt,
+          }
+        : item
+    );
+
+    const ownerNoti: Notification = {
+      id: createId("noti"),
+      recipientOwnerId: appointment.ownerId,
+      recipientRole: "owner",
+      type: "appointment_rescheduled",
+      title: "Yêu cầu dời lịch khám đã gửi",
+      message: `Lịch ${appointment.serviceName} đã được yêu cầu chuyển sang ${action.payload.input.time} ngày ${action.payload.input.date} và đang chờ xác nhận.`,
+      status: "sent",
+      actionUrl: "/owner/appointments",
+      relatedAppointmentId: appointment.id,
+      relatedPetId: appointment.petId,
+      createdAt,
+      sentAt: createdAt,
+    };
+
+    const adminNoti: Notification = {
+      id: createId("noti"),
+      recipientRole: "admin",
+      type: "appointment_rescheduled",
+      title: "Yêu cầu dời lịch khám",
+      message: `Lịch ${appointment.serviceName} của ${pet?.name ?? "Pet"} vừa yêu cầu dời sang ${action.payload.input.time} ngày ${action.payload.input.date}.`,
+      status: "sent",
+      actionUrl: "/admin/appointments",
+      relatedAppointmentId: appointment.id,
+      relatedPetId: appointment.petId,
+      createdAt,
+      sentAt: createdAt,
+    };
+
+    return { ...state, appointments: updatedAppointments, notifications: [adminNoti, ownerNoti, ...state.notifications] };
+  }
+
   if (action.type === "UPDATE_APPOINTMENT_STATUS") {
     let changed: Appointment | undefined;
-    const appointments = state.appointments.map((item) => item.id === action.payload.appointmentId ? (changed = { ...item, status: action.payload.status, internalNote: action.payload.internalNote, updatedAt: new Date().toISOString() }) : item);
+    const appointments = state.appointments.map((item) =>
+      item.id === action.payload.appointmentId
+        ? (changed = {
+            ...item,
+            status: action.payload.status,
+            internalNote: action.payload.internalNote !== undefined ? action.payload.internalNote : item.internalNote,
+            updatedAt: new Date().toISOString(),
+          })
+        : item
+    );
     const notification = changed ? appointmentNotification(changed, action.payload.status) : null;
     return { ...state, appointments, notifications: notification ? [notification, ...state.notifications] : state.notifications };
   }
+
+  if (action.type === "UPDATE_APPOINTMENT_INTERNAL_NOTE") {
+    const appointments = state.appointments.map((item) =>
+      item.id === action.payload.appointmentId
+        ? { ...item, internalNote: action.payload.internalNote, updatedAt: new Date().toISOString() }
+        : item
+    );
+    return { ...state, appointments };
+  }
+
   if (action.type === "CREATE_HOTEL_BOOKING") {
     const pet = state.pets.find((item) => item.id === action.payload.petId);
+    const owner = state.owners.find((item) => item.id === (pet?.ownerId ?? state.currentOwnerId));
     const nights = Math.max(calculateNights(action.payload.checkIn, action.payload.checkOut), 1);
     const createdAt = new Date().toISOString();
-    const booking: HotelBooking = { id: createId("booking"), petId: action.payload.petId, ownerId: pet?.ownerId ?? state.currentOwnerId, checkIn: action.payload.checkIn, checkOut: action.payload.checkOut, nights, roomType: action.payload.roomType, serviceKeys: action.payload.serviceKeys, totalAmount: calculateBookingTotal(action.payload.roomType, action.payload.serviceKeys, nights), status: "pending", ownerNote: action.payload.ownerNote, dailyCareNoteIds: [], createdAt, updatedAt: createdAt };
-    const notification: Notification = { id: createId("noti"), recipientOwnerId: booking.ownerId, type: "hotel_booking_created", title: "Đã gửi yêu cầu hotel booking", message: `Yêu cầu lưu trú ${nights} đêm đang chờ bệnh viện xác nhận.`, status: "sent", relatedBookingId: booking.id, relatedPetId: booking.petId, createdAt, sentAt: createdAt };
-    return { ...state, hotelBookings: [booking, ...state.hotelBookings], notifications: [notification, ...state.notifications] };
+    const booking: HotelBooking = {
+      id: createId("booking"),
+      petId: action.payload.petId,
+      ownerId: pet?.ownerId ?? state.currentOwnerId,
+      checkIn: action.payload.checkIn,
+      checkOut: action.payload.checkOut,
+      nights,
+      roomType: action.payload.roomType,
+      serviceKeys: action.payload.serviceKeys,
+      totalAmount: calculateBookingTotal(action.payload.roomType, action.payload.serviceKeys, nights),
+      status: "pending",
+      ownerNote: action.payload.ownerNote,
+      dailyCareNoteIds: [],
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    const ownerNoti: Notification = {
+      id: createId("noti"),
+      recipientOwnerId: booking.ownerId,
+      recipientRole: "owner",
+      type: "hotel_booking_created",
+      title: "Đã gửi yêu cầu hotel booking",
+      message: `Yêu cầu lưu trú ${nights} đêm đang chờ bệnh viện xác nhận.`,
+      status: "sent",
+      actionUrl: "/owner/hotel-booking",
+      relatedBookingId: booking.id,
+      relatedPetId: booking.petId,
+      createdAt,
+      sentAt: createdAt,
+    };
+
+    const adminNoti: Notification = {
+      id: createId("noti"),
+      recipientRole: "admin",
+      type: "hotel_booking_created",
+      title: "Hotel booking mới",
+      message: `Bệnh nhân ${pet?.name ?? "Pet"} (Chủ: ${owner?.fullName ?? "Khách hàng"}) vừa đặt phòng lưu trú ${nights} đêm (${booking.checkIn} → ${booking.checkOut}).`,
+      status: "sent",
+      actionUrl: "/admin/hotel-bookings",
+      relatedBookingId: booking.id,
+      relatedPetId: booking.petId,
+      createdAt,
+      sentAt: createdAt,
+    };
+
+    return { ...state, hotelBookings: [booking, ...state.hotelBookings], notifications: [adminNoti, ownerNoti, ...state.notifications] };
   }
+
+  if (action.type === "CANCEL_HOTEL_BOOKING") {
+    const booking = state.hotelBookings.find((item) => item.id === action.payload.bookingId);
+    if (!booking || !["pending", "confirmed"].includes(booking.status)) return state;
+    const pet = state.pets.find((item) => item.id === booking.petId);
+    const createdAt = new Date().toISOString();
+    const hotelBookings = state.hotelBookings.map((item) =>
+      item.id === action.payload.bookingId
+        ? {
+            ...item,
+            status: "cancelled" as const,
+            ownerNote: action.payload.ownerNote ? `${item.ownerNote ? `${item.ownerNote} | ` : ""}Lý do hủy: ${action.payload.ownerNote}` : item.ownerNote,
+            updatedAt: createdAt,
+          }
+        : item
+    );
+
+    const ownerNoti: Notification = {
+      id: createId("noti"),
+      recipientOwnerId: booking.ownerId,
+      recipientRole: "owner",
+      type: "hotel_booking_cancelled",
+      title: "Hotel booking đã hủy",
+      message: `Bạn đã hủy đặt phòng lưu trú từ ${booking.checkIn} đến ${booking.checkOut} thành công.`,
+      status: "sent",
+      actionUrl: "/owner/hotel-booking",
+      relatedBookingId: booking.id,
+      relatedPetId: booking.petId,
+      createdAt,
+      sentAt: createdAt,
+    };
+
+    const adminNoti: Notification = {
+      id: createId("noti"),
+      recipientRole: "admin",
+      type: "hotel_booking_cancelled",
+      title: "Hotel booking bị hủy",
+      message: `Kỳ lưu trú của ${pet?.name ?? "Pet"} từ ${booking.checkIn} đến ${booking.checkOut} vừa bị hủy bởi chủ nuôi.`,
+      status: "sent",
+      actionUrl: "/admin/hotel-bookings",
+      relatedBookingId: booking.id,
+      relatedPetId: booking.petId,
+      createdAt,
+      sentAt: createdAt,
+    };
+
+    return { ...state, hotelBookings, notifications: [adminNoti, ownerNoti, ...state.notifications] };
+  }
+
   if (action.type === "UPDATE_HOTEL_BOOKING_STATUS") {
     let changed: HotelBooking | undefined;
-    const hotelBookings = state.hotelBookings.map((item) => item.id === action.payload.bookingId ? (changed = { ...item, status: action.payload.status, internalNote: action.payload.internalNote, updatedAt: new Date().toISOString() }) : item);
+    const hotelBookings = state.hotelBookings.map((item) =>
+      item.id === action.payload.bookingId
+        ? (changed = {
+            ...item,
+            status: action.payload.status,
+            internalNote: action.payload.internalNote !== undefined ? action.payload.internalNote : item.internalNote,
+            updatedAt: new Date().toISOString(),
+          })
+        : item
+    );
     const notification = changed ? bookingNotification(changed, action.payload.status) : null;
     return { ...state, hotelBookings, notifications: notification ? [notification, ...state.notifications] : state.notifications };
   }
-  if (action.type === "ADD_DAILY_CARE_NOTE") {
-    const createdAt = new Date().toISOString();
-    const noteId = `note_${Date.now()}`;
+
+  if (action.type === "UPDATE_HOTEL_BOOKING_INTERNAL_NOTE") {
     const hotelBookings = state.hotelBookings.map((item) =>
       item.id === action.payload.bookingId
-        ? { ...item, dailyCareNoteIds: [...item.dailyCareNoteIds, noteId], updatedAt: createdAt }
+        ? { ...item, internalNote: action.payload.internalNote, updatedAt: new Date().toISOString() }
         : item
     );
-    const booking = state.hotelBookings.find(b => b.id === action.payload.bookingId);
-    const notification: Notification = { id: `noti_${Date.now()}`, recipientOwnerId: booking?.ownerId ?? state.currentOwnerId, type: "hotel_daily_update", title: "Cập nhật tình trạng thú cưng", message: action.payload.note, status: "sent", relatedBookingId: action.payload.bookingId, relatedPetId: booking?.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
-    return { ...state, hotelBookings, notifications: [notification, ...state.notifications] };
+    return { ...state, hotelBookings };
   }
+
+  if (action.type === "ADD_DAILY_CARE_NOTE") {
+    const createdAt = new Date().toISOString();
+    const careNoteId = createId("care_note");
+    const booking = state.hotelBookings.find((b) => b.id === action.payload.bookingId);
+    const newCareNote: DailyCareNote = {
+      id: careNoteId,
+      bookingId: action.payload.bookingId,
+      date: new Date().toISOString().slice(0, 10),
+      eatingStatus: action.payload.eatingStatus ?? "normal",
+      mood: action.payload.mood ?? "calm",
+      note: action.payload.note,
+      visibleToOwner: action.payload.visibleToOwner ?? true,
+      createdByStaffId: "staff_admin",
+      createdAt,
+    };
+
+    const hotelBookings = state.hotelBookings.map((item) =>
+      item.id === action.payload.bookingId
+        ? { ...item, dailyCareNoteIds: [...item.dailyCareNoteIds, careNoteId], updatedAt: createdAt }
+        : item
+    );
+    const notification: Notification = {
+      id: createId("noti"),
+      recipientOwnerId: booking?.ownerId ?? state.currentOwnerId,
+      recipientRole: "owner",
+      type: "hotel_daily_update",
+      title: "Cập nhật tình trạng thú cưng",
+      message: action.payload.note,
+      status: "sent",
+      actionUrl: "/owner/hotel-booking",
+      relatedBookingId: action.payload.bookingId,
+      relatedPetId: booking?.petId,
+      sentByStaffId: "staff_admin",
+      createdAt,
+      sentAt: createdAt,
+    };
+    return {
+      ...state,
+      dailyCareNotes: [newCareNote, ...state.dailyCareNotes],
+      hotelBookings,
+      notifications: [notification, ...state.notifications],
+    };
+  }
+
   if (action.type === "SEND_REMINDER") {
-    const appointment = state.appointments.find(a => a.id === action.payload.appointmentId);
+    const appointment = state.appointments.find((a) => a.id === action.payload.appointmentId);
     if (!appointment) return state;
     const createdAt = new Date().toISOString();
-    const notification: Notification = { id: `noti_${Date.now()}`, recipientOwnerId: appointment.ownerId, type: "appointment_reminder", title: "Nhắc lịch khám", message: `Nhắc nhở: Bạn có lịch ${appointment.serviceName} vào lúc ${appointment.time} ngày ${appointment.date} tại Bệnh viện Thú y Mỹ Đình.`, status: "sent", relatedAppointmentId: appointment.id, relatedPetId: appointment.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
+    const notification: Notification = {
+      id: createId("noti"),
+      recipientOwnerId: appointment.ownerId,
+      recipientRole: "owner",
+      type: "appointment_reminder",
+      title: "Nhắc lịch khám",
+      message: `Nhắc nhở: Bạn có lịch ${appointment.serviceName} vào lúc ${appointment.time} ngày ${appointment.date} tại Bệnh viện Thú y Mỹ Đình.`,
+      status: "sent",
+      actionUrl: "/owner/appointments",
+      relatedAppointmentId: appointment.id,
+      relatedPetId: appointment.petId,
+      sentByStaffId: "staff_admin",
+      createdAt,
+      sentAt: createdAt,
+    };
     return { ...state, notifications: [notification, ...state.notifications] };
   }
+
   if (action.type === "SEND_CUSTOM_NOTIFICATION") {
     const createdAt = new Date().toISOString();
-    const notification: Notification = { id: `noti_${Date.now()}`, recipientOwnerId: action.payload.recipientOwnerId, type: "general", title: action.payload.title, message: action.payload.message, status: "sent", createdAt, sentAt: createdAt };
+    const notification: Notification = {
+      id: createId("noti"),
+      recipientOwnerId: action.payload.recipientOwnerId,
+      recipientRole: "owner",
+      type: "general",
+      title: action.payload.title,
+      message: action.payload.message,
+      status: "sent",
+      actionUrl: "/owner/notifications",
+      createdAt,
+      sentAt: createdAt,
+    };
     return { ...state, notifications: [notification, ...state.notifications] };
   }
-  if (action.type === "MARK_NOTIFICATION_READ") return { ...state, notifications: state.notifications.map((item) => item.id === action.payload.notificationId ? { ...item, status: "read" } : item) };
-  if (action.type === "MARK_ALL_NOTIFICATIONS_READ") return { ...state, notifications: state.notifications.map((item) => item.recipientOwnerId === state.currentOwnerId ? { ...item, status: "read" } : item) };
+
+  if (action.type === "MARK_NOTIFICATION_READ") {
+    return { ...state, notifications: state.notifications.map((item) => (item.id === action.payload.notificationId ? { ...item, status: "read" } : item)) };
+  }
+
+  if (action.type === "MARK_ALL_NOTIFICATIONS_READ") {
+    return {
+      ...state,
+      notifications: state.notifications.map((item) => {
+        if (state.authRole === "admin" && item.recipientRole === "admin") {
+          return { ...item, status: "read" };
+        }
+        if (state.authRole === "owner" && item.recipientOwnerId === state.currentOwnerId) {
+          return { ...item, status: "read" };
+        }
+        return item;
+      }),
+    };
+  }
+
+  if (action.type === "DELETE_NOTIFICATION") {
+    return {
+      ...state,
+      notifications: state.notifications.filter((item) => item.id !== action.payload.notificationId),
+    };
+  }
+
   return state;
 }
 
@@ -235,11 +841,17 @@ function loadInitialState() {
 
 export function AppStoreProvider({ children }: AppStoreProviderProps) {
   const [state, dispatch] = useReducer(appStoreReducer, undefined, loadInitialState);
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }, [state]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }, [state]);
+
   const value = useMemo<AppStoreValue>(() => {
     const currentOwner = state.owners.find((owner) => owner.id === state.currentOwnerId) ?? state.owners[0];
     return {
       ...state,
+      isLoading,
       currentOwner,
       ownerPets: state.pets.filter((pet) => pet.ownerId === state.currentOwnerId),
       loginOwner: (phone) => {
@@ -259,16 +871,27 @@ export function AppStoreProvider({ children }: AppStoreProviderProps) {
       updatePet: (petId, input) => dispatch({ type: "UPDATE_PET", payload: { petId, input } }),
       createHotelBooking: (input) => dispatch({ type: "CREATE_HOTEL_BOOKING", payload: input }),
       updateHotelBookingStatus: (bookingId, status, internalNote) => dispatch({ type: "UPDATE_HOTEL_BOOKING_STATUS", payload: { bookingId, status, internalNote } }),
-      addDailyCareNote: (bookingId, note) => dispatch({ type: "ADD_DAILY_CARE_NOTE", payload: { bookingId, note } }),
+      updateHotelBookingInternalNote: (bookingId, internalNote) => dispatch({ type: "UPDATE_HOTEL_BOOKING_INTERNAL_NOTE", payload: { bookingId, internalNote } }),
+      cancelHotelBooking: (bookingId, ownerNote) => dispatch({ type: "CANCEL_HOTEL_BOOKING", payload: { bookingId, ownerNote } }),
+      addDailyCareNote: (bookingId, note, eatingStatus, mood) =>
+        dispatch({ type: "ADD_DAILY_CARE_NOTE", payload: { bookingId, note, eatingStatus, mood } }),
       createAppointment: (input) => dispatch({ type: "CREATE_APPOINTMENT", payload: input }),
+      cancelAppointment: (appointmentId, ownerNote) => dispatch({ type: "CANCEL_APPOINTMENT", payload: { appointmentId, ownerNote } }),
+      rescheduleAppointment: (appointmentId, input) => dispatch({ type: "RESCHEDULE_APPOINTMENT", payload: { appointmentId, input } }),
       updateAppointmentStatus: (appointmentId, status, internalNote) => dispatch({ type: "UPDATE_APPOINTMENT_STATUS", payload: { appointmentId, status, internalNote } }),
+      updateAppointmentInternalNote: (appointmentId, internalNote) => dispatch({ type: "UPDATE_APPOINTMENT_INTERNAL_NOTE", payload: { appointmentId, internalNote } }),
       sendReminder: (appointmentId) => dispatch({ type: "SEND_REMINDER", payload: { appointmentId } }),
       createMedicalRecord: (input) => dispatch({ type: "CREATE_MEDICAL_RECORD", payload: input }),
+      updateMedicalRecord: (recordId, input) => dispatch({ type: "UPDATE_MEDICAL_RECORD", payload: { recordId, input } }),
+      deleteMedicalRecord: (recordId) => dispatch({ type: "DELETE_MEDICAL_RECORD", payload: { recordId } }),
       markNotificationRead: (notificationId) => dispatch({ type: "MARK_NOTIFICATION_READ", payload: { notificationId } }),
       markAllNotificationsRead: () => dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ" }),
+      deleteNotification: (notificationId) => dispatch({ type: "DELETE_NOTIFICATION", payload: { notificationId } }),
       sendCustomNotification: (recipientOwnerId, title, message) => dispatch({ type: "SEND_CUSTOM_NOTIFICATION", payload: { recipientOwnerId, title, message } }),
+      resetStoreData: () => dispatch({ type: "RESET_STORE_DATA" }),
     };
-  }, [state]);
+  }, [state, isLoading]);
+
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
 }
 

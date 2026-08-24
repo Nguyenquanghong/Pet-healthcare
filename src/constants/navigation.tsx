@@ -1,4 +1,4 @@
-import { Bell, CalendarDays, FileText, Hotel, LayoutDashboard, PawPrint, Settings } from "lucide-react";
+import { Bell, CalendarDays, FileText, Hotel, LayoutDashboard, PawPrint, Settings, BarChart3, Receipt } from "lucide-react";
 
 export const ownerNav = [
   { to: "/owner/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -16,5 +16,7 @@ export const adminNav = [
   { to: "/admin/medical-records", label: "Medical Records", icon: FileText },
   { to: "/admin/hotel-bookings", label: "Hotel Bookings", icon: Hotel },
   { to: "/admin/notifications", label: "Notifications", icon: Bell },
+  { to: "/admin/analytics", label: "Thống kê", icon: BarChart3 },
+  { to: "/admin/billing", label: "Hóa đơn", icon: Receipt },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];

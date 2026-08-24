@@ -1,0 +1,210 @@
+{
+  "users": [
+    {
+      "id": "owner_1",
+      "phone": "0901234567",
+      "email": "owner@example.com",
+      "fullName": "Nguyễn Văn A",
+      "role": "owner",
+      "address": "Mỹ Đình, Nam Từ Liêm, Hà Nội"
+    },
+    {
+      "id": "doctor_mai",
+      "username": "dr.mai",
+      "phone": "0912345678",
+      "fullName": "Bs. Mai Nguyễn",
+      "role": "doctor",
+      "address": "Bệnh viện Thú y Mỹ Đình"
+    },
+    {
+      "id": "staff_admin",
+      "username": "admin",
+      "phone": "0999888777",
+      "fullName": "Admin Quản Trị",
+      "role": "admin"
+    }
+  ],
+  "pets": [
+    {
+      "id": "pet_mochi",
+      "ownerId": "owner_1",
+      "name": "Mochi",
+      "species": "dog",
+      "breed": "Shiba Inu",
+      "gender": "male",
+      "ageLabel": "2 tuổi",
+      "weightKg": 8.4,
+      "microchipId": "JP-2026-MOCHI",
+      "healthStatus": "healthy",
+      "allergies": [
+        "Không"
+      ],
+      "createdAt": "2026-08-24T18:20:49.756Z"
+    },
+    {
+      "id": "pet_yuki",
+      "ownerId": "owner_1",
+      "name": "Yuki",
+      "species": "dog",
+      "breed": "Shiba Inu",
+      "gender": "female",
+      "ageLabel": "1 tuổi",
+      "weightKg": 7.2,
+      "microchipId": "JP-2026-YUKI",
+      "healthStatus": "stable",
+      "allergies": [
+        "Thịt bò"
+      ],
+      "createdAt": "2026-08-24T18:20:49.756Z"
+    }
+  ],
+  "appointments": [
+    {
+      "id": "appointment_1",
+      "petId": "pet_mochi",
+      "ownerId": "owner_1",
+      "doctorId": "doctor_mai",
+      "type": "general_checkup",
+      "serviceName": "Khám tổng quát",
+      "clinicName": "Bệnh viện Thú y Mỹ Đình",
+      "date": "2026-11-02",
+      "time": "09:00",
+      "status": "confirmed",
+      "createdBy": "owner",
+      "createdAt": "2026-08-24T18:20:49.756Z",
+      "updatedAt": "2026-08-24T18:20:49.756Z"
+    },
+    {
+      "id": "appointment_2",
+      "petId": "pet_yuki",
+      "ownerId": "owner_1",
+      "type": "vaccination",
+      "serviceName": "Tiêm phòng dại & 7 bệnh",
+      "clinicName": "Bệnh viện Thú y Mỹ Đình",
+      "date": "2026-11-03",
+      "time": "10:30",
+      "status": "pending",
+      "ownerNote": "Ưu tiên buổi sáng",
+      "createdBy": "owner",
+      "createdAt": "2026-08-24T18:20:49.756Z",
+      "updatedAt": "2026-08-24T18:20:49.756Z"
+    }
+  ],
+  "medicalRecords": [
+    {
+      "id": "record_1",
+      "petId": "pet_mochi",
+      "ownerId": "owner_1",
+      "appointmentId": "appointment_1",
+      "doctorName": "Bs. Mai Nguyễn",
+      "visitDate": "2026-10-28",
+      "title": "Annual Checkup & Vaccination",
+      "symptoms": "Khám định kỳ, không có triệu chứng bất thường.",
+      "diagnosis": "Sức khỏe ổn định, cân nặng phù hợp.",
+      "treatment": "Tiêm vaccine nhắc lại và tư vấn dinh dưỡng.",
+      "medications": "Vitamin tổng hợp 7 ngày",
+      "vaccineName": "DHPPi + Lepto",
+      "followUpDate": "2027-04-28",
+      "weightKg": 8.4,
+      "temperatureC": 38.2,
+      "heartRateBpm": 92,
+      "createdAt": "2026-08-24T18:20:49.756Z",
+      "updatedAt": "2026-08-24T18:20:49.756Z"
+    }
+  ],
+  "hotelBookings": [
+    {
+      "id": "booking_1",
+      "petId": "pet_yuki",
+      "ownerId": "owner_1",
+      "checkIn": "2026-11-10",
+      "checkOut": "2026-11-13",
+      "nights": 3,
+      "roomType": "deluxe",
+      "serviceKeys": [
+        "special_diet"
+      ],
+      "totalAmount": 20100,
+      "status": "pending",
+      "ownerNote": "Yuki cần chế độ ăn ít muối.",
+      "dailyCareNoteIds": [],
+      "createdAt": "2026-08-24T18:20:49.756Z",
+      "updatedAt": "2026-08-24T18:20:49.756Z"
+    },
+    {
+      "id": "booking_2",
+      "petId": "pet_mochi",
+      "ownerId": "owner_1",
+      "checkIn": "2026-11-18",
+      "checkOut": "2026-11-20",
+      "nights": 2,
+      "roomType": "standard",
+      "serviceKeys": [
+        "daily_walk"
+      ],
+      "totalAmount": 7600,
+      "status": "in_stay",
+      "dailyCareNoteIds": [
+        "note_1"
+      ],
+      "createdAt": "2026-08-24T18:20:49.756Z",
+      "updatedAt": "2026-08-24T18:20:49.756Z"
+    }
+  ],
+  "dailyCareNotes": [
+    {
+      "id": "note_1",
+      "bookingId": "booking_2",
+      "date": "2026-11-19",
+      "eatingStatus": "good",
+      "mood": "happy",
+      "note": "Bé Mochi hôm nay ăn ngon miệng, đi dạo 30 phút trong sân vườn và rất hợp tác.",
+      "visibleToOwner": true,
+      "createdByStaffId": "staff_admin",
+      "createdAt": "2026-08-24T18:20:49.756Z"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "noti_1",
+      "recipientOwnerId": "owner_1",
+      "recipientRole": "owner",
+      "type": "appointment_reminder",
+      "title": "Nhắc lịch khám",
+      "message": "Mochi có lịch khám vào 09:00 ngày mai tại Bệnh viện Thú y Mỹ Đình.",
+      "status": "sent",
+      "actionUrl": "/owner/appointments",
+      "relatedPetId": "pet_mochi",
+      "relatedAppointmentId": "appointment_1",
+      "createdAt": "2026-08-24T18:20:49.756Z",
+      "sentAt": "2026-08-24T18:20:49.756Z"
+    }
+  ],
+  "invoices": [
+    {
+      "id": "inv_1",
+      "invoiceCode": "INV-APP-2026-001",
+      "type": "appointment",
+      "ownerId": "owner_1",
+      "petId": "pet_mochi",
+      "appointmentId": "appointment_1",
+      "subtotal": 250000,
+      "taxAmount": 20000,
+      "discountAmount": 0,
+      "totalAmount": 270000,
+      "paymentStatus": "paid",
+      "paymentMethod": "credit_card",
+      "issuedAt": "2026-11-02",
+      "paidAt": "2026-11-02",
+      "items": [
+        {
+          "id": "item_1",
+          "description": "Khám tổng quát & Tư vấn dinh dưỡng (Mochi)",
+          "unitPrice": 250000,
+          "quantity": 1,
+          "amount": 250000
+        }
+      ]
+    }
+  ]
+}
