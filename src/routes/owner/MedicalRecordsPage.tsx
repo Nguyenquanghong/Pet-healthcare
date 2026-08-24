@@ -1,43 +1,90 @@
-﻿import { useMemo, useState } from "react";
-import { AppLayout } from "../../components/layout/AppLayout";
-import { RecordList } from "../../components/shared/RecordList";
-import { Card } from "../../components/ui/Card";
-import { MetricCard } from "../../components/ui/MetricCard";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Download, PawPrint, Plus, Printer } from "lucide-react";
+import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
+import { PetVitalsSummary } from "../../components/owner/medical/PetVitalsSummary";
+import { ClinicalTimeline } from "../../components/owner/medical/ClinicalTimeline";
+import { ActivePrescriptions } from "../../components/owner/medical/ActivePrescriptions";
+import { DiagnosticImaging } from "../../components/owner/medical/DiagnosticImaging";
+import { Button } from "../../components/ui/Button";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { Select } from "../../components/ui/Select";
 import { useAppStore } from "../../store/AppStoreProvider";
+
+const genderLabels = {
+  male: "Đực",
+  female: "Cái",
+  unknown: "Chưa rõ",
+};
 
 export function MedicalRecordsPage() {
   const { medicalRecords, ownerPets } = useAppStore();
   const [selectedPetId, setSelectedPetId] = useState(ownerPets[0]?.id ?? "");
-  const selectedPet = ownerPets.find((pet) => pet.id === selectedPetId) ?? ownerPets[0];
-  const latestRecord = useMemo(
-    () => medicalRecords.find((record) => record.petId === selectedPet?.id),
-    [medicalRecords, selectedPet?.id],
+
+  useEffect(() => {
+    if (!ownerPets.some((pet) => pet.id === selectedPetId)) setSelectedPetId(ownerPets[0]?.id ?? "");
+  }, [ownerPets, selectedPetId]);
+
+  const pet = ownerPets.find((item) => item.id === selectedPetId);
+  const petRecords = useMemo(
+    () => medicalRecords.filter((record) => record.petId === selectedPetId).sort((a, b) => b.visitDate.localeCompare(a.visitDate)),
+    [medicalRecords, selectedPetId],
   );
 
   return (
-    <AppLayout type="owner" title="Hồ sơ y tế chi tiết">
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
-        <Card title="Clinical Timeline">
-          <div className="mb-5 flex flex-col gap-3 rounded-2xl bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-bold text-primary">Chọn thú cưng</p>
-              <p className="text-sm text-slate-500">Theo dõi lịch sử khám, chẩn đoán và điều trị.</p>
+    <OwnerLayout title="Hồ sơ y tế chi tiết">
+      {ownerPets.length === 0 ? (
+        <EmptyState
+          icon={<PawPrint size={42} />}
+          title="Bạn chưa có hồ sơ thú cưng"
+          description="Hồ sơ y tế sẽ được lưu theo từng thú cưng. Hãy thêm thú cưng đầu tiên để bắt đầu theo dõi lịch sử khám."
+          action={<Link to="/owner/pets"><Button icon={<Plus size={16} />}>Thêm thú cưng</Button></Link>}
+        />
+      ) : pet ? (
+        <>
+          <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 overflow-hidden rounded-full border border-slate-200 bg-slate-50">
+                <img
+                  src={`https://api.dicebear.com/7.x/shapes/svg?seed=${pet.name}&backgroundColor=f1f5f9`}
+                  alt={pet.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900">{pet.name} ({pet.breed})</h2>
+                <p className="text-sm text-slate-600">{pet.ageLabel} &bull; {genderLabels[pet.gender]} &bull; {petRecords.length} hồ sơ y tế</p>
+              </div>
             </div>
-            <select className="rounded-xl border border-slate-200 px-4 py-3" value={selectedPetId} onChange={(event) => setSelectedPetId(event.target.value)}>
-              {ownerPets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name} - {pet.breed}</option>)}
-            </select>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Select
+                label="Chọn thú cưng"
+                value={selectedPetId}
+                options={ownerPets.map((item) => ({ value: item.id, label: `${item.name} — ${item.breed}` }))}
+                onChange={(event) => setSelectedPetId(event.target.value)}
+                className="min-w-[260px]"
+              />
+              <div className="flex gap-3 sm:pt-6">
+                <Button variant="outline" icon={<Printer size={16} />}>Print</Button>
+                <Button icon={<Download size={16} />}>Export</Button>
+              </div>
+            </div>
           </div>
-          <RecordList ownerOnly petId={selectedPet?.id} />
-        </Card>
-        <div className="grid gap-4">
-          <MetricCard label="Weight" value={latestRecord?.weightKg ? `${latestRecord.weightKg} kg` : selectedPet?.weightKg ? `${selectedPet.weightKg} kg` : "N/A"} />
-          <MetricCard label="Temp" value={latestRecord?.temperatureC ? `${latestRecord.temperatureC}°C` : "N/A"} />
-          <MetricCard label="Heart Rate" value={latestRecord?.heartRateBpm ? `${latestRecord.heartRateBpm} bpm` : "N/A"} />
-          <Card title="Follow-up">
-            <p className="text-sm text-slate-500">{latestRecord?.followUpDate ? `Tái khám vào ${latestRecord.followUpDate}` : "Chưa có lịch tái khám."}</p>
-          </Card>
-        </div>
-      </div>
-    </AppLayout>
+
+          <div className="mb-6">
+            <PetVitalsSummary pet={pet} latestRecord={petRecords[0]} />
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
+            <ClinicalTimeline records={petRecords} />
+            <div className="space-y-6">
+              <ActivePrescriptions />
+              <DiagnosticImaging />
+            </div>
+          </div>
+        </>
+      ) : null}
+    </OwnerLayout>
   );
 }

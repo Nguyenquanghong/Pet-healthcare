@@ -1,12 +1,12 @@
 import { Bell, CalendarDays, FileText, Hotel, LayoutDashboard, PawPrint, Settings } from "lucide-react";
 
 export const ownerNav = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/pets", label: "Pet Profiles", icon: PawPrint },
-  { to: "/medical-records", label: "Medical Records", icon: FileText },
-  { to: "/appointments", label: "Appointments", icon: CalendarDays },
-  { to: "/hotel-booking", label: "Hotel Booking", icon: Hotel },
-  { to: "/notifications", label: "Notifications", icon: Bell },
+  { to: "/owner/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/owner/pets", label: "Pet Profiles", icon: PawPrint },
+  { to: "/owner/medical-records", label: "Medical Records", icon: FileText },
+  { to: "/owner/appointments", label: "Appointments", icon: CalendarDays },
+  { to: "/owner/hotel-booking", label: "Hotel Booking", icon: Hotel },
+  { to: "/owner/notifications", label: "Notifications", icon: Bell },
 ];
 
 export const adminNav = [

@@ -1,18 +1,14 @@
-﻿import { useMemo, useState } from "react";
-import { AppLayout } from "../../components/layout/AppLayout";
-import { Card } from "../../components/ui/Card";
-import { StatusBadge } from "../../components/ui/StatusBadge";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Plus, PawPrint } from "lucide-react";
+import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
+import { BookAppointmentForm, OWNER_APPOINTMENT_SERVICES } from "../../components/owner/appointments/BookAppointmentForm";
+import { OwnerAppointmentCalendar } from "../../components/owner/appointments/OwnerAppointmentCalendar";
+import { OwnerAppointmentList } from "../../components/owner/appointments/OwnerAppointmentList";
+import { Button } from "../../components/ui/Button";
+import { EmptyState } from "../../components/ui/EmptyState";
 import { useAppStore } from "../../store/AppStoreProvider";
 import type { AppointmentType } from "../../types/appointment";
-import { appointmentStatusLabels } from "../../utils/statusLabels";
-
-const services: { type: AppointmentType; label: string }[] = [
-  { type: "general_checkup", label: "Khám tổng quát" },
-  { type: "vaccination", label: "Tiêm phòng" },
-  { type: "dental", label: "Vệ sinh răng miệng" },
-  { type: "dermatology", label: "Khám da liễu" },
-  { type: "hotel_consultation", label: "Tư vấn lưu trú" },
-];
 
 export function AppointmentsPage() {
   const { appointments, createAppointment, currentOwnerId, ownerPets, pets } = useAppStore();
@@ -21,71 +17,58 @@ export function AppointmentsPage() {
   const [date, setDate] = useState("2026-11-05");
   const [time, setTime] = useState("09:00");
   const [ownerNote, setOwnerNote] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!ownerPets.some((pet) => pet.id === petId)) setPetId(ownerPets[0]?.id ?? "");
+  }, [ownerPets, petId]);
 
   const ownerAppointments = useMemo(
-    () => appointments.filter((appointment) => appointment.ownerId === currentOwnerId),
+    () => appointments.filter(a => a.ownerId === currentOwnerId),
     [appointments, currentOwnerId],
   );
-  const selectedService = services.find((service) => service.type === serviceType) ?? services[0];
+  const selectedService = OWNER_APPOINTMENT_SERVICES.find(s => s.type === serviceType) ?? OWNER_APPOINTMENT_SERVICES[0];
 
-  const submitAppointment = () => {
+  const handleSubmit = () => {
     if (!petId) return;
     createAppointment({ petId, type: serviceType, serviceName: selectedService.label, date, time, doctorId: "doctor_mai", ownerNote });
+    setOwnerNote("");
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
   };
 
   return (
-    <AppLayout type="owner" title="Quản lý lịch khám">
-      <div className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
-        <Card title="Đặt lịch khám mới">
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="block">
-              <span className="text-sm font-bold text-slate-600">Pet</span>
-              <select className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" value={petId} onChange={(event) => setPetId(event.target.value)}>
-                {ownerPets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name} - {pet.breed}</option>)}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-sm font-bold text-slate-600">Dịch vụ</span>
-              <select className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" value={serviceType} onChange={(event) => setServiceType(event.target.value as AppointmentType)}>
-                {services.map((service) => <option key={service.type} value={service.type}>{service.label}</option>)}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-sm font-bold text-slate-600">Ngày khám</span>
-              <input type="date" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" value={date} onChange={(event) => setDate(event.target.value)} />
-            </label>
-            <label className="block">
-              <span className="text-sm font-bold text-slate-600">Giờ khám</span>
-              <input type="time" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" value={time} onChange={(event) => setTime(event.target.value)} />
-            </label>
-          </div>
-          <label className="mt-4 block">
-            <span className="text-sm font-bold text-slate-600">Ghi chú</span>
-            <textarea className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3" value={ownerNote} onChange={(event) => setOwnerNote(event.target.value)} placeholder="Triệu chứng, yêu cầu bác sĩ, thời gian ưu tiên..." />
-          </label>
-          <button onClick={submitAppointment} className="mt-5 w-full rounded-xl bg-primary px-4 py-3 font-bold text-white">Create Appointment</button>
-        </Card>
-
-        <Card title="Lịch khám của bạn">
-          <div className="space-y-3">
-            {ownerAppointments.map((appointment) => {
-              const pet = pets.find((item) => item.id === appointment.petId);
-              return (
-                <div key={appointment.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-bold">{appointment.time} · {pet?.name ?? appointment.petId}</p>
-                      <p className="text-sm text-slate-500">{appointment.date} · {appointment.serviceName}</p>
-                      {appointment.ownerNote && <p className="mt-2 text-xs text-slate-500">Note: {appointment.ownerNote}</p>}
-                    </div>
-                    <StatusBadge status={appointment.status}>{appointmentStatusLabels[appointment.status]}</StatusBadge>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+    <OwnerLayout title="Quản lý lịch khám">
+      {ownerPets.length === 0 ? (
+        <EmptyState
+          icon={<PawPrint size={42} />}
+          title="Cần thêm thú cưng trước khi đặt lịch"
+          description="Lịch khám luôn gắn với một hồ sơ thú cưng cụ thể để bác sĩ theo dõi lịch sử sức khỏe chính xác."
+          action={<Link to="/owner/pets"><Button icon={<Plus size={16} />}>Thêm thú cưng</Button></Link>}
+        />
+      ) : (
+      <div className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
+        <BookAppointmentForm
+          ownerPets={ownerPets}
+          petId={petId}
+          serviceType={serviceType}
+          date={date}
+          time={time}
+          ownerNote={ownerNote}
+          success={success}
+          onPetChange={setPetId}
+          onServiceTypeChange={setServiceType}
+          onDateChange={setDate}
+          onTimeChange={setTime}
+          onOwnerNoteChange={setOwnerNote}
+          onSubmit={handleSubmit}
+        />
+        <div className="space-y-6">
+          <OwnerAppointmentCalendar appointments={ownerAppointments} />
+          <OwnerAppointmentList appointments={ownerAppointments} pets={pets} />
+        </div>
       </div>
-    </AppLayout>
+      )}
+    </OwnerLayout>
   );
 }

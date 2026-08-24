@@ -1,12 +1,29 @@
-import { useMemo, useState } from "react";
-import { AppLayout } from "../../components/layout/AppLayout";
-import { Card } from "../../components/ui/Card";
-import { StatusBadge } from "../../components/ui/StatusBadge";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { CheckCircle2, Hotel, PawPrint, Plus } from "lucide-react";
+import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
+import { AdditionalServicesCard } from "../../components/owner/booking/AdditionalServicesCard";
+import { BookingSummary } from "../../components/owner/booking/BookingSummary";
+import { RoomTypeCard } from "../../components/owner/booking/RoomTypeCard";
+import { SelectPetCard } from "../../components/owner/booking/SelectPetCard";
+import { StayDatesCard } from "../../components/owner/booking/StayDatesCard";
+import { Button } from "../../components/ui/Button";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { Textarea } from "../../components/ui/Textarea";
 import { useAppStore } from "../../store/AppStoreProvider";
 import type { HotelRoomType, HotelServiceKey } from "../../types/booking";
-import { calculateBookingTotal, calculateNights, HOTEL_SERVICE_PRICES, ROOM_PRICES } from "../../utils/bookingCalculator";
+import { calculateBookingTotal, calculateNights } from "../../utils/bookingCalculator";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { bookingStatusLabels } from "../../utils/statusLabels";
+
+const BOOKING_STATUS_STYLES: Record<string, string> = {
+  pending: "bg-amber-50 text-amber-700 border border-amber-200",
+  confirmed: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  checked_in: "bg-blue-50 text-blue-700 border border-blue-200",
+  completed: "bg-slate-100 text-slate-600 border border-slate-200",
+  rejected: "bg-rose-50 text-rose-700 border border-rose-200",
+  cancelled: "bg-slate-100 text-slate-500 border border-slate-200",
+};
 
 export function HotelBookingPage() {
   const { createHotelBooking, currentOwnerId, hotelBookings, ownerPets } = useAppStore();
@@ -16,18 +33,95 @@ export function HotelBookingPage() {
   const [roomType, setRoomType] = useState<HotelRoomType>("deluxe");
   const [serviceKeys, setServiceKeys] = useState<HotelServiceKey[]>(["special_diet"]);
   const [ownerNote, setOwnerNote] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!ownerPets.some((pet) => pet.id === petId)) setPetId(ownerPets[0]?.id ?? "");
+  }, [ownerPets, petId]);
+
   const nights = Math.max(calculateNights(checkIn, checkOut), 1);
   const total = calculateBookingTotal(roomType, serviceKeys, nights);
-  const selectedPet = ownerPets.find((pet) => pet.id === petId);
-  const ownerBookings = useMemo(() => hotelBookings.filter((booking) => booking.ownerId === currentOwnerId), [currentOwnerId, hotelBookings]);
+  const selectedPet = ownerPets.find(p => p.id === petId);
+  const ownerBookings = useMemo(
+    () => hotelBookings.filter(b => b.ownerId === currentOwnerId),
+    [currentOwnerId, hotelBookings],
+  );
 
-  const toggleService = (serviceKey: HotelServiceKey) => setServiceKeys((current) => current.includes(serviceKey) ? current.filter((key) => key !== serviceKey) : [...current, serviceKey]);
-  const submitBooking = () => {
+  const toggleService = (key: HotelServiceKey) =>
+    setServiceKeys(cur => cur.includes(key) ? cur.filter(k => k !== key) : [...cur, key]);
+
+  const handleSubmit = () => {
     if (!petId) return;
     createHotelBooking({ petId, checkIn, checkOut, roomType, serviceKeys, ownerNote });
+    setOwnerNote("");
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
   };
 
-  return <AppLayout type="owner" title="Đặt chỗ khách sạn thú cưng"><div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]"><Card title="Booking Form"><div className="grid gap-4 md:grid-cols-2"><label className="block"><span className="text-sm font-bold text-slate-600">Check-in</span><input type="date" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} /></label><label className="block"><span className="text-sm font-bold text-slate-600">Check-out</span><input type="date" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} /></label><label className="block"><span className="text-sm font-bold text-slate-600">Pet</span><select className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" value={petId} onChange={(event) => setPetId(event.target.value)}>{ownerPets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name} - {pet.breed}</option>)}</select></label><label className="block"><span className="text-sm font-bold text-slate-600">Room</span><select className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3" value={roomType} onChange={(event) => setRoomType(event.target.value as HotelRoomType)}><option value="standard">Standard Cabin - {formatCurrency(ROOM_PRICES.standard)}/đêm</option><option value="deluxe">Deluxe Suite - {formatCurrency(ROOM_PRICES.deluxe)}/đêm</option></select></label></div><div className="mt-5"><p className="mb-3 text-sm font-bold text-slate-600">Dịch vụ thêm</p><div className="grid gap-3 md:grid-cols-2">{Object.entries(HOTEL_SERVICE_PRICES).map(([key, service]) => <label key={key} className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm"><input type="checkbox" checked={serviceKeys.includes(key as HotelServiceKey)} onChange={() => toggleService(key as HotelServiceKey)} /><span>{service.label} · {formatCurrency(service.price)}{service.unit === "day" ? "/ngày" : ""}</span></label>)}</div></div><label className="mt-5 block"><span className="text-sm font-bold text-slate-600">Ghi chú</span><textarea className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3" value={ownerNote} onChange={(event) => setOwnerNote(event.target.value)} placeholder="Dặn dò ăn uống, thuốc, thói quen..." /></label></Card><Card title="Booking Summary"><SummaryRow label="Guest" value={selectedPet?.name ?? "Chưa chọn"} /><SummaryRow label="Duration" value={`${nights} nights`} /><SummaryRow label="Room" value={formatCurrency(ROOM_PRICES[roomType] * nights)} /><SummaryRow label="Services" value={formatCurrency(total - ROOM_PRICES[roomType] * nights)} /><div className="mt-4 border-t pt-4"><SummaryRow label="Total" value={formatCurrency(total)} bold /></div><button onClick={submitBooking} className="mt-5 w-full rounded-xl bg-primary px-4 py-3 font-bold text-white">Confirm Booking</button></Card><Card title="Booking của bạn" className="xl:col-span-2"><div className="grid gap-3 md:grid-cols-2">{ownerBookings.map((booking) => <div key={booking.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-bold">{ownerPets.find((pet) => pet.id === booking.petId)?.name ?? booking.petId}</p><p className="text-sm text-slate-500">{booking.checkIn} → {booking.checkOut} · {booking.nights} đêm</p></div><StatusBadge status={booking.status}>{bookingStatusLabels[booking.status]}</StatusBadge></div><p className="mt-3 text-sm font-bold text-primary">{formatCurrency(booking.totalAmount)}</p></div>)}</div></Card></div></AppLayout>;
-}
+  return (
+    <OwnerLayout title="Đặt chỗ khách sạn thú cưng">
+      {ownerPets.length === 0 ? (
+        <EmptyState
+          icon={<PawPrint size={42} />}
+          title="Cần thêm thú cưng trước khi đặt hotel"
+          description="Booking khách sạn cần liên kết với hồ sơ thú cưng để lưu dặn dò chăm sóc, dị ứng và cập nhật lưu trú."
+          action={<Link to="/owner/pets"><Button icon={<Plus size={16} />}>Thêm thú cưng</Button></Link>}
+        />
+      ) : (
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-5 text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Hotel size={20} className="text-primary" />
+              Thông tin đặt phòng
+            </h2>
 
-function SummaryRow({ label, value, bold = false }: { label: string; value: string; bold?: boolean }) { return <div className={`flex justify-between py-2 ${bold ? "text-xl font-black" : "text-sm"}`}><span>{label}</span><span>{value}</span></div>; }
+            {success && (
+              <div className="mb-5 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm font-semibold text-emerald-800">
+                <CheckCircle2 size={16} /> Đã gửi yêu cầu! Bệnh viện sẽ xác nhận trong thời gian sớm nhất.
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <SelectPetCard ownerPets={ownerPets} petId={petId} onPetChange={setPetId} />
+              <StayDatesCard checkIn={checkIn} checkOut={checkOut} onCheckInChange={setCheckIn} onCheckOutChange={setCheckOut} />
+              <RoomTypeCard roomType={roomType} onRoomTypeChange={setRoomType} />
+              <AdditionalServicesCard serviceKeys={serviceKeys} onToggleService={toggleService} />
+              <Textarea label="Dặn dò" value={ownerNote} onChange={(event) => setOwnerNote(event.target.value)} placeholder="Chế độ ăn, thuốc, thói quen, dị ứng..." />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <BookingSummary selectedPet={selectedPet} nights={nights} roomType={roomType} total={total} disabled={!petId} onSubmit={handleSubmit} />
+
+          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="font-bold text-slate-900">Booking của bạn</h3>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {ownerBookings.map(b => (
+                <div key={b.id} className="p-5 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-slate-900">
+                      {ownerPets.find(p => p.id === b.petId)?.name ?? b.petId}
+                    </p>
+                    <p className="text-sm text-slate-500 mt-0.5">{b.checkIn} → {b.checkOut} · {b.nights} đêm</p>
+                    <p className="text-sm font-bold text-primary mt-1">{formatCurrency(b.totalAmount)}</p>
+                  </div>
+                  <span className={`flex-shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${BOOKING_STATUS_STYLES[b.status] ?? "bg-slate-100 text-slate-600"}`}>
+                    {bookingStatusLabels[b.status]}
+                  </span>
+                </div>
+              ))}
+              {ownerBookings.length === 0 && (
+                <p className="px-5 py-8 text-center text-sm text-slate-400">Chưa có booking nào.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+    </OwnerLayout>
+  );
+}

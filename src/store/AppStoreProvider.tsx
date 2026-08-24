@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
 import type { Appointment, AppointmentStatus, AppointmentType } from "../types/appointment";
 import type { HotelBooking, HotelBookingStatus } from "../types/booking";
 import type { MedicalRecord } from "../types/medicalRecord";
@@ -13,34 +13,57 @@ type AppStoreProviderProps = { children: ReactNode };
 type CreateHotelBookingInput = { petId: string; checkIn: string; checkOut: string; roomType: HotelBooking["roomType"]; serviceKeys: HotelBooking["serviceKeys"]; ownerNote?: string };
 type CreateAppointmentInput = { petId: string; type: AppointmentType; serviceName: string; date: string; time: string; doctorId?: string; ownerNote?: string };
 type CreateMedicalRecordInput = Omit<MedicalRecord, "id" | "ownerId" | "createdAt" | "updatedAt">;
+type RegisterOwnerInput = Omit<Owner, "id" | "petIds">;
+type CreatePetInput = Omit<Pet, "id" | "ownerId">;
+type UpdatePetInput = Partial<Omit<Pet, "id" | "ownerId">>;
+type AuthRole = "owner" | "admin" | null;
 
-type AppState = { currentOwnerId: string; owners: Owner[]; pets: Pet[]; appointments: Appointment[]; medicalRecords: MedicalRecord[]; hotelBookings: HotelBooking[]; notifications: Notification[] };
+type AppState = { authRole: AuthRole; currentOwnerId: string; owners: Owner[]; pets: Pet[]; appointments: Appointment[]; medicalRecords: MedicalRecord[]; hotelBookings: HotelBooking[]; notifications: Notification[] };
 
 type AppAction =
+  | { type: "REGISTER_OWNER"; payload: RegisterOwnerInput }
+  | { type: "LOGIN_OWNER"; payload: { phone: string } }
+  | { type: "LOGIN_ADMIN" }
+  | { type: "LOGOUT" }
+  | { type: "CREATE_PET"; payload: CreatePetInput }
+  | { type: "UPDATE_PET"; payload: { petId: string; input: UpdatePetInput } }
   | { type: "CREATE_HOTEL_BOOKING"; payload: CreateHotelBookingInput }
   | { type: "UPDATE_HOTEL_BOOKING_STATUS"; payload: { bookingId: string; status: HotelBookingStatus; internalNote?: string } }
+  | { type: "ADD_DAILY_CARE_NOTE"; payload: { bookingId: string; note: string } }
   | { type: "CREATE_APPOINTMENT"; payload: CreateAppointmentInput }
   | { type: "UPDATE_APPOINTMENT_STATUS"; payload: { appointmentId: string; status: AppointmentStatus; internalNote?: string } }
+  | { type: "SEND_REMINDER"; payload: { appointmentId: string } }
   | { type: "CREATE_MEDICAL_RECORD"; payload: CreateMedicalRecordInput }
   | { type: "MARK_NOTIFICATION_READ"; payload: { notificationId: string } }
-  | { type: "MARK_ALL_NOTIFICATIONS_READ" };
+  | { type: "MARK_ALL_NOTIFICATIONS_READ" }
+  | { type: "SEND_CUSTOM_NOTIFICATION"; payload: { recipientOwnerId: string; title: string; message: string } };
 
 type AppStoreValue = AppState & {
   currentOwner: Owner;
   ownerPets: Pet[];
+  loginOwner: (phone: string) => boolean;
+  loginAdmin: (username: string, password: string) => boolean;
+  logout: () => void;
+  registerOwner: (input: RegisterOwnerInput) => void;
+  createPet: (input: CreatePetInput) => void;
+  updatePet: (petId: string, input: UpdatePetInput) => void;
   createHotelBooking: (input: CreateHotelBookingInput) => void;
   updateHotelBookingStatus: (bookingId: string, status: HotelBookingStatus, internalNote?: string) => void;
+  addDailyCareNote: (bookingId: string, note: string) => void;
   createAppointment: (input: CreateAppointmentInput) => void;
   updateAppointmentStatus: (appointmentId: string, status: AppointmentStatus, internalNote?: string) => void;
+  sendReminder: (appointmentId: string) => void;
   createMedicalRecord: (input: CreateMedicalRecordInput) => void;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
+  sendCustomNotification: (recipientOwnerId: string, title: string, message: string) => void;
 };
 
 const STORAGE_KEY = "niponeto_app_state";
 const now = new Date().toISOString();
 
 const initialState: AppState = {
+  authRole: null,
   currentOwnerId: "owner_1",
   owners: [{ id: "owner_1", fullName: "Nguyễn Văn A", phone: "0901234567", email: "owner@example.com", address: "Mỹ Đình, Hà Nội", petIds: ["pet_mochi", "pet_yuki"] }],
   pets: [
@@ -93,6 +116,50 @@ function normalizeState(state: AppState): AppState {
 }
 
 function appStoreReducer(state: AppState, action: AppAction): AppState {
+  if (action.type === "REGISTER_OWNER") {
+    const owner: Owner = { id: createId("owner"), ...action.payload, petIds: [] };
+    const createdAt = new Date().toISOString();
+    const notification: Notification = {
+      id: createId("noti"),
+      recipientOwnerId: owner.id,
+      type: "general",
+      title: "Chào mừng đến với Nippon Pet Care",
+      message: "Tài khoản chủ nuôi của bạn đã được tạo. Bạn có thể cập nhật hồ sơ thú cưng và đặt lịch dịch vụ ngay bây giờ.",
+      status: "sent",
+      createdAt,
+      sentAt: createdAt,
+    };
+    return { ...state, authRole: "owner", currentOwnerId: owner.id, owners: [owner, ...state.owners], notifications: [notification, ...state.notifications] };
+  }
+
+  if (action.type === "LOGIN_OWNER") {
+    const owner = state.owners.find((item) => item.phone.trim() === action.payload.phone.trim());
+    return owner ? { ...state, authRole: "owner", currentOwnerId: owner.id } : state;
+  }
+
+  if (action.type === "LOGIN_ADMIN") return { ...state, authRole: "admin" };
+
+  if (action.type === "LOGOUT") return { ...state, authRole: null };
+
+  if (action.type === "CREATE_PET") {
+    const pet: Pet = { id: createId("pet"), ownerId: state.currentOwnerId, ...action.payload };
+    const owners = state.owners.map((owner) =>
+      owner.id === state.currentOwnerId ? { ...owner, petIds: [...owner.petIds, pet.id] } : owner,
+    );
+    return { ...state, owners, pets: [pet, ...state.pets] };
+  }
+
+  if (action.type === "UPDATE_PET") {
+    return {
+      ...state,
+      pets: state.pets.map((pet) =>
+        pet.id === action.payload.petId && pet.ownerId === state.currentOwnerId
+          ? { ...pet, ...action.payload.input }
+          : pet,
+      ),
+    };
+  }
+
   if (action.type === "CREATE_MEDICAL_RECORD") {
     const pet = state.pets.find((item) => item.id === action.payload.petId);
     const createdAt = new Date().toISOString();
@@ -128,6 +195,30 @@ function appStoreReducer(state: AppState, action: AppAction): AppState {
     const notification = changed ? bookingNotification(changed, action.payload.status) : null;
     return { ...state, hotelBookings, notifications: notification ? [notification, ...state.notifications] : state.notifications };
   }
+  if (action.type === "ADD_DAILY_CARE_NOTE") {
+    const createdAt = new Date().toISOString();
+    const noteId = `note_${Date.now()}`;
+    const hotelBookings = state.hotelBookings.map((item) =>
+      item.id === action.payload.bookingId
+        ? { ...item, dailyCareNoteIds: [...item.dailyCareNoteIds, noteId], updatedAt: createdAt }
+        : item
+    );
+    const booking = state.hotelBookings.find(b => b.id === action.payload.bookingId);
+    const notification: Notification = { id: `noti_${Date.now()}`, recipientOwnerId: booking?.ownerId ?? state.currentOwnerId, type: "hotel_daily_update", title: "Cập nhật tình trạng thú cưng", message: action.payload.note, status: "sent", relatedBookingId: action.payload.bookingId, relatedPetId: booking?.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
+    return { ...state, hotelBookings, notifications: [notification, ...state.notifications] };
+  }
+  if (action.type === "SEND_REMINDER") {
+    const appointment = state.appointments.find(a => a.id === action.payload.appointmentId);
+    if (!appointment) return state;
+    const createdAt = new Date().toISOString();
+    const notification: Notification = { id: `noti_${Date.now()}`, recipientOwnerId: appointment.ownerId, type: "appointment_reminder", title: "Nhắc lịch khám", message: `Nhắc nhở: Bạn có lịch ${appointment.serviceName} vào lúc ${appointment.time} ngày ${appointment.date} tại Bệnh viện Thú y Mỹ Đình.`, status: "sent", relatedAppointmentId: appointment.id, relatedPetId: appointment.petId, sentByStaffId: "staff_admin", createdAt, sentAt: createdAt };
+    return { ...state, notifications: [notification, ...state.notifications] };
+  }
+  if (action.type === "SEND_CUSTOM_NOTIFICATION") {
+    const createdAt = new Date().toISOString();
+    const notification: Notification = { id: `noti_${Date.now()}`, recipientOwnerId: action.payload.recipientOwnerId, type: "general", title: action.payload.title, message: action.payload.message, status: "sent", createdAt, sentAt: createdAt };
+    return { ...state, notifications: [notification, ...state.notifications] };
+  }
   if (action.type === "MARK_NOTIFICATION_READ") return { ...state, notifications: state.notifications.map((item) => item.id === action.payload.notificationId ? { ...item, status: "read" } : item) };
   if (action.type === "MARK_ALL_NOTIFICATIONS_READ") return { ...state, notifications: state.notifications.map((item) => item.recipientOwnerId === state.currentOwnerId ? { ...item, status: "read" } : item) };
   return state;
@@ -147,7 +238,36 @@ export function AppStoreProvider({ children }: AppStoreProviderProps) {
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }, [state]);
   const value = useMemo<AppStoreValue>(() => {
     const currentOwner = state.owners.find((owner) => owner.id === state.currentOwnerId) ?? state.owners[0];
-    return { ...state, currentOwner, ownerPets: state.pets.filter((pet) => pet.ownerId === state.currentOwnerId), createHotelBooking: (input) => dispatch({ type: "CREATE_HOTEL_BOOKING", payload: input }), updateHotelBookingStatus: (bookingId, status, internalNote) => dispatch({ type: "UPDATE_HOTEL_BOOKING_STATUS", payload: { bookingId, status, internalNote } }), createAppointment: (input) => dispatch({ type: "CREATE_APPOINTMENT", payload: input }), updateAppointmentStatus: (appointmentId, status, internalNote) => dispatch({ type: "UPDATE_APPOINTMENT_STATUS", payload: { appointmentId, status, internalNote } }), createMedicalRecord: (input) => dispatch({ type: "CREATE_MEDICAL_RECORD", payload: input }), markNotificationRead: (notificationId) => dispatch({ type: "MARK_NOTIFICATION_READ", payload: { notificationId } }), markAllNotificationsRead: () => dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ" }) };
+    return {
+      ...state,
+      currentOwner,
+      ownerPets: state.pets.filter((pet) => pet.ownerId === state.currentOwnerId),
+      loginOwner: (phone) => {
+        const owner = state.owners.find((item) => item.phone.trim() === phone.trim());
+        if (!owner) return false;
+        dispatch({ type: "LOGIN_OWNER", payload: { phone } });
+        return true;
+      },
+      loginAdmin: (username, password) => {
+        const valid = username.trim().toLowerCase() === "admin" && password === "admin123";
+        if (valid) dispatch({ type: "LOGIN_ADMIN" });
+        return valid;
+      },
+      logout: () => dispatch({ type: "LOGOUT" }),
+      registerOwner: (input) => dispatch({ type: "REGISTER_OWNER", payload: input }),
+      createPet: (input) => dispatch({ type: "CREATE_PET", payload: input }),
+      updatePet: (petId, input) => dispatch({ type: "UPDATE_PET", payload: { petId, input } }),
+      createHotelBooking: (input) => dispatch({ type: "CREATE_HOTEL_BOOKING", payload: input }),
+      updateHotelBookingStatus: (bookingId, status, internalNote) => dispatch({ type: "UPDATE_HOTEL_BOOKING_STATUS", payload: { bookingId, status, internalNote } }),
+      addDailyCareNote: (bookingId, note) => dispatch({ type: "ADD_DAILY_CARE_NOTE", payload: { bookingId, note } }),
+      createAppointment: (input) => dispatch({ type: "CREATE_APPOINTMENT", payload: input }),
+      updateAppointmentStatus: (appointmentId, status, internalNote) => dispatch({ type: "UPDATE_APPOINTMENT_STATUS", payload: { appointmentId, status, internalNote } }),
+      sendReminder: (appointmentId) => dispatch({ type: "SEND_REMINDER", payload: { appointmentId } }),
+      createMedicalRecord: (input) => dispatch({ type: "CREATE_MEDICAL_RECORD", payload: input }),
+      markNotificationRead: (notificationId) => dispatch({ type: "MARK_NOTIFICATION_READ", payload: { notificationId } }),
+      markAllNotificationsRead: () => dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ" }),
+      sendCustomNotification: (recipientOwnerId, title, message) => dispatch({ type: "SEND_CUSTOM_NOTIFICATION", payload: { recipientOwnerId, title, message } }),
+    };
   }, [state]);
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
 }
