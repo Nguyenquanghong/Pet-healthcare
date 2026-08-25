@@ -39,15 +39,15 @@ export function AuthShell({ eyebrow = "Nippon Pet Care", title, description, chi
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl bg-white/12 p-4 ring-1 ring-white/15">
                   <HeartPulse className="mb-3" size={22} />
-                  <p className="text-sm font-bold">Chăm sóc toàn diện</p>
+                  <p className="text-sm font-bold">Complete care</p>
                 </div>
                 <div className="rounded-2xl bg-white/12 p-4 ring-1 ring-white/15">
                   <Sparkles className="mb-3" size={22} />
-                  <p className="text-sm font-bold">Trải nghiệm hiện đại</p>
+                  <p className="text-sm font-bold">Modern experience</p>
                 </div>
                 <div className="rounded-2xl bg-white/12 p-4 ring-1 ring-white/15">
                   <PawPrint className="mb-3" size={22} />
-                  <p className="text-sm font-bold">Dữ liệu riêng tư</p>
+                  <p className="text-sm font-bold">Private data</p>
                 </div>
               </div>
             </div>

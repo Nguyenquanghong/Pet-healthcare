@@ -6,7 +6,7 @@ export type MedicalRecord = {
   doctorName: string;
   visitDate: string;
   title: string;
-  symptoms: string;
+  symptoms?: string;
   diagnosis: string;
   treatment: string;
   medications?: string;

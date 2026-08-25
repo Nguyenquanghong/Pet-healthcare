@@ -7,6 +7,7 @@ import type { Owner } from "../types/owner";
 import type { Pet } from "../types/pet";
 import { calculateBookingTotal, calculateNights } from "../utils/bookingCalculator";
 import { createId } from "../utils/id";
+import { verifyPassword } from "../utils/passwordHash";
 
 type AppStoreProviderProps = { children: ReactNode };
 
@@ -15,7 +16,14 @@ type CreateAppointmentInput = { petId: string; type: AppointmentType; serviceNam
 type RescheduleAppointmentInput = { date: string; time: string; ownerNote?: string };
 type CreateMedicalRecordInput = Omit<MedicalRecord, "id" | "ownerId" | "createdAt" | "updatedAt">;
 type UpdateMedicalRecordInput = Partial<Omit<MedicalRecord, "id" | "ownerId" | "createdAt">>;
-type RegisterOwnerInput = Omit<Owner, "id" | "petIds">;
+type RegisterOwnerInput = {
+  fullName?: string;
+  phone?: string;
+  email: string;
+  passwordHash: string;
+  passwordSalt: string;
+  address?: string;
+};
 type CreatePetInput = Omit<Pet, "id" | "ownerId">;
 type UpdatePetInput = Partial<Omit<Pet, "id" | "ownerId">>;
 type AuthRole = "owner" | "admin" | null;
@@ -42,7 +50,7 @@ type AppState = {
 
 type AppAction =
   | { type: "REGISTER_OWNER"; payload: RegisterOwnerInput }
-  | { type: "LOGIN_OWNER"; payload: { phone: string } }
+  | { type: "LOGIN_OWNER"; payload: { email: string } }
   | { type: "LOGIN_ADMIN" }
   | { type: "LOGOUT" }
   | { type: "CREATE_PET"; payload: CreatePetInput }
@@ -71,10 +79,10 @@ type AppStoreValue = AppState & {
   isLoading: boolean;
   currentOwner: Owner;
   ownerPets: Pet[];
-  loginOwner: (phone: string) => boolean;
-  loginAdmin: (username: string, password: string) => boolean;
+  loginOwner: (email: string, password: string) => Promise<boolean>;
+  loginAdmin: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
-  registerOwner: (input: RegisterOwnerInput) => void;
+  registerOwner: (input: RegisterOwnerInput) => Promise<void>;
   createPet: (input: CreatePetInput) => void;
   updatePet: (petId: string, input: UpdatePetInput) => void;
   createHotelBooking: (input: CreateHotelBookingInput) => void;
@@ -104,12 +112,29 @@ type AppStoreValue = AppState & {
 };
 
 const STORAGE_KEY = "niponeto_app_state";
+const DEMO_OWNER_EMAIL = "owner@example.com";
+const DEMO_OWNER_PASSWORD_HASH = "2AaUO5pi+D5fOIXcKJSLzJYmMZFmJ0whrUQyh4Tz9DM=";
+const DEMO_OWNER_PASSWORD_SALT = "bmlwb25ldG8tZGVtby1vd25lci1zYWx0";
+const DEMO_ADMIN_USERNAME = "admin";
+const DEMO_ADMIN_PASSWORD_HASH = "Csbdv6XeLCUGafp03chOaooQPLVl+OhEPT/B+/Jic30=";
+const DEMO_ADMIN_PASSWORD_SALT = "bmlwb25ldG8tZGVtby1hZG1pbi1zYWx0";
 const now = new Date().toISOString();
 
 const initialState: AppState = {
   authRole: null,
   currentOwnerId: "owner_1",
-  owners: [{ id: "owner_1", fullName: "Nguyễn Văn A", phone: "0901234567", email: "owner@example.com", address: "Mỹ Đình, Hà Nội", petIds: ["pet_mochi", "pet_yuki"] }],
+  owners: [
+    {
+      id: "owner_1",
+      fullName: "Nguyễn Văn A",
+      phone: "0901234567",
+      email: "owner@example.com",
+      passwordHash: DEMO_OWNER_PASSWORD_HASH,
+      passwordSalt: DEMO_OWNER_PASSWORD_SALT,
+      address: "Mỹ Đình, Hà Nội",
+      petIds: ["pet_mochi", "pet_yuki"],
+    },
+  ],
   pets: [
     { id: "pet_mochi", ownerId: "owner_1", name: "Mochi", species: "dog", breed: "Shiba Inu", gender: "male", ageLabel: "2 tuổi", weightKg: 8.4, microchipId: "JP-2026-MOCHI", healthStatus: "healthy", allergies: ["Không"] },
     { id: "pet_yuki", ownerId: "owner_1", name: "Yuki", species: "dog", breed: "Shiba Inu", gender: "female", ageLabel: "1 tuổi", weightKg: 7.2, microchipId: "JP-2026-YUKI", healthStatus: "stable", allergies: ["Thịt bò"] },
@@ -319,9 +344,19 @@ function normalizeState(state: AppState): AppState {
     };
   });
 
+  const normalizedOwners = (state.owners ?? initialState.owners).map((owner) => {
+    if (owner.email?.trim().toLowerCase() !== DEMO_OWNER_EMAIL) return owner;
+    return {
+      ...owner,
+      passwordHash: owner.passwordHash ?? DEMO_OWNER_PASSWORD_HASH,
+      passwordSalt: owner.passwordSalt ?? DEMO_OWNER_PASSWORD_SALT,
+    };
+  });
+
   return {
     ...initialState,
     ...state,
+    owners: normalizedOwners,
     appointments: state.appointments ?? initialState.appointments,
     medicalRecords: state.medicalRecords ?? initialState.medicalRecords,
     hotelBookings: normalizedBookings,
@@ -337,7 +372,16 @@ function appStoreReducer(state: AppState, action: AppAction): AppState {
   }
 
   if (action.type === "REGISTER_OWNER") {
-    const owner: Owner = { id: createId("owner"), ...action.payload, petIds: [] };
+    const owner: Owner = {
+      id: createId("owner"),
+      fullName: action.payload.fullName?.trim() || action.payload.email.split("@")[0],
+      phone: action.payload.phone?.trim() || "",
+      email: action.payload.email.trim().toLowerCase(),
+      passwordHash: action.payload.passwordHash,
+      passwordSalt: action.payload.passwordSalt,
+      address: action.payload.address?.trim() || undefined,
+      petIds: [],
+    };
     const createdAt = new Date().toISOString();
     const notification: Notification = {
       id: createId("noti"),
@@ -355,7 +399,7 @@ function appStoreReducer(state: AppState, action: AppAction): AppState {
   }
 
   if (action.type === "LOGIN_OWNER") {
-    const owner = state.owners.find((item) => item.phone.trim() === action.payload.phone.trim());
+    const owner = state.owners.find((item) => item.email?.trim().toLowerCase() === action.payload.email.trim().toLowerCase());
     return owner ? { ...state, authRole: "owner", currentOwnerId: owner.id } : state;
   }
 
@@ -396,9 +440,12 @@ function appStoreReducer(state: AppState, action: AppAction): AppState {
 
   if (action.type === "UPDATE_MEDICAL_RECORD") {
     const createdAt = new Date().toISOString();
+    const nextPet = action.payload.input.petId
+      ? state.pets.find((pet) => pet.id === action.payload.input.petId)
+      : undefined;
     const medicalRecords = state.medicalRecords.map((item) =>
       item.id === action.payload.recordId
-        ? { ...item, ...action.payload.input, updatedAt: createdAt }
+        ? { ...item, ...action.payload.input, ownerId: nextPet?.ownerId ?? item.ownerId, updatedAt: createdAt }
         : item
     );
     return { ...state, medicalRecords };
@@ -854,19 +901,23 @@ export function AppStoreProvider({ children }: AppStoreProviderProps) {
       isLoading,
       currentOwner,
       ownerPets: state.pets.filter((pet) => pet.ownerId === state.currentOwnerId),
-      loginOwner: (phone) => {
-        const owner = state.owners.find((item) => item.phone.trim() === phone.trim());
+      loginOwner: async (email, password) => {
+        const owner = state.owners.find((item) => item.email?.trim().toLowerCase() === email.trim().toLowerCase());
         if (!owner) return false;
-        dispatch({ type: "LOGIN_OWNER", payload: { phone } });
+        const validPassword = await verifyPassword(password, owner.passwordHash, owner.passwordSalt);
+        if (!validPassword) return false;
+        dispatch({ type: "LOGIN_OWNER", payload: { email } });
         return true;
       },
-      loginAdmin: (username, password) => {
-        const valid = username.trim().toLowerCase() === "admin" && password === "admin123";
+      loginAdmin: async (username, password) => {
+        const valid =
+          username.trim().toLowerCase() === DEMO_ADMIN_USERNAME &&
+          (await verifyPassword(password, DEMO_ADMIN_PASSWORD_HASH, DEMO_ADMIN_PASSWORD_SALT));
         if (valid) dispatch({ type: "LOGIN_ADMIN" });
         return valid;
       },
       logout: () => dispatch({ type: "LOGOUT" }),
-      registerOwner: (input) => dispatch({ type: "REGISTER_OWNER", payload: input }),
+      registerOwner: async (input) => dispatch({ type: "REGISTER_OWNER", payload: input }),
       createPet: (input) => dispatch({ type: "CREATE_PET", payload: input }),
       updatePet: (petId, input) => dispatch({ type: "UPDATE_PET", payload: { petId, input } }),
       createHotelBooking: (input) => dispatch({ type: "CREATE_HOTEL_BOOKING", payload: input }),

@@ -4,8 +4,6 @@ import { Download, PawPrint, Plus, Printer } from "lucide-react";
 import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
 import { PetVitalsSummary } from "../../components/owner/medical/PetVitalsSummary";
 import { ClinicalTimeline } from "../../components/owner/medical/ClinicalTimeline";
-import { ActivePrescriptions } from "../../components/owner/medical/ActivePrescriptions";
-import { DiagnosticImaging } from "../../components/owner/medical/DiagnosticImaging";
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { Select } from "../../components/ui/Select";
@@ -76,12 +74,8 @@ export function MedicalRecordsPage() {
             <PetVitalsSummary pet={pet} latestRecord={petRecords[0]} />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
+          <div className="grid gap-6">
             <ClinicalTimeline records={petRecords} />
-            <div className="space-y-6">
-              <ActivePrescriptions />
-              <DiagnosticImaging />
-            </div>
           </div>
         </>
       ) : null}

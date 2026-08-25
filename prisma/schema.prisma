@@ -88,6 +88,7 @@ model User {
   phone        String   @unique
   email        String?  @unique
   passwordHash String   @map("password_hash")
+  passwordSalt String   @map("password_salt")
   fullName     String   @map("full_name")
   role         Role     @default(owner)
   address      String?

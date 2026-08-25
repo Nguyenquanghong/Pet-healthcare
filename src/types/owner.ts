@@ -3,6 +3,8 @@ export type Owner = {
   fullName: string;
   phone: string;
   email?: string;
+  passwordHash?: string;
+  passwordSalt?: string;
   address?: string;
   petIds: string[];
 };

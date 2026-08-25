@@ -14,15 +14,20 @@ import {
   FileText,
 } from "lucide-react";
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
+import {
+  createMedicalRecord as createMedicalRecordRequest,
+  deleteMedicalRecord as deleteMedicalRecordRequest,
+  updateMedicalRecord as updateMedicalRecordRequest,
+} from "../../services/medicalRecordService";
 import { useAppStore } from "../../store/AppStoreProvider";
 import type { MedicalRecord } from "../../types/medicalRecord";
 
 export function AdminMedicalRecordsPage() {
   const {
     appointments,
-    createMedicalRecord,
-    updateMedicalRecord,
-    deleteMedicalRecord,
+    createMedicalRecord: createMedicalRecordInStore,
+    updateMedicalRecord: updateMedicalRecordInStore,
+    deleteMedicalRecord: deleteMedicalRecordInStore,
     pets,
     medicalRecords,
     owners,
@@ -53,6 +58,8 @@ export function AdminMedicalRecordsPage() {
   const [doctorName, setDoctorName] = useState("Bs. Mai Nguyễn");
 
   const [toastMsg, setToastMsg] = useState("");
+  const [formError, setFormError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const toast = (msg: string) => {
     setToastMsg(msg);
@@ -72,6 +79,7 @@ export function AdminMedicalRecordsPage() {
     setHeartRateBpm("");
     setAppointmentId("");
     setDoctorName("Bs. Mai Nguyễn");
+    setFormError("");
     setShowCreateForm(false);
     setEditRecord(null);
   };
@@ -91,56 +99,87 @@ export function AdminMedicalRecordsPage() {
     setTemperatureC(r.temperatureC ? String(r.temperatureC) : "");
     setHeartRateBpm(r.heartRateBpm ? String(r.heartRateBpm) : "");
     setDoctorName(r.doctorName ?? "Bs. Mai Nguyễn");
+    setFormError("");
   };
 
-  const handleCreateSubmit = () => {
-    if (!petId || !title || !diagnosis || !treatment) return;
-    createMedicalRecord({
-      petId,
-      appointmentId: appointmentId || undefined,
-      doctorName: doctorName || "Bs. Mai Nguyễn",
-      visitDate: new Date().toISOString().slice(0, 10),
-      title,
-      symptoms,
-      diagnosis,
-      treatment,
-      medications,
-      vaccineName: vaccineName || undefined,
-      followUpDate: followUpDate || undefined,
-      weightKg: Number(weightKg) || undefined,
-      temperatureC: Number(temperatureC) || undefined,
-      heartRateBpm: Number(heartRateBpm) || undefined,
-    });
-    toast("Đã tạo hồ sơ y tế thành công.");
-    resetForm();
+  const handleCreateSubmit = async () => {
+    setFormError("");
+    setIsSubmitting(true);
+    try {
+      await createMedicalRecordRequest(
+        {
+          petId,
+          appointmentId: appointmentId || undefined,
+          doctorName,
+          visitDate: new Date().toISOString().slice(0, 10),
+          title,
+          symptoms,
+          diagnosis,
+          treatment,
+          medications,
+          vaccineName: vaccineName || undefined,
+          followUpDate: followUpDate || undefined,
+          weightKg: Number(weightKg) || undefined,
+          temperatureC: Number(temperatureC) || undefined,
+          heartRateBpm: Number(heartRateBpm) || undefined,
+        },
+        createMedicalRecordInStore,
+      );
+      toast("Đã tạo hồ sơ y tế thành công.");
+      resetForm();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Không thể tạo hồ sơ y tế.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleEditSubmit = () => {
-    if (!editRecord || !title || !diagnosis || !treatment) return;
-    updateMedicalRecord(editRecord.id, {
-      petId,
-      appointmentId: appointmentId || undefined,
-      doctorName,
-      title,
-      symptoms,
-      diagnosis,
-      treatment,
-      medications,
-      vaccineName: vaccineName || undefined,
-      followUpDate: followUpDate || undefined,
-      weightKg: Number(weightKg) || undefined,
-      temperatureC: Number(temperatureC) || undefined,
-      heartRateBpm: Number(heartRateBpm) || undefined,
-    });
-    toast("Đã cập nhật hồ sơ y tế thành công.");
-    resetForm();
+  const handleEditSubmit = async () => {
+    if (!editRecord) return;
+    setFormError("");
+    setIsSubmitting(true);
+    try {
+      await updateMedicalRecordRequest(
+        editRecord.id,
+        {
+          petId,
+          appointmentId: appointmentId || undefined,
+          doctorName,
+          title,
+          symptoms,
+          diagnosis,
+          treatment,
+          medications,
+          vaccineName: vaccineName || undefined,
+          followUpDate: followUpDate || undefined,
+          weightKg: Number(weightKg) || undefined,
+          temperatureC: Number(temperatureC) || undefined,
+          heartRateBpm: Number(heartRateBpm) || undefined,
+        },
+        updateMedicalRecordInStore,
+      );
+      toast("Đã cập nhật hồ sơ y tế thành công.");
+      resetForm();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Không thể cập nhật hồ sơ y tế.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDeleteSubmit = () => {
+  const handleDeleteSubmit = async () => {
     if (!deleteConfirmRecord) return;
-    deleteMedicalRecord(deleteConfirmRecord.id);
-    setDeleteConfirmRecord(null);
-    toast("Đã xóa hồ sơ y tế.");
+    setFormError("");
+    setIsSubmitting(true);
+    try {
+      await deleteMedicalRecordRequest(deleteConfirmRecord.id, deleteMedicalRecordInStore);
+      setDeleteConfirmRecord(null);
+      toast("Đã xóa hồ sơ y tế.");
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Không thể xóa hồ sơ y tế.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Completed/in_progress appointments for suggestion
@@ -177,6 +216,11 @@ export function AdminMedicalRecordsPage() {
       {toastMsg && (
         <div className="mb-4 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-emerald-800 font-semibold animate-fadeIn">
           <CheckCircle2 size={18} /> {toastMsg}
+        </div>
+      )}
+      {formError && (
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-700">
+          <AlertCircle size={18} /> {formError}
         </div>
       )}
 
@@ -221,6 +265,7 @@ export function AdminMedicalRecordsPage() {
             resetForm();
             setShowCreateForm((v) => !v);
           }}
+          disabled={isSubmitting}
           className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white hover:bg-primary-dark transition-colors shadow-soft"
         >
           <FilePlus2 size={16} />
@@ -378,16 +423,17 @@ export function AdminMedicalRecordsPage() {
           <div className="mt-6 flex justify-end gap-3 pt-3 border-t border-slate-100">
             <button
               onClick={resetForm}
+              disabled={isSubmitting}
               className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
             >
               Hủy
             </button>
             <button
               onClick={handleCreateSubmit}
-              disabled={!petId || !title || !diagnosis || !treatment}
+              disabled={isSubmitting}
               className="rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-50 transition-colors shadow-soft"
             >
-              Lưu hồ sơ y tế
+              {isSubmitting ? "Đang lưu..." : "Lưu hồ sơ y tế"}
             </button>
           </div>
         </div>
@@ -492,7 +538,7 @@ export function AdminMedicalRecordsPage() {
                 <Pencil size={20} className="text-primary" />
                 Chỉnh sửa hồ sơ y tế
               </h3>
-              <button onClick={resetForm} className="text-slate-400 hover:text-slate-600 rounded-lg p-1">
+              <button onClick={resetForm} disabled={isSubmitting} className="text-slate-400 hover:text-slate-600 rounded-lg p-1">
                 <X size={20} />
               </button>
             </div>
@@ -614,16 +660,17 @@ export function AdminMedicalRecordsPage() {
             <div className="pt-4 border-t border-slate-100 flex gap-3 justify-end">
               <button
                 onClick={resetForm}
+                disabled={isSubmitting}
                 className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
               >
                 Hủy
               </button>
               <button
                 onClick={handleEditSubmit}
-                disabled={!title || !diagnosis || !treatment}
+                disabled={isSubmitting}
                 className="rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-50 transition-colors shadow-soft"
               >
-                Cập nhật hồ sơ
+                {isSubmitting ? "Đang cập nhật..." : "Cập nhật hồ sơ"}
               </button>
             </div>
           </div>
@@ -641,6 +688,7 @@ export function AdminMedicalRecordsPage() {
               </h3>
               <button
                 onClick={() => setDeleteConfirmRecord(null)}
+                disabled={isSubmitting}
                 className="text-slate-400 hover:text-slate-600 rounded-lg p-1"
               >
                 <X size={18} />
@@ -658,15 +706,17 @@ export function AdminMedicalRecordsPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteConfirmRecord(null)}
+                disabled={isSubmitting}
                 className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
               >
                 Hủy
               </button>
               <button
                 onClick={handleDeleteSubmit}
-                className="flex-1 rounded-xl bg-rose-600 py-2.5 text-sm font-bold text-white hover:bg-rose-700"
+                disabled={isSubmitting}
+                className="flex-1 rounded-xl bg-rose-600 py-2.5 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-50"
               >
-                Xác nhận xóa
+                {isSubmitting ? "Đang xóa..." : "Xác nhận xóa"}
               </button>
             </div>
           </div>

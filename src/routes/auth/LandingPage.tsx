@@ -7,22 +7,22 @@ const portals = [
   {
     to: "/login",
     icon: LockKeyhole,
-    title: "Đăng nhập chủ nuôi",
-    description: "Truy cập hồ sơ thú cưng, đặt lịch khám, lưu trú và thông báo cá nhân.",
+    title: "Owner sign in",
+    description: "Access pet profiles, appointments, stays, and personal notifications.",
     accent: "bg-primary/10 text-primary",
   },
   {
     to: "/register",
     icon: UserPlus,
-    title: "Đăng ký chủ nuôi",
-    description: "Tạo hồ sơ mới trong vài phút để bắt đầu sử dụng dịch vụ tại Nippon Pet Care.",
+    title: "Owner registration",
+    description: "Create a new account in a few minutes and start using Nippon Pet Care services.",
     accent: "bg-aqua text-primary",
   },
   {
     to: "/admin/login",
     icon: ShieldCheck,
-    title: "Đăng nhập admin",
-    description: "Cổng riêng cho bác sĩ và nhân viên quản trị bệnh viện.",
+    title: "Admin sign in",
+    description: "Private access for doctors and hospital administration staff.",
     accent: "bg-slate-950 text-white",
   },
 ];
@@ -30,12 +30,12 @@ const portals = [
 export function LandingPage() {
   return (
     <AuthShell
-      title="Chăm sóc thú cưng bắt đầu từ một cổng riêng tư"
-      description="Chủ nuôi và nhân viên quản trị được tách thành hai luồng rõ ràng. Đăng nhập để đặt lịch, xem hồ sơ y tế, theo dõi khách sạn thú cưng và nhận thông báo cá nhân."
+      title="Pet Care Starts With a Private Portal"
+      description="Owners and administration staff have clear, separate flows. Sign in to book appointments, review medical records, follow pet hotel stays, and receive personal notifications."
     >
       <div className="mb-6">
-        <p className="text-sm font-extrabold uppercase tracking-[0.24em] text-primary">Chọn cổng truy cập</p>
-        <h2 className="mt-2 text-3xl font-black text-slate-950">Bạn muốn tiếp tục với vai trò nào?</h2>
+        <p className="text-sm font-extrabold uppercase tracking-[0.24em] text-primary">Choose your portal</p>
+        <h2 className="mt-2 text-3xl font-black text-slate-950">How would you like to continue?</h2>
       </div>
 
       <div className="space-y-4">
@@ -59,9 +59,18 @@ export function LandingPage() {
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-3 text-center text-xs font-bold text-slate-500">
-        <div className="rounded-2xl bg-slate-50 p-3"><CalendarDays className="mx-auto mb-2 text-primary" size={18} />Đặt lịch</div>
-        <div className="rounded-2xl bg-slate-50 p-3"><Stethoscope className="mx-auto mb-2 text-primary" size={18} />Hồ sơ y tế</div>
-        <div className="rounded-2xl bg-slate-50 p-3"><Hotel className="mx-auto mb-2 text-primary" size={18} />Pet hotel</div>
+        <div className="rounded-2xl bg-slate-50 p-3">
+          <CalendarDays className="mx-auto mb-2 text-primary" size={18} />
+          Appointments
+        </div>
+        <div className="rounded-2xl bg-slate-50 p-3">
+          <Stethoscope className="mx-auto mb-2 text-primary" size={18} />
+          Medical records
+        </div>
+        <div className="rounded-2xl bg-slate-50 p-3">
+          <Hotel className="mx-auto mb-2 text-primary" size={18} />
+          Pet hotel
+        </div>
       </div>
     </AuthShell>
   );

@@ -10,6 +10,7 @@ CREATE TABLE users (
     phone VARCHAR(20) UNIQUE NOT NULL,
     email VARCHAR(150) UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    password_salt VARCHAR(255) NOT NULL,
     full_name VARCHAR(150) NOT NULL,
     role VARCHAR(30) NOT NULL DEFAULT 'owner' CHECK (role IN ('owner', 'doctor', 'staff', 'admin')),
     address TEXT,

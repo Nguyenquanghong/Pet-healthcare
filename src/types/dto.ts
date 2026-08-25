@@ -16,8 +16,8 @@ import type { HotelBookingStatus } from "./booking";
 // Auth DTOs
 // ---------------------------------------------------------------------------
 export type LoginOwnerDTO = {
-  phone: string;
-  // password?: string; // Thêm khi backend yêu cầu
+  email: string;
+  password: string;
 };
 
 export type LoginAdminDTO = {
@@ -26,9 +26,13 @@ export type LoginAdminDTO = {
 };
 
 export type RegisterOwnerDTO = {
-  fullName: string;
-  phone: string;
-  email?: string;
+  email: string;
+  password?: string;
+  confirmPassword?: string;
+  passwordHash?: string;
+  passwordSalt?: string;
+  fullName?: string;
+  phone?: string;
   address?: string;
 };
 
@@ -112,8 +116,8 @@ export type CreateMedicalRecordDTO = {
   visitDate: string; // YYYY-MM-DD
   title: string;
   symptoms?: string;
-  diagnosis?: string;
-  treatment?: string;
+  diagnosis: string;
+  treatment: string;
   medications?: string;
   vaccineName?: string;
   followUpDate?: string;
@@ -122,7 +126,7 @@ export type CreateMedicalRecordDTO = {
   heartRateBpm?: number;
 };
 
-export type UpdateMedicalRecordDTO = Partial<Omit<CreateMedicalRecordDTO, "petId">>;
+export type UpdateMedicalRecordDTO = Partial<CreateMedicalRecordDTO>;
 
 // ---------------------------------------------------------------------------
 // Notification DTOs

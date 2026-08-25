@@ -9,6 +9,8 @@ export interface DatabaseState {
     username?: string;
     phone: string;
     email?: string;
+    passwordHash?: string;
+    passwordSalt?: string;
     fullName: string;
     role: "owner" | "doctor" | "staff" | "admin";
     address?: string;
@@ -144,6 +146,8 @@ const initialSeedData: DatabaseState = {
       id: "owner_1",
       phone: "0901234567",
       email: "owner@example.com",
+      passwordHash: "2AaUO5pi+D5fOIXcKJSLzJYmMZFmJ0whrUQyh4Tz9DM=",
+      passwordSalt: "bmlwb25ldG8tZGVtby1vd25lci1zYWx0",
       fullName: "Nguyễn Văn A",
       role: "owner",
       address: "Mỹ Đình, Nam Từ Liêm, Hà Nội",
