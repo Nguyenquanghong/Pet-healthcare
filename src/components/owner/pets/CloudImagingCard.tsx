@@ -9,9 +9,9 @@ export function CloudImagingCard({ pet, images }: CloudImagingCardProps) {
   const [activeImage, setActiveImage] = useState<MedicalImage | null>(null);
   const recentImages = [...images].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 4);
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm h-full flex flex-col">
+    <div className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+        <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
           <FolderUp className="text-primary" size={24} />
           Cloud Imaging
         </h3>
@@ -42,7 +42,7 @@ export function CloudImagingCard({ pet, images }: CloudImagingCardProps) {
 
       {activeImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label={activeImage.title}>
-          <div className="relative w-full max-w-3xl rounded-xl bg-white p-3 shadow-2xl">
+          <div className="relative w-full max-w-3xl rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
             <button type="button" onClick={() => setActiveImage(null)} className="absolute right-5 top-5 rounded-lg bg-slate-900/80 p-2 text-white hover:bg-slate-900" aria-label="Close image preview"><X size={18} /></button>
             <img src={activeImage.imageUrl} alt={activeImage.title} className="max-h-[75vh] w-full rounded-lg object-contain" />
             <p className="px-2 pb-1 pt-3 text-sm font-bold text-slate-900">{activeImage.title}</p>

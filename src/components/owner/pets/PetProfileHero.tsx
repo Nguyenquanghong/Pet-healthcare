@@ -22,7 +22,7 @@ export function PetProfileHero({ pet }: { pet: Pet }) {
       
       <div className="flex flex-1 flex-col justify-center p-6 md:p-8">
         <div>
-          <h2 className="text-3xl font-black text-primary">{pet.name}</h2>
+          <h2 className="text-2xl font-semibold text-primary">{pet.name}</h2>
           
           <div className="mt-6 grid gap-x-8 gap-y-6 sm:grid-cols-2">
             <div>

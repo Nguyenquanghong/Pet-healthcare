@@ -17,7 +17,7 @@ export function RoomTypeCard({ roomType, onRoomTypeChange }: RoomTypeCardProps) 
             key={room}
             type="button"
             onClick={() => onRoomTypeChange(room)}
-            className={`rounded-xl border p-4 text-left transition-all ${
+            className={`rounded-md border p-4 text-left transition-colors ${
               roomType === room ? "border-primary bg-primary/5" : "border-slate-200 hover:border-slate-300"
             }`}
           >

@@ -85,7 +85,7 @@ export function OwnerAppointmentCalendar({
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900">
@@ -149,9 +149,9 @@ export function OwnerAppointmentCalendar({
               onClick={() => hasAppointment && onSelectDate(day.value)}
               disabled={!hasAppointment}
               aria-pressed={isSelected}
-              className={`relative min-h-16 rounded-2xl border p-3 text-center transition ${
+              className={`relative min-h-16 rounded-md border p-3 text-center transition-colors ${
                 hasAppointment
-                  ? "border-primary/35 bg-primary/5 text-primary hover:-translate-y-0.5 hover:border-primary hover:bg-primary/10 hover:shadow-soft"
+                  ? "border-primary/35 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10"
                   : "cursor-default border-slate-100 bg-slate-50 text-slate-400"
               } ${isSelected ? "bg-primary/10 ring-2 ring-primary ring-offset-2" : ""}`}
             >

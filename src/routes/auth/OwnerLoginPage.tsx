@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, LockKeyhole, PawPrint } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { Button } from "../../components/ui/Button";
-import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { useAppStore } from "../../store/AppStoreProvider";
 import { AuthShell } from "./AuthShell";
@@ -53,19 +52,16 @@ export function OwnerLoginPage() {
       title="Welcome Back"
       description="Sign in to view appointments, medical records, notifications, and services for your pets."
     >
-      <Card className="border-white/80 bg-white/95 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.1)] lg:p-8">
+      <section>
         <div className="mb-6">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <PawPrint />
-          </div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.22em] text-primary">Sign in</p>
-          <h1 className="mt-2 text-3xl font-black text-slate-950">Owner Portal</h1>
+          <p className="text-sm font-semibold text-primary">Sign in</p>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-950">Owner Portal</h1>
           <p className="mt-2 text-sm leading-6 text-slate-500">
             Demo: use <span className="font-bold text-slate-700">owner@example.com</span> /{" "}
             <span className="font-bold text-slate-700">owner123</span>.
           </p>
         </div>
-        {errors.form && <div className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{errors.form}</div>}
+        {errors.form && <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700">{errors.form}</div>}
         <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <Input
             type="email"
@@ -117,7 +113,7 @@ export function OwnerLoginPage() {
             Back to portal selection
           </Link>
         </div>
-      </Card>
+      </section>
     </AuthShell>
   );
 }

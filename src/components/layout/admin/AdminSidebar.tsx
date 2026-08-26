@@ -15,20 +15,20 @@ export function AdminSidebar() {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col bg-slate-900 p-5 text-white lg:flex">
-      <div className="mb-8">
+    <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-slate-200 bg-white px-4 py-5 text-slate-700 lg:flex">
+      <div className="mb-7 px-2">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5">
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-1">
             <BrandLogo className="h-full w-full" />
           </div>
           <div>
-            <div className="text-base font-extrabold tracking-wide">NIPOPETO</div>
-            <div className="text-xs text-slate-400">Hospital Admin</div>
+            <div className="text-sm font-bold text-slate-950">NIPOPETO</div>
+            <div className="text-xs text-slate-500">Hospital Admin</div>
           </div>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto">
         {adminNav.map((item) => {
           const Icon = item.icon;
           const isNotif = item.to === "/admin/notifications";
@@ -37,10 +37,10 @@ export function AdminSidebar() {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
+                `flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-primary text-white shadow-soft"
-                    : "text-slate-400 hover:bg-white/5 hover:text-white"
+                    ? "bg-slate-100 text-primary"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
                 }`
               }
             >
@@ -59,20 +59,20 @@ export function AdminSidebar() {
       </nav>
 
       {/* Bottom: Staff profile + Logout */}
-      <div className="mt-auto space-y-2">
-        <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3 ring-1 ring-white/5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/30 text-sm font-bold text-aqua">
+      <div className="mt-3 border-t border-slate-200 pt-3">
+        <div className="flex items-center gap-3 px-3 py-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold text-primary">
             BS
           </div>
           <div>
-            <p className="text-sm font-semibold">Bs. Mai Nguyễn</p>
-            <p className="text-xs text-slate-400">Bác sĩ thú y</p>
+            <p className="text-sm font-semibold text-slate-900">Bs. Mai Nguyễn</p>
+            <p className="text-xs text-slate-500">Bác sĩ thú y</p>
           </div>
         </div>
         <button
           type="button"
           onClick={handleLogout}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/5 px-4 py-3 text-center text-sm font-semibold text-slate-400 transition hover:bg-white/10 hover:text-white"
+          className="mt-1 flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-700"
         >
           <LogOut size={16} /> Đăng xuất
         </button>

@@ -11,9 +11,9 @@ export function AdminLayout({ title, children }: AdminLayoutProps) {
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <AdminSidebar />
-      <main className="lg:ml-64 flex flex-col min-h-screen">
+      <main className="flex min-h-screen flex-col lg:ml-60">
         <AdminTopbar title={title} />
-        <div className="p-5 lg:p-8 flex-1">{children}</div>
+        <div className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</div>
       </main>
     </div>
   );

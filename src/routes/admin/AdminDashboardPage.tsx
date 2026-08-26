@@ -5,15 +5,15 @@ import { useAppStore } from "../../store/AppStoreProvider";
 import { appointmentStatusLabels, bookingStatusLabels } from "../../utils/statusLabels";
 import { formatCurrency } from "../../utils/formatCurrency";
 
-function StatCard({ label, value, icon: Icon, color, subtitle }: { label: string; value: number; icon: React.ElementType; color: string; subtitle?: string }) {
+function StatCard({ label, value, icon: Icon, subtitle }: { label: string; value: number; icon: React.ElementType; subtitle?: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex items-center gap-5 hover:shadow-md transition-shadow">
-      <div className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl ${color}`}>
-        <Icon size={24} className="text-white" />
+    <div className="flex items-start gap-3 border-b border-slate-200 bg-white px-4 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+      <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-slate-100 text-primary">
+        <Icon size={17} />
       </div>
       <div>
-        <p className="text-sm text-slate-500">{label}</p>
-        <p className="text-3xl font-black text-slate-900">{value}</p>
+        <p className="text-xs text-slate-500">{label}</p>
+        <p className="mt-0.5 text-2xl font-semibold text-slate-900">{value}</p>
         {subtitle && <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>}
       </div>
     </div>
@@ -34,19 +34,19 @@ export function AdminDashboardPage() {
   return (
     <AdminLayout title="Dashboard">
       {/* Stat Cards — 6 columns */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        <StatCard label="Lịch hôm nay" value={todayAppointments.length} icon={CalendarDays} color="bg-primary" />
-        <StatCard label="Chờ xác nhận" value={pendingAppointments.length} icon={Clock} color="bg-amber-500" subtitle="Lịch khám" />
-        <StatCard label="Pet đang lưu trú" value={checkedInBookings.length} icon={BedDouble} color="bg-emerald-600" />
-        <StatCard label="Tổng thú cưng" value={pets.length} icon={PawPrint} color="bg-indigo-600" subtitle={`${pets.filter(p => p.species === "dog").length} chó · ${pets.filter(p => p.species === "cat").length} mèo`} />
-        <StatCard label="Chủ nuôi" value={owners.length} icon={Users} color="bg-cyan-600" />
-        <StatCard label="Thông báo mới" value={unreadNotifications} icon={Bell} color="bg-rose-500" />
+      <div className="grid overflow-hidden rounded-lg border border-slate-200 bg-white sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <StatCard label="Lịch hôm nay" value={todayAppointments.length} icon={CalendarDays} />
+        <StatCard label="Chờ xác nhận" value={pendingAppointments.length} icon={Clock} subtitle="Lịch khám" />
+        <StatCard label="Pet đang lưu trú" value={checkedInBookings.length} icon={BedDouble} />
+        <StatCard label="Tổng thú cưng" value={pets.length} icon={PawPrint} subtitle={`${pets.filter(p => p.species === "dog").length} chó · ${pets.filter(p => p.species === "cat").length} mèo`} />
+        <StatCard label="Chủ nuôi" value={owners.length} icon={Users} />
+        <StatCard label="Thông báo mới" value={unreadNotifications} icon={Bell} />
       </div>
 
       {/* Quick Actions Panel */}
       {(pendingAppointments.length > 0 || pendingBookings.length > 0) && (
-        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-5 shadow-sm">
-          <h2 className="text-sm font-bold text-amber-800 mb-3 flex items-center gap-2">
+        <div className="mt-6 rounded-lg border border-amber-200 bg-white p-4">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Zap size={16} /> Hành động nhanh — Cần xử lý
           </h2>
           <div className="flex flex-wrap gap-2">
@@ -58,7 +58,7 @@ export function AdminDashboardPage() {
                   onClick={() => {
                     updateAppointmentStatus(a.id, "confirmed");
                   }}
-                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-xs"
+                  className="inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100"
                 >
                   <CheckCircle2 size={14} className="text-emerald-600" />
                   Xác nhận lịch {pet?.name} · {a.time} {a.date}
@@ -73,7 +73,7 @@ export function AdminDashboardPage() {
                   onClick={() => {
                     updateHotelBookingStatus(b.id, "confirmed");
                   }}
-                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-xs"
+                  className="inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100"
                 >
                   <BedDouble size={14} className="text-indigo-600" />
                   Xác nhận hotel {pet?.name} · {b.checkIn} → {b.checkOut}
@@ -84,11 +84,11 @@ export function AdminDashboardPage() {
         </div>
       )}
 
-      <div className="mt-8 grid gap-6 xl:grid-cols-2">
+      <div className="mt-6 grid gap-5 xl:grid-cols-2">
         {/* Today Appointments */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="border-b border-slate-100 px-6 py-5 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900">Lịch khám hôm nay</h2>
+            <h2 className="text-base font-semibold text-slate-900">Lịch khám hôm nay</h2>
             <button
               onClick={() => navigate("/admin/appointments")}
               className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1"
@@ -103,7 +103,7 @@ export function AdminDashboardPage() {
               return (
                 <div key={a.id} className="flex items-center justify-between gap-4 px-6 py-4">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-600">
+                    <div className="flex h-9 w-12 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold text-slate-700">
                       {a.time}
                     </div>
                     <div>
@@ -139,9 +139,9 @@ export function AdminDashboardPage() {
         </div>
 
         {/* Pending Hotel Bookings */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="border-b border-slate-100 px-6 py-5 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900">Hotel Booking chờ xử lý</h2>
+            <h2 className="text-base font-semibold text-slate-900">Hotel Booking chờ xử lý</h2>
             <button
               onClick={() => navigate("/admin/hotel-bookings")}
               className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1"
@@ -182,11 +182,11 @@ export function AdminDashboardPage() {
       </div>
 
       {/* Pets In Stay + Recent Medical Records */}
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
+      <div className="mt-5 grid gap-5 xl:grid-cols-2">
         {/* Pets Currently In Hotel */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="border-b border-slate-100 px-6 py-5">
-            <h2 className="text-xl font-bold text-slate-900">🏨 Pet đang lưu trú</h2>
+            <h2 className="text-base font-semibold text-slate-900">Pet đang lưu trú</h2>
           </div>
           <div className="divide-y divide-slate-100">
             {checkedInBookings.map(b => {
@@ -203,7 +203,7 @@ export function AdminDashboardPage() {
                       <p className="text-xs text-slate-500">{owner?.fullName} · {b.checkIn} → {b.checkOut}</p>
                     </div>
                   </div>
-                  <span className="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 animate-pulse">
+                  <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
                     Đang lưu trú
                   </span>
                 </div>
@@ -216,9 +216,9 @@ export function AdminDashboardPage() {
         </div>
 
         {/* Recent Medical Records */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="border-b border-slate-100 px-6 py-5 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900">📋 Bệnh án gần đây</h2>
+            <h2 className="text-base font-semibold text-slate-900">Bệnh án gần đây</h2>
             <button
               onClick={() => navigate("/admin/medical-records")}
               className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1"

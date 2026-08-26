@@ -40,54 +40,54 @@ export function DashboardPage() {
 
   return (
     <OwnerLayout title="Tổng quan">
-      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-2xl font-black text-slate-900">Xin chào, {currentOwner.fullName}</h2>
-          <p className="mt-1 text-slate-600">
+          <h2 className="text-xl font-semibold text-slate-900">Xin chào, {currentOwner.fullName}</h2>
+          <p className="mt-1 max-w-3xl text-sm text-slate-600">
             Quản lý hồ sơ thú cưng, lịch khám, hotel booking và thông báo chăm sóc trong một nơi.
           </p>
         </div>
         {unreadNotiCount > 0 && (
           <Link
             to="/owner/notifications"
-            className="inline-flex items-center gap-2 rounded-2xl bg-primary/10 border border-primary/20 px-4 py-2 text-xs font-bold text-primary hover:bg-primary/15 transition-colors self-start md:self-auto"
+            className="inline-flex self-start items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-slate-50 md:self-auto"
           >
-            <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
             {unreadNotiCount} thông báo mới
           </Link>
         )}
       </div>
 
-      <div className="mb-6 grid gap-3 md:grid-cols-3">
+      <div className="mb-6 grid overflow-hidden rounded-lg border border-slate-200 bg-white md:grid-cols-3 md:divide-x md:divide-slate-200">
         <Link
           to="/owner/pets"
-          className="rounded-2xl border border-primary/10 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-soft"
+          className="border-b border-slate-200 p-4 transition-colors hover:bg-slate-50 md:border-b-0"
         >
-          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-primary">
             <Plus size={18} />
           </div>
-          <p className="font-black text-slate-900">Thêm / sửa thú cưng</p>
-          <p className="mt-1 text-sm text-slate-500">Cập nhật hồ sơ để sử dụng dịch vụ nhanh hơn.</p>
+          <p className="text-sm font-semibold text-slate-900">Thêm / sửa thú cưng</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">Cập nhật hồ sơ để sử dụng dịch vụ nhanh hơn.</p>
         </Link>
         <Link
           to="/owner/appointments"
-          className="rounded-2xl border border-primary/10 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-soft"
+          className="border-b border-slate-200 p-4 transition-colors hover:bg-slate-50 md:border-b-0"
         >
-          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+          <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-primary">
             <CalendarPlus size={18} />
           </div>
-          <p className="font-black text-slate-900">Đặt lịch khám</p>
-          <p className="mt-1 text-sm text-slate-500">Gửi yêu cầu khám, tiêm phòng hoặc tư vấn.</p>
+          <p className="text-sm font-semibold text-slate-900">Đặt lịch khám</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">Gửi yêu cầu khám, tiêm phòng hoặc tư vấn.</p>
         </Link>
         <Link
           to="/owner/hotel-booking"
-          className="rounded-2xl border border-primary/10 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-soft"
+          className="p-4 transition-colors hover:bg-slate-50"
         >
-          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+          <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-primary">
             <Hotel size={18} />
           </div>
-          <p className="font-black text-slate-900">Đặt hotel thú cưng</p>
-          <p className="mt-1 text-sm text-slate-500">Chọn phòng, dịch vụ thêm và theo dõi lưu trú.</p>
+          <p className="text-sm font-semibold text-slate-900">Đặt hotel thú cưng</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">Chọn phòng, dịch vụ thêm và theo dõi lưu trú.</p>
         </Link>
       </div>
 
@@ -110,7 +110,7 @@ export function DashboardPage() {
         <div className="space-y-6">
           <div>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-slate-900">Thú cưng của bạn ({ownerPets.length})</h3>
+              <h3 className="text-base font-semibold text-slate-900">Thú cưng của bạn ({ownerPets.length})</h3>
               <Link to="/owner/pets" className="text-sm font-semibold text-primary hover:underline">
                 Quản lý
               </Link>
@@ -124,17 +124,17 @@ export function DashboardPage() {
 
           {/* Active Hotel Stay Card */}
           {activeHotelBookings.length > 0 && (
-            <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/70 to-blue-50/50 p-5 shadow-sm">
+            <div className="rounded-lg border border-slate-200 bg-white p-5">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-indigo-950 flex items-center gap-2 text-base">
-                  <BedSingle size={18} className="text-indigo-600" />
+                <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                  <BedSingle size={18} className="text-primary" />
                   Lưu trú khách sạn đang hoạt động
                 </h3>
-                <span className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white">
+                <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
                   {bookingStatusLabels[activeHotelBookings[0].status]}
                 </span>
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-indigo-900">
+              <div className="flex flex-col gap-3 text-xs text-slate-700 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-bold text-sm text-slate-900">
                     {ownerPets.find((p) => p.id === activeHotelBookings[0].petId)?.name ?? "Thú cưng"} &bull; Phòng{" "}
@@ -147,7 +147,7 @@ export function DashboardPage() {
                 </div>
                 <Link
                   to="/owner/hotel-booking"
-                  className="inline-flex items-center gap-1 font-bold text-indigo-600 hover:text-indigo-700 bg-white border border-indigo-200 rounded-xl px-3 py-2 shadow-xs"
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 font-semibold text-primary hover:bg-slate-50"
                 >
                   Xem nhật ký chăm sóc <ArrowRight size={12} />
                 </Link>
@@ -157,9 +157,9 @@ export function DashboardPage() {
 
           {/* Latest Medical Record summary */}
           {latestMedicalRecord && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-lg border border-slate-200 bg-white p-5">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="font-bold text-slate-900 flex items-center gap-2 text-base">
+                <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
                   <FileText size={18} className="text-primary" />
                   Hồ sơ y tế gần nhất
                 </h3>
@@ -180,9 +180,9 @@ export function DashboardPage() {
             </div>
           )}
 
-          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
             <div className="border-b border-slate-100 px-5 py-4">
-              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
                 Thông báo & Nhắc nhở
               </h3>
             </div>
@@ -193,9 +193,9 @@ export function DashboardPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
             <div className="border-b border-slate-100 px-5 py-4">
-              <h3 className="text-xl font-bold text-slate-900">Lịch trình sắp tới</h3>
+              <h3 className="text-base font-semibold text-slate-900">Lịch trình sắp tới</h3>
             </div>
             <div className="p-5">
               <UpcomingSchedule appointments={upcomingAppointments} />

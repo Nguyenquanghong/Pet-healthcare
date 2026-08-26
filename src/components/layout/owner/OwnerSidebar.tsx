@@ -17,16 +17,16 @@ export function OwnerSidebar() {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col bg-primary p-5 text-white shadow-2xl lg:flex">
+    <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-slate-200 bg-white px-4 py-5 text-slate-700 lg:flex">
       {/* Brand */}
-      <div className="mb-8">
+      <div className="mb-7 px-2">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5 ring-1 ring-white/20">
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-1">
             <BrandLogo className="h-full w-full" />
           </div>
           <div>
-            <div className="text-base font-extrabold tracking-wide">NIPOPETO</div>
-            <div className="mt-0.5 text-[10px] font-medium leading-4 text-cyan-100">
+            <div className="text-sm font-bold text-slate-950">NIPOPETO</div>
+            <div className="mt-0.5 text-[9px] font-medium leading-3.5 text-slate-500">
               <span className="block">Công Nghệ Nhật Bản -</span>
               <span className="block">Tận Tâm Chăm Sóc Thú Cưng</span>
             </div>
@@ -36,7 +36,7 @@ export function OwnerSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1">
+      <nav className="flex-1 space-y-0.5">
         {ownerNav.map((item) => {
           const Icon = item.icon;
           const isNotif = item.to === "/owner/notifications";
@@ -46,10 +46,10 @@ export function OwnerSidebar() {
               to={item.to}
               end={item.to === "/owner/dashboard"}
               className={({ isActive }) =>
-                `flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
+                `flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-white/20 text-white shadow-soft ring-1 ring-white/20"
-                    : "text-cyan-100/80 hover:bg-white/10 hover:text-white"
+                    ? "bg-slate-100 text-primary"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
                 }`
               }
             >
@@ -68,13 +68,13 @@ export function OwnerSidebar() {
       </nav>
 
       {/* Bottom: Logout */}
-      <div className="mt-auto border-t border-white/10 pt-4">
+      <div className="mt-auto border-t border-slate-200 pt-3">
         <button
           type="button"
           id="owner-sidebar-logout"
           onClick={handleLogout}
           aria-label="Đăng xuất tài khoản"
-          className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-center text-sm font-semibold text-cyan-100 transition hover:bg-rose-500/15 hover:text-rose-100"
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-700"
         >
           <LogOut size={16} /> Đăng xuất
         </button>

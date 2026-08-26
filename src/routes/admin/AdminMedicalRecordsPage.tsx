@@ -639,8 +639,8 @@ export function AdminMedicalRecordsPage() {
 
       {/* Edit Record Modal */}
       {editRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl my-8 animate-scaleUp max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4">
+          <div className="my-8 max-h-[90vh] w-full max-w-2xl animate-scaleUp overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <Pencil size={20} className="text-primary" />
@@ -787,8 +787,8 @@ export function AdminMedicalRecordsPage() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md animate-scaleUp rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-lg font-bold text-rose-600 flex items-center gap-2">
                 <AlertCircle size={20} />
@@ -833,8 +833,8 @@ export function AdminMedicalRecordsPage() {
 
       {/* View Detail Modal */}
       {viewDetailRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl my-8 animate-scaleUp max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4">
+          <div className="my-8 max-h-[90vh] w-full max-w-xl animate-scaleUp overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <FileText size={20} className="text-primary" />

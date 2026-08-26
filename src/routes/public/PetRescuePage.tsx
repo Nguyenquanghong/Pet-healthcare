@@ -78,7 +78,7 @@ export function PetRescuePage() {
   if (qrUnavailable) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-7 text-center">
           <QrCode size={48} className="mx-auto mb-4 text-slate-300" />
           <h1 className="mb-2 text-xl font-bold text-slate-900">QR cứu hộ không khả dụng</h1>
           <p className="mb-6 text-sm leading-6 text-slate-500">
@@ -86,7 +86,7 @@ export function PetRescuePage() {
           </p>
           <Link
             to="/"
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-soft"
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-white"
           >
             <ArrowLeft size={16} /> Về trang chủ
           </Link>
@@ -98,22 +98,22 @@ export function PetRescuePage() {
   const medicalAlerts = pet.allergies?.filter((item) => item.toLowerCase() !== "không") ?? [];
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-      <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
-        <section className="bg-gradient-to-r from-rose-600 to-amber-600 p-6 text-white sm:p-8">
-          <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-black uppercase tracking-wide backdrop-blur-xs">
+    <div className="min-h-screen bg-slate-100 p-3 sm:p-6">
+      <main className="mx-auto w-full max-w-5xl overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <section className="border-b border-slate-200 bg-white p-6 sm:p-8">
+          <div className="mb-3 inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
             <AlertTriangle size={14} /> Pet rescue QR
           </div>
-          <h1 className="text-3xl font-black sm:text-4xl">Xin chào, mình là {pet.name}</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/90">
+          <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Xin chào, mình là {pet.name}</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
             Nếu bạn đang đọc trang này, có thể mình đang đi lạc. Vui lòng giữ mình an toàn và liên hệ chủ nuôi.
           </p>
         </section>
 
         <div className="grid gap-0 lg:grid-cols-[1fr_0.9fr]">
           <section className="space-y-5 p-6 sm:p-8">
-            <div className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white text-4xl shadow-xs">
+            <div className="flex items-center gap-4 border-b border-slate-200 pb-5">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white text-4xl">
                 {pet.avatarUrl ? (
                   <img src={pet.avatarUrl} alt={pet.name} className="h-full w-full object-cover" />
                 ) : (
@@ -121,7 +121,7 @@ export function PetRescuePage() {
                 )}
               </div>
               <div>
-                <h2 className="text-2xl font-black text-slate-900">{pet.name}</h2>
+                <h2 className="text-2xl font-semibold text-slate-900">{pet.name}</h2>
                 <p className="mt-1 text-sm font-semibold text-slate-600">
                   {pet.breed} • {pet.ageLabel} • {genderLabels[pet.gender]}
                 </p>
@@ -130,22 +130,22 @@ export function PetRescuePage() {
             </div>
 
             {publicProfile.rescueNote && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-sm font-black text-amber-900">Lời nhắn từ chủ nuôi</p>
+              <div className="border-l-2 border-amber-500 bg-amber-50 p-4">
+                <p className="text-sm font-semibold text-amber-900">Lời nhắn từ chủ nuôi</p>
                 <p className="mt-1 text-sm leading-6 text-amber-800">{publicProfile.rescueNote}</p>
               </div>
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               {pet.identifyingMarks && (
-                <div className="rounded-2xl border border-slate-200 p-4">
-                  <p className="text-xs font-black uppercase tracking-wider text-slate-500">Đặc điểm nhận dạng</p>
+                <div className="rounded-md border border-slate-200 p-4">
+                  <p className="text-xs font-semibold text-slate-500">Đặc điểm nhận dạng</p>
                   <p className="mt-2 text-sm font-semibold text-slate-800">{pet.identifyingMarks}</p>
                 </div>
               )}
               {pet.lastSeenLocation && (
-                <div className="rounded-2xl border border-slate-200 p-4">
-                  <p className="text-xs font-black uppercase tracking-wider text-slate-500">Khu vực quen thuộc</p>
+                <div className="rounded-md border border-slate-200 p-4">
+                  <p className="text-xs font-semibold text-slate-500">Khu vực quen thuộc</p>
                   <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-800">
                     <MapPin size={15} className="text-primary" /> {pet.lastSeenLocation}
                   </p>
@@ -154,7 +154,7 @@ export function PetRescuePage() {
             </div>
 
             {publicProfile.showMedicalAlerts && medicalAlerts.length > 0 && (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <div className="rounded-md border border-rose-200 bg-rose-50 p-4">
                 <div className="mb-1 flex items-center gap-2 text-sm font-bold text-rose-800">
                   <AlertTriangle size={16} /> Cảnh báo y tế
                 </div>
@@ -164,7 +164,7 @@ export function PetRescuePage() {
               </div>
             )}
 
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
               <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-primary">Liên hệ chủ nuôi</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
@@ -182,7 +182,7 @@ export function PetRescuePage() {
                 {publicProfile.showOwnerPhone && owner?.phone && (
                   <a
                     href={`tel:${owner.phone}`}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3.5 text-sm font-black text-white shadow-soft transition-colors hover:bg-emerald-700"
+                    className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-700 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-800"
                   >
                     <Phone size={18} /> Gọi cho chủ nuôi ({owner.phone})
                   </a>
@@ -191,7 +191,7 @@ export function PetRescuePage() {
                 {publicProfile.showOwnerEmail && owner?.email && (
                   <a
                     href={`mailto:${owner.email}`}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                    className="flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
                     <Mail size={17} /> Gửi email
                   </a>
@@ -199,7 +199,7 @@ export function PetRescuePage() {
               </div>
             </div>
 
-            <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
+            <div className="space-y-2 border-t border-slate-200 pt-4 text-xs text-slate-600">
               <div className="flex items-center gap-2 font-bold text-slate-800">
                 <Building size={16} className="text-primary" />
                 Hỗ trợ bởi NIPOPETO
@@ -214,19 +214,19 @@ export function PetRescuePage() {
           </section>
 
           <section className="border-t border-slate-200 bg-slate-50 p-6 sm:p-8 lg:border-l lg:border-t-0">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-lg border border-slate-200 bg-white p-5">
               <div className="mb-4 flex items-center gap-2">
                 <ShieldCheck size={20} className="text-primary" />
-                <h2 className="text-lg font-black text-slate-900">Báo đã tìm thấy pet</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Báo đã tìm thấy pet</h2>
               </div>
               <p className="mb-5 text-sm leading-6 text-slate-500">
                 Thông tin này sẽ được gửi riêng cho chủ nuôi trong hệ thống. Không cần đăng nhập.
               </p>
 
               {sent ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-5 text-center">
                   <CheckCircle2 size={34} className="mx-auto mb-3 text-emerald-600" />
-                  <h3 className="font-black text-emerald-900">Đã gửi thông tin cho chủ nuôi</h3>
+                  <h3 className="font-semibold text-emerald-900">Đã gửi thông tin cho chủ nuôi</h3>
                   <p className="mt-2 text-sm leading-6 text-emerald-700">
                     Cảm ơn bạn đã giúp đỡ. Chủ nuôi sẽ nhận được vị trí và số điện thoại liên hệ của bạn.
                   </p>
@@ -277,7 +277,7 @@ export function PetRescuePage() {
             Hệ sinh thái Quản lý Thú cưng Thông minh <Heart size={12} className="fill-rose-500 text-rose-500" /> NIPOPETO
           </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

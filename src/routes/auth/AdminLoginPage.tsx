@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, LockKeyhole, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { Button } from "../../components/ui/Button";
-import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { useAppStore } from "../../store/AppStoreProvider";
 import { AuthShell } from "./AuthShell";
@@ -40,22 +39,18 @@ export function AdminLoginPage() {
       description="A private portal for doctors and operations staff to manage appointments, pet records, notifications, and hospital activity."
       tone="admin"
     >
-      <Card className="border-slate-800 bg-slate-900 p-6 text-white shadow-[0_24px_70px_rgba(0,0,0,0.28)] lg:p-8">
+      <section>
         <div className="mb-6">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-aqua text-primary">
-            <ShieldCheck />
-          </div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.22em] text-aqua">Internal security</p>
-          <h1 className="mt-2 text-3xl font-black">Admin Sign In</h1>
-          <p className="mt-2 text-sm text-slate-400">
-            Demo: <span className="font-bold text-white">admin</span> / <span className="font-bold text-white">admin123</span>.
+          <p className="text-sm font-semibold text-primary">Internal access</p>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-950">Admin Sign In</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Demo: <span className="font-semibold text-slate-700">admin</span> / <span className="font-semibold text-slate-700">admin123</span>.
           </p>
         </div>
-        {error && <div className="mb-4 rounded-xl bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-300">{error}</div>}
+        {error && <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700">{error}</div>}
         <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <Input
             label="Username *"
-            labelClassName="text-slate-200"
             value={username}
             onChange={(event) => {
               setUsername(event.target.value);
@@ -69,7 +64,6 @@ export function AdminLoginPage() {
             <Input
               type={showPassword ? "text" : "password"}
               label="Password *"
-              labelClassName="text-slate-200"
               value={password}
               onChange={(event) => {
                 setPassword(event.target.value);
@@ -82,7 +76,7 @@ export function AdminLoginPage() {
             />
             <button
               type="button"
-              className="absolute right-3 top-9 rounded-lg p-1 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+              className="absolute right-3 top-9 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
               onClick={() => setShowPassword((value) => !value)}
               aria-label={showPassword ? "Hide password" : "Show password"}
               disabled={isSubmitting}
@@ -94,10 +88,10 @@ export function AdminLoginPage() {
             {isSubmitting ? "Signing in..." : "Sign in as admin"}
           </Button>
         </form>
-        <Link to="/" className="mt-5 block text-center text-sm font-semibold text-slate-400 hover:text-white">
+        <Link to="/" className="mt-5 block text-center text-sm font-semibold text-slate-500 hover:text-primary">
           Back to portal selection
         </Link>
-      </Card>
+      </section>
     </AuthShell>
   );
 }

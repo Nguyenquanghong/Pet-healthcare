@@ -11,9 +11,9 @@ export function OwnerLayout({ title, children }: OwnerLayoutProps) {
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <OwnerSidebar />
-      <main className="lg:ml-64 flex flex-col min-h-screen">
+      <main className="flex min-h-screen flex-col lg:ml-60">
         <OwnerTopbar title={title} />
-        <div className="p-5 lg:p-8 flex-1 flex flex-col">{children}</div>
+        <div className="mx-auto flex w-full max-w-[1480px] flex-1 flex-col px-4 py-6 sm:px-6 lg:px-8">{children}</div>
       </main>
     </div>
   );

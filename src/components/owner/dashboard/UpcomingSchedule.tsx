@@ -23,7 +23,7 @@ export function UpcomingSchedule({ appointments }: { appointments: Appointment[]
   }
 
   return (
-    <div className="space-y-3.5">
+    <div className="divide-y divide-slate-100">
       {appointments.slice(0, 3).map((appointment, index) => {
         const pet = pets.find((p) => p.id === appointment.petId);
 
@@ -44,10 +44,10 @@ export function UpcomingSchedule({ appointments }: { appointments: Appointment[]
         return (
           <div
             key={appointment.id}
-            className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50/50 p-3.5 hover:bg-slate-50 transition-colors"
+            className="flex items-center gap-3 py-3.5 first:pt-0"
           >
             <div
-              className={`flex flex-col items-center justify-center rounded-xl px-3 py-2 text-center h-14 w-14 flex-shrink-0 ${
+              className={`flex h-12 w-12 flex-shrink-0 flex-col items-center justify-center rounded-md px-2 py-1.5 text-center ${
                 isPending
                   ? "bg-amber-100 text-amber-800"
                   : index === 0
@@ -55,8 +55,8 @@ export function UpcomingSchedule({ appointments }: { appointments: Appointment[]
                   : "bg-blue-100 text-blue-800"
               }`}
             >
-              <span className="text-lg font-black leading-tight">{day}</span>
-              <span className="text-[10px] font-bold uppercase">{monthShort}</span>
+              <span className="text-base font-semibold leading-tight">{day}</span>
+              <span className="text-[10px] font-medium">{monthShort}</span>
             </div>
 
             <div className="flex-1 min-w-0">

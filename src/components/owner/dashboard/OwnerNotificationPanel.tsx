@@ -43,7 +43,7 @@ export function OwnerNotificationPanel() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="divide-y divide-slate-100">
       {myNotifications.slice(0, 4).map((notif) => {
         const isUnread = notif.status === "sent";
 
@@ -51,11 +51,11 @@ export function OwnerNotificationPanel() {
           <div
             key={notif.id}
             onClick={() => isUnread && markNotificationRead(notif.id)}
-            className={`flex items-start gap-3.5 rounded-xl border p-3.5 transition-colors cursor-pointer hover:shadow-xs ${
-              isUnread ? "border-primary/25 bg-blue-50/50" : "border-slate-200 bg-white"
+            className={`flex cursor-pointer items-start gap-3 py-3.5 first:pt-0 ${
+              isUnread ? "bg-slate-50" : "bg-white"
             }`}
           >
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-slate-100 text-base">
               {TYPE_ICON[notif.type] ?? "📢"}
             </div>
             <div className="flex-1 min-w-0">

@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, CalendarDays, Hotel, LockKeyhole, ShieldCheck, Stethoscope, UserPlus } from "lucide-react";
-import { Card } from "../../components/ui/Card";
+import { ArrowRight, LockKeyhole, ShieldCheck, UserPlus } from "lucide-react";
 import { AuthShell } from "./AuthShell";
 
 const portals = [
@@ -9,21 +8,18 @@ const portals = [
     icon: LockKeyhole,
     title: "Owner sign in",
     description: "Access pet profiles, appointments, stays, and personal notifications.",
-    accent: "bg-primary/10 text-primary",
   },
   {
     to: "/register",
     icon: UserPlus,
     title: "Owner registration",
     description: "Create a new account in a few minutes and start using Nippon Pet Care services.",
-    accent: "bg-aqua text-primary",
   },
   {
     to: "/admin/login",
     icon: ShieldCheck,
     title: "Admin sign in",
     description: "Private access for doctors and hospital administration staff.",
-    accent: "bg-slate-950 text-white",
   },
 ];
 
@@ -34,44 +30,29 @@ export function LandingPage() {
       description="Owners and administration staff have clear, separate flows. Sign in to book appointments, review medical records, follow pet hotel stays, and receive personal notifications."
     >
       <div className="mb-6">
-        <p className="text-sm font-extrabold uppercase tracking-[0.24em] text-primary">Choose your portal</p>
-        <h2 className="mt-2 text-3xl font-black text-slate-950">How would you like to continue?</h2>
+        <p className="text-sm font-semibold text-primary">Choose your portal</p>
+        <h2 className="mt-1 text-2xl font-semibold text-slate-950">How would you like to continue?</h2>
+        <p className="mt-2 text-sm text-slate-500">Select the account area that matches your role.</p>
       </div>
 
-      <div className="space-y-4">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         {portals.map((portal) => {
           const Icon = portal.icon;
           return (
-            <Link key={portal.to} to={portal.to} className="group block">
-              <Card className="flex items-center gap-4 border-white/80 bg-white/90 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] transition duration-200 hover:-translate-y-1 hover:border-primary/20 hover:shadow-[0_22px_55px_rgba(0,63,112,0.16)]">
-                <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${portal.accent}`}>
-                  <Icon size={24} />
+            <Link key={portal.to} to={portal.to} className="group flex items-center gap-4 border-b border-slate-200 p-4 last:border-b-0 hover:bg-slate-50">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-primary">
+                  <Icon size={20} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-lg font-black text-slate-950">{portal.title}</h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-500">{portal.description}</p>
+                  <h3 className="text-sm font-semibold text-slate-950">{portal.title}</h3>
+                  <p className="mt-0.5 text-sm leading-5 text-slate-500">{portal.description}</p>
                 </div>
-                <ArrowRight className="text-slate-300 transition group-hover:translate-x-1 group-hover:text-primary" size={22} />
-              </Card>
+                <ArrowRight className="text-slate-400 group-hover:text-primary" size={18} />
             </Link>
           );
         })}
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-3 text-center text-xs font-bold text-slate-500">
-        <div className="rounded-2xl bg-slate-50 p-3">
-          <CalendarDays className="mx-auto mb-2 text-primary" size={18} />
-          Appointments
-        </div>
-        <div className="rounded-2xl bg-slate-50 p-3">
-          <Stethoscope className="mx-auto mb-2 text-primary" size={18} />
-          Medical records
-        </div>
-        <div className="rounded-2xl bg-slate-50 p-3">
-          <Hotel className="mx-auto mb-2 text-primary" size={18} />
-          Pet hotel
-        </div>
-      </div>
     </AuthShell>
   );
 }

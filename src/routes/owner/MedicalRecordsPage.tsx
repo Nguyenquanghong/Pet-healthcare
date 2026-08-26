@@ -48,7 +48,7 @@ export function MedicalRecordsPage() {
         />
       ) : pet ? (
         <>
-          <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+          <div className="mb-6 flex flex-col gap-4 border-b border-slate-200 bg-white px-0 pb-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
               <div className="h-14 w-14 overflow-hidden rounded-full border border-slate-200 bg-slate-50">
                 <img
@@ -58,7 +58,7 @@ export function MedicalRecordsPage() {
                 />
               </div>
               <div>
-                <h2 className="text-2xl font-black text-slate-900">{pet.name} ({pet.breed})</h2>
+                <h2 className="text-xl font-semibold text-slate-900">{pet.name} ({pet.breed})</h2>
                 <p className="text-sm text-slate-600">{pet.ageLabel} &bull; {genderLabels[pet.gender]} &bull; {petRecords.length} hồ sơ y tế</p>
               </div>
             </div>

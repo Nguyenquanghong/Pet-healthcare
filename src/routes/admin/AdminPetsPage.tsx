@@ -195,8 +195,8 @@ export function AdminPetsPage() {
 
       {/* Pet Detail Modal */}
       {selectedPet && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl my-8 animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4">
+          <div className="my-8 w-full max-w-2xl animate-scaleUp rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
             {/* Header */}
             <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-100">
               <div className="flex items-center gap-4">

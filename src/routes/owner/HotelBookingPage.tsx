@@ -85,22 +85,22 @@ export function HotelBookingPage() {
           }
         />
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-5 text-xl font-bold text-slate-900 flex items-center gap-2">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+          <div>
+            <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
+              <h2 className="mb-5 flex items-center gap-2 text-lg font-semibold text-slate-900">
                 <Hotel size={20} className="text-primary" />
                 Thông tin đặt phòng
               </h2>
 
               {success && (
-                <div className="mb-5 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm font-semibold text-emerald-800">
+                <div className="mb-5 flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
                   <CheckCircle2 size={16} /> Đã gửi yêu cầu! Bệnh viện sẽ xác nhận trong thời gian sớm nhất.
                 </div>
               )}
 
               {feedbackMsg && (
-                <div className="mb-5 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm font-semibold text-emerald-800">
+                <div className="mb-5 flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
                   <CheckCircle2 size={16} /> {feedbackMsg}
                 </div>
               )}
@@ -117,7 +117,7 @@ export function HotelBookingPage() {
                   placeholder="Chế độ ăn, thuốc, thói quen, dị ứng, giờ đưa đón..."
                 />
               </div>
-            </div>
+            </section>
           </div>
 
           <div className="space-y-6">
@@ -131,7 +131,7 @@ export function HotelBookingPage() {
             />
 
             {/* List of bookings */}
-            <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
               <div className="border-b border-slate-100 px-5 py-4">
                 <h3 className="font-bold text-slate-900">Booking của bạn</h3>
               </div>
@@ -154,7 +154,7 @@ export function HotelBookingPage() {
                           </p>
                           <p className="text-sm font-bold text-primary mt-1">{formatCurrency(b.totalAmount)}</p>
                           {b.ownerNote && (
-                            <p className="text-xs text-slate-500 mt-1 bg-slate-50 border border-slate-100 rounded-lg p-2">
+                            <p className="mt-1 rounded-md border border-slate-100 bg-slate-50 p-2 text-xs text-slate-500">
                               📝 {b.ownerNote}
                             </p>
                           )}
@@ -162,7 +162,7 @@ export function HotelBookingPage() {
 
                         <div className="flex flex-col items-end gap-2">
                           <span
-                            className={`flex-shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${
+                            className={`flex-shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${
                               BOOKING_STATUS_STYLES[b.status] ?? "bg-slate-100 text-slate-600"
                             }`}
                           >
@@ -172,7 +172,7 @@ export function HotelBookingPage() {
                           {canCancel && (
                             <button
                               onClick={() => setCancelTarget(b)}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition-colors"
+                              className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-100 hover:text-rose-700"
                             >
                               <Ban size={12} /> Hủy booking
                             </button>
@@ -182,7 +182,7 @@ export function HotelBookingPage() {
 
                       {/* Daily Care Notes Section for this Booking */}
                       {relatedNotes.length > 0 && (
-                        <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3.5 space-y-2.5">
+                        <div className="space-y-2.5 border-l-2 border-primary bg-slate-50 p-3.5">
                           <p className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
                             <MessageSquareText size={14} className="text-indigo-600" />
                             Nhật ký chăm sóc hàng ngày ({relatedNotes.length})
@@ -191,7 +191,7 @@ export function HotelBookingPage() {
                             {relatedNotes.map((note) => (
                               <div
                                 key={note.id}
-                                className="rounded-lg bg-white border border-indigo-100/80 p-3 text-xs shadow-xs space-y-1"
+                                className="space-y-1 border-t border-slate-200 pt-3 text-xs first:border-t-0 first:pt-0"
                               >
                                 <div className="flex items-center justify-between text-slate-500 font-medium">
                                   <span className="font-bold text-slate-700">{note.date}</span>
@@ -217,15 +217,15 @@ export function HotelBookingPage() {
                   <p className="px-5 py-8 text-center text-sm text-slate-400">Chưa có booking nào.</p>
                 )}
               </div>
-            </div>
+            </section>
           </div>
         </div>
       )}
 
       {/* Cancel Booking Modal */}
       {cancelTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md animate-scaleUp rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 text-rose-600">
                 <Ban size={20} />

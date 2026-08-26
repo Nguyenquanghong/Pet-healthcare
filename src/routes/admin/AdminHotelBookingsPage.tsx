@@ -22,7 +22,7 @@ import { bookingStatusLabels, eatingStatusLabels, moodLabels } from "../../utils
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
   confirmed: "bg-blue-50 text-blue-700 border-blue-200",
-  in_stay: "bg-indigo-50 text-indigo-700 border-indigo-200 animate-pulse",
+  in_stay: "bg-indigo-50 text-indigo-700 border-indigo-200",
   checked_out: "bg-emerald-50 text-emerald-700 border-emerald-200",
   rejected: "bg-rose-50 text-rose-700 border-rose-200",
   cancelled: "bg-slate-100 text-slate-500 border-slate-200",
@@ -358,8 +358,8 @@ export function AdminHotelBookingsPage() {
 
       {/* Reject Modal */}
       {rejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md animate-scaleUp rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-lg font-bold text-rose-600 flex items-center gap-2">
                 <XCircle size={20} />
@@ -401,8 +401,8 @@ export function AdminHotelBookingsPage() {
 
       {/* Daily Note Modal */}
       {dailyNoteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-lg animate-scaleUp rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <MessageSquarePlus size={20} className="text-primary" />
@@ -496,8 +496,8 @@ export function AdminHotelBookingsPage() {
 
       {/* Internal Note Modal */}
       {internalNoteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md animate-scaleUp rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <StickyNote size={18} className="text-primary" />
@@ -539,8 +539,8 @@ export function AdminHotelBookingsPage() {
 
       {/* Full Daily Care History Modal */}
       {careHistoryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl my-8 animate-scaleUp max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4">
+          <div className="my-8 max-h-[90vh] w-full max-w-xl animate-scaleUp overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <History size={22} className="text-indigo-600" />

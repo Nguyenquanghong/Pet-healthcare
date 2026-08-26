@@ -16,20 +16,20 @@ export function Button({
   ...props
 }: ButtonProps) {
   const baseStyles =
-    "inline-flex items-center justify-center rounded-xl font-bold transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none";
+    "inline-flex items-center justify-center rounded-lg border border-transparent font-semibold transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50";
 
   const variants = {
-    primary: "bg-primary text-white hover:bg-primary-dark shadow-soft hover:shadow-lg",
-    secondary: "bg-aqua text-primary hover:brightness-110 shadow-soft",
-    outline: "border-2 border-slate-200 bg-transparent hover:border-primary hover:text-primary",
-    ghost: "bg-transparent hover:bg-slate-100 text-slate-600 hover:text-primary",
-    danger: "bg-red-50 text-red-600 hover:bg-red-100",
+    primary: "border-primary bg-primary text-white hover:border-primary-dark hover:bg-primary-dark",
+    secondary: "border-slate-200 bg-slate-100 text-slate-800 hover:bg-slate-200",
+    outline: "border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50",
+    ghost: "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+    danger: "border-rose-200 bg-white text-rose-700 hover:bg-rose-50",
   };
 
   const sizes = {
     sm: "px-3 py-1.5 text-sm gap-1.5",
-    md: "px-4 py-2.5 text-base gap-2",
-    lg: "px-6 py-3.5 text-lg gap-2",
+    md: "px-4 py-2.5 text-sm gap-2",
+    lg: "px-5 py-3 text-base gap-2",
   };
 
   return (

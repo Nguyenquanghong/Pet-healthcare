@@ -213,10 +213,10 @@ export function PetsPage() {
 
   return (
     <OwnerLayout title="Hồ sơ thú cưng thông minh">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.2em] text-primary">Pet Profiles</p>
-          <h2 className="mt-2 text-3xl font-black text-slate-950">Quản lý hồ sơ thú cưng</h2>
+          <p className="text-sm font-medium text-primary">Pet Profiles</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Quản lý hồ sơ thú cưng</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
             Lưu thông tin cơ bản, dị ứng và trạng thái sức khỏe để đặt lịch khám hoặc hotel booking nhanh hơn.
           </p>
@@ -240,19 +240,19 @@ export function PetsPage() {
       )}
 
       {ownerPets.length > 0 && (
-        <div className="mb-6 flex gap-3 overflow-x-auto pb-2">
+        <div className="mb-6 flex gap-2 overflow-x-auto border-b border-slate-200 pb-3">
           {ownerPets.map((pet) => (
             <button
               key={pet.id}
               type="button"
               onClick={() => selectPet(pet)}
-              className={`flex min-w-[210px] items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+              className={`flex min-w-44 items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${
                 selectedPet?.id === pet.id
-                  ? "border-primary bg-primary text-white shadow-soft"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-primary/40 hover:bg-slate-50"
+                  ? "border-primary bg-white text-primary"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
               }`}
             >
-              <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white/20 text-xl">
+              <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-slate-100 text-lg">
                 {pet.avatarUrl ? (
                   <img src={pet.avatarUrl} alt={pet.name} className="h-full w-full object-cover" />
                 ) : (
@@ -260,8 +260,8 @@ export function PetsPage() {
                 )}
               </span>
               <span>
-                <span className="block font-black">{pet.name}</span>
-                <span className={`text-xs ${selectedPet?.id === pet.id ? "text-white/80" : "text-slate-500"}`}>{pet.breed}</span>
+                <span className="block text-sm font-semibold">{pet.name}</span>
+                <span className="text-xs text-slate-500">{pet.breed}</span>
               </span>
             </button>
           ))}
@@ -269,13 +269,13 @@ export function PetsPage() {
       )}
 
       {showForm && (
-        <form onSubmit={handleSubmit} noValidate className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft">
+        <form onSubmit={handleSubmit} noValidate className="mb-8 overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/70 px-6 py-5">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">
+              <p className="text-xs font-semibold text-primary">
                 {formMode === "edit" ? "Edit pet profile" : "New pet profile"}
               </p>
-              <h3 className="mt-1 text-2xl font-black text-slate-950">
+              <h3 className="mt-1 text-xl font-semibold text-slate-950">
                 {formMode === "edit" ? "Cập nhật hồ sơ" : "Thêm thú cưng mới"}
               </h3>
               <p className="mt-1 text-sm text-slate-500">Chỉ cần nhập các thông tin nhận diện chính. Trường có dấu * là bắt buộc.</p>
@@ -286,8 +286,8 @@ export function PetsPage() {
           </div>
 
           <div className="grid gap-6 p-6 lg:grid-cols-[280px_1fr]">
-            <aside className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <aside className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="aspect-square overflow-hidden rounded-lg border border-slate-200 bg-white">
                 {form.avatarUrl ? (
                   <img src={form.avatarUrl} alt="Xem trước ảnh thú cưng" className="h-full w-full object-cover" />
                 ) : (
@@ -300,7 +300,7 @@ export function PetsPage() {
               <p className="mt-4 text-sm font-black text-slate-900">Ảnh thú cưng</p>
               <p className="mt-1 text-xs leading-5 text-slate-500">Ảnh giúp chủ nuôi và người tìm thấy nhận diện pet nhanh hơn.</p>
               <div className="mt-4 grid gap-2">
-                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-soft transition hover:bg-primary-dark">
+                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-dark">
                   <ImagePlus size={16} />
                   Chọn ảnh
                   <input type="file" accept="image/*" onChange={handleAvatarChange} className="sr-only" />
@@ -309,7 +309,7 @@ export function PetsPage() {
                   <button
                     type="button"
                     onClick={() => updateField("avatarUrl", "")}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:border-rose-200 hover:text-rose-600"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:border-rose-300 hover:text-rose-700"
                   >
                     <Trash2 size={16} />
                     Xóa ảnh
@@ -323,7 +323,7 @@ export function PetsPage() {
               <section>
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
-                    <h4 className="text-base font-black text-slate-900">Thông tin cơ bản</h4>
+                    <h4 className="text-base font-semibold text-slate-900">Thông tin cơ bản</h4>
                     <p className="mt-0.5 text-xs text-slate-500">Dùng cho hồ sơ, đặt lịch và nhận diện nhanh.</p>
                   </div>
                 </div>
@@ -336,8 +336,8 @@ export function PetsPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-                <h4 className="text-base font-black text-slate-900">Thông tin cứu hộ</h4>
+              <section className="border-l-2 border-amber-400 bg-amber-50/60 p-4">
+                <h4 className="text-base font-semibold text-slate-900">Thông tin cứu hộ</h4>
                 <p className="mt-0.5 text-xs text-slate-600">Các trường này sẽ giúp ích khi người lạ quét QR cứu hộ.</p>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <Input label="Dị ứng / lưu ý y tế" value={form.allergies} onChange={(event) => updateField("allergies", event.target.value)} placeholder="Thịt bò, phấn hoa..." />
@@ -369,7 +369,7 @@ export function PetsPage() {
       ) : (
         <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
           <div className="space-y-6">
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
               <PetProfileHero pet={selectedPet} />
             </div>
             <div className="grid gap-6 md:grid-cols-2">
@@ -381,7 +381,7 @@ export function PetsPage() {
           <div className="space-y-6">
             <SmartQrToken pet={selectedPet} />
             {selectedPet.notes && (
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-lg border border-slate-200 bg-white p-5">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Ghi chú chăm sóc</p>
                 <p className="mt-2 text-sm leading-6 text-slate-700">{selectedPet.notes}</p>
               </div>

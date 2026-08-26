@@ -7,14 +7,14 @@ interface TableProps {
 
 export function Table({ children, className = "" }: TableProps) {
   return (
-    <div className={`w-full overflow-x-auto rounded-xl border border-slate-200 bg-white ${className}`}>
+    <div className={`w-full overflow-x-auto rounded-lg border border-slate-200 bg-white ${className}`}>
       <table className="w-full text-left text-sm text-slate-600">{children}</table>
     </div>
   );
 }
 
 export function TableHeader({ children }: { children: ReactNode }) {
-  return <thead className="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">{children}</thead>;
+  return <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500">{children}</thead>;
 }
 
 export function TableRow({ children, className = "", onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
@@ -29,9 +29,9 @@ export function TableRow({ children, className = "", onClick }: { children: Reac
 }
 
 export function TableHead({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <th className={`px-6 py-4 font-bold ${className}`}>{children}</th>;
+  return <th className={`px-4 py-3 font-semibold ${className}`}>{children}</th>;
 }
 
 export function TableCell({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <td className={`px-6 py-4 ${className}`}>{children}</td>;
+  return <td className={`px-4 py-3 ${className}`}>{children}</td>;
 }

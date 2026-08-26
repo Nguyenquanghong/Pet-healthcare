@@ -17,8 +17,8 @@ export function LoadingSpinner({ size = 24, label, className = "" }: LoadingSpin
 
 export function LoadingOverlay({ message = "Đang xử lý dữ liệu..." }: { message?: string }) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/30 backdrop-blur-xs">
-      <div className="flex flex-col items-center gap-3 rounded-2xl bg-white p-6 shadow-2xl animate-scaleUp">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/40">
+      <div className="flex animate-scaleUp flex-col items-center gap-3 rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
         <Loader2 size={36} className="animate-spin text-primary" />
         <p className="text-sm font-bold text-slate-800">{message}</p>
       </div>

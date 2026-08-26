@@ -17,7 +17,7 @@ export function AdditionalServicesCard({ serviceKeys, onToggleService }: Additio
           return (
             <label
               key={serviceKey}
-              className={`flex items-center gap-3 rounded-xl border p-3.5 text-sm cursor-pointer transition-all ${
+              className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm transition-colors ${
                 serviceKeys.includes(serviceKey) ? "border-primary bg-primary/5" : "border-slate-200 hover:border-slate-300"
               }`}
             >

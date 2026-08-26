@@ -100,7 +100,7 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Lịch khám của bạn</h2>
@@ -128,9 +128,9 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`rounded-2xl border px-4 py-3 text-left transition ${
+                className={`rounded-md border px-4 py-3 text-left transition-colors ${
                   isActive
-                    ? "border-primary bg-primary/5 shadow-sm"
+                    ? "border-primary bg-primary/5"
                     : "border-slate-200 bg-white hover:border-primary/30 hover:bg-slate-50"
                 }`}
               >
@@ -217,8 +217,8 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
       </div>
 
       {rescheduleItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 animate-scaleUp">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900">
                 <CalendarClock size={20} className="text-primary" />
@@ -262,8 +262,8 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
       )}
 
       {cancelItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 animate-scaleUp">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h3 className="flex items-center gap-2 text-lg font-bold text-rose-600">
                 <Ban size={20} />

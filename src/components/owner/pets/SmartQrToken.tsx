@@ -106,7 +106,7 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-5">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
@@ -127,7 +127,7 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
       </div>
 
       <div className="flex flex-col items-center">
-        <div className="relative mb-5 flex aspect-square w-52 items-center justify-center rounded-2xl border-2 border-slate-200 bg-white p-3 shadow-xs">
+        <div className="relative mb-5 flex aspect-square w-48 items-center justify-center rounded-lg border border-slate-200 bg-white p-3">
           <img src={qrImageUrl} alt={`Mã QR cứu hộ của ${pet.name}`} className="h-full w-full rounded-xl object-contain" />
           {pet.qrEnabled === false && (
             <div className="absolute inset-3 flex items-center justify-center rounded-xl bg-white/90 text-sm font-black text-slate-500">
@@ -160,7 +160,7 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
         <button
           type="button"
           onClick={handlePrintTag}
-          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-xs font-bold text-white shadow-soft transition hover:bg-primary-dark"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary py-2.5 text-xs font-semibold text-white transition-colors hover:bg-primary-dark"
         >
           <Printer size={13} /> In thẻ QR
         </button>
@@ -191,7 +191,7 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
         </Button>
       </div>
 
-      <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <div className="mt-5 border-l-2 border-amber-400 bg-amber-50 p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-black text-amber-900">
           <ShieldAlert size={16} />
           Thông tin hiển thị khi quét QR

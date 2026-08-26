@@ -10,9 +10,9 @@ export function DigitalHealthRecordCard({ pet, records }: DigitalHealthRecordCar
   const recentRecords = [...records].sort((a, b) => b.visitDate.localeCompare(a.visitDate)).slice(0, 2);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+        <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
           <Activity className="text-primary" size={24} />
           Digital Health Record
         </h3>

@@ -46,7 +46,7 @@ export function BookAppointmentForm({
   onSubmit,
 }: BookAppointmentFormProps) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm h-fit">
+    <div className="h-fit rounded-lg border border-slate-200 bg-white p-5">
       <h2 className="mb-5 text-xl font-bold text-slate-900 flex items-center gap-2">
         <CalendarPlus size={20} className="text-primary" />
         Đặt lịch khám mới

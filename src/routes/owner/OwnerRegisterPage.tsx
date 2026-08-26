@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckCircle2, Eye, EyeOff, UserPlus } from "lucide-react";
 import { Button } from "../../components/ui/Button";
-import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { Textarea } from "../../components/ui/Textarea";
 import { useAppStore } from "../../store/AppStoreProvider";
@@ -80,22 +79,19 @@ export function OwnerRegisterPage() {
       title="Create Your Owner Account"
       description="Register to manage pets, book appointments, review medical records, receive notifications, and use pet hotel services."
     >
-      <Card className="border-white/80 bg-white/95 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.1)] lg:p-8">
+      <section>
         <div className="mb-6">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <UserPlus size={24} />
-          </div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.22em] text-primary">Register</p>
-          <h2 className="mt-2 text-3xl font-black text-slate-950">Owner Details</h2>
+          <p className="text-sm font-semibold text-primary">Register</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Owner Details</h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">Fields marked with * are required. You will be signed in after your account is created.</p>
         </div>
 
         {created && (
-          <div className="mb-5 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+          <div className="mb-5 flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-800">
             <CheckCircle2 size={16} /> Account created successfully. Redirecting to add your pet profile...
           </div>
         )}
-        {errors.form && <div className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{errors.form}</div>}
+        {errors.form && <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700">{errors.form}</div>}
 
         <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <Input
@@ -194,7 +190,7 @@ export function OwnerRegisterPage() {
             </Link>
           </div>
         </form>
-      </Card>
+      </section>
     </AuthShell>
   );
 }

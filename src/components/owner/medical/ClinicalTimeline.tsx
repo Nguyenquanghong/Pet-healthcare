@@ -21,14 +21,14 @@ export function ClinicalTimeline({ records }: ClinicalTimelineProps) {
   const { appointments } = useAppStore();
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2 mb-8">
+    <div className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
+      <h3 className="mb-6 flex items-center gap-2 text-lg font-semibold text-slate-900">
         <History className="text-primary" size={24} />
         Lịch sử khám lâm sàng
       </h3>
 
       {records.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center">
+        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
           <p className="font-bold text-slate-700">Chưa có hồ sơ y tế cho thú cưng này.</p>
           <p className="mt-1 text-sm text-slate-500">
             Khi bác sĩ tạo medical record sau buổi khám, dữ liệu chi tiết sẽ xuất hiện tại đây.
@@ -69,7 +69,7 @@ export function ClinicalTimeline({ records }: ClinicalTimelineProps) {
 
                 {/* Linked Appointment Badge */}
                 {linkedAppointment && (
-                  <div className="my-2.5 inline-flex items-center gap-2 rounded-xl bg-blue-50/80 border border-blue-200/80 px-3 py-1.5 text-xs text-blue-900 font-medium">
+                  <div className="my-2.5 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-900">
                     <Calendar size={13} className="text-blue-600" />
                     <span>
                       Lịch khám: <strong>{linkedAppointment.serviceName}</strong> lúc {linkedAppointment.time} (
@@ -103,7 +103,7 @@ export function ClinicalTimeline({ records }: ClinicalTimelineProps) {
                 )}
 
                 {(record.symptoms || record.treatment) && (
-                  <div className="mt-3 rounded-xl bg-slate-50 p-4 border border-slate-100 text-slate-700 text-sm leading-relaxed space-y-1.5">
+                  <div className="mt-3 space-y-1.5 border-l-2 border-slate-300 bg-slate-50 p-4 text-sm leading-relaxed text-slate-700">
                     {record.symptoms && (
                       <p>
                         <span className="font-bold text-slate-900">Triệu chứng:</span> {record.symptoms}
