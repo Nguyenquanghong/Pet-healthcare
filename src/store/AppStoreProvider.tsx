@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer, useState, ty
 import type { Appointment, AppointmentStatus, AppointmentType } from "../types/appointment";
 import type { DailyCareNote, HotelBooking, HotelBookingStatus } from "../types/booking";
 import type { MedicalRecord } from "../types/medicalRecord";
+import type { MedicalImage } from "../types/medicalImage";
 import type { Notification } from "../types/notification";
 import type { Owner } from "../types/owner";
 import type { Pet } from "../types/pet";
@@ -26,6 +27,8 @@ type RegisterOwnerInput = {
 };
 type CreatePetInput = Omit<Pet, "id" | "ownerId">;
 type UpdatePetInput = Partial<Omit<Pet, "id" | "ownerId">>;
+type RescueReportInput = { petId: string; finderName?: string; finderPhone: string; location: string; note?: string };
+type UploadMedicalImageInput = { petId: string; title: string; imageUrl: string; mimeType: string };
 type AuthRole = "owner" | "admin" | null;
 
 type AddDailyCareNoteInput = {
@@ -43,6 +46,7 @@ type AppState = {
   pets: Pet[];
   appointments: Appointment[];
   medicalRecords: MedicalRecord[];
+  medicalImages: MedicalImage[];
   hotelBookings: HotelBooking[];
   dailyCareNotes: DailyCareNote[];
   notifications: Notification[];
@@ -55,6 +59,7 @@ type AppAction =
   | { type: "LOGOUT" }
   | { type: "CREATE_PET"; payload: CreatePetInput }
   | { type: "UPDATE_PET"; payload: { petId: string; input: UpdatePetInput } }
+  | { type: "SUBMIT_RESCUE_REPORT"; payload: RescueReportInput }
   | { type: "CREATE_HOTEL_BOOKING"; payload: CreateHotelBookingInput }
   | { type: "UPDATE_HOTEL_BOOKING_STATUS"; payload: { bookingId: string; status: HotelBookingStatus; internalNote?: string } }
   | { type: "UPDATE_HOTEL_BOOKING_INTERNAL_NOTE"; payload: { bookingId: string; internalNote: string } }
@@ -69,6 +74,8 @@ type AppAction =
   | { type: "CREATE_MEDICAL_RECORD"; payload: CreateMedicalRecordInput }
   | { type: "UPDATE_MEDICAL_RECORD"; payload: { recordId: string; input: UpdateMedicalRecordInput } }
   | { type: "DELETE_MEDICAL_RECORD"; payload: { recordId: string } }
+  | { type: "UPLOAD_MEDICAL_IMAGE"; payload: UploadMedicalImageInput }
+  | { type: "DELETE_MEDICAL_IMAGE"; payload: { imageId: string } }
   | { type: "MARK_NOTIFICATION_READ"; payload: { notificationId: string } }
   | { type: "MARK_ALL_NOTIFICATIONS_READ" }
   | { type: "DELETE_NOTIFICATION"; payload: { notificationId: string } }
@@ -85,6 +92,7 @@ type AppStoreValue = AppState & {
   registerOwner: (input: RegisterOwnerInput) => Promise<void>;
   createPet: (input: CreatePetInput) => void;
   updatePet: (petId: string, input: UpdatePetInput) => void;
+  submitRescueReport: (input: RescueReportInput) => void;
   createHotelBooking: (input: CreateHotelBookingInput) => void;
   updateHotelBookingStatus: (bookingId: string, status: HotelBookingStatus, internalNote?: string) => void;
   updateHotelBookingInternalNote: (bookingId: string, internalNote: string) => void;
@@ -104,6 +112,8 @@ type AppStoreValue = AppState & {
   createMedicalRecord: (input: CreateMedicalRecordInput) => void;
   updateMedicalRecord: (recordId: string, input: UpdateMedicalRecordInput) => void;
   deleteMedicalRecord: (recordId: string) => void;
+  uploadMedicalImage: (input: UploadMedicalImageInput) => void;
+  deleteMedicalImage: (imageId: string) => void;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
   deleteNotification: (notificationId: string) => void;
@@ -119,6 +129,30 @@ const DEMO_ADMIN_USERNAME = "admin";
 const DEMO_ADMIN_PASSWORD_HASH = "Csbdv6XeLCUGafp03chOaooQPLVl+OhEPT/B+/Jic30=";
 const DEMO_ADMIN_PASSWORD_SALT = "bmlwb25ldG8tZGVtby1hZG1pbi1zYWx0";
 const now = new Date().toISOString();
+
+function createQrToken(petId: string) {
+  return `${petId}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getDefaultPublicProfile(pet?: Partial<Pet>): NonNullable<Pet["publicProfile"]> {
+  return {
+    showOwnerPhone: true,
+    showOwnerEmail: false,
+    showOwnerAddress: false,
+    showMedicalAlerts: true,
+    rescueNote: "Please keep my pet safe and contact me as soon as possible.",
+    ...pet?.publicProfile,
+  };
+}
+
+function normalizePet(pet: Pet): Pet {
+  return {
+    ...pet,
+    qrToken: pet.qrToken ?? createQrToken(pet.id),
+    qrEnabled: pet.qrEnabled ?? true,
+    publicProfile: getDefaultPublicProfile(pet),
+  };
+}
 
 const initialState: AppState = {
   authRole: null,
@@ -136,9 +170,9 @@ const initialState: AppState = {
     },
   ],
   pets: [
-    { id: "pet_mochi", ownerId: "owner_1", name: "Mochi", species: "dog", breed: "Shiba Inu", gender: "male", ageLabel: "2 tuổi", weightKg: 8.4, microchipId: "JP-2026-MOCHI", healthStatus: "healthy", allergies: ["Không"] },
-    { id: "pet_yuki", ownerId: "owner_1", name: "Yuki", species: "dog", breed: "Shiba Inu", gender: "female", ageLabel: "1 tuổi", weightKg: 7.2, microchipId: "JP-2026-YUKI", healthStatus: "stable", allergies: ["Thịt bò"] },
-    { id: "pet_sashimi", ownerId: "owner_2", name: "Sashimi", species: "cat", breed: "Scottish Fold", gender: "female", ageLabel: "1 tuổi", weightKg: 4.1, healthStatus: "vaccination_due" },
+    { id: "pet_mochi", ownerId: "owner_1", name: "Mochi", species: "dog", breed: "Shiba Inu", gender: "male", ageLabel: "2 tuổi", weightKg: 8.4, microchipId: "JP-2026-MOCHI", healthStatus: "healthy", allergies: ["Không"], identifyingMarks: "Lông vàng nâu, đuôi cuộn tròn.", lastSeenLocation: "Mỹ Đình, Hà Nội", qrToken: "rescue_mochi_demo", qrEnabled: true, publicProfile: getDefaultPublicProfile({ publicProfile: { showOwnerPhone: true, showOwnerEmail: false, showOwnerAddress: false, showMedicalAlerts: true, rescueNote: "Mochi hơi nhát. Vui lòng không đuổi theo, hãy gọi chủ nuôi ngay." } }) },
+    { id: "pet_yuki", ownerId: "owner_1", name: "Yuki", species: "dog", breed: "Shiba Inu", gender: "female", ageLabel: "1 tuổi", weightKg: 7.2, microchipId: "JP-2026-YUKI", healthStatus: "stable", allergies: ["Thịt bò"], identifyingMarks: "Nhỏ con, có vòng cổ màu đỏ.", qrToken: "rescue_yuki_demo", qrEnabled: true, publicProfile: getDefaultPublicProfile({ publicProfile: { showOwnerPhone: true, showOwnerEmail: false, showOwnerAddress: false, showMedicalAlerts: true, rescueNote: "Yuki dị ứng thịt bò, vui lòng không cho ăn đồ lạ." } }) },
+    { id: "pet_sashimi", ownerId: "owner_2", name: "Sashimi", species: "cat", breed: "Scottish Fold", gender: "female", ageLabel: "1 tuổi", weightKg: 4.1, healthStatus: "vaccination_due", qrToken: "rescue_sashimi_demo", qrEnabled: true, publicProfile: getDefaultPublicProfile() },
   ],
   appointments: [
     { id: "appointment_1", petId: "pet_mochi", ownerId: "owner_1", doctorId: "doctor_mai", type: "general_checkup", serviceName: "Khám tổng quát", clinicName: "Bệnh viện Thú y Mỹ Đình", date: "2026-11-02", time: "09:00", status: "confirmed", createdBy: "owner", createdAt: now, updatedAt: now },
@@ -148,6 +182,7 @@ const initialState: AppState = {
     { id: "record_1", petId: "pet_mochi", ownerId: "owner_1", appointmentId: "appointment_1", doctorName: "Bs. Mai Nguyễn", visitDate: "2026-10-28", title: "Annual Checkup & Vaccination", symptoms: "Khám định kỳ, không có triệu chứng bất thường.", diagnosis: "Sức khỏe ổn định, cân nặng phù hợp giống Shiba Inu.", treatment: "Tiêm vaccine nhắc lại và tư vấn dinh dưỡng.", medications: "Vitamin tổng hợp 7 ngày", vaccineName: "DHPPi + Lepto", followUpDate: "2027-04-28", weightKg: 8.4, temperatureC: 38.2, heartRateBpm: 92, createdAt: now, updatedAt: now },
     { id: "record_2", petId: "pet_yuki", ownerId: "owner_1", doctorName: "Dr. Kenji Sato", visitDate: "2026-10-14", title: "Dermatology Consult", symptoms: "Ngứa nhẹ sau khi đổi thức ăn.", diagnosis: "Nghi dị ứng protein bò.", treatment: "Ngưng thức ăn chứa bò, theo dõi da trong 14 ngày.", medications: "Sữa tắm dịu nhẹ 2 lần/tuần", followUpDate: "2026-11-14", weightKg: 7.2, temperatureC: 38.4, heartRateBpm: 96, createdAt: now, updatedAt: now },
   ],
+  medicalImages: [],
   hotelBookings: [
     { id: "booking_1", petId: "pet_yuki", ownerId: "owner_1", checkIn: "2026-11-10", checkOut: "2026-11-13", nights: 3, roomType: "deluxe", serviceKeys: ["special_diet"], totalAmount: 20100, status: "pending", ownerNote: "Yuki cần chế độ ăn ít muối.", dailyCareNoteIds: [], createdAt: now, updatedAt: now },
     { id: "booking_2", petId: "pet_mochi", ownerId: "owner_1", checkIn: "2026-11-18", checkOut: "2026-11-20", nights: 2, roomType: "standard", serviceKeys: ["daily_walk"], totalAmount: 7600, status: "in_stay", dailyCareNoteIds: ["note_1"], createdAt: now, updatedAt: now },
@@ -357,8 +392,10 @@ function normalizeState(state: AppState): AppState {
     ...initialState,
     ...state,
     owners: normalizedOwners,
+    pets: (state.pets ?? initialState.pets).map(normalizePet),
     appointments: state.appointments ?? initialState.appointments,
     medicalRecords: state.medicalRecords ?? initialState.medicalRecords,
+    medicalImages: state.medicalImages ?? initialState.medicalImages,
     hotelBookings: normalizedBookings,
     dailyCareNotes: state.dailyCareNotes ?? initialState.dailyCareNotes ?? [],
     notifications: state.notifications ?? initialState.notifications,
@@ -408,7 +445,8 @@ function appStoreReducer(state: AppState, action: AppAction): AppState {
   if (action.type === "LOGOUT") return { ...state, authRole: null };
 
   if (action.type === "CREATE_PET") {
-    const pet: Pet = { id: createId("pet"), ownerId: state.currentOwnerId, ...action.payload };
+    const id = createId("pet");
+    const pet: Pet = normalizePet({ id, ownerId: state.currentOwnerId, ...action.payload });
     const owners = state.owners.map((owner) =>
       owner.id === state.currentOwnerId ? { ...owner, petIds: [...owner.petIds, pet.id] } : owner,
     );
@@ -420,10 +458,32 @@ function appStoreReducer(state: AppState, action: AppAction): AppState {
       ...state,
       pets: state.pets.map((pet) =>
         pet.id === action.payload.petId && pet.ownerId === state.currentOwnerId
-          ? { ...pet, ...action.payload.input }
+          ? normalizePet({ ...pet, ...action.payload.input })
           : pet,
       ),
     };
+  }
+
+  if (action.type === "SUBMIT_RESCUE_REPORT") {
+    const pet = state.pets.find((item) => item.id === action.payload.petId && item.qrEnabled !== false);
+    if (!pet) return state;
+
+    const createdAt = new Date().toISOString();
+    const notification: Notification = {
+      id: createId("noti"),
+      recipientOwnerId: pet.ownerId,
+      recipientRole: "owner",
+      type: "pet_rescue_report",
+      title: `Có người vừa tìm thấy ${pet.name}`,
+      message: `${action.payload.finderName?.trim() || "Người tìm thấy"} báo đã gặp ${pet.name} tại ${action.payload.location}. SĐT liên hệ: ${action.payload.finderPhone}.${action.payload.note ? ` Ghi chú: ${action.payload.note}` : ""}`,
+      status: "sent",
+      actionUrl: "/owner/notifications",
+      relatedPetId: pet.id,
+      createdAt,
+      sentAt: createdAt,
+    };
+
+    return { ...state, notifications: [notification, ...state.notifications] };
   }
 
   if (action.type === "CREATE_MEDICAL_RECORD") {
@@ -456,6 +516,24 @@ function appStoreReducer(state: AppState, action: AppAction): AppState {
       ...state,
       medicalRecords: state.medicalRecords.filter((item) => item.id !== action.payload.recordId),
     };
+  }
+
+  if (action.type === "UPLOAD_MEDICAL_IMAGE") {
+    const pet = state.pets.find((item) => item.id === action.payload.petId);
+    if (!pet) return state;
+    const createdAt = new Date().toISOString();
+    const image: MedicalImage = {
+      ...action.payload,
+      id: createId("image"),
+      ownerId: pet.ownerId,
+      uploadedByStaffId: "staff_admin",
+      createdAt,
+    };
+    return { ...state, medicalImages: [image, ...state.medicalImages] };
+  }
+
+  if (action.type === "DELETE_MEDICAL_IMAGE") {
+    return { ...state, medicalImages: state.medicalImages.filter((item) => item.id !== action.payload.imageId) };
   }
 
   if (action.type === "CREATE_APPOINTMENT") {
@@ -920,6 +998,7 @@ export function AppStoreProvider({ children }: AppStoreProviderProps) {
       registerOwner: async (input) => dispatch({ type: "REGISTER_OWNER", payload: input }),
       createPet: (input) => dispatch({ type: "CREATE_PET", payload: input }),
       updatePet: (petId, input) => dispatch({ type: "UPDATE_PET", payload: { petId, input } }),
+      submitRescueReport: (input) => dispatch({ type: "SUBMIT_RESCUE_REPORT", payload: input }),
       createHotelBooking: (input) => dispatch({ type: "CREATE_HOTEL_BOOKING", payload: input }),
       updateHotelBookingStatus: (bookingId, status, internalNote) => dispatch({ type: "UPDATE_HOTEL_BOOKING_STATUS", payload: { bookingId, status, internalNote } }),
       updateHotelBookingInternalNote: (bookingId, internalNote) => dispatch({ type: "UPDATE_HOTEL_BOOKING_INTERNAL_NOTE", payload: { bookingId, internalNote } }),
@@ -935,6 +1014,8 @@ export function AppStoreProvider({ children }: AppStoreProviderProps) {
       createMedicalRecord: (input) => dispatch({ type: "CREATE_MEDICAL_RECORD", payload: input }),
       updateMedicalRecord: (recordId, input) => dispatch({ type: "UPDATE_MEDICAL_RECORD", payload: { recordId, input } }),
       deleteMedicalRecord: (recordId) => dispatch({ type: "DELETE_MEDICAL_RECORD", payload: { recordId } }),
+      uploadMedicalImage: (input) => dispatch({ type: "UPLOAD_MEDICAL_IMAGE", payload: input }),
+      deleteMedicalImage: (imageId) => dispatch({ type: "DELETE_MEDICAL_IMAGE", payload: { imageId } }),
       markNotificationRead: (notificationId) => dispatch({ type: "MARK_NOTIFICATION_READ", payload: { notificationId } }),
       markAllNotificationsRead: () => dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ" }),
       deleteNotification: (notificationId) => dispatch({ type: "DELETE_NOTIFICATION", payload: { notificationId } }),

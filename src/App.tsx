@@ -38,8 +38,8 @@ export function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<OwnerLoginPage />} />
       <Route path="/register" element={<OwnerRegisterPage />} />
-      <Route path="/rescue/:petId" element={<PetRescuePage />} />
-      <Route path="/pet/:petId" element={<Navigate to="/rescue/:petId" replace />} />
+      <Route path="/rescue/:qrToken" element={<PetRescuePage />} />
+      <Route path="/pet/:qrToken" element={<PetRescuePage />} />
       <Route path="/owner" element={<Navigate to="/owner/dashboard" replace />} />
       <Route path="/owner/dashboard" element={<OwnerOnly><DashboardPage /></OwnerOnly>} />
       <Route path="/owner/pets" element={<OwnerOnly><PetsPage /></OwnerOnly>} />

@@ -1,19 +1,19 @@
 /**
- * apiClient — Universal HTTP API Client for NIPONETO
+ * Universal HTTP API Client for NIPOPETO.
  *
- * Tự động gửi request đến Express Backend REST API (http://localhost:5000/api).
- * Nếu Backend chưa chạy hoặc gặp lỗi mạng, sẽ trả về lỗi ApiError rõ ràng
- * hoặc fallback về Local Mock Store.
+ * Development default: http://localhost:5000/api
+ * Production default: /api
+ * Override with: VITE_API_BASE_URL
  */
 
 import { ApiError, ApiErrorCode, httpStatusToErrorCode } from "../utils/apiError";
 
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:5000/api" : "/api")).replace(
+  /\/$/,
+  "",
+);
 
-export async function request<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   const headers: HeadersInit = {
@@ -31,18 +31,17 @@ export async function request<T>(
 
     if (!response.ok) {
       const code = httpStatusToErrorCode(response.status);
-      throw new ApiError(code, response.status, data?.error || "Lỗi giao tiếp máy chủ", data);
+      throw new ApiError(code, response.status, data?.error || "Backend request failed.", data);
     }
 
     return data as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    // Network failure (server is offline)
     throw new ApiError(
       ApiErrorCode.SERVER_ERROR,
       500,
-      "Không thể kết nối đến Backend Server. Vui lòng kiểm tra lại kết nối mạng.",
-      error
+      "Cannot connect to the backend server. Please check VITE_API_BASE_URL and network connectivity.",
+      error,
     );
   }
 }

@@ -11,6 +11,7 @@ export type NotificationType =
   | "hotel_daily_update"
   | "hotel_checked_out"
   | "vaccination_reminder"
+  | "pet_rescue_report"
   | "promotion"
   | "general";
 

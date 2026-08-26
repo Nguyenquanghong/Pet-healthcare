@@ -1,6 +1,13 @@
-import { FolderUp, UploadCloud } from "lucide-react";
+import { FolderUp, ImageOff, X } from "lucide-react";
+import { useState } from "react";
+import type { MedicalImage } from "../../../types/medicalImage";
+import type { Pet } from "../../../types/pet";
 
-export function CloudImagingCard() {
+type CloudImagingCardProps = { pet: Pet; images: MedicalImage[] };
+
+export function CloudImagingCard({ pet, images }: CloudImagingCardProps) {
+  const [activeImage, setActiveImage] = useState<MedicalImage | null>(null);
+  const recentImages = [...images].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 4);
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
@@ -9,26 +16,39 @@ export function CloudImagingCard() {
           Cloud Imaging
         </h3>
         <span className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">
-          2 Files
+          {images.length} {images.length === 1 ? "file" : "files"}
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 flex-1">
-        <div className="rounded-xl overflow-hidden relative group cursor-pointer bg-slate-900 border border-slate-200">
-          <img 
-            src="https://images.unsplash.com/photo-1582719471384-894fbb16e074?w=500&auto=format&fit=crop&q=60" 
-            alt="X-Ray" 
-            className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity mix-blend-luminosity" 
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-          <p className="absolute bottom-3 left-3 text-white text-sm font-bold z-10">Chest X-Ray</p>
+      {recentImages.length ? (
+        <div className="grid grid-cols-2 gap-4 flex-1">
+          {recentImages.map((image) => (
+            <button key={image.id} type="button" onClick={() => setActiveImage(image)} className="group relative min-h-32 overflow-hidden rounded-xl border border-slate-200 bg-slate-900 text-left">
+              <img src={image.imageUrl} alt={image.title} className="h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-100" />
+              <div className="absolute inset-x-0 bottom-0 bg-slate-950/75 px-3 py-2">
+                <p className="truncate text-sm font-bold text-white">{image.title}</p>
+                <p className="text-[11px] text-slate-300">{new Date(image.createdAt).toLocaleDateString()}</p>
+              </div>
+            </button>
+          ))}
         </div>
-        
-        <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-slate-400 hover:text-primary hover:border-primary hover:bg-slate-50/50 transition-colors cursor-pointer min-h-32">
-          <UploadCloud size={32} className="mb-2" />
-          <span className="text-sm font-semibold">Upload Scan</span>
+      ) : (
+        <div className="flex min-h-44 flex-1 flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-5 text-center text-slate-500">
+          <ImageOff size={32} className="mb-3 text-slate-400" />
+          <p className="text-sm font-semibold">No diagnostic images yet</p>
+          <p className="mt-1 text-xs leading-5">Images uploaded by the clinic for {pet.name} will appear here.</p>
         </div>
-      </div>
+      )}
+
+      {activeImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label={activeImage.title}>
+          <div className="relative w-full max-w-3xl rounded-xl bg-white p-3 shadow-2xl">
+            <button type="button" onClick={() => setActiveImage(null)} className="absolute right-5 top-5 rounded-lg bg-slate-900/80 p-2 text-white hover:bg-slate-900" aria-label="Close image preview"><X size={18} /></button>
+            <img src={activeImage.imageUrl} alt={activeImage.title} className="max-h-[75vh] w-full rounded-lg object-contain" />
+            <p className="px-2 pb-1 pt-3 text-sm font-bold text-slate-900">{activeImage.title}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

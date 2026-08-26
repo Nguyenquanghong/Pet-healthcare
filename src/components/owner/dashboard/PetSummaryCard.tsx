@@ -9,7 +9,7 @@ export function PetSummaryCard({ pet }: { pet: Pet }) {
       <div className="p-5 flex items-start gap-4">
         <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-2xl bg-slate-100">
           <img 
-            src={`https://api.dicebear.com/7.x/shapes/svg?seed=${pet.name}&backgroundColor=f1f5f9`} 
+            src={pet.avatarUrl || `https://api.dicebear.com/7.x/shapes/svg?seed=${pet.name}&backgroundColor=f1f5f9`}
             alt={pet.name} 
             className="h-full w-full object-cover" 
           />

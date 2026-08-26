@@ -1,4 +1,4 @@
-import { Bell, Search } from "lucide-react";
+import { Bell } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAppStore } from "../../../store/AppStoreProvider";
 
@@ -7,10 +7,18 @@ interface OwnerTopbarProps {
 }
 
 export function OwnerTopbar({ title }: OwnerTopbarProps) {
-  const { notifications, currentOwnerId } = useAppStore();
+  const { notifications, currentOwner, currentOwnerId } = useAppStore();
   const unreadCount = notifications.filter(
     (n) => n.recipientOwnerId === currentOwnerId && n.status === "sent"
   ).length;
+  const initials = currentOwner?.fullName
+    ? currentOwner.fullName
+        .split(" ")
+        .slice(-2)
+        .map((word) => word[0])
+        .join("")
+        .toUpperCase()
+    : "ON";
 
   return (
     <header className="sticky top-0 z-10 flex flex-col gap-4 border-b border-slate-200 bg-canvas/90 px-5 py-5 backdrop-blur md:flex-row md:items-center md:justify-between lg:px-8">
@@ -19,16 +27,15 @@ export function OwnerTopbar({ title }: OwnerTopbarProps) {
         <h1 className="text-2xl font-extrabold text-slate-950">{title}</h1>
       </div>
 
-      <div className="flex items-center gap-3 w-full md:w-auto">
-        <div className="flex flex-1 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-500 shadow-xs md:w-auto">
-          <Search size={18} />
-          <input
-            id="owner-topbar-search"
-            type="text"
-            placeholder="Tìm thú cưng, dịch vụ..."
-            aria-label="Tìm thú cưng hoặc dịch vụ"
-            className="bg-transparent outline-none text-sm w-full md:w-48 lg:w-64"
-          />
+      <div className="flex w-full items-center justify-end gap-3 md:w-auto">
+        <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xs">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-black text-primary ring-1 ring-primary/10">
+            {initials}
+          </div>
+          <div className="hidden min-w-0 sm:block">
+            <p className="truncate text-sm font-bold text-slate-900">{currentOwner?.fullName ?? "Chủ nuôi"}</p>
+            <p className="mt-0.5 text-xs font-medium text-slate-500">Chủ thú cưng</p>
+          </div>
         </div>
 
         <NavLink
