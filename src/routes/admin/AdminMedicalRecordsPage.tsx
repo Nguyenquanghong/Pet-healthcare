@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ChangeEvent } from "react";
 import {
   CheckCircle2,
   FilePlus2,
@@ -12,6 +12,8 @@ import {
   Calendar,
   AlertCircle,
   FileText,
+  ImagePlus,
+  Trash,
 } from "lucide-react";
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
 import {
@@ -28,12 +30,16 @@ export function AdminMedicalRecordsPage() {
     createMedicalRecord: createMedicalRecordInStore,
     updateMedicalRecord: updateMedicalRecordInStore,
     deleteMedicalRecord: deleteMedicalRecordInStore,
+    deleteMedicalImage,
+    uploadMedicalImage,
     pets,
+    medicalImages,
     medicalRecords,
     owners,
   } = useAppStore();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showImageForm, setShowImageForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPetFilter, setSelectedPetFilter] = useState("all");
 
@@ -56,6 +62,10 @@ export function AdminMedicalRecordsPage() {
   const [temperatureC, setTemperatureC] = useState("");
   const [heartRateBpm, setHeartRateBpm] = useState("");
   const [doctorName, setDoctorName] = useState("Bs. Mai Nguyễn");
+  const [imagePetId, setImagePetId] = useState(pets[0]?.id ?? "");
+  const [imageTitle, setImageTitle] = useState("");
+  const [imageDataUrl, setImageDataUrl] = useState("");
+  const [imageMimeType, setImageMimeType] = useState("");
 
   const [toastMsg, setToastMsg] = useState("");
   const [formError, setFormError] = useState("");
@@ -182,6 +192,47 @@ export function AdminMedicalRecordsPage() {
     }
   };
 
+  const handleImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setFormError("Please select an image file (JPG, PNG, or WEBP).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setFormError("Diagnostic images must not exceed 5 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageDataUrl(String(reader.result));
+      setImageMimeType(file.type);
+      if (!imageTitle.trim()) setImageTitle(file.name.replace(/\.[^.]+$/, ""));
+      setFormError("");
+    };
+    reader.onerror = () => setFormError("Unable to read the image. Please try again.");
+    reader.readAsDataURL(file);
+  };
+
+  const handleImageUpload = () => {
+    if (!imagePetId || !imageDataUrl || !imageTitle.trim()) {
+      setFormError("Select a pet, enter an image title, and choose an image to upload.");
+      return;
+    }
+    uploadMedicalImage({ petId: imagePetId, title: imageTitle.trim(), imageUrl: imageDataUrl, mimeType: imageMimeType });
+    setImageTitle("");
+    setImageDataUrl("");
+    setImageMimeType("");
+    setShowImageForm(false);
+    setFormError("");
+    toast("Diagnostic image uploaded successfully.");
+  };
+
+  const imageList = useMemo(
+    () => medicalImages.filter((image) => image.petId === imagePetId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [medicalImages, imagePetId],
+  );
+
   // Completed/in_progress appointments for suggestion
   const relevantAppointments = useMemo(() => {
     return appointments.filter((a) => a.petId === petId);
@@ -260,6 +311,15 @@ export function AdminMedicalRecordsPage() {
           </select>
         </div>
 
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => setShowImageForm((value) => !value)}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 rounded-xl border border-primary/30 bg-white px-5 py-2.5 text-sm font-bold text-primary hover:bg-slate-50 transition-colors"
+          >
+            <ImagePlus size={16} />
+            {showImageForm ? "Close upload" : "Upload diagnostic image"}
+          </button>
         <button
           onClick={() => {
             resetForm();
@@ -271,7 +331,55 @@ export function AdminMedicalRecordsPage() {
           <FilePlus2 size={16} />
           {showCreateForm ? "Đóng form" : "Tạo hồ sơ mới"}
         </button>
+        </div>
       </div>
+
+      {showImageForm && (
+        <div className="mb-8 rounded-2xl border border-primary/20 bg-white p-6 shadow-soft animate-scaleUp">
+          <div className="mb-5 flex items-center gap-2">
+            <ImagePlus size={20} className="text-primary" />
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Upload diagnostic image</h2>
+              <p className="mt-1 text-sm text-slate-500">Upload X-ray, ultrasound, or microscope images. The owner can view them from the pet profile.</p>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className={labelCls}>Pet *</label>
+              <select className={fieldCls} value={imagePetId} onChange={(event) => setImagePetId(event.target.value)}>
+                {pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name} - {pet.breed}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Image title *</label>
+              <input className={fieldCls} value={imageTitle} onChange={(event) => setImageTitle(event.target.value)} placeholder="Example: Chest X-ray" />
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelCls}>Image file * (JPG, PNG, WEBP; max 5 MB)</label>
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageFileChange} className={fieldCls} />
+            </div>
+          </div>
+          {imageDataUrl && <img src={imageDataUrl} alt="Diagnostic image preview" className="mt-4 h-48 w-full rounded-xl border border-slate-200 bg-slate-50 object-contain" />}
+          <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-3">
+            <button onClick={() => { setShowImageForm(false); setImageDataUrl(""); }} className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button onClick={handleImageUpload} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark shadow-soft">Save image</button>
+          </div>
+          {imageList.length > 0 && (
+            <div className="mt-6 border-t border-slate-100 pt-5">
+              <p className="mb-3 text-sm font-bold text-slate-900">Uploaded images ({imageList.length})</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {imageList.map((image) => (
+                  <div key={image.id} className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                    <img src={image.imageUrl} alt={image.title} className="h-24 w-full object-cover" />
+                    <p className="truncate px-2 py-1.5 text-xs font-semibold text-slate-700">{image.title}</p>
+                    <button type="button" onClick={() => deleteMedicalImage(image.id)} className="absolute right-1.5 top-1.5 rounded-md bg-white/95 p-1.5 text-rose-600 shadow-sm hover:bg-rose-50" aria-label={`Delete ${image.title}`}><Trash size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Create Form */}
       {showCreateForm && (

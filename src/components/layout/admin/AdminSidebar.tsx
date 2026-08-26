@@ -2,6 +2,7 @@ import { LogOut } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { adminNav } from "../../../constants/navigation";
 import { useAppStore } from "../../../store/AppStoreProvider";
+import { BrandLogo } from "../../shared/BrandLogo";
 
 export function AdminSidebar() {
   const navigate = useNavigate();
@@ -17,11 +18,11 @@ export function AdminSidebar() {
     <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col bg-slate-900 p-5 text-white lg:flex">
       <div className="mb-8">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary font-extrabold text-white">
-            NPC
+          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5">
+            <BrandLogo className="h-full w-full" />
           </div>
           <div>
-            <div className="text-base font-extrabold tracking-wide">NIPPON PET CARE</div>
+            <div className="text-base font-extrabold tracking-wide">NIPOPETO</div>
             <div className="text-xs text-slate-400">Hospital Admin</div>
           </div>
         </div>

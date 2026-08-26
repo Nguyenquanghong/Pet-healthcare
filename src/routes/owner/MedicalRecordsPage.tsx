@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Download, PawPrint, Plus, Printer } from "lucide-react";
 import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
 import { PetVitalsSummary } from "../../components/owner/medical/PetVitalsSummary";
@@ -17,11 +17,19 @@ const genderLabels = {
 
 export function MedicalRecordsPage() {
   const { medicalRecords, ownerPets } = useAppStore();
-  const [selectedPetId, setSelectedPetId] = useState(ownerPets[0]?.id ?? "");
+  const [searchParams] = useSearchParams();
+  const requestedPetId = searchParams.get("petId");
+  const [selectedPetId, setSelectedPetId] = useState(() =>
+    ownerPets.some((pet) => pet.id === requestedPetId) ? requestedPetId ?? "" : ownerPets[0]?.id ?? "",
+  );
 
   useEffect(() => {
-    if (!ownerPets.some((pet) => pet.id === selectedPetId)) setSelectedPetId(ownerPets[0]?.id ?? "");
-  }, [ownerPets, selectedPetId]);
+    if (requestedPetId && ownerPets.some((pet) => pet.id === requestedPetId)) {
+      setSelectedPetId(requestedPetId);
+    } else if (!ownerPets.some((pet) => pet.id === selectedPetId)) {
+      setSelectedPetId(ownerPets[0]?.id ?? "");
+    }
+  }, [ownerPets, requestedPetId, selectedPetId]);
 
   const pet = ownerPets.find((item) => item.id === selectedPetId);
   const petRecords = useMemo(
@@ -44,7 +52,7 @@ export function MedicalRecordsPage() {
             <div className="flex items-center gap-4">
               <div className="h-14 w-14 overflow-hidden rounded-full border border-slate-200 bg-slate-50">
                 <img
-                  src={`https://api.dicebear.com/7.x/shapes/svg?seed=${pet.name}&backgroundColor=f1f5f9`}
+                  src={pet.avatarUrl || `https://api.dicebear.com/7.x/shapes/svg?seed=${pet.name}&backgroundColor=f1f5f9`}
                   alt={pet.name}
                   className="h-full w-full object-cover"
                 />

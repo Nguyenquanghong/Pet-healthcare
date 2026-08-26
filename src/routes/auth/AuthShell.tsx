@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { HeartPulse, PawPrint, Sparkles } from "lucide-react";
+import { BrandLogo } from "../../components/shared/BrandLogo";
 
 type AuthShellProps = {
   eyebrow?: string;
@@ -25,8 +26,9 @@ export function AuthShell({ eyebrow = "Nippon Pet Care", title, description, chi
             <div className="absolute -bottom-24 -right-16 h-72 w-72 rounded-full border-[42px] border-white/10" />
             <div className="relative z-10 flex min-h-full flex-col justify-between gap-12">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/12 px-4 py-2 text-sm font-extrabold shadow-sm ring-1 ring-white/15">
-                  <PawPrint size={18} /> {eyebrow}
+                <div className="inline-flex items-center gap-3 rounded-2xl bg-white px-4 py-2 text-sm font-extrabold text-slate-950 shadow-sm ring-1 ring-white/30">
+                  <BrandLogo variant="lockup" className="h-16 w-32" />
+                  <span className="sr-only">{eyebrow}</span>
                 </div>
                 <h1 className="mt-8 max-w-xl text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                   {title}

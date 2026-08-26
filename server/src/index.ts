@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { loadEnvFile } from "./env";
 import { authRouter } from "./routes/auth";
 import { petsRouter } from "./routes/pets";
 import { appointmentsRouter } from "./routes/appointments";
@@ -9,11 +10,14 @@ import { notificationsRouter } from "./routes/notifications";
 import { invoicesRouter } from "./routes/invoices";
 import { db } from "./db";
 
+loadEnvFile();
+
 const app = express();
 const PORT = process.env.PORT || 5000;
+const corsOrigins = process.env.CORS_ORIGIN?.split(",").map((origin) => origin.trim()).filter(Boolean);
 
 // Middlewares
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({ origin: corsOrigins?.length ? corsOrigins : true, credentials: true }));
 app.use(express.json());
 
 // Request logging
@@ -63,5 +67,6 @@ app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`🚀 NIPONETO REST API Server đang chạy tại:`);
   console.log(`👉 http://localhost:${PORT}/api/health`);
+  console.log(`🌐 CORS Origin: ${corsOrigins?.length ? corsOrigins.join(", ") : "any"}`);
   console.log(`====================================================`);
 });

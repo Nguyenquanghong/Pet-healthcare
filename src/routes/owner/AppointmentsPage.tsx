@@ -17,6 +17,7 @@ export function AppointmentsPage() {
   const [date, setDate] = useState("2026-11-05");
   const [time, setTime] = useState("09:00");
   const [ownerNote, setOwnerNote] = useState("");
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState("");
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
@@ -26,6 +27,12 @@ export function AppointmentsPage() {
   const ownerAppointments = useMemo(
     () => appointments.filter(a => a.ownerId === currentOwnerId),
     [appointments, currentOwnerId],
+  );
+  const visibleAppointments = useMemo(
+    () => selectedCalendarDate
+      ? ownerAppointments.filter((appointment) => appointment.date === selectedCalendarDate)
+      : ownerAppointments,
+    [ownerAppointments, selectedCalendarDate],
   );
   const selectedService = OWNER_APPOINTMENT_SERVICES.find(s => s.type === serviceType) ?? OWNER_APPOINTMENT_SERVICES[0];
 
@@ -64,8 +71,18 @@ export function AppointmentsPage() {
           onSubmit={handleSubmit}
         />
         <div className="space-y-6">
-          <OwnerAppointmentCalendar appointments={ownerAppointments} />
-          <OwnerAppointmentList appointments={ownerAppointments} pets={pets} />
+          <OwnerAppointmentCalendar
+            appointments={ownerAppointments}
+            selectedDate={selectedCalendarDate}
+            onSelectDate={setSelectedCalendarDate}
+            onClearDate={() => setSelectedCalendarDate("")}
+          />
+          <OwnerAppointmentList
+            appointments={visibleAppointments}
+            pets={pets}
+            selectedDate={selectedCalendarDate || undefined}
+            onClearDate={() => setSelectedCalendarDate("")}
+          />
         </div>
       </div>
       )}

@@ -2,10 +2,11 @@ import { LogOut } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { ownerNav } from "../../../constants/navigation";
 import { useAppStore } from "../../../store/AppStoreProvider";
+import { BrandLogo } from "../../shared/BrandLogo";
 
 export function OwnerSidebar() {
   const navigate = useNavigate();
-  const { logout, notifications, currentOwnerId, currentOwner } = useAppStore();
+  const { logout, notifications, currentOwnerId } = useAppStore();
   const unreadCount = notifications.filter(
     (n) => n.recipientOwnerId === currentOwnerId && n.status === "sent"
   ).length;
@@ -15,27 +16,20 @@ export function OwnerSidebar() {
     navigate("/", { replace: true });
   };
 
-  // Initials from owner full name
-  const initials = currentOwner?.fullName
-    ? currentOwner.fullName
-        .split(" ")
-        .slice(-2)
-        .map((w) => w[0])
-        .join("")
-        .toUpperCase()
-    : "ON";
-
   return (
     <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col bg-primary p-5 text-white shadow-2xl lg:flex">
       {/* Brand */}
       <div className="mb-8">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 font-extrabold text-white text-sm tracking-wide ring-1 ring-white/20">
-            NPC
+          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5 ring-1 ring-white/20">
+            <BrandLogo className="h-full w-full" />
           </div>
           <div>
-            <div className="text-base font-extrabold tracking-wide">NIPPON PET CARE</div>
-            <div className="text-xs text-cyan-200">Chủ thú cưng</div>
+            <div className="text-base font-extrabold tracking-wide">NIPOPETO</div>
+            <div className="mt-0.5 text-[10px] font-medium leading-4 text-cyan-100">
+              <span className="block">Công Nghệ Nhật Bản -</span>
+              <span className="block">Tận Tâm Chăm Sóc Thú Cưng</span>
+            </div>
           </div>
         </div>
 
@@ -73,23 +67,14 @@ export function OwnerSidebar() {
         })}
       </nav>
 
-      {/* Bottom: Owner profile + Logout */}
-      <div className="mt-auto space-y-2">
-        <div className="flex items-center gap-3 rounded-xl bg-white/10 p-3 ring-1 ring-white/10">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-aqua/30 text-sm font-bold text-aqua ring-1 ring-aqua/30">
-            {initials}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{currentOwner?.fullName ?? "Chủ nuôi"}</p>
-            <p className="text-xs text-cyan-200">{currentOwner?.phone ?? ""}</p>
-          </div>
-        </div>
+      {/* Bottom: Logout */}
+      <div className="mt-auto border-t border-white/10 pt-4">
         <button
           type="button"
           id="owner-sidebar-logout"
           onClick={handleLogout}
           aria-label="Đăng xuất tài khoản"
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-center text-sm font-semibold text-cyan-100 ring-1 ring-white/10 transition hover:bg-white/20 hover:text-white"
+          className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-center text-sm font-semibold text-cyan-100 transition hover:bg-rose-500/15 hover:text-rose-100"
         >
           <LogOut size={16} /> Đăng xuất
         </button>
