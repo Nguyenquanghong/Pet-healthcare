@@ -15,6 +15,8 @@ type RescheduleAppointmentInput = { date: string; time: string; ownerNote?: stri
 type CreateMedicalRecordInput = Omit<MedicalRecord, "id" | "ownerId" | "createdAt" | "updatedAt">;
 type UpdateMedicalRecordInput = Partial<Omit<MedicalRecord, "id" | "ownerId" | "createdAt">>;
 type RegisterOwnerInput = { fullName?: string; phone?: string; email: string; password: string; confirmPassword: string; address?: string };
+type UpdateOwnerProfileInput = { fullName: string; email: string; phone?: string; address?: string };
+type ChangePasswordInput = { currentPassword: string; newPassword: string; confirmPassword: string };
 type CreatePetInput = Omit<Pet, "id" | "ownerId">;
 type UpdatePetInput = Partial<Omit<Pet, "id" | "ownerId">>;
 type RescueReportInput = { petId: string; finderName?: string; finderPhone: string; location: string; note?: string };
@@ -43,6 +45,8 @@ type AppStoreValue = AppState & {
   loginAdmin: (username: string, password: string) => Promise<string | null>;
   logout: () => void;
   registerOwner: (input: RegisterOwnerInput) => Promise<void>;
+  updateOwnerProfile: (input: UpdateOwnerProfileInput) => Promise<void>;
+  changePassword: (input: ChangePasswordInput) => Promise<void>;
   createPet: (input: CreatePetInput) => void;
   updatePet: (petId: string, input: UpdatePetInput) => void;
   submitRescueReport: (input: RescueReportInput) => void;
@@ -155,6 +159,25 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           setAuthRole("owner");
           await loadData();
         } finally { setIsLoading(false); }
+      },
+      updateOwnerProfile: async (input) => {
+        setIsLoading(true);
+        setError("");
+        try {
+          await apiClient.patch("/auth/me", input);
+          await loadData();
+        } finally {
+          setIsLoading(false);
+        }
+      },
+      changePassword: async (input) => {
+        setIsLoading(true);
+        setError("");
+        try {
+          await apiClient.post("/auth/me/password", input);
+        } finally {
+          setIsLoading(false);
+        }
       },
       createPet: (input) => mutate(() => apiClient.post("/pets", input)),
       updatePet: (id, input) => mutate(() => apiClient.patch(`/pets/${id}`, input)),

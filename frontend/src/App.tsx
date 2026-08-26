@@ -21,6 +21,7 @@ import { MedicalRecordsPage } from "./routes/owner/MedicalRecordsPage";
 import { NotificationsPage } from "./routes/owner/NotificationsPage";
 import { OwnerRegisterPage } from "./routes/owner/OwnerRegisterPage";
 import { PetsPage } from "./routes/owner/PetsPage";
+import { OwnerProfilePage } from "./routes/owner/OwnerProfilePage";
 import { PetRescuePage } from "./routes/public/PetRescuePage";
 
 function OwnerOnly({ children }: { children: ReactNode }) {
@@ -45,6 +46,7 @@ export function App() {
       <Route path="/pet/:qrToken" element={<PetRescuePage />} />
       <Route path="/owner" element={<Navigate to="/owner/dashboard" replace />} />
       <Route path="/owner/dashboard" element={<OwnerOnly><DashboardPage /></OwnerOnly>} />
+      <Route path="/owner/profile" element={<OwnerOnly><OwnerProfilePage /></OwnerOnly>} />
       <Route path="/owner/pets" element={<OwnerOnly><PetsPage /></OwnerOnly>} />
       <Route path="/owner/medical-records" element={<OwnerOnly><MedicalRecordsPage /></OwnerOnly>} />
       <Route path="/owner/appointments" element={<OwnerOnly><AppointmentsPage /></OwnerOnly>} />

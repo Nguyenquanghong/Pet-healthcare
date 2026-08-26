@@ -21,18 +21,18 @@ export function OwnerSidebar() {
       {/* Brand */}
       <div className="mb-7 px-2">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-1">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white p-1.5">
             <BrandLogo className="h-full w-full" />
           </div>
-          <div>
-            <div className="text-sm font-bold text-slate-950">NIPOPETO</div>
-            <div className="mt-0.5 text-[9px] font-medium leading-3.5 text-slate-500">
-              <span className="block">Công Nghệ Nhật Bản -</span>
-              <span className="block">Tận Tâm Chăm Sóc Thú Cưng</span>
-            </div>
+          <div className="min-w-0">
+            <div className="text-base font-bold leading-5 text-slate-950">NIPOPETO</div>
+            <div className="mt-0.5 text-[11px] font-medium leading-4 text-slate-500">Nippon Pet Care</div>
           </div>
         </div>
-
+        <p className="mt-2.5 text-[10px] font-medium leading-4 text-slate-500">
+          <span className="block">Công Nghệ Nhật Bản -</span>
+          <span className="block">Tận Tâm Chăm Sóc Thú Cưng</span>
+        </p>
       </div>
 
       {/* Navigation */}

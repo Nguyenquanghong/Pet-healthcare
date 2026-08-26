@@ -27,14 +27,19 @@ export function OwnerTopbar({ title }: OwnerTopbarProps) {
         <h1 className="truncate text-lg font-semibold text-slate-950 sm:text-xl">{title}</h1>
 
         <div className="flex items-center gap-2">
-          <div className="flex min-w-0 items-center gap-2.5 px-2 py-1.5">
+          <NavLink
+            to="/owner/profile"
+            aria-label="Manage profile"
+            title="Manage profile"
+            className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-slate-100"
+          >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold text-primary">
               {initials}
             </div>
             <p className="hidden max-w-40 truncate text-sm font-medium text-slate-800 sm:block">
               {currentOwner?.fullName ?? "Chủ nuôi"}
             </p>
-          </div>
+          </NavLink>
 
           <NavLink
             id="owner-topbar-bell"

@@ -1,7 +1,8 @@
-import { Bell, CalendarDays, FileText, Hotel, LayoutDashboard, PawPrint, Settings, BarChart3, Receipt } from "lucide-react";
+import { Bell, CalendarDays, FileText, Hotel, LayoutDashboard, PawPrint, Settings, BarChart3, Receipt, UserRound } from "lucide-react";
 
 export const ownerNav = [
   { to: "/owner/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/owner/profile", label: "Profile", icon: UserRound },
   { to: "/owner/pets", label: "Pet Profiles", icon: PawPrint },
   { to: "/owner/medical-records", label: "Medical Records", icon: FileText },
   { to: "/owner/appointments", label: "Appointments", icon: CalendarDays },
