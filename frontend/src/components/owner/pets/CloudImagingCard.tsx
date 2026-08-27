@@ -21,7 +21,7 @@ export function CloudImagingCard({ pet, images }: CloudImagingCardProps) {
       </div>
 
       {recentImages.length ? (
-        <div className="grid grid-cols-2 gap-4 flex-1">
+        <div className="grid gap-4 sm:grid-cols-2 flex-1">
           {recentImages.map((image) => (
             <button key={image.id} type="button" onClick={() => setActiveImage(image)} className="group relative min-h-32 overflow-hidden rounded-xl border border-slate-200 bg-slate-900 text-left">
               <img src={image.imageUrl} alt={image.title} className="h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-100" />

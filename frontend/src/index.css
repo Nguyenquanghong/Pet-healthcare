@@ -26,6 +26,34 @@ button, a, input, select, textarea {
   -webkit-tap-highlight-color: transparent;
 }
 
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .fixed.inset-0.z-50:not(.loading-overlay) {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .fixed.inset-0.z-50:not(.loading-overlay) > :first-child {
+    width: 100%;
+    max-height: calc(100dvh - 0.5rem);
+    margin: 0;
+    overflow-y: auto;
+    border-radius: 0.5rem 0.5rem 0 0;
+    padding: 1rem;
+  }
+}
+
+@media (pointer: coarse) {
+  button {
+    min-height: 44px;
+  }
+}
+
 /* Bring legacy surfaces into the same restrained product system. */
 .rounded-2xl {
   border-radius: 0.625rem;

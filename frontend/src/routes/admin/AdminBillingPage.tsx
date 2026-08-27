@@ -207,7 +207,7 @@ export function AdminBillingPage() {
       {/* Invoice List Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="min-w-[820px] w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-bold">
               <tr>
                 <th className="px-5 py-4">Mã Hóa đơn</th>
@@ -347,7 +347,7 @@ export function AdminBillingPage() {
               </div>
 
               {/* Customer & Pet Details */}
-              <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+              <div className="grid gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4 text-xs sm:grid-cols-2">
                 <div>
                   <p className="font-bold uppercase tracking-wider text-slate-400 mb-1">Khách hàng / Chủ nuôi</p>
                   <p className="font-bold text-slate-900 text-sm">

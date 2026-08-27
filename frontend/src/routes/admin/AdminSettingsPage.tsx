@@ -20,7 +20,7 @@ export function AdminSettingsPage() {
           <dl className="space-y-4 text-sm">
             <div><dt className="text-xs font-semibold text-slate-500">Tên cơ sở</dt><dd className="mt-1 font-medium text-slate-900">Nippon Pet Care</dd></div>
             <div><dt className="text-xs font-semibold text-slate-500">Địa chỉ</dt><dd className="mt-1 text-slate-700">18 Phạm Hùng, Mỹ Đình 2, Nam Từ Liêm, Hà Nội</dd></div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div><dt className="text-xs font-semibold text-slate-500">Hotline</dt><dd className="mt-1 flex items-center gap-1.5 font-medium text-primary"><Phone size={14} /> 1900 6868</dd></div>
               <div><dt className="text-xs font-semibold text-slate-500">Giờ làm việc</dt><dd className="mt-1 flex items-center gap-1.5 text-slate-700"><Clock size={14} /> 08:00 - 20:00</dd></div>
             </div>

@@ -16,7 +16,7 @@ export function AdminLayout({ title, children }: AdminLayoutProps) {
       <main className="flex min-h-screen flex-col lg:ml-60">
         <AdminTopbar title={title} />
         {isLoading && <div className="h-0.5 w-full animate-pulse bg-primary" aria-label="Loading" />}
-        <div className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[1600px] flex-1 px-4 pb-24 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pb-6">
           {error && <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>}
           {children}
         </div>

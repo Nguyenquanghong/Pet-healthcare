@@ -8,8 +8,8 @@ export function DataTable({ type }: { type: "appointments" | "pets" | "bookings"
   const { appointments, hotelBookings, owners, pets: storePets } = useAppStore();
   const headers = type === "appointments" ? ["Time", "Pet", "Service", "Doctor", "Status"] : type === "pets" ? ["Pet", "Breed", "Age", "Owner", "Status"] : ["Pet", "Owner", "Dates", "Room", "Total", "Status"];
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
+    <div className="overscroll-x-contain overflow-x-auto">
+      <table className="min-w-[680px] w-full text-left text-sm">
         <thead>
           <tr className="border-b">{headers.map((header) => <th key={header} className="p-3">{header}</th>)}</tr>
         </thead>

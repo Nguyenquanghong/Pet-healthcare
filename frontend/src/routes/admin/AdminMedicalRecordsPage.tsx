@@ -492,7 +492,7 @@ export function AdminMedicalRecordsPage() {
               />
             </div>
 
-            <div className="md:col-span-2 grid grid-cols-3 gap-3">
+            <div className="grid gap-3 sm:grid-cols-3 md:col-span-2">
               <div>
                 <label className={labelCls}>Cân nặng (kg)</label>
                 <input
@@ -550,7 +550,7 @@ export function AdminMedicalRecordsPage() {
       {/* Records List Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="min-w-[900px] w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase font-bold">
               <tr>
                 <th className="px-5 py-4">Ngày khám</th>
@@ -732,7 +732,7 @@ export function AdminMedicalRecordsPage() {
                 />
               </div>
 
-              <div className="md:col-span-2 grid grid-cols-3 gap-3">
+            <div className="grid gap-3 sm:grid-cols-3 md:col-span-2">
                 <div>
                   <label className={labelCls}>Cân nặng (kg)</label>
                   <input
@@ -865,7 +865,7 @@ export function AdminMedicalRecordsPage() {
               </div>
 
               {(viewDetailRecord.weightKg || viewDetailRecord.temperatureC || viewDetailRecord.heartRateBpm) && (
-                <div className="grid grid-cols-3 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                <div className="grid gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-center sm:grid-cols-3">
                   <div>
                     <p className="text-[11px] font-bold text-slate-400 uppercase">Cân nặng</p>
                     <p className="font-black text-slate-900 text-base">{viewDetailRecord.weightKg ?? "—"} kg</p>

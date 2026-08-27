@@ -281,7 +281,7 @@ export function AdminAnalyticsPage() {
         </h3>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="min-w-[720px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-500 border-b border-slate-200">
               <tr>
                 <th className="px-5 py-3">Bác sĩ phụ trách</th>

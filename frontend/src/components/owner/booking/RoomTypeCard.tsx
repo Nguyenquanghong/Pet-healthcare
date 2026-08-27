@@ -11,13 +11,13 @@ export function RoomTypeCard({ roomType, onRoomTypeChange }: RoomTypeCardProps) 
   return (
     <div>
       <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Loại phòng</label>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {(["standard", "deluxe"] as HotelRoomType[]).map((room) => (
           <button
             key={room}
             type="button"
             onClick={() => onRoomTypeChange(room)}
-            className={`rounded-md border p-4 text-left transition-colors ${
+            className={`min-h-20 rounded-md border p-4 text-left transition-colors ${
               roomType === room ? "border-primary bg-primary/5" : "border-slate-200 hover:border-slate-300"
             }`}
           >

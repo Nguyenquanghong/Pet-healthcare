@@ -217,8 +217,8 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
       </div>
 
       {rescheduleItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 sm:items-center sm:p-4">
+          <div className="max-h-[calc(100dvh-1rem)] w-full max-w-md overflow-y-auto rounded-t-lg border border-slate-200 bg-white p-4 animate-scaleUp sm:rounded-lg sm:p-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900">
                 <CalendarClock size={20} className="text-primary" />
@@ -236,7 +236,7 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
                 Sau khi đổi lịch, lịch hẹn sẽ chuyển về trạng thái <strong>Chờ xác nhận</strong> để phòng khám kiểm tra.
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <Input type="date" label="Ngày mới" value={rescheduleDate} onChange={(event) => setRescheduleDate(event.target.value)} />
                 <Input type="time" label="Giờ mới" value={rescheduleTime} onChange={(event) => setRescheduleTime(event.target.value)} />
               </div>
@@ -262,8 +262,8 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
       )}
 
       {cancelItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 sm:items-center sm:p-4">
+          <div className="max-h-[calc(100dvh-1rem)] w-full max-w-md overflow-y-auto rounded-t-lg border border-slate-200 bg-white p-4 animate-scaleUp sm:rounded-lg sm:p-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h3 className="flex items-center gap-2 text-lg font-bold text-rose-600">
                 <Ban size={20} />

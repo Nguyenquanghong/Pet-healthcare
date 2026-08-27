@@ -9,7 +9,7 @@ interface StayDatesCardProps {
 
 export function StayDatesCard({ checkIn, checkOut, onCheckInChange, onCheckOutChange }: StayDatesCardProps) {
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid gap-4 sm:grid-cols-2">
       <Input type="date" label="Ngày nhận phòng" value={checkIn} onChange={(event) => onCheckInChange(event.target.value)} />
       <Input type="date" label="Ngày trả phòng" value={checkOut} onChange={(event) => onCheckOutChange(event.target.value)} />
     </div>

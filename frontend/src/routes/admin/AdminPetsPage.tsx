@@ -124,7 +124,7 @@ export function AdminPetsPage() {
           <p className="text-slate-500">{filteredPets.length} / {pets.length} thú cưng</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="min-w-[760px] w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase font-bold">
               <tr>
                 <th className="px-6 py-4">Thú cưng</th>
@@ -241,7 +241,7 @@ export function AdminPetsPage() {
             {selectedOwner && (
               <div className="rounded-xl bg-blue-50/50 border border-blue-100 p-4 mb-6">
                 <p className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-2">Thông tin chủ nhân</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="grid gap-2 text-sm sm:grid-cols-2">
                   <div>
                     <p className="font-bold text-slate-900">{selectedOwner.fullName}</p>
                     <p className="text-xs text-slate-500">{selectedOwner.email}</p>

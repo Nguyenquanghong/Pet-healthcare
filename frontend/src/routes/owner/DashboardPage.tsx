@@ -58,7 +58,7 @@ export function DashboardPage() {
         )}
       </div>
 
-      <div className="mb-6 grid overflow-hidden rounded-lg border border-slate-200 bg-white md:grid-cols-3 md:divide-x md:divide-slate-200">
+      <div className="mb-6 grid divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white md:grid-cols-3 md:divide-x md:divide-y-0">
         <Link
           to="/owner/pets"
           className="border-b border-slate-200 p-4 transition-colors hover:bg-slate-50 md:border-b-0"

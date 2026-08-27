@@ -46,7 +46,7 @@ export function BookAppointmentForm({
   onSubmit,
 }: BookAppointmentFormProps) {
   return (
-    <div className="h-fit rounded-lg border border-slate-200 bg-white p-5">
+    <div className="h-fit rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
       <h2 className="mb-5 text-xl font-bold text-slate-900 flex items-center gap-2">
         <CalendarPlus size={20} className="text-primary" />
         Đặt lịch khám mới
@@ -74,7 +74,7 @@ export function BookAppointmentForm({
           options={OWNER_APPOINTMENT_SERVICES.map((service) => ({ value: service.type, label: service.label }))}
           onChange={(event) => onServiceTypeChange(event.target.value as AppointmentType)}
         />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Input type="date" label="Ngày khám" value={date} onChange={(event) => onDateChange(event.target.value)} />
           <Input type="time" label="Giờ khám" value={time} onChange={(event) => onTimeChange(event.target.value)} />
         </div>

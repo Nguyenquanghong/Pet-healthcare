@@ -7,8 +7,8 @@ interface TableProps {
 
 export function Table({ children, className = "" }: TableProps) {
   return (
-    <div className={`w-full overflow-x-auto rounded-lg border border-slate-200 bg-white ${className}`}>
-      <table className="w-full text-left text-sm text-slate-600">{children}</table>
+    <div className={`w-full overscroll-x-contain overflow-x-auto rounded-lg border border-slate-200 bg-white ${className}`}>
+      <table className="min-w-[680px] w-full text-left text-sm text-slate-600">{children}</table>
     </div>
   );
 }

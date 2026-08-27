@@ -180,7 +180,7 @@ export function AdminAppointmentsPage() {
       <div className="mb-6 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Search box */}
-          <div className="relative flex-1 max-w-md">
+          <div className="relative w-full flex-1 md:max-w-md">
             <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -200,13 +200,13 @@ export function AdminAppointmentsPage() {
           </div>
 
           {/* Quick Date Filters */}
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 overflow-x-auto pb-1 md:w-auto">
             <button
               onClick={() => {
                 setDateFilter("all");
                 setCustomDate("");
               }}
-              className={`rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors ${
+              className={`shrink-0 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors ${
                 dateFilter === "all"
                   ? "bg-slate-900 text-white border-slate-900"
                   : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
@@ -219,7 +219,7 @@ export function AdminAppointmentsPage() {
                 setDateFilter("today");
                 setCustomDate("");
               }}
-              className={`rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors ${
+              className={`shrink-0 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors ${
                 dateFilter === "today"
                   ? "bg-primary text-white border-primary"
                   : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
@@ -234,7 +234,7 @@ export function AdminAppointmentsPage() {
                 setCustomDate(e.target.value);
                 setDateFilter("custom");
               }}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold focus:border-primary focus:outline-none"
+              className="min-w-36 shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold focus:border-primary focus:outline-none"
             />
           </div>
         </div>
@@ -270,7 +270,7 @@ export function AdminAppointmentsPage() {
       {/* Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="min-w-[940px] w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase font-bold">
               <tr>
                 <th className="px-5 py-4">Thời gian</th>
@@ -574,7 +574,7 @@ export function AdminAppointmentsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
                     Triệu chứng
@@ -598,7 +598,7 @@ export function AdminAppointmentsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
                     Hướng điều trị *
@@ -623,7 +623,7 @@ export function AdminAppointmentsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
                     Cân nặng (kg)
