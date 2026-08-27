@@ -42,7 +42,9 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
 
   const origin = window.location.origin;
   const qrToken = pet.qrToken ?? pet.id;
-  const publicRescueUrl = `${origin}/rescue/${qrToken}`;
+  // Keep the public QR on the site root so static hosts can serve it without
+  // requiring a server-side SPA rewrite for deep links.
+  const publicRescueUrl = `${origin}/?rescue=${encodeURIComponent(qrToken)}`;
   const privateMedicalUrl = `${origin}/owner/medical-records?petId=${pet.id}`;
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&data=${encodeURIComponent(
     publicRescueUrl,

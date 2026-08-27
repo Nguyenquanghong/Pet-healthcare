@@ -28,8 +28,13 @@ const genderLabels = {
   unknown: "Chưa rõ",
 };
 
-export function PetRescuePage() {
-  const { qrToken } = useParams<{ qrToken: string }>();
+interface PetRescuePageProps {
+  qrToken?: string;
+}
+
+export function PetRescuePage({ qrToken: qrTokenProp }: PetRescuePageProps = {}) {
+  const { qrToken: routeQrToken } = useParams<{ qrToken: string }>();
+  const qrToken = qrTokenProp ?? routeQrToken;
   const [pet, setPet] = useState<Pet | null>(null);
   const [owner, setOwner] = useState<Owner | null>(null);
   const [isLoading, setIsLoading] = useState(true);

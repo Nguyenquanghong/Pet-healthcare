@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { useAppStore } from "./store/AppStoreProvider";
 import { LoadingSpinner } from "./components/ui/LoadingSpinner";
 import { AdminAppointmentsPage } from "./routes/admin/AdminAppointmentsPage";
@@ -36,10 +36,17 @@ function AdminOnly({ children }: { children: ReactNode }) {
   return authRole === "admin" ? children : <Navigate to="/admin/login" replace />;
 }
 
+function PublicEntryPage() {
+  const [searchParams] = useSearchParams();
+  const rescueToken = searchParams.get("rescue")?.trim();
+
+  return rescueToken ? <PetRescuePage qrToken={rescueToken} /> : <LandingPage />;
+}
+
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<PublicEntryPage />} />
       <Route path="/login" element={<OwnerLoginPage />} />
       <Route path="/register" element={<OwnerRegisterPage />} />
       <Route path="/rescue/:qrToken" element={<PetRescuePage />} />
