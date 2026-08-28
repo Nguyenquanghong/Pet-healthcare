@@ -139,10 +139,6 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
         </div>
       </div>
 
-      <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-        <p className="break-all text-xs font-semibold text-slate-600">{publicRescueUrl}</p>
-      </div>
-
       <div className="grid grid-cols-2 gap-2 border-b border-slate-100 pb-4">
         <button
           type="button"
