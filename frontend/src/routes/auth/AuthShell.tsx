@@ -9,7 +9,7 @@ type AuthShellProps = {
   tone?: "owner" | "admin";
 };
 
-export function AuthShell({ eyebrow = "Nippon Pet Care", title, description, children, tone = "owner" }: AuthShellProps) {
+export function AuthShell({ eyebrow = "Nippon Pet Care", title, children, tone = "owner" }: AuthShellProps) {
   const isAdmin = tone === "admin";
 
   return (
@@ -20,11 +20,12 @@ export function AuthShell({ eyebrow = "Nippon Pet Care", title, description, chi
             <div>
               <div className="flex items-center justify-between gap-4 lg:block">
                 <div className="inline-flex shrink-0 bg-white p-2">
-                  <BrandLogo variant="lockup" className="h-10 w-24 lg:h-12 lg:w-28" />
+                  <BrandLogo variant="lockup" className="h-9 w-20 sm:h-10 sm:w-24 lg:h-12 lg:w-28" />
                 </div>
-                <div className="min-w-0 text-right lg:hidden">
-                  <p className="text-base font-semibold">NIPOPETO</p>
-                  <p className="mt-1 max-w-64 text-xs leading-5 text-white/75">
+                <div className="min-w-0 max-w-sm flex-1 text-left lg:hidden">
+                  <p className="text-[10px] font-semibold uppercase text-white/70 sm:text-xs">{eyebrow}</p>
+                  <p className="mt-1 text-sm font-semibold leading-5 text-white sm:text-lg sm:leading-6">{title}</p>
+                  <p className="mt-1 text-[10px] leading-4 text-white/70 sm:text-xs sm:leading-5">
                     Công Nghệ Nhật Bản - Tận Tâm Chăm Sóc Thú Cưng
                   </p>
                 </div>
@@ -33,9 +34,6 @@ export function AuthShell({ eyebrow = "Nippon Pet Care", title, description, chi
               <h1 className="mt-3 hidden max-w-lg text-4xl font-semibold leading-tight lg:block">
                 {title}
               </h1>
-              <p className="mt-4 hidden max-w-xl text-base leading-6 text-white/75 lg:block">
-                {description}
-              </p>
             </div>
             <p className="mt-10 hidden border-t border-white/15 pt-5 text-xs leading-5 text-white/60 lg:block">
               Công Nghệ Nhật Bản - Tận Tâm Chăm Sóc Thú Cưng
