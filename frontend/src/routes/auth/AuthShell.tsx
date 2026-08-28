@@ -15,8 +15,8 @@ export function AuthShell({ eyebrow = "Nippon Pet Care", title, description, chi
   return (
     <main className="min-h-screen bg-slate-100 text-ink sm:px-6 sm:py-6 lg:px-8">
       <div className="mx-auto flex min-h-screen w-full max-w-6xl items-stretch sm:min-h-[calc(100vh-3rem)] sm:items-center">
-        <div className="grid w-full overflow-hidden border-slate-200 bg-white sm:rounded-lg sm:border lg:grid-cols-[0.9fr_1.1fr]">
-          <section className={`flex flex-col justify-between p-5 text-white sm:p-7 lg:p-12 ${isAdmin ? "bg-slate-900" : "bg-primary"}`}>
+        <div className="grid w-full grid-rows-[auto_1fr] overflow-hidden border-slate-200 bg-white sm:rounded-lg sm:border lg:grid-cols-[0.9fr_1.1fr] lg:grid-rows-none">
+          <section className={`flex flex-col p-5 text-white sm:p-7 lg:justify-between lg:p-12 ${isAdmin ? "bg-slate-900" : "bg-primary"}`}>
             <div>
               <div className="inline-flex bg-white p-2">
                 <BrandLogo variant="lockup" className="h-10 w-24 lg:h-12 lg:w-28" />
@@ -34,7 +34,7 @@ export function AuthShell({ eyebrow = "Nippon Pet Care", title, description, chi
             </p>
           </section>
 
-          <section className="flex items-center justify-center p-5 sm:p-10 lg:p-12">
+          <section className="flex items-start justify-center p-5 sm:p-10 lg:items-center lg:p-12">
             <div className="w-full max-w-lg">{children}</div>
           </section>
         </div>
