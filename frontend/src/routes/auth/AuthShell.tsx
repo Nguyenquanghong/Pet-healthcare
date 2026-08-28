@@ -18,8 +18,16 @@ export function AuthShell({ eyebrow = "Nippon Pet Care", title, description, chi
         <div className="grid w-full grid-rows-[auto_1fr] overflow-hidden border-slate-200 bg-white sm:rounded-lg sm:border lg:grid-cols-[0.9fr_1.1fr] lg:grid-rows-none">
           <section className={`flex flex-col p-5 text-white sm:p-7 lg:justify-between lg:p-12 ${isAdmin ? "bg-slate-900" : "bg-primary"}`}>
             <div>
-              <div className="inline-flex bg-white p-2">
-                <BrandLogo variant="lockup" className="h-10 w-24 lg:h-12 lg:w-28" />
+              <div className="flex items-center justify-between gap-4 lg:block">
+                <div className="inline-flex shrink-0 bg-white p-2">
+                  <BrandLogo variant="lockup" className="h-10 w-24 lg:h-12 lg:w-28" />
+                </div>
+                <div className="min-w-0 text-right lg:hidden">
+                  <p className="text-base font-semibold">NIPOPETO</p>
+                  <p className="mt-1 max-w-64 text-xs leading-5 text-white/75">
+                    Công Nghệ Nhật Bản - Tận Tâm Chăm Sóc Thú Cưng
+                  </p>
+                </div>
               </div>
               <p className="mt-8 hidden text-xs font-semibold uppercase text-white/70 lg:block">{eyebrow}</p>
               <h1 className="mt-3 hidden max-w-lg text-4xl font-semibold leading-tight lg:block">
