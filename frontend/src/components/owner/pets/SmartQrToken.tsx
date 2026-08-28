@@ -45,7 +45,6 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
   // Keep the public QR on the site root so static hosts can serve it without
   // requiring a server-side SPA rewrite for deep links.
   const publicRescueUrl = `${origin}/?rescue=${encodeURIComponent(qrToken)}`;
-  const privateMedicalUrl = `${origin}/owner/medical-records?petId=${pet.id}`;
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&data=${encodeURIComponent(
     publicRescueUrl,
   )}`;
@@ -220,9 +219,6 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
         />
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
-        Trang riêng cho bác sĩ vẫn giữ trong hệ thống nội bộ: <span className="font-semibold text-slate-900">{privateMedicalUrl}</span>
-      </div>
     </div>
   );
 }
