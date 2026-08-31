@@ -55,7 +55,7 @@ type AppStoreValue = AppState & {
   updateHotelBookingInternalNote: (bookingId: string, internalNote: string) => void;
   cancelHotelBooking: (bookingId: string, ownerNote?: string) => void;
   addDailyCareNote: (bookingId: string, note: string, eatingStatus?: "good" | "normal" | "poor", mood?: "happy" | "calm" | "anxious" | "tired") => void;
-  createAppointment: (input: CreateAppointmentInput) => void;
+  createAppointment: (input: CreateAppointmentInput) => Promise<void>;
   cancelAppointment: (appointmentId: string, ownerNote?: string) => void;
   rescheduleAppointment: (appointmentId: string, input: RescheduleAppointmentInput) => void;
   updateAppointmentStatus: (appointmentId: string, status: AppointmentStatus, internalNote?: string) => void;
@@ -123,19 +123,22 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const runMutation = async (operation: () => Promise<unknown>) => {
+    setIsLoading(true);
+    setError("");
+    try {
+      await operation();
+      await loadData();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The request could not be completed.");
+      throw reason;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const mutate = (operation: () => Promise<unknown>) => {
-    void (async () => {
-      setIsLoading(true);
-      setError("");
-      try {
-        await operation();
-        await loadData();
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : "The request could not be completed.");
-      } finally {
-        setIsLoading(false);
-      }
-    })();
+    void runMutation(operation).catch(() => undefined);
   };
 
   const value = useMemo<AppStoreValue>(() => {
@@ -187,7 +190,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       updateHotelBookingInternalNote: (id, internalNote) => { const status = state.hotelBookings.find((item) => item.id === id)?.status; mutate(() => apiClient.patch(`/hotel-bookings/${id}/status`, { status, internalNote })); },
       cancelHotelBooking: (id, ownerNote) => mutate(() => apiClient.patch(`/hotel-bookings/${id}/cancel`, { ownerNote })),
       addDailyCareNote: (id, note, eatingStatus, mood) => mutate(() => apiClient.post(`/hotel-bookings/${id}/care-notes`, { note, eatingStatus, mood })),
-      createAppointment: (input) => mutate(() => apiClient.post("/appointments", input)),
+      createAppointment: (input) => runMutation(() => apiClient.post("/appointments", input)),
       cancelAppointment: (id, ownerNote) => mutate(() => apiClient.patch(`/appointments/${id}/cancel`, { ownerNote })),
       rescheduleAppointment: (id, input) => mutate(() => apiClient.patch(`/appointments/${id}/reschedule`, input)),
       updateAppointmentStatus: (id, status, internalNote) => mutate(() => apiClient.patch(`/appointments/${id}/status`, { status, internalNote })),

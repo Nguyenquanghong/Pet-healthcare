@@ -23,6 +23,7 @@ export const OWNER_ROUTES = {
   PETS: "/owner/pets",
   MEDICAL_RECORDS: "/owner/medical-records",
   APPOINTMENTS: "/owner/appointments",
+  SPA_BOOKING: "/owner/spa-booking",
   HOTEL_BOOKING: "/owner/hotel-booking",
   NOTIFICATIONS: "/owner/notifications",
 } as const;

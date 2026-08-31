@@ -6,7 +6,7 @@ export const appointmentStatusLabels: Record<AppointmentStatus, string> = {
   pending: "Chờ xác nhận",
   confirmed: "Đã xác nhận",
   checked_in: "Đã check-in",
-  in_progress: "Đang khám",
+  in_progress: "Đang thực hiện",
   completed: "Hoàn thành",
   cancelled: "Đã hủy",
   no_show: "Không đến",

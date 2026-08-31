@@ -16,6 +16,7 @@ if (health.status !== "ok") throw new Error("Health check did not return ok.");
 const owner = await request("/auth/owner/login", { method: "POST", body: JSON.stringify({ email: "owner@example.com", password: "owner123" }) });
 const ownerData = await request("/bootstrap", { headers: { Authorization: `Bearer ${owner.token}` } });
 if (!ownerData.owners.length || !ownerData.pets.length) throw new Error("Owner bootstrap data is incomplete.");
+if (!ownerData.appointments.some((appointment) => appointment.type === "spa_bath")) throw new Error("Spa booking data is unavailable.");
 
 const admin = await request("/auth/admin/login", { method: "POST", body: JSON.stringify({ username: "admin", password: "admin123" }) });
 const adminData = await request("/bootstrap", { headers: { Authorization: `Bearer ${admin.token}` } });
@@ -24,4 +25,4 @@ if (!adminData.owners.length) throw new Error("Admin bootstrap data is incomplet
 const rescue = await request("/public/pets/mochi-rescue-demo");
 if (rescue.pet?.name !== "Mochi") throw new Error("Public rescue profile is unavailable.");
 
-console.log("Smoke test passed: health, owner auth, admin auth, bootstrap, and public rescue profile.");
+console.log("Smoke test passed: health, owner auth, admin auth, spa booking, bootstrap, and public rescue profile.");

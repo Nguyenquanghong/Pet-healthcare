@@ -13,10 +13,11 @@ import {
   X,
   Clock,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
 import { useAppStore } from "../../store/AppStoreProvider";
-import type { Appointment, AppointmentStatus } from "../../types/appointment";
+import { isSpaAppointmentType, type Appointment, type AppointmentStatus } from "../../types/appointment";
 import { appointmentStatusLabels } from "../../utils/statusLabels";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,7 +35,7 @@ const ALL_STATUSES: { key: string; label: string }[] = [
   { key: "pending", label: "Chờ xác nhận" },
   { key: "confirmed", label: "Đã xác nhận" },
   { key: "checked_in", label: "Đã check-in" },
-  { key: "in_progress", label: "Đang khám" },
+  { key: "in_progress", label: "Đang thực hiện" },
   { key: "completed", label: "Hoàn thành" },
   { key: "no_show", label: "Vắng mặt (No-show)" },
   { key: "cancelled", label: "Đã hủy" },
@@ -52,6 +53,7 @@ export function AdminAppointmentsPage() {
   } = useAppStore();
 
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [serviceFilter, setServiceFilter] = useState<"all" | "medical" | "spa">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<string>("all"); // 'all' | 'today' | custom date
   const [customDate, setCustomDate] = useState("");
@@ -82,8 +84,14 @@ export function AdminAppointmentsPage() {
     setTimeout(() => setToastMsg(""), 3500);
   };
 
+  const categoryAppointments = useMemo(() => appointments.filter((appointment) => {
+    if (serviceFilter === "spa") return isSpaAppointmentType(appointment.type);
+    if (serviceFilter === "medical") return !isSpaAppointmentType(appointment.type);
+    return true;
+  }), [appointments, serviceFilter]);
+
   const filteredAppointments = useMemo(() => {
-    return appointments.filter((a) => {
+    return categoryAppointments.filter((a) => {
       // Status filter
       if (filterStatus !== "all" && a.status !== filterStatus) return false;
 
@@ -107,7 +115,7 @@ export function AdminAppointmentsPage() {
 
       return true;
     });
-  }, [appointments, filterStatus, dateFilter, customDate, searchQuery, pets, owners, todayStr]);
+  }, [categoryAppointments, filterStatus, dateFilter, customDate, searchQuery, pets, owners, todayStr]);
 
   const handleStatusUpdate = (id: string, status: AppointmentStatus, internalNote?: string) => {
     updateAppointmentStatus(id, status, internalNote);
@@ -119,7 +127,7 @@ export function AdminAppointmentsPage() {
     updateAppointmentStatus(cancelModal.id, "cancelled", cancelReason ? `Lý do hủy: ${cancelReason}` : undefined);
     setCancelModal(null);
     setCancelReason("");
-    toast("Đã hủy lịch khám thành công.");
+    toast("Đã hủy lịch hẹn thành công.");
   };
 
   const handleSaveInternalNote = () => {
@@ -168,7 +176,7 @@ export function AdminAppointmentsPage() {
   };
 
   return (
-    <AdminLayout title="Quản lý lịch khám">
+    <AdminLayout title="Quản lý lịch hẹn">
       {toastMsg && (
         <div className="mb-4 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-emerald-800 font-semibold animate-fadeIn">
           <CheckCircle2 size={18} />
@@ -239,13 +247,30 @@ export function AdminAppointmentsPage() {
           </div>
         </div>
 
+        <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4" aria-label="Lọc loại lịch hẹn">
+          {([
+            { key: "all", label: "Tất cả dịch vụ" },
+            { key: "medical", label: "Khám & điều trị" },
+            { key: "spa", label: "Spa & grooming" },
+          ] as const).map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setServiceFilter(item.key)}
+              className={`rounded-md border px-4 py-2 text-sm font-semibold transition-colors ${serviceFilter === item.key ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         {/* Status Tabs */}
         <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
           {ALL_STATUSES.map((s) => {
             const count =
               s.key === "all"
-                ? appointments.length
-                : appointments.filter((a) => a.status === s.key).length;
+                ? categoryAppointments.length
+                : categoryAppointments.filter((a) => a.status === s.key).length;
 
             return (
               <button
@@ -285,6 +310,7 @@ export function AdminAppointmentsPage() {
               {filteredAppointments.map((a) => {
                 const pet = pets.find((p) => p.id === a.petId);
                 const owner = owners.find((o) => o.id === a.ownerId);
+                const isSpa = isSpaAppointmentType(a.type);
 
                 return (
                   <tr key={a.id} className="hover:bg-slate-50/60 transition-colors">
@@ -306,7 +332,10 @@ export function AdminAppointmentsPage() {
 
                     <td className="px-5 py-4">
                       <p className="font-semibold text-slate-800">{a.serviceName}</p>
-                      <p className="text-xs text-slate-400">{a.clinicName}</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${isSpa ? "bg-cyan-50 text-cyan-700" : "bg-slate-100 text-slate-600"}`}>{isSpa ? "SPA" : "Y TẾ"}</span>
+                        <span className="text-xs text-slate-400">{a.clinicName}</span>
+                      </div>
                     </td>
 
                     <td className="px-5 py-4 whitespace-nowrap">
@@ -389,11 +418,11 @@ export function AdminAppointmentsPage() {
                             onClick={() => handleStatusUpdate(a.id, "in_progress")}
                             className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-violet-700 transition-colors"
                           >
-                            <Stethoscope size={13} /> Bắt đầu khám
+                            {isSpa ? <Sparkles size={13} /> : <Stethoscope size={13} />} {isSpa ? "Bắt đầu Spa" : "Bắt đầu khám"}
                           </button>
                         )}
 
-                        {(a.status === "in_progress" || a.status === "checked_in") && (
+                        {!isSpa && (a.status === "in_progress" || a.status === "checked_in") && (
                           <button
                             onClick={() => openCreateRecordForAppointment(a)}
                             className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-xs"
@@ -432,7 +461,7 @@ export function AdminAppointmentsPage() {
               {filteredAppointments.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                    Không tìm thấy lịch khám phù hợp.
+                    Không tìm thấy lịch hẹn phù hợp.
                   </td>
                 </tr>
               )}
@@ -448,7 +477,7 @@ export function AdminAppointmentsPage() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <StickyNote size={18} className="text-primary" />
-                Ghi chú nội bộ lịch khám
+                Ghi chú nội bộ lịch hẹn
               </h3>
               <button
                 onClick={() => setInternalNoteModal(null)}
@@ -493,7 +522,7 @@ export function AdminAppointmentsPage() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-lg font-bold text-rose-600 flex items-center gap-2">
                 <XCircle size={20} />
-                Hủy lịch khám
+                Hủy lịch hẹn
               </h3>
               <button
                 onClick={() => setCancelModal(null)}

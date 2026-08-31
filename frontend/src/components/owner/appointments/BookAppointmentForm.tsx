@@ -22,6 +22,8 @@ interface BookAppointmentFormProps {
   time: string;
   ownerNote: string;
   success: boolean;
+  error: string;
+  isSubmitting: boolean;
   onPetChange: (value: string) => void;
   onServiceTypeChange: (value: AppointmentType) => void;
   onDateChange: (value: string) => void;
@@ -38,6 +40,8 @@ export function BookAppointmentForm({
   time,
   ownerNote,
   success,
+  error,
+  isSubmitting,
   onPetChange,
   onServiceTypeChange,
   onDateChange,
@@ -57,6 +61,7 @@ export function BookAppointmentForm({
           <CheckCircle2 size={16} /> Đã gửi yêu cầu đặt lịch! Admin sẽ xác nhận sớm.
         </div>
       )}
+      {error && <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>}
 
       <div className="space-y-4">
         <Select
@@ -84,8 +89,8 @@ export function BookAppointmentForm({
           onChange={(event) => onOwnerNoteChange(event.target.value)}
           placeholder="Triệu chứng, yêu cầu bác sĩ, thời gian ưu tiên..."
         />
-        <Button onClick={onSubmit} disabled={!petId} className="w-full">
-          Gửi yêu cầu đặt lịch
+        <Button onClick={onSubmit} disabled={!petId || !date || !time || isSubmitting} className="w-full">
+          {isSubmitting ? "Đang gửi yêu cầu..." : "Gửi yêu cầu đặt lịch"}
         </Button>
       </div>
     </div>

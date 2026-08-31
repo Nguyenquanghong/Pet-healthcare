@@ -8,10 +8,10 @@ import { OwnerAppointmentList } from "../../components/owner/appointments/OwnerA
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { useAppStore } from "../../store/AppStoreProvider";
-import type { AppointmentType } from "../../types/appointment";
+import { isSpaAppointmentType, type AppointmentType } from "../../types/appointment";
 
 export function AppointmentsPage() {
-  const { appointments, createAppointment, currentOwnerId, ownerPets, pets } = useAppStore();
+  const { appointments, createAppointment, currentOwnerId, error, isLoading, ownerPets, pets } = useAppStore();
   const [petId, setPetId] = useState(ownerPets[0]?.id ?? "");
   const [serviceType, setServiceType] = useState<AppointmentType>("general_checkup");
   const [date, setDate] = useState("2026-11-05");
@@ -25,7 +25,7 @@ export function AppointmentsPage() {
   }, [ownerPets, petId]);
 
   const ownerAppointments = useMemo(
-    () => appointments.filter(a => a.ownerId === currentOwnerId),
+    () => appointments.filter(a => a.ownerId === currentOwnerId && !isSpaAppointmentType(a.type)),
     [appointments, currentOwnerId],
   );
   const visibleAppointments = useMemo(
@@ -36,12 +36,16 @@ export function AppointmentsPage() {
   );
   const selectedService = OWNER_APPOINTMENT_SERVICES.find(s => s.type === serviceType) ?? OWNER_APPOINTMENT_SERVICES[0];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!petId) return;
-    createAppointment({ petId, type: serviceType, serviceName: selectedService.label, date, time, doctorId: "doctor_mai", ownerNote });
-    setOwnerNote("");
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 3000);
+    try {
+      await createAppointment({ petId, type: serviceType, serviceName: selectedService.label, date, time, doctorId: "doctor_mai", ownerNote });
+      setOwnerNote("");
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch {
+      setSuccess(false);
+    }
   };
 
   return (
@@ -63,6 +67,8 @@ export function AppointmentsPage() {
           time={time}
           ownerNote={ownerNote}
           success={success}
+          error={error}
+          isSubmitting={isLoading}
           onPetChange={setPetId}
           onServiceTypeChange={setServiceType}
           onDateChange={setDate}

@@ -1,4 +1,4 @@
-import type { AppointmentType } from "../types/appointment";
+import type { AppointmentType, SpaAppointmentType } from "../types/appointment";
 import type { HotelRoomType, HotelServiceKey } from "../types/booking";
 
 /**
@@ -18,6 +18,18 @@ export const appointmentServiceOptions: {
   { type: "surgery", label: "Phẫu thuật", description: "Tiểu phẫu, triệt sản, và phẫu thuật chuyên khoa", estimatedPrice: 1500000 },
   { type: "hotel_consultation", label: "Tư vấn lưu trú", description: "Khám sức khỏe trước khi nhận phòng hotel", estimatedPrice: 150000 },
   { type: "other", label: "Khác", description: "Dịch vụ khác theo yêu cầu", estimatedPrice: 200000 },
+];
+
+export const spaServiceOptions: {
+  type: SpaAppointmentType;
+  label: string;
+  description: string;
+  durationMinutes: number;
+  estimatedPrice: number;
+}[] = [
+  { type: "spa_bath", label: "Tắm & sấy", description: "Tắm làm sạch, sấy khô và vệ sinh tai cơ bản", durationMinutes: 60, estimatedPrice: 250000 },
+  { type: "spa_grooming", label: "Cắt tỉa & chăm sóc", description: "Cắt tỉa lông, móng và tạo kiểu theo giống", durationMinutes: 90, estimatedPrice: 450000 },
+  { type: "spa_combo", label: "Spa trọn gói", description: "Tắm sấy, cắt tỉa, vệ sinh tai và chăm sóc móng", durationMinutes: 120, estimatedPrice: 650000 },
 ];
 
 /**
@@ -53,7 +65,7 @@ export const hotelServiceOptions: {
  * Helper: lấy label dịch vụ khám từ type
  */
 export function getServiceLabel(type: AppointmentType): string {
-  return appointmentServiceOptions.find((s) => s.type === type)?.label ?? "Dịch vụ khác";
+  return appointmentServiceOptions.find((s) => s.type === type)?.label ?? spaServiceOptions.find((s) => s.type === type)?.label ?? "Dịch vụ khác";
 }
 
 /**

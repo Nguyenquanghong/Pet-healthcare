@@ -52,6 +52,9 @@ enum AppointmentType {
   dermatology
   surgery
   hotel_consultation
+  spa_bath
+  spa_grooming
+  spa_combo
   other
 }
 

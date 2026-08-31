@@ -22,6 +22,7 @@ import { NotificationsPage } from "./routes/owner/NotificationsPage";
 import { OwnerRegisterPage } from "./routes/owner/OwnerRegisterPage";
 import { PetsPage } from "./routes/owner/PetsPage";
 import { OwnerProfilePage } from "./routes/owner/OwnerProfilePage";
+import { SpaBookingPage } from "./routes/owner/SpaBookingPage";
 import { PetRescuePage } from "./routes/public/PetRescuePage";
 
 function OwnerOnly({ children }: { children: ReactNode }) {
@@ -57,6 +58,7 @@ export function App() {
       <Route path="/owner/pets" element={<OwnerOnly><PetsPage /></OwnerOnly>} />
       <Route path="/owner/medical-records" element={<OwnerOnly><MedicalRecordsPage /></OwnerOnly>} />
       <Route path="/owner/appointments" element={<OwnerOnly><AppointmentsPage /></OwnerOnly>} />
+      <Route path="/owner/spa-booking" element={<OwnerOnly><SpaBookingPage /></OwnerOnly>} />
       <Route path="/owner/hotel-booking" element={<OwnerOnly><HotelBookingPage /></OwnerOnly>} />
       <Route path="/owner/notifications" element={<OwnerOnly><NotificationsPage /></OwnerOnly>} />
       <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -73,6 +75,7 @@ export function App() {
       <Route path="/pets" element={<Navigate to="/owner/pets" replace />} />
       <Route path="/medical-records" element={<Navigate to="/owner/medical-records" replace />} />
       <Route path="/appointments" element={<Navigate to="/owner/appointments" replace />} />
+      <Route path="/spa-booking" element={<Navigate to="/owner/spa-booking" replace />} />
       <Route path="/hotel-booking" element={<Navigate to="/owner/hotel-booking" replace />} />
       <Route path="/notifications" element={<Navigate to="/owner/notifications" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />

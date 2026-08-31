@@ -24,11 +24,12 @@ const STATUS_VARIANTS: Record<string, "default" | "success" | "warning" | "dange
 const STATUS_TABS: Array<{ key: StatusTab; label: string; description: string; countClass: string }> = [
   { key: "all", label: "Tất cả", description: "Toàn bộ lịch", countClass: "bg-slate-900 text-white" },
   { key: "pending", label: "Đang chờ", description: "Chờ xác nhận hoặc đang xử lý", countClass: "bg-amber-100 text-amber-800" },
-  { key: "completed", label: "Đã hoàn thành", description: "Lịch khám đã hoàn tất", countClass: "bg-emerald-100 text-emerald-800" },
+  { key: "completed", label: "Đã hoàn thành", description: "Lịch hẹn đã hoàn tất", countClass: "bg-emerald-100 text-emerald-800" },
   { key: "cancelled", label: "Đã hủy", description: "Lịch đã hủy hoặc vắng mặt", countClass: "bg-rose-100 text-rose-800" },
 ];
 
 interface OwnerAppointmentListProps {
+  mode?: "medical" | "spa";
   appointments: Appointment[];
   pets: Pet[];
   selectedDate?: string;
@@ -41,7 +42,7 @@ function getStatusTab(status: Appointment["status"]): Exclude<StatusTab, "all"> 
   return "pending";
 }
 
-export function OwnerAppointmentList({ appointments, pets, selectedDate, onClearDate }: OwnerAppointmentListProps) {
+export function OwnerAppointmentList({ mode = "medical", appointments, pets, selectedDate, onClearDate }: OwnerAppointmentListProps) {
   const { cancelAppointment, rescheduleAppointment } = useAppStore();
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [rescheduleItem, setRescheduleItem] = useState<Appointment | null>(null);
@@ -88,7 +89,7 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
       ownerNote: rescheduleNote.trim() || undefined,
     });
     setRescheduleItem(null);
-    showToast("Đã gửi yêu cầu đổi lịch khám. Lịch hẹn đang chờ phòng khám xác nhận.");
+    showToast(`Đã gửi yêu cầu đổi lịch ${mode === "spa" ? "Spa" : "khám"}. Lịch hẹn đang chờ xác nhận.`);
   };
 
   const handleConfirmCancel = () => {
@@ -96,14 +97,14 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
     cancelAppointment(cancelItem.id, cancelReason.trim() || undefined);
     setCancelItem(null);
     setCancelReason("");
-    showToast("Đã hủy lịch khám thành công.");
+    showToast(`Đã hủy lịch ${mode === "spa" ? "Spa" : "khám"} thành công.`);
   };
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Lịch khám của bạn</h2>
+          <h2 className="text-xl font-bold text-slate-900">{mode === "spa" ? "Lịch Spa của bạn" : "Lịch khám của bạn"}</h2>
           <p className="mt-0.5 text-sm text-slate-500">
             {selectedDate ? `${appointments.length} lịch hẹn vào ngày ${selectedDate}` : `${appointments.length} lịch hẹn`}
           </p>
@@ -188,7 +189,7 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
                       type="button"
                       onClick={() => openReschedule(appointment)}
                       className="inline-flex items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 hover:text-primary-dark"
-                      title="Đổi ngày hoặc giờ khám"
+                      title={mode === "spa" ? "Đổi ngày hoặc giờ Spa" : "Đổi ngày hoặc giờ khám"}
                     >
                       <CalendarClock size={13} />
                       Đổi lịch
@@ -222,7 +223,7 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900">
                 <CalendarClock size={20} className="text-primary" />
-                Đổi lịch khám
+                Đổi lịch {mode === "spa" ? "Spa" : "khám"}
               </h3>
               <button type="button" onClick={() => setRescheduleItem(null)} className="rounded-lg p-1 text-slate-400 hover:text-slate-600">
                 <X size={18} />
@@ -267,7 +268,7 @@ export function OwnerAppointmentList({ appointments, pets, selectedDate, onClear
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h3 className="flex items-center gap-2 text-lg font-bold text-rose-600">
                 <Ban size={20} />
-                Xác nhận hủy lịch khám
+                Xác nhận hủy lịch {mode === "spa" ? "Spa" : "khám"}
               </h3>
               <button type="button" onClick={() => setCancelItem(null)} className="rounded-lg p-1 text-slate-400 hover:text-slate-600">
                 <X size={18} />

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { Appointment } from "../../../types/appointment";
+import { todayIso } from "../../../utils/date";
 
 interface OwnerAppointmentCalendarProps {
   appointments: Appointment[];
@@ -43,7 +44,7 @@ export function OwnerAppointmentCalendar({
   onSelectDate,
   onClearDate,
 }: OwnerAppointmentCalendarProps) {
-  const fallbackMonth = selectedDate ? toMonthKey(selectedDate) : toMonthKey(appointments[0]?.date ?? "2026-11-01");
+  const fallbackMonth = selectedDate ? toMonthKey(selectedDate) : toMonthKey(appointments[0]?.date ?? todayIso());
   const [visibleMonth, setVisibleMonth] = useState(fallbackMonth);
 
   useEffect(() => {
