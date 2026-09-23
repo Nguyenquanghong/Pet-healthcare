@@ -1,0 +1,13 @@
+.git
+.codex
+node_modules
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+.env
+.env.*
+backend/uploads
+frontend/dist
+benchmarks/kaggle/results

@@ -5,6 +5,7 @@ vite.config.js
 vite.config.d.ts
 .env
 .env.local
+.env.docker
 frontend/.env
 backend/.env
 backend/uploads/

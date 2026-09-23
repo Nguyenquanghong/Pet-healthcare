@@ -1,17 +1,31 @@
-import { Router } from "express";
-import { prisma } from "../lib/prisma.js";
+import { Router, type Response } from "express";
+import { InvoicesService } from "../application/services/invoices.js";
+import { BusinessError } from "../domain/error.js";
+import type { InvoiceValue } from "../application/ports/invoices.js";
 
-export const invoicesRouter = Router();
-const invoiceDto = (item: Awaited<ReturnType<typeof prisma.invoice.findFirst>> & { items?: unknown[] }) => item && ({ ...item, subtotal: Number(item.subtotal), taxAmount: Number(item.taxAmount), discountAmount: Number(item.discountAmount), totalAmount: Number(item.totalAmount) });
+const invoiceDto = (item: InvoiceValue) => ({ ...item, subtotal: Number(item.subtotal), taxAmount: Number(item.taxAmount), discountAmount: Number(item.discountAmount), totalAmount: Number(item.totalAmount) });
 
-invoicesRouter.get("/", async (req, res) => {
-  const ownerId = req.auth!.role === "owner" ? req.auth!.sub : typeof req.query.ownerId === "string" ? req.query.ownerId : undefined;
-  const invoices = await prisma.invoice.findMany({ where: ownerId ? { ownerId } : undefined, include: { items: true }, orderBy: { issuedAt: "desc" } });
-  res.json(invoices.map(invoiceDto));
-});
+export function createInvoicesRouter(service: InvoicesService) {
+  const router = Router();
+  function failure(res: Response, error: unknown) {
+    if (error instanceof BusinessError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
 
-invoicesRouter.patch("/:id/pay", async (req, res) => {
-  if (req.auth!.role === "owner") return res.status(403).json({ error: "Staff access is required." });
-  const invoice = await prisma.invoice.update({ where: { id: req.params.id }, data: { paymentStatus: "paid", paymentMethod: req.body.paymentMethod || "cash", paidAt: new Date() }, include: { items: true } });
-  res.json({ invoice: invoiceDto(invoice) });
-});
+  router.get("/", async (req, res) => {
+    const ownerId = typeof req.query.ownerId === "string" ? req.query.ownerId : undefined;
+    res.json((await service.list(req.auth!, ownerId)).map(invoiceDto));
+  });
+
+  router.patch("/:id/pay", async (req, res) => {
+    try {
+      const invoice = await service.pay(req.auth!, req.params.id, req.body.paymentMethod);
+      res.json({ invoice: invoiceDto(invoice) });
+    } catch (error) { failure(res, error); }
+  });
+
+  return router;
+}

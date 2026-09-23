@@ -1,0 +1,23 @@
+FROM node:24-bookworm-slim AS build
+WORKDIR /work
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json ./
+COPY backend/package.json backend/package.json
+COPY frontend/package.json frontend/package.json
+RUN npm ci --workspace @nipopeto/backend --include-workspace-root
+COPY backend backend
+RUN npm run build --workspace @nipopeto/backend
+
+FROM node:24-bookworm-slim AS runtime
+WORKDIR /work
+ENV NODE_ENV=production
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json ./
+COPY backend/package.json backend/package.json
+COPY frontend/package.json frontend/package.json
+RUN npm ci --omit=dev --workspace @nipopeto/backend --include-workspace-root
+COPY --from=build /work/node_modules/.prisma /work/node_modules/.prisma
+COPY --from=build /work/backend/dist /work/backend/dist
+USER node
+EXPOSE 5000
+CMD ["node", "backend/dist/src/index.js"]

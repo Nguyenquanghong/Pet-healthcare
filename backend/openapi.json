@@ -1,0 +1,3222 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "NIPOPETO Pet Healthcare API",
+    "version": "2.0.0",
+    "description": "Current REST/JSON backend contract. Known policy and concurrency limitations are documented in the architecture audit."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health"
+    },
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Bootstrap"
+    },
+    {
+      "name": "Pets"
+    },
+    {
+      "name": "Appointments"
+    },
+    {
+      "name": "Medical records"
+    },
+    {
+      "name": "Hotel"
+    },
+    {
+      "name": "Notifications"
+    },
+    {
+      "name": "Invoices"
+    },
+    {
+      "name": "Public rescue"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Health",
+        "operationId": "get_api_health",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable; API reports degraded health",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/owner/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Owner login",
+        "operationId": "post_api_auth_owner_login",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenUser"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerLoginInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/admin/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Staff login",
+        "operationId": "post_api_auth_admin_login",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenUser"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminLoginInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/owner/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Register owner",
+        "operationId": "post_api_auth_owner_register",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenUser"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRegisterInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Current user",
+        "operationId": "get_api_auth_me",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Update profile",
+        "operationId": "patch_api_auth_me",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me/password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Change password",
+        "operationId": "post_api_auth_me_password",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bootstrap": {
+      "get": {
+        "tags": [
+          "Bootstrap"
+        ],
+        "summary": "Load aggregate state",
+        "operationId": "get_api_bootstrap",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bootstrap"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/pets": {
+      "get": {
+        "tags": [
+          "Pets"
+        ],
+        "summary": "List pets",
+        "operationId": "get_api_pets",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Pet"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Pets"
+        ],
+        "summary": "Create pet",
+        "operationId": "post_api_pets",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PetEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PetInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pets/{id}": {
+      "patch": {
+        "tags": [
+          "Pets"
+        ],
+        "summary": "Update pet",
+        "operationId": "patch_api_pets_id",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PetEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PetUpdateInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appointments": {
+      "get": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "List appointments",
+        "operationId": "get_api_appointments",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Appointment"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Create appointment",
+        "operationId": "post_api_appointments",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appointments/{id}/status": {
+      "patch": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Change appointment status",
+        "operationId": "patch_api_appointments_id_status",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appointments/{id}/reschedule": {
+      "patch": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Reschedule appointment",
+        "operationId": "patch_api_appointments_id_reschedule",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appointments/{id}/cancel": {
+      "patch": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Cancel appointment",
+        "operationId": "patch_api_appointments_id_cancel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appointments/{id}/reminder": {
+      "post": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Send reminder",
+        "operationId": "post_api_appointments_id_reminder",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/medical-records": {
+      "get": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "List medical records",
+        "operationId": "get_api_medical_records",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MedicalRecord"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "Create medical record",
+        "operationId": "post_api_medical_records",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicalRecordEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedicalRecordInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/medical-records/{id}": {
+      "patch": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "Update medical record",
+        "operationId": "patch_api_medical_records_id",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicalRecordEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedicalRecordUpdateInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "Delete medical record",
+        "operationId": "delete_api_medical_records_id",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/medical-records/images": {
+      "post": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "Add medical image",
+        "operationId": "post_api_medical_records_images",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicalImageEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedicalImageInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/medical-records/images/{id}": {
+      "delete": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "Delete medical image",
+        "operationId": "delete_api_medical_records_images_id",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/hotel-bookings": {
+      "get": {
+        "tags": [
+          "Hotel"
+        ],
+        "summary": "List bookings",
+        "operationId": "get_api_hotel_bookings",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HotelBooking"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Hotel"
+        ],
+        "summary": "Create booking",
+        "operationId": "post_api_hotel_bookings",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelBookingEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotelBookingInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hotel-bookings/{id}/status": {
+      "patch": {
+        "tags": [
+          "Hotel"
+        ],
+        "summary": "Change booking status",
+        "operationId": "patch_api_hotel_bookings_id_status",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelBookingEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hotel-bookings/{id}/cancel": {
+      "patch": {
+        "tags": [
+          "Hotel"
+        ],
+        "summary": "Cancel booking",
+        "operationId": "patch_api_hotel_bookings_id_cancel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelBookingEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hotel-bookings/{id}/care-notes": {
+      "post": {
+        "tags": [
+          "Hotel"
+        ],
+        "summary": "Add care note",
+        "operationId": "post_api_hotel_bookings_id_care_notes",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareNoteEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CareNoteInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "List notifications",
+        "operationId": "get_api_notifications",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/notifications/read-all": {
+      "patch": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark all notifications read",
+        "operationId": "patch_api_notifications_read_all",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "patch": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark notification read",
+        "operationId": "patch_api_notifications_id_read",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/notifications/{id}": {
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Delete notification",
+        "operationId": "delete_api_notifications_id",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/notifications/send": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Send notification",
+        "operationId": "post_api_notifications_send",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationSendInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invoices": {
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "summary": "List invoices",
+        "operationId": "get_api_invoices",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Invoice"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/invoices/{id}/pay": {
+      "patch": {
+        "tags": [
+          "Invoices"
+        ],
+        "summary": "Record payment",
+        "operationId": "patch_api_invoices_id_pay",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/pets/{token}": {
+      "get": {
+        "tags": [
+          "Public rescue"
+        ],
+        "summary": "Public pet profile",
+        "operationId": "get_api_public_pets_token",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPet"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/public/pets/{token}/rescue-reports": {
+      "post": {
+        "tags": [
+          "Public rescue"
+        ],
+        "summary": "Report found pet",
+        "operationId": "post_api_public_pets_token_rescue_reports",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescueReportInput"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "doctor",
+              "staff",
+              "admin"
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fullName",
+          "role"
+        ]
+      },
+      "Pet": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string"
+          },
+          "breed": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string"
+          },
+          "ageLabel": {
+            "type": "string"
+          },
+          "weightKg": {
+            "type": "number"
+          },
+          "microchipId": {
+            "type": "string"
+          },
+          "healthStatus": {
+            "type": "string"
+          },
+          "allergies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "qrToken": {
+            "type": "string"
+          },
+          "qrEnabled": {
+            "type": "boolean"
+          },
+          "publicProfile": {
+            "$ref": "#/components/schemas/PublicProfile"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "name",
+          "species",
+          "gender",
+          "healthStatus",
+          "allergies",
+          "qrEnabled",
+          "publicProfile"
+        ]
+      },
+      "PublicProfile": {
+        "type": "object",
+        "properties": {
+          "showOwnerPhone": {
+            "type": "boolean"
+          },
+          "showOwnerEmail": {
+            "type": "boolean"
+          },
+          "showOwnerAddress": {
+            "type": "boolean"
+          },
+          "showMedicalAlerts": {
+            "type": "boolean"
+          },
+          "rescueNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "showOwnerPhone",
+          "showOwnerEmail",
+          "showOwnerAddress",
+          "showMedicalAlerts"
+        ]
+      },
+      "Appointment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "petId": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "clinicName": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "doctorId": {
+            "type": "string"
+          },
+          "ownerNote": {
+            "type": "string"
+          },
+          "internalNote": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "petId",
+          "ownerId",
+          "type",
+          "serviceName",
+          "date",
+          "time",
+          "status"
+        ]
+      },
+      "MedicalRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "petId": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "appointmentId": {
+            "type": "string"
+          },
+          "doctorName": {
+            "type": "string"
+          },
+          "visitDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "title": {
+            "type": "string"
+          },
+          "diagnosis": {
+            "type": "string"
+          },
+          "treatment": {
+            "type": "string"
+          },
+          "weightKg": {
+            "type": "number"
+          },
+          "temperatureC": {
+            "type": "number"
+          },
+          "heartRateBpm": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "petId",
+          "ownerId",
+          "doctorName",
+          "visitDate",
+          "title",
+          "diagnosis",
+          "treatment"
+        ]
+      },
+      "MedicalImage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "petId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "petId",
+          "title",
+          "imageUrl",
+          "mimeType"
+        ]
+      },
+      "HotelBooking": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "petId": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date"
+          },
+          "nights": {
+            "type": "integer"
+          },
+          "roomType": {
+            "type": "string"
+          },
+          "serviceKeys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string"
+          },
+          "dailyCareNoteIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "petId",
+          "ownerId",
+          "checkIn",
+          "checkOut",
+          "nights",
+          "roomType",
+          "totalAmount",
+          "status"
+        ]
+      },
+      "CareNote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "bookingId": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "note": {
+            "type": "string"
+          },
+          "eatingStatus": {
+            "type": "string"
+          },
+          "mood": {
+            "type": "string"
+          },
+          "visibleToOwner": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "bookingId",
+          "date",
+          "note",
+          "visibleToOwner"
+        ]
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "recipientOwnerId": {
+            "type": "string"
+          },
+          "recipientRole": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "actionUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "recipientRole",
+          "type",
+          "title",
+          "message",
+          "status"
+        ]
+      },
+      "Invoice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "invoiceCode": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "petId": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "taxAmount": {
+            "type": "number"
+          },
+          "discountAmount": {
+            "type": "number"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "paymentStatus": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceItem"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "invoiceCode",
+          "ownerId",
+          "petId",
+          "subtotal",
+          "totalAmount",
+          "paymentStatus"
+        ]
+      },
+      "InvoiceItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "description",
+          "quantity"
+        ]
+      },
+      "String": {
+        "type": "string"
+      },
+      "TokenUser": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "token",
+          "user"
+        ]
+      },
+      "UserEnvelope": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "user"
+        ]
+      },
+      "PetEnvelope": {
+        "type": "object",
+        "properties": {
+          "pet": {
+            "$ref": "#/components/schemas/Pet"
+          }
+        },
+        "required": [
+          "pet"
+        ]
+      },
+      "AppointmentEnvelope": {
+        "type": "object",
+        "properties": {
+          "appointment": {
+            "$ref": "#/components/schemas/Appointment"
+          }
+        },
+        "required": [
+          "appointment"
+        ]
+      },
+      "MedicalRecordEnvelope": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "$ref": "#/components/schemas/MedicalRecord"
+          }
+        },
+        "required": [
+          "record"
+        ]
+      },
+      "MedicalImageEnvelope": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "$ref": "#/components/schemas/MedicalImage"
+          }
+        },
+        "required": [
+          "image"
+        ]
+      },
+      "HotelBookingEnvelope": {
+        "type": "object",
+        "properties": {
+          "booking": {
+            "$ref": "#/components/schemas/HotelBooking"
+          }
+        },
+        "required": [
+          "booking"
+        ]
+      },
+      "CareNoteEnvelope": {
+        "type": "object",
+        "properties": {
+          "careNote": {
+            "$ref": "#/components/schemas/CareNote"
+          }
+        },
+        "required": [
+          "careNote"
+        ]
+      },
+      "NotificationEnvelope": {
+        "type": "object",
+        "properties": {
+          "notification": {
+            "$ref": "#/components/schemas/Notification"
+          }
+        },
+        "required": [
+          "notification"
+        ]
+      },
+      "InvoiceEnvelope": {
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "$ref": "#/components/schemas/Invoice"
+          }
+        },
+        "required": [
+          "invoice"
+        ]
+      },
+      "PublicPet": {
+        "type": "object",
+        "properties": {
+          "pet": {
+            "$ref": "#/components/schemas/Pet"
+          },
+          "owner": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "fullName": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "address": {
+                "type": "string"
+              },
+              "petIds": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/String"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "fullName",
+              "phone",
+              "petIds"
+            ]
+          }
+        },
+        "required": [
+          "pet",
+          "owner"
+        ]
+      },
+      "Bootstrap": {
+        "type": "object",
+        "properties": {
+          "currentOwnerId": {
+            "type": "string"
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            }
+          },
+          "pets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Pet"
+            }
+          },
+          "appointments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Appointment"
+            }
+          },
+          "medicalRecords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalRecord"
+            }
+          },
+          "medicalImages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalImage"
+            }
+          },
+          "hotelBookings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelBooking"
+            }
+          },
+          "dailyCareNotes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CareNote"
+            }
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
+          }
+        },
+        "required": [
+          "currentOwnerId",
+          "owners",
+          "pets",
+          "appointments",
+          "medicalRecords",
+          "medicalImages",
+          "hotelBookings",
+          "dailyCareNotes",
+          "notifications"
+        ]
+      },
+      "OwnerLoginInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "AdminLoginInput": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "OwnerRegisterInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "confirmPassword": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "confirmPassword"
+        ]
+      },
+      "ProfileInput": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fullName",
+          "email"
+        ]
+      },
+      "PasswordInput": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string"
+          },
+          "confirmPassword": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword",
+          "confirmPassword"
+        ]
+      },
+      "PetInput": {
+        "type": "object",
+        "properties": {
+          "ownerId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string"
+          },
+          "weightKg": {
+            "type": "number"
+          },
+          "allergies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "publicProfile": {
+            "$ref": "#/components/schemas/PublicProfile"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "AppointmentInput": {
+        "type": "object",
+        "properties": {
+          "petId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string"
+          },
+          "doctorId": {
+            "type": "string"
+          },
+          "ownerNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "petId",
+          "serviceName",
+          "date",
+          "time"
+        ]
+      },
+      "StatusInput": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "internalNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "RescheduleInput": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string"
+          },
+          "ownerNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "time"
+        ]
+      },
+      "CancelInput": {
+        "type": "object",
+        "properties": {
+          "ownerNote": {
+            "type": "string"
+          }
+        }
+      },
+      "MedicalRecordInput": {
+        "type": "object",
+        "properties": {
+          "petId": {
+            "type": "string"
+          },
+          "appointmentId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "visitDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "doctorName": {
+            "type": "string"
+          },
+          "diagnosis": {
+            "type": "string"
+          },
+          "treatment": {
+            "type": "string"
+          },
+          "weightKg": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "petId",
+          "title",
+          "visitDate",
+          "doctorName",
+          "diagnosis",
+          "treatment"
+        ]
+      },
+      "MedicalImageInput": {
+        "type": "object",
+        "properties": {
+          "petId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "petId",
+          "title",
+          "imageUrl",
+          "mimeType"
+        ]
+      },
+      "HotelBookingInput": {
+        "type": "object",
+        "properties": {
+          "petId": {
+            "type": "string"
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date"
+          },
+          "roomType": {
+            "type": "string"
+          },
+          "serviceKeys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "ownerNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "petId",
+          "checkIn",
+          "checkOut"
+        ]
+      },
+      "CareNoteInput": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          },
+          "eatingStatus": {
+            "type": "string"
+          },
+          "mood": {
+            "type": "string"
+          },
+          "visibleToOwner": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
+      "NotificationSendInput": {
+        "type": "object",
+        "properties": {
+          "recipientOwnerId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipientOwnerId",
+          "title",
+          "message"
+        ]
+      },
+      "RescueReportInput": {
+        "type": "object",
+        "properties": {
+          "finderPhone": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "finderName": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "finderPhone",
+          "location"
+        ]
+      },
+      "PaymentInput": {
+        "type": "object",
+        "properties": {
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank_transfer",
+              "credit_card",
+              "qr_code"
+            ]
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "version",
+          "database"
+        ]
+      },
+      "PetUpdateInput": {
+        "type": "object",
+        "properties": {
+          "ownerId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string"
+          },
+          "weightKg": {
+            "type": "number"
+          },
+          "allergies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "publicProfile": {
+            "$ref": "#/components/schemas/PublicProfile"
+          }
+        }
+      },
+      "MedicalRecordUpdateInput": {
+        "type": "object",
+        "properties": {
+          "petId": {
+            "type": "string"
+          },
+          "appointmentId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "visitDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "doctorName": {
+            "type": "string"
+          },
+          "diagnosis": {
+            "type": "string"
+          },
+          "treatment": {
+            "type": "string"
+          },
+          "weightKg": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}

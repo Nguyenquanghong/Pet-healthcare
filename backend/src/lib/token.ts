@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import type { Role } from "@prisma/client";
+import type { Role } from "../domain/auth.js";
 
 export type AuthPayload = { sub: string; role: Role };
 

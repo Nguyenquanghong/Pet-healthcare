@@ -1,8 +1,12 @@
-import type { Appointment, DailyCareNote, HotelBooking, MedicalRecord, Pet, User } from "@prisma/client";
+import type { UserAccount } from "../application/ports/auth.js";
+import type { AppointmentRecord } from "../application/ports/appointments.js";
+import type { MedicalRecordValue } from "../application/ports/medicalRecords.js";
+import type { CareNoteValue, HotelBookingValue } from "../application/ports/hotelBookings.js";
+import type { PetValue } from "../application/ports/pets.js";
 
 export const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
 
-export function publicUser(user: User) {
+export function publicUser(user: UserAccount) {
   return {
     id: user.id,
     username: user.username ?? undefined,
@@ -15,11 +19,11 @@ export function publicUser(user: User) {
   };
 }
 
-export function ownerDto(user: User & { pets?: Array<{ id: string }> }) {
+export function ownerDto(user: UserAccount & { pets?: Array<{ id: string }> }) {
   return { ...publicUser(user), petIds: user.pets?.map((pet) => pet.id) ?? [] };
 }
 
-export function petDto(pet: Pet) {
+export function petDto(pet: PetValue) {
   return {
     id: pet.id,
     ownerId: pet.ownerId,
@@ -48,11 +52,11 @@ export function petDto(pet: Pet) {
   };
 }
 
-export function appointmentDto(item: Appointment) {
+export function appointmentDto(item: AppointmentRecord) {
   return { ...item, date: dateOnly(item.appointmentDate), time: item.appointmentTime, appointmentDate: undefined, appointmentTime: undefined };
 }
 
-export function medicalRecordDto(item: MedicalRecord) {
+export function medicalRecordDto(item: MedicalRecordValue) {
   return {
     ...item,
     visitDate: dateOnly(item.visitDate),
@@ -62,7 +66,7 @@ export function medicalRecordDto(item: MedicalRecord) {
   };
 }
 
-export function hotelBookingDto(item: HotelBooking & { dailyCareNotes?: Array<{ id: string }> }) {
+export function hotelBookingDto(item: HotelBookingValue) {
   return {
     ...item,
     checkIn: dateOnly(item.checkIn),
@@ -73,6 +77,6 @@ export function hotelBookingDto(item: HotelBooking & { dailyCareNotes?: Array<{ 
   };
 }
 
-export function careNoteDto(item: DailyCareNote) {
+export function careNoteDto(item: CareNoteValue) {
   return { ...item, date: dateOnly(item.noteDate), noteDate: undefined };
 }

@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import type { Role } from "@prisma/client";
+import type { Role } from "../domain/auth.js";
 import { verifyToken, type AuthPayload } from "../lib/token.js";
 
 declare global {
