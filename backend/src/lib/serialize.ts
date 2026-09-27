@@ -52,6 +52,30 @@ export function petDto(pet: PetValue) {
   };
 }
 
+export function publicPetDto(pet: PetValue) {
+  return {
+    id: pet.id,
+    name: pet.name,
+    species: pet.species,
+    breed: pet.breed ?? "",
+    gender: pet.gender,
+    ageLabel: pet.ageLabel ?? "",
+    microchipId: pet.microchipId ?? undefined,
+    avatarUrl: pet.avatarUrl ?? undefined,
+    identifyingMarks: pet.identifyingMarks ?? undefined,
+    lastSeenLocation: pet.lastSeenLocation ?? undefined,
+    qrEnabled: pet.qrEnabled,
+    ...(pet.showMedicalAlerts ? { healthStatus: pet.healthStatus, allergies: pet.allergies } : {}),
+    publicProfile: {
+      showOwnerPhone: pet.showOwnerPhone,
+      showOwnerEmail: pet.showOwnerEmail,
+      showOwnerAddress: pet.showOwnerAddress,
+      showMedicalAlerts: pet.showMedicalAlerts,
+      rescueNote: pet.rescueNote ?? undefined,
+    },
+  };
+}
+
 export function appointmentDto(item: AppointmentRecord) {
   return { ...item, date: dateOnly(item.appointmentDate), time: item.appointmentTime, appointmentDate: undefined, appointmentTime: undefined };
 }

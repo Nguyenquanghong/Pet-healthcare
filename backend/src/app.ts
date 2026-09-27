@@ -62,7 +62,7 @@ export function createApp(client: PrismaClient) {
     }
   });
 
-  app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, limit: 50, standardHeaders: "draft-8", legacyHeaders: false }), createAuthRouter(new AuthService({ users: new PrismaUserRepository(client), passwords: passwordAdapter, tokens: tokenAdapter })));
+  app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, limit: 50, standardHeaders: "draft-8", legacyHeaders: false, message: { error: "Too many requests, please try again later." } }), createAuthRouter(new AuthService({ users: new PrismaUserRepository(client), passwords: passwordAdapter, tokens: tokenAdapter })));
   app.use("/api/public", createPublicRouter(new PublicRescueService(createPublicRescueDependencies(client))));
   app.use("/api/bootstrap", requireAuth, createBootstrapRouter(new BootstrapService(new PrismaBootstrapRepository(client))));
   app.use("/api/pets", requireAuth, createPetsRouter(new PetsService(new PrismaPetRepository(client), qrTokenAdapter)));
@@ -74,6 +74,15 @@ export function createApp(client: PrismaClient) {
 
   app.use((req, res) => res.status(404).json({ error: `Route ${req.originalUrl} was not found.` }));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const bodyError = error as { type?: string } | null;
+    if (bodyError?.type === "entity.parse.failed") {
+      res.status(400).json({ error: "Request body must be valid JSON." });
+      return;
+    }
+    if (bodyError?.type === "entity.too.large") {
+      res.status(413).json({ error: "Request body is too large." });
+      return;
+    }
     console.error(error);
     res.status(500).json({ error: "An unexpected server error occurred." });
   });

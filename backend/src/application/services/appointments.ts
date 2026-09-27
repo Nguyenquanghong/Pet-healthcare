@@ -18,7 +18,8 @@ const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function validDate(value: string) {
-  return datePattern.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`));
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return datePattern.test(value) && !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function appointmentDate(value: string) {

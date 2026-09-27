@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { MedicalDependencies, MedicalNotificationWriter, MedicalRecordRepository, MedicalTransaction, MedicalUnitOfWork } from "../../application/ports/medicalRecords.js";
+import { appointmentSlotWrite } from "./appointmentSlotConflict.js";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -11,6 +12,9 @@ class PrismaMedicalRecordRepository implements MedicalRecordRepository {
   }
   findPet(id: string) {
     return this.client.pet.findUnique({ where: { id }, select: { id: true, ownerId: true, name: true } });
+  }
+  findAppointment(id: string) {
+    return this.client.appointment.findUnique({ where: { id }, select: { id: true, petId: true, ownerId: true } });
   }
   find(id: string) {
     return this.client.medicalRecord.findUnique({ where: { id } });
@@ -31,7 +35,7 @@ class PrismaMedicalRecordRepository implements MedicalRecordRepository {
     await this.client.medicalImage.delete({ where: { id } });
   }
   async completeAppointment(id: string) {
-    await this.client.appointment.update({ where: { id }, data: { status: "completed" } });
+    await appointmentSlotWrite(this.client.appointment.update({ where: { id }, data: { status: "completed" } }));
   }
 }
 

@@ -18,7 +18,7 @@ import { Input } from "../../components/ui/Input";
 import { Textarea } from "../../components/ui/Textarea";
 import { apiClient } from "../../services/apiClient";
 import type { Owner } from "../../types/owner";
-import type { Pet } from "../../types/pet";
+import type { PublicPet } from "../../types/pet";
 
 type RescueFormErrors = Partial<Record<"finderPhone" | "location", string>>;
 
@@ -35,7 +35,7 @@ interface PetRescuePageProps {
 export function PetRescuePage({ qrToken: qrTokenProp }: PetRescuePageProps = {}) {
   const { qrToken: routeQrToken } = useParams<{ qrToken: string }>();
   const qrToken = qrTokenProp ?? routeQrToken;
-  const [pet, setPet] = useState<Pet | null>(null);
+  const [pet, setPet] = useState<PublicPet | null>(null);
   const [owner, setOwner] = useState<Owner | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [finderName, setFinderName] = useState("");
@@ -47,7 +47,7 @@ export function PetRescuePage({ qrToken: qrTokenProp }: PetRescuePageProps = {})
 
   useEffect(() => {
     if (!qrToken) return setIsLoading(false);
-    apiClient.get<{ pet: Pet; owner: Owner }>(`/public/pets/${qrToken}`)
+    apiClient.get<{ pet: PublicPet; owner: Owner }>(`/public/pets/${qrToken}`)
       .then((result) => { setPet(result.pet); setOwner(result.owner); })
       .catch(() => { setPet(null); setOwner(null); })
       .finally(() => setIsLoading(false));

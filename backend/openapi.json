@@ -103,6 +103,7 @@
               }
             }
           },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
           "default": {
             "description": "Error",
             "content": {
@@ -145,6 +146,7 @@
               }
             }
           },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
           "default": {
             "description": "Error",
             "content": {
@@ -187,6 +189,7 @@
               }
             }
           },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
           "default": {
             "description": "Error",
             "content": {
@@ -239,6 +242,7 @@
               }
             }
           },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
           "default": {
             "description": "Error",
             "content": {
@@ -283,6 +287,7 @@
               }
             }
           },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
           "default": {
             "description": "Error",
             "content": {
@@ -332,6 +337,7 @@
               }
             }
           },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
           "default": {
             "description": "Error",
             "content": {
@@ -2021,6 +2027,13 @@
     }
   },
   "components": {
+    "responses": {
+      "TooManyRequests": {
+        "description": "Auth rate limit exceeded (50 requests per 15 minutes)",
+        "headers": { "Retry-After": { "schema": { "type": "string" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
     "securitySchemes": {
       "BearerAuth": {
         "type": "http",
@@ -2652,11 +2665,32 @@
           "invoice"
         ]
       },
+      "PublicPetProfile": {
+        "type": "object",
+        "description": "QR-safe pet projection. Medical fields appear only when publicProfile.showMedicalAlerts is true; internal notes are never public.",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "species": { "type": "string" },
+          "breed": { "type": "string" },
+          "gender": { "type": "string" },
+          "ageLabel": { "type": "string" },
+          "microchipId": { "type": "string" },
+          "avatarUrl": { "type": "string" },
+          "identifyingMarks": { "type": "string" },
+          "lastSeenLocation": { "type": "string" },
+          "qrEnabled": { "type": "boolean" },
+          "healthStatus": { "type": "string", "description": "Only when showMedicalAlerts is true" },
+          "allergies": { "type": "array", "items": { "type": "string" }, "description": "Only when showMedicalAlerts is true" },
+          "publicProfile": { "$ref": "#/components/schemas/PublicProfile" }
+        },
+        "required": ["id", "name", "species", "breed", "gender", "ageLabel", "qrEnabled", "publicProfile"]
+      },
       "PublicPet": {
         "type": "object",
         "properties": {
           "pet": {
-            "$ref": "#/components/schemas/Pet"
+            "$ref": "#/components/schemas/PublicPetProfile"
           },
           "owner": {
             "type": "object",

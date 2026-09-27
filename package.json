@@ -2,7 +2,10 @@
   "name": "nipopeto-platform",
   "private": true,
   "version": "1.0.0",
-  "workspaces": ["frontend", "backend"],
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
     "dev": "concurrently -n frontend,backend -c cyan,green \"npm run dev -w frontend\" \"npm run dev -w backend\"",
     "dev:frontend": "npm run dev -w frontend",
@@ -11,9 +14,12 @@
     "db:generate": "npm run db:generate -w backend",
     "db:migrate": "npm run db:migrate -w backend",
     "db:seed": "npm run db:seed -w backend",
-    "test:smoke": "npm run test:smoke -w backend"
+    "test:smoke": "npm run test:smoke -w backend",
+    "test": "npm run build && npm run test:unit -w backend && npm run test:architecture -w backend && npm run test:openapi -w backend",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "concurrently": "^9.2.1"
   }
 }

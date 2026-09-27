@@ -1,7 +1,7 @@
 import { Router, type Response } from "express";
 import { PublicRescueService } from "../application/services/publicRescue.js";
 import { BusinessError } from "../domain/error.js";
-import { petDto } from "../lib/serialize.js";
+import { publicPetDto } from "../lib/serialize.js";
 
 export function createPublicRouter(service: PublicRescueService) {
   const router = Router();
@@ -16,7 +16,7 @@ export function createPublicRouter(service: PublicRescueService) {
   router.get("/pets/:token", async (req, res) => {
     try {
       const result = await service.getPet(req.params.token);
-      res.json({ pet: petDto(result.pet), owner: result.owner });
+      res.json({ pet: publicPetDto(result.pet), owner: result.owner });
     } catch (error) { failure(res, error); }
   });
 

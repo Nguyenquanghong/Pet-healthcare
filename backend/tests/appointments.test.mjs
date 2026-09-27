@@ -69,3 +69,10 @@ test("status change requires staff and keeps notification write", async () => {
   assert.equal(changed.status, "confirmed");
   assert.equal(deps.notifications, 1);
 });
+
+test("impossible calendar dates are rejected instead of rolling over", async () => {
+  const deps = fixture();
+  await assert.rejects(deps.service.create(owner, { ...input, date: "2099-02-31" }), { status: 422 });
+  await assert.rejects(deps.service.reschedule(owner, "appt-1", { date: "2099-02-31", time: "10:00" }), { status: 422 });
+  assert.equal(deps.committed.length, 0);
+});

@@ -27,6 +27,7 @@ export type MedicalUpdate = Partial<Omit<MedicalWrite, "petId" | "ownerId" | "ap
 export interface MedicalRecordRepository {
   list(ownerId?: string, petId?: string): Promise<MedicalRecordValue[]>;
   findPet(id: string): Promise<{ id: string; ownerId: string; name: string } | null>;
+  findAppointment(id: string): Promise<{ id: string; petId: string; ownerId: string } | null>;
   find(id: string): Promise<MedicalRecordValue | null>;
   create(data: MedicalWrite): Promise<MedicalRecordValue>;
   update(id: string, data: MedicalUpdate): Promise<MedicalRecordValue>;

@@ -20,6 +20,7 @@ const prisma = new PrismaClient({ datasources: { db: { url: rawUrl } } });
 const marker = `phase1-${randomBytes(8).toString("hex")}`;
 const password = hashPassword("test-password-123");
 let owner;
+let staff;
 let server;
 
 async function expectRollback(name, work, count) {
@@ -33,6 +34,10 @@ try {
   await prisma.$connect();
   owner = await prisma.user.create({ data: {
     email: `${marker}@example.test`, fullName: "Phase 1 test owner", role: "owner",
+    passwordHash: password.passwordHash, passwordSalt: password.passwordSalt,
+  } });
+  staff = await prisma.user.create({ data: {
+    username: marker, fullName: "Phase 1 test staff", role: "staff",
     passwordHash: password.passwordHash, passwordSalt: password.passwordSalt,
   } });
   const pet = await prisma.pet.create({ data: {
@@ -94,6 +99,40 @@ try {
   const created = await request("/api/pets", "POST", login.body.token, { name: "Created via HTTP", species: "cat" });
   assert.equal(created.status, 201);
   assert.equal(created.body.pet.name, "Created via HTTP");
+  const staffLogin = await request("/api/auth/admin/login", "POST", undefined, { username: marker, password: "test-password-123" });
+  assert.equal(staffLogin.status, 200);
+  const token = login.body.token;
+  const staffToken = staffLogin.body.token;
+  const booked = await request("/api/appointments", "POST", token, {
+    petId: pet.id, type: "general_checkup", serviceName: "Integration checkup", date: "2099-01-01", time: "11:00",
+  });
+  assert.equal(booked.status, 201, JSON.stringify(booked.body));
+  const appointmentId = booked.body.appointment.id;
+  assert.equal((await request(`/api/appointments/${appointmentId}/reschedule`, "PATCH", token,
+    { date: "2099-01-02", time: "12:00" })).status, 200);
+  assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", token, { status: "confirmed" })).status, 403);
+  assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", staffToken, { status: "confirmed" })).status, 200);
+  const record = await request("/api/medical-records", "POST", staffToken, {
+    petId: pet.id, appointmentId, doctorName: "Integration doctor", visitDate: "2099-01-02",
+    title: "Checkup", diagnosis: "Healthy", treatment: "Observation",
+  });
+  assert.equal(record.status, 201, JSON.stringify(record.body));
+  assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: appointmentId } })).status, "completed");
+  assert.ok((await request("/api/medical-records", "GET", token)).body.some(item => item.id === record.body.record.id));
+  assert.equal((await request(`/api/medical-records/${record.body.record.id}`, "DELETE", token)).status, 403);
+  assert.equal((await request(`/api/medical-records/${record.body.record.id}`, "DELETE", staffToken)).status, 204);
+  const stay = await request("/api/hotel-bookings", "POST", token, {
+    petId: pet.id, checkIn: "2099-01-01", checkOut: "2099-01-03", roomType: "standard", serviceKeys: ["daily_walk"],
+  });
+  assert.equal(stay.status, 201, JSON.stringify(stay.body));
+  assert.equal(Number(stay.body.booking.totalAmount), 820000);
+  const bookingId = stay.body.booking.id;
+  assert.equal((await request(`/api/hotel-bookings/${bookingId}/status`, "PATCH", staffToken, { status: "confirmed" })).status, 200);
+  assert.equal((await request(`/api/hotel-bookings/${bookingId}/care-notes`, "POST", staffToken, { note: "Fed and walked" })).status, 201);
+  assert.ok((await request("/api/hotel-bookings", "GET", token)).body.some(item => item.id === bookingId));
+  assert.equal((await request(`/api/hotel-bookings/${bookingId}/cancel`, "PATCH", token, { ownerNote: "Test finished" })).status, 200);
+  assert.equal((await request("/api/bootstrap", "GET", token)).status, 200);
+  assert.equal((await request("/api/invoices", "GET", token)).status, 200);
   const report = await request(`/api/public/pets/${marker}/rescue-reports`, "POST", undefined, { finderPhone: "000", location: "Test park" });
   assert.equal(report.status, 201);
   assert.equal(await prisma.rescueReport.count({ where: { petId: pet.id } }), 1);
@@ -105,9 +144,14 @@ try {
   assert.ok(rescueNotification, "rescue notification must appear in owner inbox");
   assert.equal((await request(`/api/notifications/${rescueNotification.id}`, "DELETE", login.body.token)).status, 204);
   assert.equal(await prisma.notification.count({ where: { id: rescueNotification.id } }), 0);
-  console.log("PostgreSQL integration PASS: migrations, four real rollback adapters, health/login, protected GET/POST, JSON, rescue transaction, inbox GET/DELETE, auth 401/403.");
+  console.log("PostgreSQL integration PASS: four real rollback adapters; owner/staff login; appointments create/reschedule/status; medical record + completed appointment + delete; hotel pricing/status/care/cancel; bootstrap/invoices; rescue + inbox DELETE; auth 401/403.");
 } finally {
   if (server) await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-  if (owner) await prisma.user.delete({ where: { id: owner.id } });
+  if (owner) {
+    const pets = await prisma.pet.findMany({ where: { ownerId: owner.id }, select: { id: true } });
+    await prisma.notification.deleteMany({ where: { relatedPetId: { in: pets.map(pet => pet.id) } } });
+    await prisma.user.delete({ where: { id: owner.id } });
+  }
+  if (staff) await prisma.user.delete({ where: { id: staff.id } });
   await prisma.$disconnect();
 }

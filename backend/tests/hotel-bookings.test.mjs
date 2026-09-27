@@ -58,3 +58,15 @@ test("care note requires staff and a nonblank note", async () => {
   assert.equal(result.note, "Fed");
   assert.equal(result.visibleToOwner, false);
 });
+
+test("invalid dates, room, services and status fail before persistence", async () => {
+  const deps = fixture();
+  const input = { petId: "pet-1", checkIn: "2099-01-01", checkOut: "2099-01-03" };
+  for (const invalid of [
+    { roomType: "unknown" }, { roomType: "toString" },
+    { serviceKeys: ["unknown"] }, { serviceKeys: ["daily_walk", "daily_walk"] },
+    { checkIn: "2099-02-31", checkOut: "2099-03-05" }, { checkIn: "bad" },
+  ]) await assert.rejects(deps.service.create(owner, { ...input, ...invalid }), { status: 422 });
+  await assert.rejects(deps.service.changeStatus(staff, "booking-1", { status: "unknown" }), { status: 422 });
+  assert.equal(deps.committed.length, 0);
+});

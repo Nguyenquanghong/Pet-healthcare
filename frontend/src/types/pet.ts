@@ -30,3 +30,7 @@ export type Pet = {
   qrEnabled?: boolean;
   publicProfile?: PetPublicProfile;
 };
+
+// The QR endpoint intentionally returns only a public subset of the private Pet DTO.
+export type PublicPet = Pick<Pet, "id" | "name" | "species" | "breed" | "gender" | "ageLabel" | "microchipId" | "avatarUrl" | "identifyingMarks" | "lastSeenLocation" | "qrEnabled" | "publicProfile"> &
+  Partial<Pick<Pet, "healthStatus" | "allergies">>;

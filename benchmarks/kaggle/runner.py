@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import psutil
+from metrics import CpuSampler
 
 
 def command(args, *, cwd=None, env=None, stdout=None):
@@ -48,14 +49,20 @@ def wait_health(port, process, timeout=60):
     raise RuntimeError("API health did not become ready")
 
 
-def process_usage(pid):
+def process_usage(pid, sampler):
     try:
         parent = psutil.Process(pid)
         members = [parent, *parent.children(recursive=True)]
-        return {
-            "cpu_percent_per_core_total": sum(item.cpu_percent(interval=None) for item in members if item.is_running()),
-            "rss_bytes": sum(item.memory_info().rss for item in members if item.is_running()),
-        }
+        times = {}
+        rss = 0
+        for item in members:
+            try:
+                cpu = item.cpu_times()
+                times[(item.pid, item.create_time())] = cpu.user + cpu.system
+                rss += item.memory_info().rss
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        return {"cpu_percent_per_core_total": sampler.sample(time.monotonic(), times), "rss_bytes": rss}
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return {"cpu_percent_per_core_total": None, "rss_bytes": None}
 
@@ -67,8 +74,21 @@ def run_locust(repo, environment, profile, users, spawn_rate, duration, log_path
     if csv_prefix:
         args.extend(["--csv", str(csv_prefix), "--csv-full-history"])
     log = open(log_path, "w", encoding="utf-8")
-    process = subprocess.Popen(args, cwd=repo, env=environment, stdout=log, stderr=subprocess.STDOUT)
+    process = subprocess.Popen(args, cwd=repo, env=environment, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     return process, log
+
+
+def stop_process(process):
+    if process is None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+        process.wait(timeout=10)
+    except ProcessLookupError:
+        process.wait()
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
 
 
 def aggregated_stats(csv_path):
@@ -149,10 +169,14 @@ def main():
         "offered_rps": None,
         "load_model": "closed-loop users with think time; independent offered RPS is not defined",
         "generator_shares_cpu": True,
+        "resource_sampling": "CPU time deltas, first sample null; short-lived processes between polls may be missed; RSS sums can include shared pages",
+        "status": "running",
     }
     (result_dir / "manifest.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
     api = None
+    warmup = load = None
+    api_log = warmup_log = load_log = None
     pg_started = False
     with tempfile.TemporaryDirectory(prefix="nipopeto-kaggle-") as temporary:
         temporary_path = Path(temporary)
@@ -172,8 +196,8 @@ def main():
             prefix = []
         try:
             with open(result_dir / "setup.log", "w", encoding="utf-8") as setup_log:
-                command(prefix + [str(pg_bin / "initdb"), "-D", str(data_dir), "-A", "trust", "--no-instructions"], stdout=setup_log)
-                command(prefix + [str(pg_bin / "pg_ctl"), "-D", str(data_dir), "-l", str(pg_log), "-o", "-c listen_addresses=127.0.0.1 -p 55432", "start"], stdout=setup_log)
+                command(prefix + [str(pg_bin / "initdb"), "-D", str(data_dir), "-U", "postgres", "-A", "trust", "--no-instructions"], stdout=setup_log)
+                command(prefix + [str(pg_bin / "pg_ctl"), "-D", str(data_dir), "-l", str(pg_log), "-o", f"-c listen_addresses=127.0.0.1 -p 55432 -k {temporary_path}", "start"], stdout=setup_log)
                 pg_started = True
                 command(["createdb", "-h", "127.0.0.1", "-p", "55432", "-U", "postgres", "nipopeto"], stdout=setup_log)
 
@@ -196,19 +220,22 @@ def main():
             with open(result_dir / "setup.log", "a", encoding="utf-8") as setup_log:
                 command(["node", str(repo / "benchmarks/kaggle/prepare_fixture.mjs")], cwd=repo, env=environment, stdout=setup_log)
 
+            environment["BENCH_PHASE"] = "warmup"
             warmup, warmup_log = run_locust(repo, environment, args.profile, args.users, args.spawn_rate, args.warmup, result_dir / "warmup.log")
             warmup_code = warmup.wait()
             warmup_log.close()
             if warmup_code != 0:
                 raise RuntimeError(f"Locust warmup exited {warmup_code}; inspect warmup.log")
 
+            environment["BENCH_PHASE"] = "measured"
             load, load_log = run_locust(repo, environment, args.profile, args.users, args.spawn_rate, args.duration, result_dir / "load.log", result_dir / "load")
             pg_pid = int((data_dir / "postmaster.pid").read_text().splitlines()[0])
+            samplers = [CpuSampler(), CpuSampler(), CpuSampler()]
             samples = []
             while load.poll() is None:
                 samples.append({
                     "utc": datetime.now(timezone.utc).isoformat(),
-                    "api": process_usage(api.pid), "postgres": process_usage(pg_pid), "generator": process_usage(load.pid),
+                    "api": process_usage(api.pid, samplers[0]), "postgres": process_usage(pg_pid, samplers[1]), "generator": process_usage(load.pid, samplers[2]),
                 })
                 time.sleep(1)
             load_code = load.wait()
@@ -219,19 +246,25 @@ def main():
             metadata["results"] = stats
             metadata["ended_at_utc"] = datetime.now(timezone.utc).isoformat()
             metadata["threshold_exceeded"] = (stats["error_rate"] is None or stats["error_rate"] > 0.01 or stats["p95_ms"] > 2000)
+            metadata["status"] = "failed" if load_code else "completed"
             (result_dir / "manifest.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
             print(f"Saved Kaggle run evidence in {result_dir}; threshold_exceeded={metadata['threshold_exceeded']}")
             return 2 if metadata["threshold_exceeded"] or load_code else 0
+        except BaseException:
+            metadata["status"] = "failed"
+            metadata["ended_at_utc"] = datetime.now(timezone.utc).isoformat()
+            (result_dir / "manifest.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+            raise
         finally:
-            if api is not None:
-                os.killpg(api.pid, signal.SIGTERM)
-                try:
-                    api.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    os.killpg(api.pid, signal.SIGKILL)
-                    api.wait()
+            for process in (load, warmup, api):
+                stop_process(process)
+            for log in (load_log, warmup_log, api_log):
+                if log is not None:
+                    log.close()
             if pg_started:
                 command(prefix + [str(pg_bin / "pg_ctl"), "-D", str(data_dir), "-m", "immediate", "stop"])
+            if pg_log.exists():
+                shutil.copyfile(pg_log, result_dir / "postgres.log")
 
 
 if __name__ == "__main__":

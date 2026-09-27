@@ -6,6 +6,7 @@ import os
 import random
 
 from locust import HttpUser, between, task
+from metrics import appointment_slot
 
 with open(os.environ["BENCH_FIXTURE"], encoding="utf-8") as fixture_file:
     USERS = json.load(fixture_file)["users"]
@@ -73,10 +74,10 @@ class MixedUser(BasePetUser):
 
     @task(10)
     def create_appointment(self):
-        minute = self.appointment_number % 1440
+        day, slot = appointment_slot(self.appointment_number, os.environ.get("BENCH_PHASE", "measured"))
         self.appointment_number += 1
         self.client.post(
             "/api/appointments",
             name="POST /api/appointments",
-            json={"petId": self.fixture["petId"], "type": "general_checkup", "serviceName": "Synthetic checkup", "date": "2099-01-01", "time": f"{minute // 60:02d}:{minute % 60:02d}"},
+            json={"petId": self.fixture["petId"], "type": "general_checkup", "serviceName": "Synthetic checkup", "date": day, "time": slot},
         )

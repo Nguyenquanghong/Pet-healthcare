@@ -41,6 +41,13 @@ export class MedicalRecordsService {
       heartRateBpm: optionalNumber(input.heartRateBpm), internalNote: input.internalNote?.trim() || null,
     };
     return this.deps.unitOfWork.run(async ({ records, notifications }) => {
+      if (data.appointmentId) {
+        const appointment = await records.findAppointment(data.appointmentId);
+        if (!appointment) throw new BusinessError(404, "Appointment not found.");
+        if (appointment.petId !== pet.id || appointment.ownerId !== pet.ownerId) {
+          throw new BusinessError(422, "Appointment does not belong to this pet and owner.");
+        }
+      }
       const created = await records.create(data);
       if (created.appointmentId) await records.completeAppointment(created.appointmentId);
       await notifications.create({

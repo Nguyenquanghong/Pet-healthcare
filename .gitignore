@@ -10,3 +10,7 @@ frontend/.env
 backend/.env
 backend/uploads/
 .DS_Store
+playwright-report/
+test-results/
+__pycache__/
+MANUAL_TEST_CHECKLIST.md

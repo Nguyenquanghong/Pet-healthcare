@@ -13,6 +13,7 @@ function fixture(failNotification = false) {
   const records = {
     list: async () => committed,
     findPet: async () => pet,
+    findAppointment: async () => ({ id: "appt-1", petId: pet.id, ownerId: pet.ownerId }),
     find: async () => null,
     create: async (data) => ({ ...data, id: "record-1", createdAt: new Date(), updatedAt: new Date() }),
   };

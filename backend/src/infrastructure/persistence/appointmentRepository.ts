@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { AppointmentDependencies, AppointmentRepository, AppointmentTransaction, AppointmentUnitOfWork, NotificationWriter } from "../../application/ports/appointments.js";
+import { appointmentSlotWrite } from "./appointmentSlotConflict.js";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -32,11 +33,11 @@ class PrismaAppointmentRepository implements AppointmentRepository {
   }
 
   create(data: Parameters<AppointmentRepository["create"]>[0]) {
-    return this.client.appointment.create({ data });
+    return appointmentSlotWrite(this.client.appointment.create({ data }));
   }
 
   update(id: string, data: Parameters<AppointmentRepository["update"]>[1]) {
-    return this.client.appointment.update({ where: { id }, data });
+    return appointmentSlotWrite(this.client.appointment.update({ where: { id }, data }));
   }
 }
 
