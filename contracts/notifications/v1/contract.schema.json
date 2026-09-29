@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pet-healthcare.local/contracts/notifications/v1/contract.schema.json",
+  "title": "Notification boundary v1",
+  "description": "Wire DTOs. Single-message requests are limited to 16384 UTF-8 bytes; availability response to 1048576 bytes. Unknown fields and versions are rejected.",
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "timestamp": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?Z$" },
+    "notification": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "recipientOwnerId", "recipientRole", "type", "title", "message", "status", "actionUrl", "relatedPetId", "relatedAppointmentId", "relatedBookingId", "sentByStaffId", "createdAt", "sentAt"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "recipientOwnerId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "recipientRole": { "enum": ["owner", "admin"] },
+        "type": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "status": { "enum": ["draft", "sent", "read"] },
+        "actionUrl": { "anyOf": [{ "type": "string", "maxLength": 512, "pattern": "^/" }, { "type": "null" }] },
+        "relatedPetId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "relatedAppointmentId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "relatedBookingId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "sentByStaffId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "createdAt": { "$ref": "#/$defs/timestamp" },
+        "sentAt": { "$ref": "#/$defs/timestamp" }
+      },
+      "allOf": [
+        { "if": { "properties": { "recipientRole": { "const": "owner" } } }, "then": { "properties": { "recipientOwnerId": { "$ref": "#/$defs/id" } } } },
+        { "if": { "properties": { "recipientRole": { "const": "admin" } } }, "then": { "properties": { "recipientOwnerId": { "type": "null" } } } }
+      ]
+    },
+    "event": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "eventId", "correlationId", "producer", "occurredAt", "notification"],
+      "properties": {
+        "version": { "const": "v1" },
+        "eventId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+        "correlationId": { "$ref": "#/$defs/id" },
+        "producer": { "enum": ["appointments", "medical_records", "hotel_bookings", "public_rescue", "reminders", "manual"] },
+        "occurredAt": { "$ref": "#/$defs/timestamp" },
+        "notification": { "$ref": "#/$defs/notification" }
+      }
+    },
+    "ingestAck": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "eventId", "notificationId", "outcome"],
+      "properties": {
+        "version": { "const": "v1" },
+        "eventId": { "$ref": "#/$defs/event/properties/eventId" },
+        "notificationId": { "$ref": "#/$defs/id" },
+        "outcome": { "enum": ["created", "duplicate"] }
+      }
+    },
+    "actorClaims": {
+      "type": "object", "additionalProperties": false,
+      "required": ["iss", "aud", "sub", "role", "iat", "exp"],
+      "properties": {
+        "iss": { "const": "pet-healthcare-core" },
+        "aud": { "const": "pet-healthcare-notifications" },
+        "sub": { "$ref": "#/$defs/id" },
+        "role": { "enum": ["owner", "doctor", "staff", "admin"] },
+        "iat": { "type": "integer", "minimum": 0 },
+        "exp": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "availability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "notificationAvailability", "notifications"],
+      "properties": {
+        "version": { "const": "v1" },
+        "notificationAvailability": { "enum": ["available", "unavailable"] },
+        "notifications": { "type": "array", "items": { "$ref": "#/$defs/notification" } }
+      },
+      "allOf": [{ "if": { "properties": { "notificationAvailability": { "const": "unavailable" } } }, "then": { "properties": { "notifications": { "type": "array", "maxItems": 0 } } } }]
+    },
+    "error": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "code", "message"],
+      "properties": {
+        "version": { "const": "v1" },
+        "code": { "enum": ["BAD_CONTRACT", "UNAUTHORIZED", "FORBIDDEN", "NOT_FOUND", "CONFLICT", "UNAVAILABLE", "NOTIFICATION_COMMIT_UNKNOWN"] },
+        "message": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "operationId": { "$ref": "#/$defs/id" }
+      },
+      "allOf": [{ "if": { "properties": { "code": { "const": "NOTIFICATION_COMMIT_UNKNOWN" } } }, "then": { "required": ["operationId"] } }]
+    },
+    "manualSendResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "operationId", "notification"],
+      "properties": {
+        "version": { "const": "v1" },
+        "operationId": { "$ref": "#/$defs/id" },
+        "notification": { "$ref": "#/$defs/notification" }
+      }
+    },
+    "manualSendRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "operationId", "recipientOwnerId", "title", "message"],
+      "properties": {
+        "version": { "const": "v1" },
+        "operationId": { "$ref": "#/$defs/id" },
+        "recipientOwnerId": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    }
+  }
+}

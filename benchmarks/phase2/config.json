@@ -1,0 +1,14 @@
+{
+  "version": "phase2-v1-screening",
+  "seed": 20260928,
+  "actions": 100,
+  "concurrency": 10,
+  "clientTimeoutMs": 5000,
+  "poolLimitTotal": 12,
+  "fixture": {
+    "owners": 10,
+    "businessPerOwner": 2,
+    "notificationsPerOwner": 20,
+    "adminNotifications": 10
+  }
+}

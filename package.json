@@ -15,11 +15,13 @@
     "db:migrate": "npm run db:migrate -w backend",
     "db:seed": "npm run db:seed -w backend",
     "test:smoke": "npm run test:smoke -w backend",
-    "test": "npm run build && npm run test:unit -w backend && npm run test:architecture -w backend && npm run test:openapi -w backend",
+    "test": "npm run build && npm run test:unit -w backend && npm run test:architecture -w backend && npm run test:openapi -w backend && npm run test:phase2",
+    "test:phase2": "node --test contracts/notifications/v1/*.test.mjs benchmarks/phase2/*.test.mjs",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
+    "ajv": "^8.20.0",
     "concurrently": "^9.2.1"
   }
 }
