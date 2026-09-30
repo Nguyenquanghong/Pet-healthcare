@@ -1,6 +1,9 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { MedicalDependencies, MedicalNotificationWriter, MedicalRecordRepository, MedicalTransaction, MedicalUnitOfWork } from "../../application/ports/medicalRecords.js";
 import { appointmentSlotWrite } from "./appointmentSlotConflict.js";
+import { appendStatusEvent } from "./bookingLifecycleRepository.js";
+import { BusinessError } from "../../domain/error.js";
+import type { Actor } from "../../domain/auth.js";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -13,7 +16,8 @@ class PrismaMedicalRecordRepository implements MedicalRecordRepository {
   findPet(id: string) {
     return this.client.pet.findUnique({ where: { id }, select: { id: true, ownerId: true, name: true } });
   }
-  findAppointment(id: string) {
+  async findAppointment(id: string) {
+    await this.client.$queryRaw`SELECT id FROM appointments WHERE id = ${id} FOR UPDATE`;
     return this.client.appointment.findUnique({ where: { id }, select: { id: true, petId: true, ownerId: true } });
   }
   find(id: string) {
@@ -34,8 +38,13 @@ class PrismaMedicalRecordRepository implements MedicalRecordRepository {
   async deleteImage(id: string) {
     await this.client.medicalImage.delete({ where: { id } });
   }
-  async completeAppointment(id: string) {
-    await appointmentSlotWrite(this.client.appointment.update({ where: { id }, data: { status: "completed" } }));
+  async completeAppointment(id: string, actor: Actor) {
+    const before = await this.client.appointment.findUnique({ where: { id } });
+    if (!before || !["checked_in", "in_progress", "completed"].includes(before.status))
+      throw new BusinessError(409, "Lịch khám chưa nhận thú cưng hoặc đã bị điều chỉnh. Hãy kiểm tra lại trước khi lưu bệnh án.");
+    if (before.status === "completed") return;
+    const saved = await appointmentSlotWrite(this.client.appointment.update({ where: { id }, data: { status: "completed", statusRevision: { increment: 1 } } }));
+    await appendStatusEvent(this.client, "appointment", id, actor, "medical_completed", before.status, "completed", saved.statusRevision);
   }
 }
 

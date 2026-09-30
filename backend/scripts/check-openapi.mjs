@@ -11,6 +11,7 @@ const mounts = {
   auth: "/api/auth", public: "/api/public", bootstrap: "/api/bootstrap",
   pets: "/api/pets", appointments: "/api/appointments", medicalRecords: "/api/medical-records",
   hotelBookings: "/api/hotel-bookings", notifications: "/api/notifications", invoices: "/api/invoices",
+  payments: "/api/payments",
 };
 const runtime = new Set(["GET /api/health"]);
 for (const [file, mount] of Object.entries(mounts)) {
@@ -34,5 +35,5 @@ for (const [path, methods] of Object.entries(spec.paths)) {
   }
 }
 assert.deepEqual([...documented].sort(), [...runtime].sort(), "OpenAPI routes differ from mounted runtime routes");
-assert.equal(runtime.size, 37, "Expected baseline route inventory changed; review explicitly");
+assert.equal(runtime.size, 53, "Expected route inventory including VietQR changed; review explicitly");
 process.stdout.write(`OpenAPI PASS: ${runtime.size} operations match source and schemas validate.\n`);

@@ -62,12 +62,10 @@ test("existing slot keeps conflict response before transaction", async () => {
   assert.equal(deps.committed.length, 0);
 });
 
-test("status change requires staff and keeps notification write", async () => {
+test("status change rejects owners before reaching lifecycle", async () => {
   const deps = fixture();
   await assert.rejects(deps.service.changeStatus(owner, "appt-1", { status: "confirmed" }), { status: 403 });
-  const changed = await deps.service.changeStatus(staff, "appt-1", { status: "confirmed" });
-  assert.equal(changed.status, "confirmed");
-  assert.equal(deps.notifications, 1);
+  assert.equal(deps.notifications, 0);
 });
 
 test("impossible calendar dates are rejected instead of rolling over", async () => {

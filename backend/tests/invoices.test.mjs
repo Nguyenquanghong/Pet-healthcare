@@ -16,3 +16,36 @@ test("invoice reads scope owner and payment requires staff", async () => {
   assert.equal(result.paymentMethod, "cash");
   assert.ok(result.paidAt instanceof Date);
 });
+
+test("invoice issuance rejects invalid amounts, unfinished services and owner writes", async () => {
+  let status = "completed";
+  let created;
+  const service = new InvoicesService({ issue: work => work({
+    source: async () => ({ status, ownerId: "actual-owner", petId: "actual-pet", description: "Consultation", amount: 300000 }),
+    create: async data => { created = data; return data; },
+    notify: async () => {},
+  }) });
+  const staff = { sub: "staff", role: "staff" };
+  const input = { type: "appointment", relatedId: "appointment", subtotal: 250000, taxAmount: 20000, discountAmount: 10000, ownerId: "forged" };
+  assert.throws(() => service.create({ sub: "owner", role: "owner" }, input), { status: 403 });
+  for (const type of [null, [], {}, { toString: "appointment" }, 1, "other"]) {
+    assert.throws(() => service.create(staff, { ...input, type }), { status: 422 });
+  }
+  for (const subtotal of [-1, 0.5, "250000", Infinity, 10000000000, undefined]) {
+    assert.throws(() => service.create(staff, { ...input, subtotal }), { status: 422 });
+  }
+  assert.throws(() => service.pay(staff, "invoice", "bitcoin"), { status: 422 });
+  assert.throws(() => service.pay(staff, "invoice", null), { status: 422 });
+  await assert.rejects(service.create(staff, { ...input, discountAmount: 300000 }), { status: 422 });
+  status = "pending";
+  await assert.rejects(service.create(staff, input), { status: 409 });
+  status = "completed";
+  await service.create(staff, input);
+  assert.equal(created.totalAmount, 260000);
+  assert.equal(created.ownerId, "actual-owner");
+  assert.equal(created.petId, "actual-pet");
+  status = "checked_out";
+  await service.create(staff, { type: "hotel_booking", relatedId: "booking" });
+  assert.equal(created.subtotal, 300000);
+  assert.throws(() => service.create(staff, { type: "hotel_booking", relatedId: "booking", subtotal: 1 }), { status: 422 });
+});

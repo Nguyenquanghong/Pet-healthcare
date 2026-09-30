@@ -1,0 +1,7 @@
+{
+  "currency": "VND",
+  "roomRates": { "standard": 350000, "deluxe": 600000, "vip": 1000000 },
+  "hotelServiceRates": { "grooming_spa": 180000, "special_diet": 90000, "video_call": 50000, "daily_walk": 60000, "medicine_support": 80000 },
+  "fixedSpaRates": { "spa_bath": 250000, "spa_grooming": 450000, "spa_combo": 650000 },
+  "appointmentEstimates": { "general_checkup": 250000, "vaccination": 350000, "dental": 500000, "dermatology": 300000, "surgery": 1500000, "hotel_consultation": 150000, "other": 200000 }
+}

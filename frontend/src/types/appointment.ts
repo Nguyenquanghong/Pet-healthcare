@@ -26,6 +26,7 @@ export type Appointment = {
   date: string;
   time: string;
   status: AppointmentStatus;
+  statusRevision: number;
   ownerNote?: string;
   internalNote?: string;
   createdBy: "owner" | "staff";

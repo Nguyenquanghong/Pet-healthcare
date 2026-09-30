@@ -8,6 +8,7 @@ export const ownerNav = [
   { to: "/owner/medical-records", label: "Medical Records", mobileLabel: "Records", icon: FileText },
   { to: "/owner/profile", label: "Profile", icon: UserRound },
   { to: "/owner/hotel-booking", label: "Hotel Booking", icon: Hotel },
+  { to: "/owner/billing", label: "Hóa đơn & Thanh toán", mobileLabel: "Thanh toán", icon: Receipt },
   { to: "/owner/notifications", label: "Notifications", icon: Bell },
 ];
 

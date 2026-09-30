@@ -126,3 +126,24 @@ button, a, input, select, textarea {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+@media print {
+  body:has(> .invoice-print-overlay) > :not(.invoice-print-overlay) {
+    display: none !important;
+  }
+  .invoice-print-overlay {
+    position: static !important;
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+  .invoice-print-sheet {
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    border: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+}

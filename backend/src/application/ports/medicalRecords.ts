@@ -1,3 +1,4 @@
+import type { Actor } from "../../domain/auth.js";
 export type MedicalRecordValue = {
   id: string; petId: string; ownerId: string; appointmentId: string | null;
   doctorName: string; visitDate: Date; title: string; symptoms: string | null;
@@ -34,7 +35,7 @@ export interface MedicalRecordRepository {
   delete(id: string): Promise<void>;
   createImage(data: { petId: string; title: string; imageUrl: string; mimeType: string }): Promise<MedicalImageValue>;
   deleteImage(id: string): Promise<void>;
-  completeAppointment(id: string): Promise<void>;
+  completeAppointment(id: string, actor: Actor): Promise<void>;
 }
 
 export interface MedicalNotificationWriter {

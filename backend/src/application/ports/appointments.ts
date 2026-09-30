@@ -17,6 +17,7 @@ export type AppointmentRecord = {
   appointmentDate: Date;
   appointmentTime: string;
   status: AppointmentStatus;
+  statusRevision: number;
   ownerNote: string | null;
   internalNote: string | null;
   createdBy: string;

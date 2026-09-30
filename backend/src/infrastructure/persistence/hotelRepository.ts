@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { BusinessError } from "../../domain/error.js";
 import type { HotelBookingRepository, HotelDependencies, HotelNotificationWriter, HotelTransaction, HotelUnitOfWork } from "../../application/ports/hotelBookings.js";
 
 type Client = PrismaClient | Prisma.TransactionClient;
@@ -28,7 +29,10 @@ class PrismaHotelBookingRepository implements HotelBookingRepository {
   cancel(id: string, ownerNote: string | null) {
     return this.client.hotelBooking.update({ where: { id }, data: { status: "cancelled", ownerNote }, include: noteIds });
   }
-  createCareNote(data: Parameters<HotelBookingRepository["createCareNote"]>[0]) {
+  async createCareNote(data: Parameters<HotelBookingRepository["createCareNote"]>[0]) {
+    await this.client.$queryRaw`SELECT id FROM hotel_bookings WHERE id = ${data.bookingId} FOR UPDATE`;
+    const booking = await this.client.hotelBooking.findUnique({ where: { id: data.bookingId } });
+    if (!booking || booking.status !== "in_stay") throw new BusinessError(409, "Chỉ ghi nhật ký khi thú cưng đang lưu trú. Hãy tải lại trạng thái.");
     return this.client.dailyCareNote.create({ data });
   }
 }

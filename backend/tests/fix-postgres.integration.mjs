@@ -39,6 +39,12 @@ try {
   await new Promise(resolve => server.once("listening", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   async function request(path, method = "GET", token, body) {
+    const match = path.match(/^\/api\/(appointments|hotel-bookings)\/([^/]+)\/(status|cancel|reschedule)$/);
+    if (method === "PATCH" && match && body && body.expectedRevision === undefined) {
+      const record = await (match[1] === "appointments" ? prisma.appointment : prisma.hotelBooking).findUnique({ where: { id: match[2] } });
+      body = { ...body, expectedRevision: record?.statusRevision ?? 0 };
+    }
+
     const response = await fetch(base + path, { method, headers: {
       ...(token ? { authorization: `Bearer ${token}` } : {}),
       ...(body === undefined ? {} : { "content-type": "application/json" }),
@@ -103,6 +109,7 @@ try {
   assert.equal((await request(`/api/appointments/${occupied.id}/status`, "PATCH", staffToken, { status: "confirmed" })).status, 409);
   assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: occupied.id } })).status, "cancelled");
   assert.equal(await prisma.notification.count({ where: { relatedAppointmentId: occupied.id } }), beforeStatus);
+  assert.equal((await request(`/api/appointments/${replacement.id}/status`, "PATCH", staffToken, { status: "confirmed" })).status, 200);
   assert.equal((await request(`/api/appointments/${replacement.id}/status`, "PATCH", staffToken, { status: "no_show" })).status, 200);
   await create(pet.id, "2099-01-14");
   await create(sibling.id, "2099-01-14");
@@ -123,6 +130,7 @@ try {
   }
   const standalone = await request("/api/medical-records", "POST", staffToken, medicalInput(pet.id, undefined));
   assert.equal(standalone.status, 201);
+  for (const status of ["confirmed", "checked_in"]) assert.equal((await request(`/api/appointments/${first.id}/status`, "PATCH", staffToken, { status })).status, 200);
   const valid = await request("/api/medical-records", "POST", staffToken, medicalInput(pet.id, first.id));
   assert.equal(valid.status, 201, JSON.stringify(valid.body));
   assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: first.id } })).status, "completed");
@@ -138,15 +146,16 @@ try {
 
   const medical = createMedicalDependencies(prisma);
   const rollbackAppointment = await create(pet.id, "2099-01-21");
+  await prisma.appointment.update({ where: { id: rollbackAppointment.id }, data: { status: "checked_in" } });
   const beforeRollback = await baseline();
   const sentinel = new Error("synthetic notification failure");
   await assert.rejects(medical.unitOfWork.run(async ({ records }) => {
     await records.create({ petId: pet.id, ownerId: owner.id, appointmentId: rollbackAppointment.id, doctorName: "Fix", visitDate: new Date("2099-01-21T00:00:00.000Z"), title: "Rollback", symptoms: null, diagnosis: "Fix", treatment: "Fix", medications: null, vaccineName: null, followUpDate: null, internalNote: null });
-    await records.completeAppointment(rollbackAppointment.id);
+    await records.completeAppointment(rollbackAppointment.id, { sub: staff.id, role: "staff" });
     throw sentinel;
   }), error => error === sentinel);
   assert.deepEqual(await baseline(), beforeRollback);
-  assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: rollbackAppointment.id } })).status, "pending");
+  assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: rollbackAppointment.id } })).status, "checked_in");
   summary.scenarios.push("medical record + completion rollback on notification failure");
 
   const publicPath = `/api/public/pets/${marker}`;

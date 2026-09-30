@@ -20,7 +20,7 @@ for (const role of ["owner", "admin"] as const) {
     await page.getByRole("button", { name: role === "owner" ? "Sign in" : "Sign in as admin", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/${role}/dashboard$`));
     const routes = role === "owner"
-      ? ["dashboard", "profile", "pets", "medical-records", "appointments", "spa-booking", "hotel-booking", "notifications"]
+      ? ["dashboard", "profile", "pets", "medical-records", "appointments", "spa-booking", "hotel-booking", "notifications", "billing"]
       : ["dashboard", "appointments", "pets", "medical-records", "hotel-bookings", "notifications", "analytics", "billing", "settings"];
     for (const route of routes) {
       // Full navigation tests session restoration as well as component rendering.

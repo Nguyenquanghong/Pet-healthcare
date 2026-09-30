@@ -19,6 +19,7 @@ import { DashboardPage } from "./routes/owner/DashboardPage";
 import { HotelBookingPage } from "./routes/owner/HotelBookingPage";
 import { MedicalRecordsPage } from "./routes/owner/MedicalRecordsPage";
 import { NotificationsPage } from "./routes/owner/NotificationsPage";
+import { OwnerBillingPage } from "./routes/owner/OwnerBillingPage";
 import { OwnerRegisterPage } from "./routes/owner/OwnerRegisterPage";
 import { PetsPage } from "./routes/owner/PetsPage";
 import { OwnerProfilePage } from "./routes/owner/OwnerProfilePage";
@@ -61,6 +62,7 @@ export function App() {
       <Route path="/owner/spa-booking" element={<OwnerOnly><SpaBookingPage /></OwnerOnly>} />
       <Route path="/owner/hotel-booking" element={<OwnerOnly><HotelBookingPage /></OwnerOnly>} />
       <Route path="/owner/notifications" element={<OwnerOnly><NotificationsPage /></OwnerOnly>} />
+      <Route path="/owner/billing" element={<OwnerOnly><OwnerBillingPage /></OwnerOnly>} />
       <Route path="/admin/login" element={<AdminLoginPage />} />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="/admin/dashboard" element={<AdminOnly><AdminDashboardPage /></AdminOnly>} />

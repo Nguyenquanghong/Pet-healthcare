@@ -13,6 +13,14 @@ import { AuthService } from "./application/services/auth.js";
 import { PetsService } from "./application/services/pets.js";
 import { PublicRescueService } from "./application/services/publicRescue.js";
 import { InvoicesService } from "./application/services/invoices.js";
+import { BookingLifecycleService } from "./application/services/bookingLifecycle.js";
+import { PrismaBookingLifecycleStore } from "./infrastructure/persistence/bookingLifecycleRepository.js";
+import { VietQrGenerator } from "./infrastructure/payments/vietqr.js";
+import { PaymentsService } from "./application/services/payments.js";
+import { PrismaPaymentRepository } from "./infrastructure/persistence/paymentRepository.js";
+import { VnpaySandboxGateway } from "./infrastructure/security/vnpay.js";
+import { bankTransferConfig } from "./infrastructure/config/bankTransfer.js";
+import { createPaymentsRouter } from "./routes/payments.js";
 import { BootstrapService } from "./application/services/bootstrap.js";
 import { createAppointmentDependencies } from "./infrastructure/persistence/appointmentRepository.js";
 import { createMedicalDependencies } from "./infrastructure/persistence/medicalRepository.js";
@@ -39,6 +47,7 @@ import { createPublicRouter } from "./routes/public.js";
 
 export function createApp(client: PrismaClient) {
   const app = express();
+  const bankTransfer = bankTransferConfig(process.env);
   const checkDatabase = databaseHealthCheck(client);
   const origins = process.env.CORS_ORIGIN?.split(",").map((value) => value.trim()).filter(Boolean);
 
@@ -66,11 +75,17 @@ export function createApp(client: PrismaClient) {
   app.use("/api/public", createPublicRouter(new PublicRescueService(createPublicRescueDependencies(client))));
   app.use("/api/bootstrap", requireAuth, createBootstrapRouter(new BootstrapService(new PrismaBootstrapRepository(client))));
   app.use("/api/pets", requireAuth, createPetsRouter(new PetsService(new PrismaPetRepository(client), qrTokenAdapter)));
-  app.use("/api/appointments", requireAuth, createAppointmentsRouter(new AppointmentService(createAppointmentDependencies(client))));
+  const lifecycle = new BookingLifecycleService(new PrismaBookingLifecycleStore(client));
+  app.use("/api/appointments", requireAuth, createAppointmentsRouter(new AppointmentService(createAppointmentDependencies(client), lifecycle)));
   app.use("/api/medical-records", requireAuth, createMedicalRecordsRouter(new MedicalRecordsService(createMedicalDependencies(client))));
-  app.use("/api/hotel-bookings", requireAuth, createHotelBookingsRouter(new HotelBookingsService(createHotelDependencies(client))));
+  app.use("/api/hotel-bookings", requireAuth, createHotelBookingsRouter(new HotelBookingsService(createHotelDependencies(client), lifecycle)));
   app.use("/api/notifications", requireAuth, createNotificationsRouter(new NotificationsService(new PrismaNotificationRepository(client))));
-  app.use("/api/invoices", requireAuth, createInvoicesRouter(new InvoicesService(new PrismaInvoiceRepository(client))));
+  app.use("/api/invoices", requireAuth, createInvoicesRouter(new InvoicesService(new PrismaInvoiceRepository(client), bankTransfer, new VietQrGenerator())));
+  app.use("/api/payments", createPaymentsRouter(new PaymentsService(new PrismaPaymentRepository(client), new VnpaySandboxGateway({
+    tmnCode: process.env.VNPAY_TMN_CODE || "", hashSecret: process.env.VNPAY_HASH_SECRET || "",
+    returnUrl: process.env.VNPAY_RETURN_URL || "",
+    active: process.env.VNPAY_ENABLED === "true",
+  }), bankTransfer)));
 
   app.use((req, res) => res.status(404).json({ error: `Route ${req.originalUrl} was not found.` }));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

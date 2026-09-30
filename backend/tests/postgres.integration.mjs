@@ -79,6 +79,12 @@ try {
   await new Promise((resolve) => server.once("listening", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   async function request(path, method = "GET", token, body) {
+    const match = path.match(/^\/api\/(appointments|hotel-bookings)\/([^/]+)\/(status|cancel|reschedule)$/);
+    if (method === "PATCH" && match && body && body.expectedRevision === undefined) {
+      const record = await (match[1] === "appointments" ? prisma.appointment : prisma.hotelBooking).findUnique({ where: { id: match[2] } });
+      body = { ...body, expectedRevision: record?.statusRevision ?? 0 };
+    }
+
     const response = await fetch(base + path, { method, headers: {
       ...(token ? { authorization: `Bearer ${token}` } : {}),
       ...(body ? { "content-type": "application/json" } : {}),
@@ -112,6 +118,7 @@ try {
     { date: "2099-01-02", time: "12:00" })).status, 200);
   assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", token, { status: "confirmed" })).status, 403);
   assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", staffToken, { status: "confirmed" })).status, 200);
+  assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", staffToken, { status: "checked_in" })).status, 200);
   const record = await request("/api/medical-records", "POST", staffToken, {
     petId: pet.id, appointmentId, doctorName: "Integration doctor", visitDate: "2099-01-02",
     title: "Checkup", diagnosis: "Healthy", treatment: "Observation",
@@ -128,9 +135,10 @@ try {
   assert.equal(Number(stay.body.booking.totalAmount), 820000);
   const bookingId = stay.body.booking.id;
   assert.equal((await request(`/api/hotel-bookings/${bookingId}/status`, "PATCH", staffToken, { status: "confirmed" })).status, 200);
+  assert.equal((await request(`/api/hotel-bookings/${bookingId}/status`, "PATCH", staffToken, { status: "in_stay" })).status, 200);
   assert.equal((await request(`/api/hotel-bookings/${bookingId}/care-notes`, "POST", staffToken, { note: "Fed and walked" })).status, 201);
   assert.ok((await request("/api/hotel-bookings", "GET", token)).body.some(item => item.id === bookingId));
-  assert.equal((await request(`/api/hotel-bookings/${bookingId}/cancel`, "PATCH", token, { ownerNote: "Test finished" })).status, 200);
+  assert.equal((await request(`/api/hotel-bookings/${bookingId}/cancel`, "PATCH", token, { ownerNote: "Test finished" })).status, 409);
   assert.equal((await request("/api/bootstrap", "GET", token)).status, 200);
   assert.equal((await request("/api/invoices", "GET", token)).status, 200);
   const report = await request(`/api/public/pets/${marker}/rescue-reports`, "POST", undefined, { finderPhone: "000", location: "Test park" });

@@ -49,7 +49,7 @@ export class MedicalRecordsService {
         }
       }
       const created = await records.create(data);
-      if (created.appointmentId) await records.completeAppointment(created.appointmentId);
+      if (created.appointmentId) await records.completeAppointment(created.appointmentId, actor);
       await notifications.create({
         recipientOwnerId: pet.ownerId, recipientRole: "owner", type: "medical_record_updated",
         title: "New medical record", message: `${pet.name} has a new medical record: ${created.title}.`,

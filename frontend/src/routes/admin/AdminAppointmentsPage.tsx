@@ -1,3 +1,6 @@
+import { BookingStatusDialog, type StatusDialogSelection } from "./BookingStatusDialog";
+import { useBookingAction } from "./useBookingAction";
+import { apiClient } from "../../services/apiClient";
 import { useMemo, useState } from "react";
 import {
   Bell,
@@ -46,10 +49,8 @@ export function AdminAppointmentsPage() {
     appointments,
     owners,
     pets,
-    updateAppointmentStatus,
-    updateAppointmentInternalNote,
+    userRole,
     sendReminder,
-    createMedicalRecord,
   } = useAppStore();
 
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -76,6 +77,8 @@ export function AdminAppointmentsPage() {
   const [recordHeartRate, setRecordHeartRate] = useState("");
 
   const [toastMsg, setToastMsg] = useState("");
+  const [statusDialog, setStatusDialog] = useState<StatusDialogSelection | null>(null);
+  const { run: runAction, error: actionError } = useBookingAction();
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -117,25 +120,25 @@ export function AdminAppointmentsPage() {
     });
   }, [categoryAppointments, filterStatus, dateFilter, customDate, searchQuery, pets, owners, todayStr]);
 
-  const handleStatusUpdate = (id: string, status: AppointmentStatus, internalNote?: string) => {
-    updateAppointmentStatus(id, status, internalNote);
-    toast(`Đã cập nhật trạng thái: ${appointmentStatusLabels[status]}`);
+  const handleStatusUpdate = (id: string, status: AppointmentStatus) => {
+    const booking = appointments.find(item => item.id === id);
+    if (booking) setStatusDialog({ booking, intent: status });
   };
 
   const handleConfirmCancel = () => {
     if (!cancelModal) return;
-    updateAppointmentStatus(cancelModal.id, "cancelled", cancelReason ? `Lý do hủy: ${cancelReason}` : undefined);
-    setCancelModal(null);
-    setCancelReason("");
-    toast("Đã hủy lịch hẹn thành công.");
+    void runAction(() => apiClient.patch(`/appointments/${cancelModal.id}/status`, { status: "cancelled", expectedRevision: cancelModal.statusRevision,
+      internalNote: cancelReason ? `Lý do hủy: ${cancelReason}` : undefined }), () => {
+      setCancelModal(null); setCancelReason(""); toast("Đã hủy lịch hẹn thành công.");
+    });
   };
 
   const handleSaveInternalNote = () => {
     if (!internalNoteModal) return;
-    updateAppointmentInternalNote(internalNoteModal.id, internalNoteText.trim());
-    setInternalNoteModal(null);
-    setInternalNoteText("");
-    toast("Đã cập nhật ghi chú nội bộ.");
+    void runAction(() => apiClient.patch(`/appointments/${internalNoteModal.id}/status`, { status: internalNoteModal.status,
+      expectedRevision: internalNoteModal.statusRevision, internalNote: internalNoteText.trim() }), () => {
+      setInternalNoteModal(null); setInternalNoteText(""); toast("Đã cập nhật ghi chú nội bộ.");
+    });
   };
 
   const openCreateRecordForAppointment = (a: Appointment) => {
@@ -155,7 +158,7 @@ export function AdminAppointmentsPage() {
   const handleSaveMedicalRecord = () => {
     if (!createRecordModal || !recordTitle || !recordDiagnosis || !recordTreatment) return;
 
-    createMedicalRecord({
+    void runAction(() => apiClient.post("/medical-records", {
       petId: createRecordModal.petId,
       appointmentId: createRecordModal.id,
       doctorName: "Bs. Mai Nguyễn",
@@ -169,14 +172,16 @@ export function AdminAppointmentsPage() {
       weightKg: Number(recordWeight) || undefined,
       temperatureC: Number(recordTemp) || undefined,
       heartRateBpm: Number(recordHeartRate) || undefined,
+    }), () => {
+      setCreateRecordModal(null);
+      toast("Đã tạo hồ sơ y tế thành công! Lịch khám đã chuyển sang Hoàn thành.");
     });
-
-    setCreateRecordModal(null);
-    toast("Đã tạo hồ sơ y tế thành công! Lịch khám đã chuyển sang Hoàn thành.");
   };
 
   return (
     <AdminLayout title="Quản lý lịch hẹn">
+      {actionError && <p role="alert" className="fixed right-4 top-20 z-[100] max-w-md rounded-xl border border-rose-300 bg-white p-4 text-rose-700 shadow-lg">{actionError}</p>}
+      {statusDialog && <BookingStatusDialog kind="appointment" selection={statusDialog} onClose={() => setStatusDialog(null)} onSaved={() => toast("Đã lưu thao tác và lịch sử.")} />}
       {toastMsg && (
         <div className="mb-4 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-emerald-800 font-semibold animate-fadeIn">
           <CheckCircle2 size={18} />
@@ -378,6 +383,9 @@ export function AdminAppointmentsPage() {
                           <StickyNote size={14} />
                         </button>
 
+                        <button onClick={() => setStatusDialog({ booking: a, intent: "history" })} className="rounded-lg border px-2 py-1.5 text-xs">Lịch sử thao tác</button>
+                        {(a.status === "checked_in" || (a.status === "completed" && userRole === "admin")) &&
+                          <button onClick={() => setStatusDialog({ booking: a, intent: "undo" })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{a.status === "checked_in" ? "Hoàn tác check-in" : "Mở lại dịch vụ"}</button>}
                         {/* Status workflow buttons */}
                         {a.status === "pending" && (
                           <button

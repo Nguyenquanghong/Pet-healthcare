@@ -40,6 +40,9 @@
     },
     {
       "name": "Public rescue"
+    },
+    {
+      "name": "Payments"
     }
   ],
   "paths": {
@@ -103,7 +106,9 @@
               }
             }
           },
-          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
           "default": {
             "description": "Error",
             "content": {
@@ -146,7 +151,9 @@
               }
             }
           },
-          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
           "default": {
             "description": "Error",
             "content": {
@@ -189,7 +196,9 @@
               }
             }
           },
-          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
           "default": {
             "description": "Error",
             "content": {
@@ -242,7 +251,9 @@
               }
             }
           },
-          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
           "default": {
             "description": "Error",
             "content": {
@@ -287,7 +298,9 @@
               }
             }
           },
-          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
           "default": {
             "description": "Error",
             "content": {
@@ -337,7 +350,9 @@
               }
             }
           },
-          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
           "default": {
             "description": "Error",
             "content": {
@@ -1863,6 +1878,101 @@
             "BearerAuth": []
           }
         ]
+      },
+      "post": {
+        "tags": [
+          "Invoices"
+        ],
+        "summary": "Issue an unpaid invoice for a completed appointment or checked-out hotel booking",
+        "operationId": "post_api_invoices",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invoice or source service not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate invoice, unfinished service, or payment state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid amount or payment method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvoiceInput"
+              }
+            }
+          }
+        },
+        "description": "Staff only. One invoice per service. Appointment subtotal is the agreed fee in whole VND; hotel subtotal is read from the stored booking. Tax and discount are explicit amounts; total is computed by the server. Payment status is independent of service status."
       }
     },
     "/api/invoices/{id}/pay": {
@@ -1885,6 +1995,46 @@
           },
           "401": {
             "description": "Authentication required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff role required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invoice or source service not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate invoice, unfinished service, or payment state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid amount or payment method",
             "content": {
               "application/json": {
                 "schema": {
@@ -1928,7 +2078,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Staff records receipt of funds. Unpaid becomes paid atomically. Repeating the same method preserves paidAt; a different method or refunded invoice returns 409. This endpoint does not charge an external payment provider."
       }
     },
     "/api/public/pets/{token}": {
@@ -2024,14 +2175,1084 @@
           }
         }
       }
+    },
+    "/api/invoices/checkout": {
+      "post": {
+        "tags": [
+          "Invoices"
+        ],
+        "operationId": "checkoutInvoice",
+        "summary": "Owner obtains invoice for own completed fixed-price spa or checked-out hotel",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "relatedId"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "appointment",
+                      "hotel_booking"
+                    ]
+                  },
+                  "relatedId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invoices/{id}/onsite": {
+      "patch": {
+        "tags": [
+          "Invoices"
+        ],
+        "operationId": "chooseOnsite",
+        "summary": "Owner chooses payment at store; invoice remains unpaid",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/payments/options": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "operationId": "paymentOptions",
+        "summary": "Configured sandbox payment methods",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "vnpayEnabled": {
+                      "type": "boolean"
+                    },
+                    "environment": {
+                      "type": "string",
+                      "enum": [
+                        "sandbox"
+                      ]
+                    },
+                    "bankTransfer": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "bankName": {
+                          "type": "string"
+                        },
+                        "accountNumber": {
+                          "type": "string"
+                        },
+                        "accountHolder": {
+                          "type": "string"
+                        },
+                        "isDemo": {
+                          "type": "boolean"
+                        },
+                        "bankBin": {
+                          "type": "string",
+                          "pattern": "^[0-9]{6}$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/payments/{id}/vnpay": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "operationId": "startVnpay",
+        "summary": "Owner starts or resumes VNPay Sandbox payment; amount comes from invoice",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "paymentUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "reference": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/payments/{id}/reconcile": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "operationId": "reconcileVnpay",
+        "summary": "Owner of invoice or staff queries VNPay and verifies signed result",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/payments/vnpay/return": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "operationId": "verifyVnpayReturn",
+        "summary": "Verify browser return signature only; never changes payment status",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "vnp_TmnCode",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_TxnRef",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_Amount",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_ResponseCode",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_TransactionStatus",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_TransactionNo",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_SecureHash",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_BankCode",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_PayDate",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_OrderInfo",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_BankTranNo",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_CardType",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/payments/vnpay/ipn": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "operationId": "vnpayIpn",
+        "summary": "VNPay signed callback; verifies merchant, amount and unique reference",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "RspCode",
+                    "Message"
+                  ],
+                  "properties": {
+                    "RspCode": {
+                      "type": "string",
+                      "enum": [
+                        "00",
+                        "01",
+                        "02",
+                        "04",
+                        "97",
+                        "99"
+                      ]
+                    },
+                    "Message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "vnp_TmnCode",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_TxnRef",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_Amount",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_ResponseCode",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_TransactionStatus",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_TransactionNo",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_SecureHash",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_BankCode",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_PayDate",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_OrderInfo",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_BankTranNo",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vnp_CardType",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/invoices/{id}/bank-transfer": {
+      "patch": {
+        "tags": [
+          "Invoices"
+        ],
+        "operationId": "chooseBankTransfer",
+        "summary": "Owner chooses manual bank transfer; saves recipient details; remains unpaid",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invoices/{id}/transfer-report": {
+      "post": {
+        "tags": [
+          "Invoices"
+        ],
+        "operationId": "reportBankTransfer",
+        "summary": "Owner reports transfer for staff review; remains unpaid",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reference": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invoices/{id}/transfer-reject": {
+      "post": {
+        "tags": [
+          "Invoices"
+        ],
+        "operationId": "rejectBankTransfer",
+        "summary": "Staff requests recheck of a pending transfer; remains unpaid",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invoices/{id}/transfer-qr": {
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "operationId": "getInvoiceTransferQr",
+        "summary": "Locally generated VietQR PNG for an unpaid bank transfer; owner-scoped, unavailable for pending reports or legacy/demo destinations",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "QR with saved invoice amount, recipient and purpose. Cache-Control: no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "dataUrl",
+                    "content",
+                    "amount"
+                  ],
+                  "properties": {
+                    "dataUrl": {
+                      "type": "string",
+                      "pattern": "^data:image/png;base64,"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "amount": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appointments/{id}/status-history": {
+      "get": {
+        "tags": [
+          "Appointments"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "operationId": "appointmentStatusHistory",
+        "summary": "Staff-only immutable status history; legacy history is not synthesized",
+        "responses": {
+          "200": {
+            "description": "Events newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookingStatusEvent"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appointments/{id}/undo-status": {
+      "post": {
+        "tags": [
+          "Appointments"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "operationId": "undoAppointmentStatus",
+        "summary": "Reverse an eligible recorded check-in or reopen completion (admin only); reject dependent records and stale revisions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason",
+                  "expectedRevision"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated booking, original event retained and reversal appended atomically",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appointment": {
+                      "$ref": "#/components/schemas/Appointment"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hotel-bookings/{id}/status-history": {
+      "get": {
+        "tags": [
+          "Hotel bookings"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "operationId": "bookingStatusHistory",
+        "summary": "Staff-only immutable status history; legacy history is not synthesized",
+        "responses": {
+          "200": {
+            "description": "Events newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookingStatusEvent"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hotel-bookings/{id}/undo-status": {
+      "post": {
+        "tags": [
+          "Hotel bookings"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "operationId": "undoHotelBookingStatus",
+        "summary": "Reverse an eligible recorded check-in or reopen completion (admin only); reject dependent records and stale revisions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason",
+                  "expectedRevision"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated booking, original event retained and reversal appended atomically",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "booking": {
+                      "$ref": "#/components/schemas/HotelBooking"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "responses": {
       "TooManyRequests": {
         "description": "Auth rate limit exceeded (50 requests per 15 minutes)",
-        "headers": { "Retry-After": { "schema": { "type": "string" } } },
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -2238,6 +3459,11 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "statusRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "readOnly": true
           }
         },
         "required": [
@@ -2381,6 +3607,11 @@
             "items": {
               "$ref": "#/components/schemas/String"
             }
+          },
+          "statusRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "readOnly": true
           }
         },
         "required": [
@@ -2501,13 +3732,116 @@
             "type": "string"
           },
           "paymentMethod": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "cash",
+              "bank_transfer",
+              "credit_card",
+              "qr_code",
+              "vnpay",
+              null
+            ]
           },
           "items": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/InvoiceItem"
             }
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "appointment",
+              "hotel_booking"
+            ]
+          },
+          "appointmentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "hotelBookingId": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentChannel": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "online",
+              "onsite",
+              "bank_transfer",
+              null
+            ]
+          },
+          "bankTransferDetails": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "bankName": {
+                "type": "string"
+              },
+              "accountNumber": {
+                "type": "string"
+              },
+              "accountHolder": {
+                "type": "string"
+              },
+              "isDemo": {
+                "type": "boolean"
+              },
+              "bankBin": {
+                "type": "string",
+                "pattern": "^[0-9]{6}$"
+              }
+            }
+          },
+          "transferReviewStatus": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "pending",
+              "rejected",
+              "confirmed",
+              null
+            ]
+          },
+          "transferReportedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "transferReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "transferReviewNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "transferCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^NIPO[0-9]{10}$",
+            "readOnly": true
+          },
+          "transferContent": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Stable transfer purpose; legacy invoices retain their original instruction."
           }
         },
         "required": [
@@ -2517,7 +3851,8 @@
           "petId",
           "subtotal",
           "totalAmount",
-          "paymentStatus"
+          "paymentStatus",
+          "transferContent"
         ]
       },
       "InvoiceItem": {
@@ -2669,22 +4004,64 @@
         "type": "object",
         "description": "QR-safe pet projection. Medical fields appear only when publicProfile.showMedicalAlerts is true; internal notes are never public.",
         "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "species": { "type": "string" },
-          "breed": { "type": "string" },
-          "gender": { "type": "string" },
-          "ageLabel": { "type": "string" },
-          "microchipId": { "type": "string" },
-          "avatarUrl": { "type": "string" },
-          "identifyingMarks": { "type": "string" },
-          "lastSeenLocation": { "type": "string" },
-          "qrEnabled": { "type": "boolean" },
-          "healthStatus": { "type": "string", "description": "Only when showMedicalAlerts is true" },
-          "allergies": { "type": "array", "items": { "type": "string" }, "description": "Only when showMedicalAlerts is true" },
-          "publicProfile": { "$ref": "#/components/schemas/PublicProfile" }
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string"
+          },
+          "breed": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string"
+          },
+          "ageLabel": {
+            "type": "string"
+          },
+          "microchipId": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string"
+          },
+          "identifyingMarks": {
+            "type": "string"
+          },
+          "lastSeenLocation": {
+            "type": "string"
+          },
+          "qrEnabled": {
+            "type": "boolean"
+          },
+          "healthStatus": {
+            "type": "string",
+            "description": "Only when showMedicalAlerts is true"
+          },
+          "allergies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Only when showMedicalAlerts is true"
+          },
+          "publicProfile": {
+            "$ref": "#/components/schemas/PublicProfile"
+          }
         },
-        "required": ["id", "name", "species", "breed", "gender", "ageLabel", "qrEnabled", "publicProfile"]
+        "required": [
+          "id",
+          "name",
+          "species",
+          "breed",
+          "gender",
+          "ageLabel",
+          "qrEnabled",
+          "publicProfile"
+        ]
       },
       "PublicPet": {
         "type": "object",
@@ -2968,10 +4345,16 @@
           },
           "internalNote": {
             "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "statusRevision from the booking displayed to the user; stale values return 409."
           }
         },
         "required": [
-          "status"
+          "status",
+          "expectedRevision"
         ]
       },
       "RescheduleInput": {
@@ -2986,11 +4369,17 @@
           },
           "ownerNote": {
             "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "statusRevision from the booking displayed to the user; stale values return 409."
           }
         },
         "required": [
           "date",
-          "time"
+          "time",
+          "expectedRevision"
         ]
       },
       "CancelInput": {
@@ -2998,8 +4387,16 @@
         "properties": {
           "ownerNote": {
             "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "statusRevision from the booking displayed to the user; stale values return 409."
           }
-        }
+        },
+        "required": [
+          "expectedRevision"
+        ]
       },
       "MedicalRecordInput": {
         "type": "object",
@@ -3248,6 +4645,123 @@
           },
           "weightKg": {
             "type": "number"
+          }
+        }
+      },
+      "CreateInvoiceInput": {
+        "type": "object",
+        "required": [
+          "type",
+          "relatedId"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "appointment",
+              "hotel_booking"
+            ]
+          },
+          "relatedId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subtotal": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999999999,
+            "description": "Legacy appointment fee when items is omitted; omit for hotel bookings."
+          },
+          "taxAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999999999
+          },
+          "discountAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999999999
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "description": "Appointment final charges; hotel extras only (stored booking base is added automatically).",
+            "items": {
+              "type": "object",
+              "required": [
+                "description",
+                "quantity",
+                "unitPrice"
+              ],
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10000
+                },
+                "unitPrice": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9999999999
+                }
+              }
+            }
+          }
+        }
+      },
+      "BookingStatusEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "bookingId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "fromStatus": {
+            "type": "string"
+          },
+          "toStatus": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "actorRole": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversesId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

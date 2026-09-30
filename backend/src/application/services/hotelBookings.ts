@@ -1,20 +1,22 @@
+import { BookingLifecycleService, type LifecycleInput, type UndoInput } from "./bookingLifecycle.js";
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import pricing from "../../domain/pricing.json" with { type: "json" };
 import type { HotelDependencies, HotelBookingValue, CareNoteValue } from "../ports/hotelBookings.js";
 
 export type HotelCreateInput = { petId?: string; checkIn?: string; checkOut?: string; roomType?: string; serviceKeys?: unknown; ownerNote?: string };
-export type HotelStatusInput = { status?: string; internalNote?: string | null };
+export type HotelStatusInput = LifecycleInput;
 export type CareNoteInput = { note?: string; eatingStatus?: string; mood?: string; visibleToOwner?: boolean };
 
-const roomRates: Record<string, number> = { standard: 350_000, deluxe: 600_000, vip: 1_000_000 };
-const serviceRates: Record<string, number> = { grooming_spa: 180_000, special_diet: 90_000, video_call: 50_000, daily_walk: 60_000, medicine_support: 80_000 };
+const roomRates: Record<string, number> = pricing.roomRates;
+const serviceRates: Record<string, number> = pricing.hotelServiceRates;
 const statuses = ["pending", "confirmed", "in_stay", "checked_out", "cancelled", "rejected"];
 const staffOnly = (actor: Actor) => {
   if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
 };
 
 export class HotelBookingsService {
-  constructor(private readonly deps: HotelDependencies) {}
+  constructor(private readonly deps: HotelDependencies, private readonly lifecycle: BookingLifecycleService) {}
 
   list(actor: Actor, requestedOwnerId?: string) {
     return this.deps.bookings.list(actor.role === "owner" ? actor.sub : requestedOwnerId);
@@ -56,25 +58,15 @@ export class HotelBookingsService {
 
   async changeStatus(actor: Actor, id: string, input: HotelStatusInput): Promise<HotelBookingValue> {
     staffOnly(actor);
-    if (!statuses.includes(input.status || "")) throw new BusinessError(422, "Select a valid hotel booking status.");
-    const existing = await this.deps.bookings.findWithPet(id);
-    if (!existing) throw new BusinessError(404, "Hotel booking not found.");
-    return this.deps.unitOfWork.run(async ({ bookings, notifications }) => {
-      const updated = await bookings.updateStatus(existing.booking.id, input.status as string, input.internalNote ?? existing.booking.internalNote);
-      await notifications.create({
-        recipientOwnerId: existing.booking.ownerId, recipientRole: "owner", type: `hotel_booking_${input.status}`,
-        title: "Hotel booking updated", message: `${existing.petName}'s booking is now ${input.status}.`,
-        actionUrl: "/owner/hotel-booking", relatedPetId: existing.booking.petId, relatedBookingId: existing.booking.id,
-      });
-      return updated;
-    });
+    if (!statuses.includes(String(input.status))) throw new BusinessError(422, "Select a valid hotel booking status.");
+    return await this.lifecycle.change(actor, "hotel", id, input) as HotelBookingValue;
   }
-
-  async cancel(actor: Actor, id: string, ownerNote?: string): Promise<HotelBookingValue> {
-    const existing = await this.deps.bookings.findForCancel(id);
-    if (!existing) throw new BusinessError(404, "Hotel booking not found.");
-    if (actor.role === "owner" && existing.ownerId !== actor.sub) throw new BusinessError(403, "You cannot cancel this booking.");
-    return this.deps.bookings.cancel(existing.id, ownerNote ? `Cancellation reason: ${ownerNote}` : existing.ownerNote);
+  async undoStatus(actor: Actor, id: string, input: UndoInput): Promise<HotelBookingValue> {
+    return await this.lifecycle.undo(actor, "hotel", id, input) as HotelBookingValue;
+  }
+  history(actor: Actor, id: string) { return this.lifecycle.history(actor, "hotel", id); }
+  async cancel(actor: Actor, id: string, ownerNote?: string, expectedRevision?: unknown): Promise<HotelBookingValue> {
+    return await this.lifecycle.cancel(actor, "hotel", id, expectedRevision, ownerNote) as HotelBookingValue;
   }
 
   async addCareNote(actor: Actor, id: string, input: CareNoteInput): Promise<CareNoteValue> {

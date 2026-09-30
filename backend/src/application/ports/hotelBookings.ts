@@ -4,6 +4,7 @@ export type HotelBookingValue = {
   totalAmount: number | { toString(): string }; status: "pending" | "confirmed" | "in_stay" | "checked_out" | "cancelled" | "rejected";
   ownerNote: string | null; internalNote: string | null; createdAt: Date; updatedAt: Date;
   dailyCareNotes?: Array<{ id: string }>;
+  statusRevision: number;
 };
 
 export type CareNoteValue = {

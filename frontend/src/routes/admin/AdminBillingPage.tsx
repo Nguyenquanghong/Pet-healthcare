@@ -1,21 +1,22 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Printer,
   Receipt,
   Search,
   CheckCircle2,
-  Clock,
   X,
-  CreditCard,
-  Building,
-  FileText,
-  Eye,
   Check,
 } from "lucide-react";
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
 import { useAppStore } from "../../store/AppStoreProvider";
-import type { Invoice, PaymentStatus } from "../../types/invoice";
-import { formatCurrency } from "../../utils/formatCurrency";
+import type { Invoice, PaymentStatus, PaymentMethod } from "../../types/invoice";
+import { formatInvoiceCurrency as formatCurrency } from "../../utils/formatCurrency";
+
+import { apiClient } from "../../services/apiClient";
+import { InvoiceIssueForm } from "./InvoiceIssueForm";
+
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { cash: "Tiền mặt", bank_transfer: "Chuyển khoản", credit_card: "Thẻ", qr_code: "QR", vnpay: "VNPay" };
 
 const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
   paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -30,11 +31,31 @@ const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
 };
 
 export function AdminBillingPage() {
-  const { appointments, hotelBookings, pets, owners } = useAppStore();
+  const { pets, owners } = useAppStore();
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const selectedInvoice = invoices.find(invoice => invoice.id === selectedId);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [issuing, setIssuing] = useState(false);
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [paymentError, setPaymentError] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [rejectInvoice, setRejectInvoice] = useState<Invoice | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const submitting = useRef(false);
+
+  const loadInvoices = async () => {
+    setLoading(true); setLoadError("");
+    try { setInvoices(await apiClient.get<Invoice[]>("/invoices")); }
+    catch (reason) { setLoadError(reason instanceof Error ? reason.message : "Không tải được hóa đơn."); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void loadInvoices(); }, []);
   const [toastMsg, setToastMsg] = useState("");
 
   const toast = (msg: string) => {
@@ -42,91 +63,9 @@ export function AdminBillingPage() {
     setTimeout(() => setToastMsg(""), 3500);
   };
 
-  // Dynamically generate invoices from store appointments & hotel bookings
-  const invoices = useMemo<Invoice[]>(() => {
-    const list: Invoice[] = [];
-
-    // Map appointments to invoices
-    appointments.forEach((a, idx) => {
-      const pet = pets.find((p) => p.id === a.petId);
-      const isPaid = ["completed", "confirmed", "in_progress"].includes(a.status);
-      const unitPrice = 250000;
-      const subtotal = unitPrice;
-      const taxAmount = Math.round(subtotal * 0.08);
-      const totalAmount = subtotal + taxAmount;
-
-      list.push({
-        id: `inv_app_${a.id}`,
-        invoiceCode: `INV-APP-2026-${String(idx + 1).padStart(3, "0")}`,
-        type: "appointment",
-        ownerId: a.ownerId,
-        petId: a.petId,
-        relatedId: a.id,
-        items: [
-          {
-            id: `item_1_${a.id}`,
-            description: `Dịch vụ khám: ${a.serviceName} (${pet?.name ?? "Thú cưng"})`,
-            unitPrice,
-            quantity: 1,
-            amount: unitPrice,
-          },
-        ],
-        subtotal,
-        taxAmount,
-        discountAmount: 0,
-        totalAmount,
-        paymentStatus: isPaid ? "paid" : "unpaid",
-        paymentMethod: isPaid ? "credit_card" : undefined,
-        issuedAt: a.createdAt || a.date,
-        paidAt: isPaid ? a.createdAt || a.date : undefined,
-        notes: a.ownerNote,
-      });
-    });
-
-    // Map hotel bookings to invoices
-    hotelBookings.forEach((b, idx) => {
-      const pet = pets.find((p) => p.id === b.petId);
-      const isPaid = ["checked_out", "in_stay"].includes(b.status);
-      const subtotal = b.totalAmount;
-      const taxAmount = Math.round(subtotal * 0.08);
-      const totalAmount = subtotal + taxAmount;
-
-      list.push({
-        id: `inv_htl_${b.id}`,
-        invoiceCode: `INV-HTL-2026-${String(idx + 1).padStart(3, "0")}`,
-        type: "hotel_booking",
-        ownerId: b.ownerId,
-        petId: b.petId,
-        relatedId: b.id,
-        items: [
-          {
-            id: `item_htl_${b.id}`,
-            description: `Phòng lưu trú ${b.roomType.toUpperCase()} (${b.nights} đêm) — Bé ${pet?.name ?? "Thú cưng"}`,
-            unitPrice: Math.round(b.totalAmount / b.nights),
-            quantity: b.nights,
-            amount: b.totalAmount,
-          },
-        ],
-        subtotal,
-        taxAmount,
-        discountAmount: 0,
-        totalAmount,
-        paymentStatus: isPaid ? "paid" : "unpaid",
-        paymentMethod: isPaid ? "bank_transfer" : undefined,
-        issuedAt: b.createdAt || b.checkIn,
-        paidAt: isPaid ? b.createdAt || b.checkIn : undefined,
-        notes: b.ownerNote,
-      });
-    });
-
-    return list;
-  }, [appointments, hotelBookings, pets]);
-
-  const [localPaymentStatuses, setLocalPaymentStatuses] = useState<Record<string, PaymentStatus>>({});
-
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
-      const currentStatus = localPaymentStatuses[inv.id] ?? inv.paymentStatus;
+      const currentStatus = inv.paymentStatus;
       if (statusFilter !== "all" && currentStatus !== statusFilter) return false;
 
       if (searchQuery.trim()) {
@@ -134,7 +73,7 @@ export function AdminBillingPage() {
         const pet = pets.find((p) => p.id === inv.petId);
         const owner = owners.find((o) => o.id === inv.ownerId);
 
-        const matchCode = inv.invoiceCode.toLowerCase().includes(q);
+        const matchCode = inv.invoiceCode.toLowerCase().includes(q) || inv.transferContent.toLowerCase().includes(q);
         const matchOwner = owner?.fullName.toLowerCase().includes(q) || owner?.phone.includes(q);
         const matchPet = pet?.name.toLowerCase().includes(q);
 
@@ -142,11 +81,19 @@ export function AdminBillingPage() {
       }
       return true;
     });
-  }, [invoices, statusFilter, searchQuery, pets, owners, localPaymentStatuses]);
+  }, [invoices, statusFilter, searchQuery, pets, owners]);
 
-  const handleMarkAsPaid = (invId: string) => {
-    setLocalPaymentStatuses((prev) => ({ ...prev, [invId]: "paid" }));
-    toast("Đã chuyển trạng thái hóa đơn sang Đã thanh toán!");
+  const handleMarkAsPaid = async () => {
+    if (!paymentInvoice || submitting.current) return;
+    submitting.current = true; setPaying(true); setPaymentError("");
+    try {
+      const { invoice } = await apiClient.patch<{ invoice: Invoice }>(`/invoices/${paymentInvoice.id}/pay`, { paymentMethod });
+      setInvoices(previous => previous.map(item => item.id === invoice.id ? invoice : item));
+      setPaymentInvoice(null);
+      toast("Đã lưu xác nhận thu tiền.");
+    } catch (reason) {
+      setPaymentError(reason instanceof Error ? reason.message : "Không thể ghi nhận thanh toán. Hãy tải lại để đối chiếu trước khi thử lại.");
+    } finally { submitting.current = false; setPaying(false); }
   };
 
   const handlePrint = () => {
@@ -161,13 +108,70 @@ export function AdminBillingPage() {
         </div>
       )}
 
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-600">Ghi nhận tiền đã thu cho hóa đơn dịch vụ.</p>
+        <div className="flex gap-2">
+          <button disabled={loading || paying} onClick={() => void loadInvoices()} className="rounded-lg border px-4 py-2 disabled:opacity-50">Tải lại</button>
+          <button disabled={loading || !!loadError} onClick={() => setIssuing(true)} className="rounded-lg bg-primary px-4 py-2 text-white disabled:opacity-50">Lập hóa đơn</button>
+        </div>
+      </div>
+      {loadError && <p role="alert" className="mb-4 text-rose-700">{loadError}</p>}
+      {loading && <p role="status" className="mb-4">Đang tải hóa đơn...</p>}
+      {issuing && <InvoiceIssueForm invoices={invoices} onClose={() => setIssuing(false)} onCreated={invoice => {
+        setInvoices(previous => [invoice, ...previous]); setIssuing(false); toast("Đã lưu hóa đơn chờ thanh toán.");
+      }} />}
+      {paymentInvoice && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+        <form role="dialog" aria-modal="true" aria-labelledby="payment-title" className="w-full max-w-md space-y-4 rounded-xl bg-white p-6"
+          onSubmit={event => { event.preventDefault(); void handleMarkAsPaid(); }}>
+          <h2 id="payment-title" className="text-xl font-bold">Xác nhận đã thu tiền</h2>
+          <p className="break-all">{paymentInvoice.invoiceCode}</p>
+          <p className="text-xl font-bold">{formatCurrency(paymentInvoice.totalAmount)}</p>
+          <label className="block">Phương thức thanh toán
+            <select className="mt-1 w-full rounded-lg border p-2" value={paymentMethod} disabled={paying || paymentInvoice.paymentChannel === "bank_transfer"} onChange={event => setPaymentMethod(event.target.value as PaymentMethod)}>
+              {Object.entries(PAYMENT_METHOD_LABELS).filter(([value]) => value !== "vnpay").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <p className="text-sm text-slate-600">Chỉ xác nhận sau khi đã nhận đủ tiền. Thao tác này ghi nhận khoản thu, không tự trừ tiền từ thẻ hoặc tài khoản ngân hàng.</p>
+          {paymentInvoice.paymentChannel === "bank_transfer" && <div className="space-y-1 rounded-lg bg-blue-50 p-3 text-sm">
+            {paymentInvoice.bankTransferDetails?.isDemo && <p className="font-semibold text-amber-800">Dữ liệu minh họa — xác nhận để demo.</p>}
+            <p>Tài khoản nhận: {paymentInvoice.bankTransferDetails?.accountNumber} · {paymentInvoice.bankTransferDetails?.bankName}</p>
+            <p className="break-all">Nội dung chuyển: {paymentInvoice.transferContent}</p>
+            <p>Mã giao dịch khách báo: {paymentInvoice.transferReference || "Chưa cung cấp"}</p>
+            <p>Thông báo của khách chưa chứng minh cửa hàng đã nhận tiền. Kiểm tra giao dịch ngân hàng và số tiền trước khi xác nhận.</p>
+          </div>}
+          {paymentError && <p role="alert" className="text-rose-700">{paymentError}</p>}
+          <div className="flex justify-end gap-3">
+            <button type="button" disabled={paying} onClick={() => setPaymentInvoice(null)} className="rounded-lg border px-4 py-2">Hủy</button>
+            <button type="submit" disabled={paying} className="rounded-lg bg-emerald-600 px-4 py-2 text-white disabled:opacity-50">{paying ? "Đang lưu..." : "Xác nhận đã thu đủ tiền"}</button>
+          </div>
+        </form>
+      </div>}
+      {rejectInvoice && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+        <form role="dialog" aria-modal="true" aria-label="Chưa xác nhận chuyển khoản" className="w-full max-w-md space-y-4 rounded-xl bg-white p-6" onSubmit={async event => {
+          event.preventDefault();
+          if (submitting.current) return;
+          submitting.current = true; setPaying(true); setPaymentError("");
+          try {
+            const result = await apiClient.post<{ invoice: Invoice }>(`/invoices/${rejectInvoice.id}/transfer-reject`, { reason: rejectReason });
+            setInvoices(previous => previous.map(i => i.id === result.invoice.id ? result.invoice : i));
+            setRejectInvoice(null); toast("Đã gửi lý do cho chủ nuôi; hóa đơn vẫn chưa thanh toán.");
+          } catch (reason) { setPaymentError(reason instanceof Error ? reason.message : "Không lưu được kết quả kiểm tra."); }
+          finally { submitting.current = false; setPaying(false); }
+        }}>
+          <h2 className="text-xl font-bold">Chưa xác nhận chuyển khoản</h2>
+          <label className="block text-sm">Lý do<textarea className="mt-1 w-full rounded-lg border p-2" required maxLength={500} disabled={paying} value={rejectReason} onChange={e => setRejectReason(e.target.value)} /></label>
+          {paymentError && <p role="alert" className="text-rose-700">{paymentError}</p>}
+          <div className="flex justify-end gap-3"><button type="button" disabled={paying} onClick={() => setRejectInvoice(null)} className="rounded-lg border px-4 py-2">Hủy</button><button disabled={paying || !rejectReason.trim()} className="rounded-lg bg-primary px-4 py-2 text-white">Gửi lý do</button></div>
+        </form>
+      </div>}
+
       {/* Header Search & Controls */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
           <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Tìm theo mã hóa đơn, tên chủ nuôi, thú cưng..."
+            placeholder="Tìm mã hóa đơn / chuyển khoản, chủ nuôi, thú cưng..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm focus:border-primary focus:outline-none shadow-xs"
@@ -214,7 +218,7 @@ export function AdminBillingPage() {
                 <th className="px-5 py-4">Khách hàng & Thú cưng</th>
                 <th className="px-5 py-4">Loại dịch vụ</th>
                 <th className="px-5 py-4">Ngày phát hành</th>
-                <th className="px-5 py-4">Tổng tiền (gồm VAT)</th>
+                <th className="px-5 py-4">Tổng thanh toán</th>
                 <th className="px-5 py-4">Trạng thái</th>
                 <th className="px-5 py-4 text-right">Hành động</th>
               </tr>
@@ -223,7 +227,7 @@ export function AdminBillingPage() {
               {filteredInvoices.map((inv) => {
                 const pet = pets.find((p) => p.id === inv.petId);
                 const owner = owners.find((o) => o.id === inv.ownerId);
-                const currentStatus = localPaymentStatuses[inv.id] ?? inv.paymentStatus;
+                const currentStatus = inv.paymentStatus;
 
                 return (
                   <tr key={inv.id} className="hover:bg-slate-50/60 transition-colors">
@@ -243,7 +247,7 @@ export function AdminBillingPage() {
                     </td>
 
                     <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-600">
-                      {inv.issuedAt.slice(0, 10)}
+                      {new Date(inv.issuedAt).toLocaleDateString("vi-VN")}
                     </td>
 
                     <td className="px-5 py-4 whitespace-nowrap font-black text-primary">
@@ -258,21 +262,34 @@ export function AdminBillingPage() {
                       >
                         {PAYMENT_STATUS_LABELS[currentStatus]}
                       </span>
+                      <p className="mt-1 text-xs text-slate-500">{inv.paymentChannel === "online" ? "VNPay · xác nhận tự động" : inv.paymentChannel === "onsite" ? "Thanh toán tại cửa hàng" : inv.paymentChannel === "bank_transfer" ? "Chuyển khoản ngân hàng" : "Chưa chọn cách thanh toán"}</p>
+                      {inv.transferReviewStatus === "pending" && <p className="mt-1 text-xs font-bold text-amber-700">Khách báo đã chuyển · Chờ kiểm tra</p>}
+                      {inv.transferReviewStatus === "rejected" && currentStatus === "unpaid" && <p className="mt-1 text-xs text-rose-700">Đã yêu cầu kiểm tra lại</p>}
                     </td>
 
                     <td className="px-5 py-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
+                        {currentStatus === "unpaid" && inv.transferReviewStatus === "pending" && <button className="rounded-lg border px-2.5 py-1.5 text-xs" disabled={paying} onClick={() => { setRejectInvoice(inv); setRejectReason(""); setPaymentError(""); }}>Chưa nhận được tiền</button>}
+                        {currentStatus === "unpaid" && inv.paymentChannel === "online" && <button disabled={paying} className="rounded-lg border px-2.5 py-1.5 text-xs" onClick={async () => {
+                          setPaying(true);
+                          try {
+                            const result = await apiClient.post<{ message: string }>(`/payments/${inv.id}/reconcile`);
+                            toast(result.message); await loadInvoices();
+                          } catch (reason) { setLoadError(reason instanceof Error ? reason.message : "Không thể đối soát VNPay."); }
+                          finally { setPaying(false); }
+                        }}>Đối soát VNPay</button>}
                         <button
-                          onClick={() => setSelectedInvoice(inv)}
+                          onClick={() => setSelectedId(inv.id)}
                           title="Xem / In hóa đơn"
                           className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
                         >
                           <Printer size={14} className="text-primary" /> Xem / In
                         </button>
 
-                        {currentStatus === "unpaid" && (
+                        {currentStatus === "unpaid" && inv.paymentChannel !== "online" && (
                           <button
-                            onClick={() => handleMarkAsPaid(inv.id)}
+                            disabled={loading || !!loadError}
+                            onClick={() => { setPaymentInvoice(inv); setPaymentMethod(inv.paymentChannel === "bank_transfer" ? "bank_transfer" : "cash"); setPaymentError(""); }}
                             title="Xác nhận thanh toán"
                             className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors"
                           >
@@ -285,7 +302,7 @@ export function AdminBillingPage() {
                 );
               })}
 
-              {filteredInvoices.length === 0 && (
+              {!loading && !loadError && filteredInvoices.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                     Không tìm thấy hóa đơn phù hợp.
@@ -298,9 +315,9 @@ export function AdminBillingPage() {
       </div>
 
       {/* Printable Invoice Modal */}
-      {selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4">
-          <div className="my-8 w-full max-w-2xl animate-scaleUp rounded-lg border border-slate-200 bg-white p-8 shadow-lg print:max-w-none print:border-0 print:p-0 print:shadow-none">
+      {selectedInvoice && createPortal(
+        <div className="invoice-print-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4">
+          <div role="dialog" aria-modal="true" aria-label="Chi tiết hóa đơn" className="invoice-print-sheet my-8 w-full max-w-2xl rounded-lg border border-slate-200 bg-white p-8 shadow-lg print:max-w-none print:border-0 print:p-0 print:shadow-none">
             {/* Header / Actions in modal */}
             <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-100 print:hidden">
               <span className="inline-flex items-center gap-1.5 font-bold text-slate-900 text-lg">
@@ -314,7 +331,7 @@ export function AdminBillingPage() {
                   <Printer size={15} /> In Hóa đơn
                 </button>
                 <button
-                  onClick={() => setSelectedInvoice(null)}
+                  onClick={() => setSelectedId(null)}
                   className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
                 >
                   <X size={20} />
@@ -341,8 +358,8 @@ export function AdminBillingPage() {
                   <span className="inline-block rounded-xl bg-primary/10 border border-primary/20 px-3 py-1 text-xs font-extrabold text-primary mb-2">
                     HÓA ĐƠN DỊCH VỤ
                   </span>
-                  <p className="text-sm font-bold text-slate-900">{selectedInvoice.invoiceCode}</p>
-                  <p className="text-xs text-slate-500">Ngày phát hành: {selectedInvoice.issuedAt.slice(0, 10)}</p>
+                  <p className="break-words text-xs font-bold text-slate-900">{selectedInvoice.invoiceCode}</p>
+                  <p className="text-xs text-slate-500">Ngày phát hành: {new Date(selectedInvoice.issuedAt).toLocaleDateString("vi-VN")}</p>
                 </div>
               </div>
 
@@ -408,14 +425,28 @@ export function AdminBillingPage() {
                     <span className="font-semibold">{formatCurrency(selectedInvoice.subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600">
-                    <span>Thuế GTGT (VAT 8%):</span>
+                    <span>Tiền thuế:</span>
                     <span className="font-semibold">{formatCurrency(selectedInvoice.taxAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Giảm giá:</span>
+                    <span>{formatCurrency(selectedInvoice.discountAmount)}</span>
                   </div>
                   <div className="flex justify-between text-slate-900 font-bold text-base pt-2 border-t border-slate-200">
                     <span>Tổng thanh toán:</span>
                     <span className="text-primary">{formatCurrency(selectedInvoice.totalAmount)}</span>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-lg border p-3">
+                <p>Trạng thái: <strong>{PAYMENT_STATUS_LABELS[selectedInvoice.paymentStatus]}</strong></p>
+                {selectedInvoice.paymentMethod && <p>Phương thức: {PAYMENT_METHOD_LABELS[selectedInvoice.paymentMethod]}</p>}
+                {selectedInvoice.paymentChannel === "bank_transfer" && <p>Nội dung chuyển: {selectedInvoice.transferContent}</p>}
+                {selectedInvoice.paymentChannel === "bank_transfer" && selectedInvoice.bankTransferDetails?.isDemo && <p>Dữ liệu thanh toán minh họa.</p>}
+                {selectedInvoice.transferReference && <p>Mã giao dịch khách báo: {selectedInvoice.transferReference}</p>}
+                {selectedInvoice.paidAt && <p>Thời điểm thu tiền: {new Date(selectedInvoice.paidAt).toLocaleString("vi-VN")}</p>}
+                {selectedInvoice.notes && <p>Ghi chú: {selectedInvoice.notes}</p>}
               </div>
 
               {/* Signatures */}
@@ -437,7 +468,7 @@ export function AdminBillingPage() {
 
             <div className="pt-4 border-t border-slate-100 text-right print:hidden">
               <button
-                onClick={() => setSelectedInvoice(null)}
+                onClick={() => setSelectedId(null)}
                 className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-bold text-white hover:bg-slate-800"
               >
                 Đóng
@@ -445,7 +476,7 @@ export function AdminBillingPage() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </AdminLayout>
   );
 }

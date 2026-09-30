@@ -1,17 +1,18 @@
 import type { HotelRoomType, HotelServiceKey } from "../types/booking";
 import { daysBetween } from "./date";
+import pricing from "../../../backend/src/domain/pricing.json";
 
 export const ROOM_PRICES: Record<HotelRoomType, number> = {
-  standard: 3000,
-  deluxe: 5500,
+  standard: pricing.roomRates.standard,
+  deluxe: pricing.roomRates.deluxe,
 };
 
 export const HOTEL_SERVICE_PRICES: Record<HotelServiceKey, { label: string; price: number; unit: "each" | "day" }> = {
-  grooming_spa: { label: "Grooming & Spa", price: 4000, unit: "each" },
-  special_diet: { label: "Special Diet Plan", price: 1200, unit: "day" },
-  video_call: { label: "Video Call", price: 1000, unit: "each" },
-  daily_walk: { label: "Daily Walk", price: 800, unit: "day" },
-  medicine_support: { label: "Medicine Support", price: 700, unit: "day" },
+  grooming_spa: { label: "Grooming & Spa", price: pricing.hotelServiceRates.grooming_spa, unit: "day" },
+  special_diet: { label: "Special Diet Plan", price: pricing.hotelServiceRates.special_diet, unit: "day" },
+  video_call: { label: "Video Call", price: pricing.hotelServiceRates.video_call, unit: "day" },
+  daily_walk: { label: "Daily Walk", price: pricing.hotelServiceRates.daily_walk, unit: "day" },
+  medicine_support: { label: "Medicine Support", price: pricing.hotelServiceRates.medicine_support, unit: "day" },
 };
 
 export const calculateNights = daysBetween;

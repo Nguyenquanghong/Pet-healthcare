@@ -84,6 +84,7 @@ enum PaymentMethod {
   bank_transfer
   credit_card
   qr_code
+  vnpay
 }
 
 model User {
@@ -158,6 +159,7 @@ model Appointment {
   appointmentDate DateTime          @map("appointment_date") @db.Date
   appointmentTime String            @map("appointment_time")
   status          AppointmentStatus @default(pending)
+  statusRevision  Int               @default(0) @map("status_revision")
   ownerNote       String?           @map("owner_note")
   internalNote    String?           @map("internal_note")
   createdBy       String            @default("owner") @map("created_by")
@@ -225,6 +227,7 @@ model HotelBooking {
   serviceKeys    String[]           @map("service_keys")
   totalAmount    Decimal            @map("total_amount") @db.Decimal(12, 2)
   status         HotelBookingStatus @default(pending)
+  statusRevision Int                @default(0) @map("status_revision")
   ownerNote      String?            @map("owner_note")
   internalNote   String?            @map("internal_note")
   createdAt      DateTime           @default(now()) @map("created_at")
@@ -236,6 +239,28 @@ model HotelBooking {
 
   @@index([ownerId, checkIn])
   @@map("hotel_bookings")
+}
+
+model BookingStatusEvent {
+  id          String @id @default(uuid())
+  kind        String
+  bookingId   String @map("booking_id")
+  revision    Int
+  action      String
+  fromStatus  String @map("from_status")
+  toStatus    String @map("to_status")
+  actorId     String @map("actor_id")
+  actorName   String @map("actor_name")
+  actorRole   String @map("actor_role")
+  reason      String?
+  reversesId  String? @unique @map("reverses_id")
+  reverses    BookingStatusEvent? @relation("BookingReversal", fields: [reversesId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  reversedBy  BookingStatusEvent? @relation("BookingReversal")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([kind, bookingId, revision])
+  @@index([kind, bookingId, createdAt], map: "booking_status_events_booking_idx")
+  @@map("booking_status_events")
 }
 
 model DailyCareNote {
@@ -292,17 +317,24 @@ model RescueReport {
 model Invoice {
   id             String         @id @default(uuid())
   invoiceCode    String         @unique @map("invoice_code")
+  transferCode   String?        @unique @default(dbgenerated("('NIPO'::text || lpad((nextval('invoice_transfer_code_seq'::regclass))::text, 10, '0'::text))")) @map("transfer_code")
   type           String
   ownerId        String         @map("owner_id")
   petId          String         @map("pet_id")
-  appointmentId  String?        @map("appointment_id")
-  hotelBookingId String?        @map("hotel_booking_id")
+  appointmentId  String?        @unique @map("appointment_id")
+  hotelBookingId String?        @unique @map("hotel_booking_id")
   subtotal       Decimal        @db.Decimal(12, 2)
   taxAmount      Decimal        @default(0) @map("tax_amount") @db.Decimal(12, 2)
   discountAmount Decimal        @default(0) @map("discount_amount") @db.Decimal(12, 2)
   totalAmount    Decimal        @map("total_amount") @db.Decimal(12, 2)
   paymentStatus  PaymentStatus  @default(unpaid) @map("payment_status")
   paymentMethod  PaymentMethod? @map("payment_method")
+  paymentChannel String?        @map("payment_channel")
+  bankTransferDetails Json?      @map("bank_transfer_details")
+  transferReviewStatus String?   @map("transfer_review_status")
+  transferReportedAt DateTime?   @map("transfer_reported_at")
+  transferReference String?      @map("transfer_reference")
+  transferReviewNote String?     @map("transfer_review_note")
   issuedAt       DateTime       @default(now()) @map("issued_at")
   paidAt         DateTime?      @map("paid_at")
   notes          String?
@@ -313,6 +345,7 @@ model Invoice {
   appointment    Appointment?   @relation(fields: [appointmentId], references: [id])
   hotelBooking   HotelBooking?  @relation(fields: [hotelBookingId], references: [id])
   items          InvoiceItem[]
+  paymentAttempts PaymentAttempt[]
 
   @@index([ownerId, issuedAt])
   @@map("invoices")
@@ -328,4 +361,18 @@ model InvoiceItem {
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@map("invoice_items")
+}
+
+model PaymentAttempt {
+  id             String   @id
+  invoiceId      String   @map("invoice_id")
+  amount         Decimal  @db.Decimal(12, 2)
+  status         String   @default("pending")
+  transactionNo  String?  @unique @map("transaction_no")
+  responseCode   String?  @map("response_code")
+  createdAt      DateTime @default(now()) @map("created_at")
+  expiresAt      DateTime @map("expires_at")
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  @@index([invoiceId, createdAt])
+  @@map("payment_attempts")
 }

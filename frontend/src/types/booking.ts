@@ -13,6 +13,7 @@ export type HotelBooking = {
   serviceKeys: HotelServiceKey[];
   totalAmount: number;
   status: HotelBookingStatus;
+  statusRevision: number;
   ownerNote?: string;
   internalNote?: string;
   dailyCareNoteIds: string[];

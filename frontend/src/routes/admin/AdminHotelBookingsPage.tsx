@@ -1,3 +1,6 @@
+import { BookingStatusDialog, type StatusDialogSelection } from "./BookingStatusDialog";
+import { useBookingAction } from "./useBookingAction";
+import { apiClient } from "../../services/apiClient";
 import { useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -37,9 +40,7 @@ export function AdminHotelBookingsPage() {
     dailyCareNotes,
     owners,
     pets,
-    updateHotelBookingStatus,
-    updateHotelBookingInternalNote,
-    addDailyCareNote,
+    userRole,
   } = useAppStore();
 
   const [tab, setTab] = useState<TabKey>("all");
@@ -61,41 +62,41 @@ export function AdminHotelBookingsPage() {
   const [internalNoteText, setInternalNoteText] = useState("");
 
   const [toastMsg, setToastMsg] = useState("");
+  const [statusDialog, setStatusDialog] = useState<StatusDialogSelection | null>(null);
+  const { run: runAction, error: actionError } = useBookingAction();
 
   const toast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 3500);
   };
 
-  const handleStatus = (id: string, status: HotelBookingStatus, note?: string) => {
-    updateHotelBookingStatus(id, status, note);
-    toast(`Đã cập nhật: ${bookingStatusLabels[status] ?? status}`);
+  const handleStatus = (id: string, status: HotelBookingStatus) => {
+    const booking = hotelBookings.find(item => item.id === id);
+    if (booking) setStatusDialog({ booking, intent: status });
   };
 
   const handleConfirmReject = () => {
     if (!rejectModal) return;
-    updateHotelBookingStatus(rejectModal.id, "rejected", rejectReason ? `Lý do từ chối: ${rejectReason}` : undefined);
-    setRejectModal(null);
-    setRejectReason("");
-    toast("Đã từ chối booking.");
+    void runAction(() => apiClient.patch(`/hotel-bookings/${rejectModal.id}/status`, { status: "rejected", expectedRevision: rejectModal.statusRevision,
+      internalNote: rejectReason ? `Lý do từ chối: ${rejectReason}` : undefined }), () => {
+      setRejectModal(null); setRejectReason(""); toast("Đã từ chối booking.");
+    });
   };
 
   const handleDailyNote = () => {
     if (!dailyNoteModal || !noteText.trim()) return;
-    addDailyCareNote(dailyNoteModal, noteText.trim(), eatingStatus, mood);
-    setDailyNoteModal(null);
-    setNoteText("");
-    setEatingStatus("good");
-    setMood("happy");
-    toast("Đã gửi cập nhật tình trạng chăm sóc hàng ngày.");
+    void runAction(() => apiClient.post(`/hotel-bookings/${dailyNoteModal}/care-notes`, { note: noteText.trim(), eatingStatus, mood }), () => {
+      setDailyNoteModal(null); setNoteText(""); setEatingStatus("good"); setMood("happy");
+      toast("Đã gửi cập nhật tình trạng chăm sóc hàng ngày.");
+    });
   };
 
   const handleSaveInternalNote = () => {
     if (!internalNoteModal) return;
-    updateHotelBookingInternalNote(internalNoteModal.id, internalNoteText.trim());
-    setInternalNoteModal(null);
-    setInternalNoteText("");
-    toast("Đã lưu ghi chú nội bộ.");
+    void runAction(() => apiClient.patch(`/hotel-bookings/${internalNoteModal.id}/status`, { status: internalNoteModal.status,
+      expectedRevision: internalNoteModal.statusRevision, internalNote: internalNoteText.trim() }), () => {
+      setInternalNoteModal(null); setInternalNoteText(""); toast("Đã lưu ghi chú nội bộ.");
+    });
   };
 
   const filteredBookings = useMemo(() => {
@@ -136,6 +137,8 @@ export function AdminHotelBookingsPage() {
 
   return (
     <AdminLayout title="Quản lý Hotel Bookings">
+      {actionError && <p role="alert" className="fixed right-4 top-20 z-[100] max-w-md rounded-xl border border-rose-300 bg-white p-4 text-rose-700 shadow-lg">{actionError}</p>}
+      {statusDialog && <BookingStatusDialog kind="hotel" selection={statusDialog} onClose={() => setStatusDialog(null)} onSaved={() => toast("Đã lưu thao tác và lịch sử.")} />}
       {toastMsg && (
         <div className="mb-4 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-emerald-800 font-semibold animate-fadeIn">
           <CheckCircle2 size={18} />
@@ -210,6 +213,7 @@ export function AdminHotelBookingsPage() {
           return (
             <div
               key={b.id}
+              data-testid={`hotel-booking-${b.id}`}
               className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col justify-between"
             >
               <div className="p-5">
@@ -293,6 +297,10 @@ export function AdminHotelBookingsPage() {
                 </button>
 
                 <div className="flex flex-wrap items-center gap-1.5">
+                  <button onClick={() => setStatusDialog({ booking: b, intent: "history" })} className="rounded-lg border px-2 py-1.5 text-xs">Lịch sử thao tác</button>
+                  {(b.status === "in_stay" || (b.status === "checked_out" && userRole === "admin")) &&
+                    <button onClick={() => setStatusDialog({ booking: b, intent: "undo" })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{b.status === "in_stay" ? "Hoàn tác check-in" : "Mở lại dịch vụ"}</button>}
+
                   {b.status === "pending" && (
                     <>
                       <button

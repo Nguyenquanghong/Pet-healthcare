@@ -43,9 +43,6 @@ export function AdminLoginPage() {
         <div className="mb-6">
           <p className="text-sm font-semibold text-primary">Internal access</p>
           <h1 className="mt-1 text-2xl font-semibold text-slate-950">Admin Sign In</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Demo: <span className="font-semibold text-slate-700">admin</span> / <span className="font-semibold text-slate-700">admin123</span>.
-          </p>
         </div>
         {error && <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700">{error}</div>}
         <form className="space-y-4" onSubmit={handleSubmit} noValidate>
@@ -56,7 +53,6 @@ export function AdminLoginPage() {
               setUsername(event.target.value);
               setError("");
             }}
-            placeholder="admin"
             autoComplete="username"
             disabled={isSubmitting}
           />
@@ -69,7 +65,6 @@ export function AdminLoginPage() {
                 setPassword(event.target.value);
                 setError("");
               }}
-              placeholder="admin123"
               autoComplete="current-password"
               className="[&_input]:pr-12"
               disabled={isSubmitting}

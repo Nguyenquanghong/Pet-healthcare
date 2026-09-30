@@ -36,6 +36,8 @@ type AppState = {
 
 type AppStoreValue = AppState & {
   authRole: AuthRole;
+  userRole: string | null;
+  refreshData: () => Promise<void>;
   isLoading: boolean;
   isAuthReady: boolean;
   error: string;
@@ -80,6 +82,7 @@ const AppStoreContext = createContext<AppStoreValue | null>(null);
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(emptyState);
   const [authRole, setAuthRole] = useState<AuthRole>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [error, setError] = useState("");
@@ -94,6 +97,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         const { user } = await apiClient.get<{ user: { role: string } }>("/auth/me");
         if (!active) return;
         setAuthRole(user.role === "owner" ? "owner" : "admin");
+        setUserRole(user.role);
         await loadData();
       } catch {
         authToken.clear();
@@ -109,9 +113,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     setError("");
     try {
-      const result = await apiClient.post<{ token: string }>(endpoint, credentials);
+      const result = await apiClient.post<{ token: string; user: { role: string } }>(endpoint, credentials);
       authToken.set(result.token);
       setAuthRole(role);
+      setUserRole(result.user.role);
       await loadData();
       return null;
     } catch (reason) {
@@ -146,6 +151,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     return {
       ...state,
       authRole,
+      userRole,
+      refreshData: loadData,
       isLoading,
       isAuthReady,
       error,
@@ -153,7 +160,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       ownerPets: state.pets.filter((pet) => pet.ownerId === state.currentOwnerId),
       loginOwner: (email, password) => authenticate("/auth/owner/login", { email, password }, "owner"),
       loginAdmin: (username, password) => authenticate("/auth/admin/login", { username, password }, "admin"),
-      logout: () => { authToken.clear(); setAuthRole(null); setState(emptyState); },
+      logout: () => { authToken.clear(); setAuthRole(null); setUserRole(null); setState(emptyState); },
       registerOwner: async (input) => {
         setIsLoading(true);
         try {
@@ -186,15 +193,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       updatePet: (id, input) => mutate(() => apiClient.patch(`/pets/${id}`, input)),
       submitRescueReport: (input) => { const pet = state.pets.find((item) => item.id === input.petId); mutate(() => apiClient.post(`/public/pets/${pet?.qrToken || input.petId}/rescue-reports`, input)); },
       createHotelBooking: (input) => mutate(() => apiClient.post("/hotel-bookings", input)),
-      updateHotelBookingStatus: (id, status, internalNote) => mutate(() => apiClient.patch(`/hotel-bookings/${id}/status`, { status, internalNote })),
-      updateHotelBookingInternalNote: (id, internalNote) => { const status = state.hotelBookings.find((item) => item.id === id)?.status; mutate(() => apiClient.patch(`/hotel-bookings/${id}/status`, { status, internalNote })); },
-      cancelHotelBooking: (id, ownerNote) => mutate(() => apiClient.patch(`/hotel-bookings/${id}/cancel`, { ownerNote })),
+      updateHotelBookingStatus: (id, status, internalNote) => mutate(() => apiClient.patch(`/hotel-bookings/${id}/status`, { status, internalNote, expectedRevision: state.hotelBookings.find(item => item.id === id)?.statusRevision })),
+      updateHotelBookingInternalNote: (id, internalNote) => { const status = state.hotelBookings.find((item) => item.id === id)?.status; mutate(() => apiClient.patch(`/hotel-bookings/${id}/status`, { status, internalNote, expectedRevision: state.hotelBookings.find(item => item.id === id)?.statusRevision })); },
+      cancelHotelBooking: (id, ownerNote) => mutate(() => apiClient.patch(`/hotel-bookings/${id}/cancel`, { ownerNote, expectedRevision: state.hotelBookings.find(item => item.id === id)?.statusRevision })),
       addDailyCareNote: (id, note, eatingStatus, mood) => mutate(() => apiClient.post(`/hotel-bookings/${id}/care-notes`, { note, eatingStatus, mood })),
       createAppointment: (input) => runMutation(() => apiClient.post("/appointments", input)),
-      cancelAppointment: (id, ownerNote) => mutate(() => apiClient.patch(`/appointments/${id}/cancel`, { ownerNote })),
-      rescheduleAppointment: (id, input) => mutate(() => apiClient.patch(`/appointments/${id}/reschedule`, input)),
-      updateAppointmentStatus: (id, status, internalNote) => mutate(() => apiClient.patch(`/appointments/${id}/status`, { status, internalNote })),
-      updateAppointmentInternalNote: (id, internalNote) => { const status = state.appointments.find((item) => item.id === id)?.status; mutate(() => apiClient.patch(`/appointments/${id}/status`, { status, internalNote })); },
+      cancelAppointment: (id, ownerNote) => mutate(() => apiClient.patch(`/appointments/${id}/cancel`, { ownerNote, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
+      rescheduleAppointment: (id, input) => mutate(() => apiClient.patch(`/appointments/${id}/reschedule`, { ...input, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
+      updateAppointmentStatus: (id, status, internalNote) => mutate(() => apiClient.patch(`/appointments/${id}/status`, { status, internalNote, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
+      updateAppointmentInternalNote: (id, internalNote) => { const status = state.appointments.find((item) => item.id === id)?.status; mutate(() => apiClient.patch(`/appointments/${id}/status`, { status, internalNote, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })); },
       sendReminder: (id) => mutate(() => apiClient.post(`/appointments/${id}/reminder`)),
       createMedicalRecord: (input) => mutate(() => apiClient.post("/medical-records", input)),
       updateMedicalRecord: (id, input) => mutate(() => apiClient.patch(`/medical-records/${id}`, input)),
@@ -207,7 +214,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       sendCustomNotification: (recipientOwnerId, title, message) => mutate(() => apiClient.post("/notifications/send", { recipientOwnerId, title, message })),
       resetStoreData: () => mutate(() => Promise.resolve()),
     };
-  }, [state, authRole, isLoading, isAuthReady, error]);
+  }, [state, authRole, userRole, isLoading, isAuthReady, error]);
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
 }
