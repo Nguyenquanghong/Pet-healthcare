@@ -22,6 +22,7 @@ import { AdminLayout } from "../../components/layout/admin/AdminLayout";
 import { useAppStore } from "../../store/AppStoreProvider";
 import { isSpaAppointmentType, type Appointment, type AppointmentStatus } from "../../types/appointment";
 import { appointmentStatusLabels } from "../../utils/statusLabels";
+import { compareBookingStatus } from "../../utils/bookingOrder";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
@@ -117,7 +118,7 @@ export function AdminAppointmentsPage() {
       }
 
       return true;
-    });
+    }).sort(compareBookingStatus);
   }, [categoryAppointments, filterStatus, dateFilter, customDate, searchQuery, pets, owners, todayStr]);
 
   const handleStatusUpdate = (id: string, status: AppointmentStatus) => {

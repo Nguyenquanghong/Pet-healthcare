@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Appointment, AppointmentType } from "../types/appointment";
 import type { DailyCareNote, HotelBooking } from "../types/booking";
 import type { MedicalImage } from "../types/medicalImage";
@@ -41,6 +41,7 @@ type AppStoreValue = AppState & {
   isLoading: boolean;
   isAuthReady: boolean;
   error: string;
+  syncError: string;
   currentOwner: Owner;
   ownerPets: Pet[];
   loginOwner: (email: string, password: string) => Promise<string | null>;
@@ -80,13 +81,52 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [error, setError] = useState("");
+  const [syncError, setSyncError] = useState("");
+  const loadSequence = useRef(0);
+  const pendingLoads = useRef(0);
 
-  const loadData = async () => setState(await apiClient.get<AppState>("/bootstrap"));
+  const loadData = useCallback(async () => {
+    const token = authToken.get();
+    if (!token) return;
+    const sequence = ++loadSequence.current;
+    pendingLoads.current += 1;
+    try {
+      const data = await apiClient.get<AppState>("/bootstrap", { signal: AbortSignal.timeout(15_000) });
+      // A response started before a mutation or logout must not replace newer data.
+      if (sequence === loadSequence.current && token === authToken.get()) {
+        setState(data);
+        setSyncError("");
+      }
+    } catch (reason) {
+      if (sequence === loadSequence.current && token === authToken.get())
+        setSyncError("Chưa cập nhật được dữ liệu mới. Hệ thống sẽ tự thử lại khi có kết nối.");
+      throw reason;
+    } finally { pendingLoads.current -= 1; }
+  }, []);
+
+  useEffect(() => {
+    if (!authRole || !isAuthReady) return;
+    const refresh = () => {
+      if (document.visibilityState !== "visible" || !navigator.onLine || pendingLoads.current) return;
+      void loadData().catch(() => undefined);
+    };
+    const timer = window.setInterval(refresh, 10_000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [authRole, isAuthReady, loadData]);
 
   useEffect(() => {
     let active = true;
     const restore = async () => {
-      if (!authToken.get()) return setIsAuthReady(true);
+      const token = authToken.get();
+      if (!token) return setIsAuthReady(true);
       try {
         const { user } = await apiClient.get<{ user: { role: string } }>("/auth/me");
         if (!active) return;
@@ -94,14 +134,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         setUserRole(user.role);
         await loadData();
       } catch {
-        authToken.clear();
+        if (active && token === authToken.get()) {
+          authToken.clear(); setAuthRole(null); setUserRole(null); setState(emptyState);
+        }
       } finally {
         if (active) setIsAuthReady(true);
       }
     };
     void restore();
-    return () => { active = false; };
-  }, []);
+    return () => { active = false; loadSequence.current += 1; };
+  }, [loadData]);
 
   const authenticate = async (endpoint: string, credentials: object, role: Exclude<AuthRole, null>) => {
     setIsLoading(true);
@@ -152,11 +194,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       isLoading,
       isAuthReady,
       error,
+      syncError,
       currentOwner,
       ownerPets: state.pets.filter((pet) => pet.ownerId === state.currentOwnerId),
       loginOwner: (email, password) => authenticate("/auth/owner/login", { email, password }, "owner"),
       loginAdmin: (username, password) => authenticate("/auth/admin/login", { username, password }, "admin"),
-      logout: () => { authToken.clear(); setAuthRole(null); setUserRole(null); setState(emptyState); },
+      logout: () => { loadSequence.current += 1; authToken.clear(); setAuthRole(null); setUserRole(null); setState(emptyState); setSyncError(""); },
       registerOwner: async (input) => {
         setIsLoading(true);
         try {
@@ -224,7 +267,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       deleteNotification: (id) => mutate(() => apiClient.delete(`/notifications/${id}`)),
       sendCustomNotification: (recipientOwnerId, title, message) => mutate(() => apiClient.post("/notifications/send", { recipientOwnerId, title, message })),
     };
-  }, [state, authRole, userRole, isLoading, isAuthReady, error]);
+  }, [state, authRole, userRole, isLoading, isAuthReady, error, syncError, loadData]);
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
 }

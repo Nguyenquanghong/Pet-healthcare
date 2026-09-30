@@ -23,6 +23,7 @@ import type { DailyCareNote, HotelBooking, HotelBookingStatus } from "../../type
 import type { Invoice } from "../../types/invoice";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { bookingStatusLabels, eatingStatusLabels, moodLabels } from "../../utils/statusLabels";
+import { compareBookingStatus } from "../../utils/bookingOrder";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
@@ -132,7 +133,7 @@ export function AdminHotelBookingsPage() {
       }
 
       return true;
-    });
+    }).sort(compareBookingStatus);
   }, [hotelBookings, tab, roomTypeFilter, searchQuery, pets, owners]);
 
   const tabLabel: Record<TabKey, string> = {

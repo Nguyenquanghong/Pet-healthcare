@@ -3,6 +3,7 @@ import { Ban, CalendarClock, CheckCircle2, X } from "lucide-react";
 import type { Appointment } from "../../../types/appointment";
 import type { Pet } from "../../../types/pet";
 import { appointmentStatusLabels } from "../../../utils/statusLabels";
+import { compareBookingStatus } from "../../../utils/bookingOrder";
 import { useAppStore } from "../../../store/AppStoreProvider";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
@@ -68,8 +69,8 @@ export function OwnerAppointmentList({ mode = "medical", appointments, pets, sel
   }, [appointments]);
 
   const visibleAppointments = useMemo(() => {
-    if (activeTab === "all") return appointments;
-    return appointments.filter((appointment) => getStatusTab(appointment.status) === activeTab);
+    return appointments.filter((appointment) => activeTab === "all" || getStatusTab(appointment.status) === activeTab)
+      .sort(compareBookingStatus);
   }, [activeTab, appointments]);
 
   const showToast = (msg: string) => {

@@ -15,6 +15,7 @@ import type { HotelBooking, HotelRoomType, HotelServiceKey } from "../../types/b
 import { calculateBookingTotal, calculateNights } from "../../utils/bookingCalculator";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { bookingStatusLabels, eatingStatusLabels, moodLabels } from "../../utils/statusLabels";
+import { compareBookingStatus } from "../../utils/bookingOrder";
 
 const BOOKING_STATUS_STYLES: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border border-amber-200",
@@ -55,7 +56,7 @@ export function HotelBookingPage() {
   const total = datesValid ? calculateBookingTotal(roomType, serviceKeys, nights) : 0;
   const selectedPet = ownerPets.find((p) => p.id === petId);
   const ownerBookings = useMemo(
-    () => hotelBookings.filter((b) => b.ownerId === currentOwnerId),
+    () => hotelBookings.filter((b) => b.ownerId === currentOwnerId).sort(compareBookingStatus),
     [currentOwnerId, hotelBookings]
   );
 
