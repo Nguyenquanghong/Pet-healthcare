@@ -15,7 +15,7 @@ for (const kind of ["appointment", "hotel"] as const) test(`${kind}: confirm ide
   const petResult=await request.post(`${api}/pets`,{headers:ownerHeaders,data:{name,species:"dog"}});
   expect(petResult.status()).toBe(201); const {pet}=await petResult.json();
   const collection=kind==="appointment"?"appointments":"hotel-bookings";
-  const source=await request.post(`${api}/${collection}`,{headers:ownerHeaders,data:kind==="appointment"
+  const source=await request.post(`${api}/${collection}`,{headers:kind==="hotel"?{...ownerHeaders,"Idempotency-Key":randomUUID()}:ownerHeaders,data:kind==="appointment"
     ?{petId:pet.id,type:"spa_bath",serviceName:name,date:"2039-01-01",time:"10:00"}
     :{petId:pet.id,checkIn:"2039-01-01",checkOut:"2039-01-02",roomType:"standard",serviceKeys:[]}});
   expect(source.status()).toBe(201); const created=await source.json(); const booking=created.appointment||created.booking;
@@ -80,16 +80,35 @@ for (const kind of ["appointment", "hotel"] as const) test(`${kind}: confirm ide
     await expect(finishDialog).toContainText(name);
     await finishDialog.getByRole("button",{name:title,exact:true}).click();await expect(finishDialog).toHaveCount(0);
   };
-  await finish();
-  await card.getByRole("button",{name:"Mở lại dịch vụ",exact:true}).click();
-  dialog=page.getByRole("dialog",{name:"Mở lại dịch vụ",exact:true});
-  await dialog.getByLabel("Lý do hoàn tác").fill("Chưa bàn giao xong");
-  await dialog.getByRole("button",{name:"Xác nhận hoàn tác",exact:true}).click();await expect(dialog).toHaveCount(0);
-  await finish();
-  expect((await request.post(`${api}/invoices/checkout`,{headers:ownerHeaders,data:{type:kind==="appointment"?"appointment":"hotel_booking",relatedId:booking.id}})).status()).toBe(200);
-  await card.getByRole("button",{name:"Mở lại dịch vụ",exact:true}).click();
-  dialog=page.getByRole("dialog",{name:"Mở lại dịch vụ",exact:true});
-  await dialog.getByLabel("Lý do hoàn tác").fill("Kiểm tra điều kiện hóa đơn");
-  await dialog.getByRole("button",{name:"Xác nhận hoàn tác",exact:true}).click();
-  await expect(dialog.getByRole("alert")).toContainText("hóa đơn liên quan");
+  if(kind==="hotel") {
+    await expect(card.getByRole("button",{name:"Chờ thanh toán",exact:true})).toBeDisabled();
+    expect((await request.post(`${api}/invoices/checkout`,{headers:ownerHeaders,data:{type:"hotel_booking",relatedId:booking.id}})).status()).toBe(403);
+    const issued=await request.post(`${api}/invoices`,{headers,data:{type:"hotel_booking",relatedId:booking.id}});
+    expect(issued.status()).toBe(201);
+    const {invoice}=await issued.json();
+    await page.reload();
+    await expect(card.getByRole("button",{name:"Chờ thanh toán",exact:true})).toBeDisabled();
+    expect((await request.patch(`${api}/invoices/${invoice.id}/pay`,{headers,data:{paymentMethod:"cash"}})).status()).toBe(200);
+    await page.reload();
+    await finish();
+    await card.getByRole("button",{name:"Hoàn tác trả thú cưng",exact:true}).click();
+    dialog=page.getByRole("dialog",{name:"Hoàn tác trả thú cưng",exact:true});
+    await dialog.getByLabel("Lý do hoàn tác").fill("Chưa bàn giao xong");
+    await dialog.getByRole("button",{name:"Xác nhận hoàn tác",exact:true}).click();await expect(dialog).toHaveCount(0);
+    expect((await request.get(`${api}/invoices`,{headers})).status()).toBe(200);
+    await finish();
+  } else {
+    await finish();
+    await card.getByRole("button",{name:"Mở lại dịch vụ",exact:true}).click();
+    dialog=page.getByRole("dialog",{name:"Mở lại dịch vụ",exact:true});
+    await dialog.getByLabel("Lý do hoàn tác").fill("Chưa bàn giao xong");
+    await dialog.getByRole("button",{name:"Xác nhận hoàn tác",exact:true}).click();await expect(dialog).toHaveCount(0);
+    await finish();
+    expect((await request.post(`${api}/invoices/checkout`,{headers:ownerHeaders,data:{type:"appointment",relatedId:booking.id}})).status()).toBe(200);
+    await card.getByRole("button",{name:"Mở lại dịch vụ",exact:true}).click();
+    dialog=page.getByRole("dialog",{name:"Mở lại dịch vụ",exact:true});
+    await dialog.getByLabel("Lý do hoàn tác").fill("Kiểm tra điều kiện hóa đơn");
+    await dialog.getByRole("button",{name:"Xác nhận hoàn tác",exact:true}).click();
+    await expect(dialog.getByRole("alert")).toContainText("hóa đơn liên quan");
+  }
 });

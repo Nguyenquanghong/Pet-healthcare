@@ -11,6 +11,7 @@ export type BookingPatch = { internalNote?: string | null; ownerNote?: string | 
 export interface LifecycleTransaction {
   booking: LifecycleBooking;
   dependencies(): Promise<{ medical: number; care: number; invoices: number }>;
+  hotelInvoiceStatus(): Promise<string | null>;
   latestTransition(): Promise<StatusEvent | null>;
   save(status: string, patch?: BookingPatch): Promise<LifecycleBooking>;
   event(actor: Actor, action: string, from: string, to: string, revision: number, reason?: string, reversesId?: string): Promise<void>;

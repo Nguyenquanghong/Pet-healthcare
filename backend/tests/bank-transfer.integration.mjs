@@ -90,6 +90,13 @@ try {
   assert.equal(paid.paymentChannel, "bank_transfer");
   assert.equal(paid.transferReviewStatus, "confirmed");
   assert.equal(await db.notification.count({ where: { recipientOwnerId: owner.id, type: "invoice_paid" } }), 1);
+  const audit = await req(path + "/payment-history", staffToken);
+  assert.equal(audit.status, 200);
+  assert.equal(audit.body.length, 4);
+  assert.equal(audit.body.filter(event => event.action === "transfer_reported" && event.actorId === owner.id).length, 2);
+  assert.equal(audit.body.filter(event => event.action === "transfer_rejected" && event.actorId === staff.id && event.reason).length, 1);
+  assert.equal(audit.body.filter(event => event.action === "payment_confirmed" && event.actorId === staff.id).length, 1);
+  assert.equal((await req(path + "/payment-history", ownerToken)).status, 403);
   assert.equal((await req(path + "/transfer-report", ownerToken, "POST", {})).status, 409);
   assert.equal((await req(path + "/transfer-reject", staffToken, "POST", { reason: "late" })).status, 409);
   await stop(); await start();

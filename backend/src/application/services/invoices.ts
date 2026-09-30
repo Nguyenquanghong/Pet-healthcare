@@ -31,6 +31,7 @@ export class InvoicesService {
   }
   checkout(actor: Actor, input: Record<string, unknown>) {
     if (actor.role !== "owner") throw new BusinessError(403, "Chỉ chủ nuôi được tự tạo yêu cầu thanh toán.");
+    if (input.type === "hotel_booking") throw new BusinessError(403, "Hóa đơn lưu trú cần nhân viên chốt phí cuối kỳ.");
     if (Object.keys(input).some(key => !["type", "relatedId"].includes(key)))
       throw new BusinessError(422, "Giá được tính ở hệ thống, không nhận số tiền từ khách hàng.");
     return this.issue(actor, input, true);
@@ -49,8 +50,9 @@ export class InvoicesService {
     return this.invoices.issue(async tx => {
       const source = await tx.source(type, relatedId);
       if (!source || (selfCheckout && source.ownerId !== actor.sub)) throw new BusinessError(404, "Không tìm thấy dịch vụ.");
-      if (source.status !== (type === "appointment" ? "completed" : "checked_out"))
-        throw new BusinessError(409, "Chỉ chốt phí sau khi lịch khám hoàn tất hoặc lượt lưu trú đã trả phòng.");
+      if (source.status !== (type === "appointment" ? "completed" : "in_stay") &&
+          !(type === "hotel_booking" && source.status === "checked_out"))
+        throw new BusinessError(409, "Chỉ chốt phí sau khi khám hoàn tất hoặc trong kỳ lưu trú.");
       if (selfCheckout) {
         const existing = await tx.findSource(type, relatedId);
         if (existing) return existing;
@@ -102,18 +104,24 @@ export class InvoicesService {
     if (actor.role !== "owner") throw new BusinessError(403, "Chỉ chủ nuôi được báo đã chuyển khoản.");
     if (reference !== undefined && (typeof reference !== "string" || reference.length > 100))
       throw new BusinessError(422, "Mã giao dịch tối đa 100 ký tự.");
-    return this.invoices.reportTransfer(id, actor.sub, typeof reference === "string" ? reference.trim() || null : null);
+    return this.invoices.reportTransfer(id, actor.sub, typeof reference === "string" ? reference.trim() || null : null, actor);
   }
   rejectTransfer(actor: Actor, id: string, reason: unknown) {
     if (actor.role === "owner") throw new BusinessError(403, "Chỉ nhân viên được kiểm tra chuyển khoản.");
     if (typeof reason !== "string" || !reason.trim() || reason.length > 500)
       throw new BusinessError(422, "Nhập lý do chưa xác nhận (tối đa 500 ký tự).");
-    return this.invoices.rejectTransfer(id, reason.trim());
+    return this.invoices.rejectTransfer(id, reason.trim(), actor);
   }
   pay(actor: Actor, id: string, paymentMethod: unknown = "cash") {
     if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
-    if (typeof paymentMethod !== "string" || !["cash", "bank_transfer", "credit_card", "qr_code"].includes(paymentMethod))
+    if (typeof paymentMethod !== "string" || !["cash", "bank_transfer"].includes(paymentMethod))
       throw new BusinessError(422, "Phương thức thanh toán không hợp lệ.");
-    return this.invoices.pay(id, paymentMethod, new Date());
+    return this.invoices.pay(id, paymentMethod, new Date(), actor);
+  }
+  async paymentHistory(actor: Actor, id: string) {
+    if (actor.role === "owner") throw new BusinessError(403, "Chỉ nhân viên được xem lịch sử kiểm tra thu tiền.");
+    const invoice = await this.invoices.find(id);
+    if (!invoice) throw new BusinessError(404, "Không tìm thấy hóa đơn.");
+    return this.invoices.paymentHistory(id);
   }
 }

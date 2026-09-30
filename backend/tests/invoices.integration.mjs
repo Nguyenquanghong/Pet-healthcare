@@ -69,6 +69,12 @@ try {
   assert.equal(persisted.paidAt.toISOString(), paid.paidAt);
   assert.equal(persisted.paymentMethod, paid.paymentMethod);
   assert.equal(Number(persisted.totalAmount), 260000);
+  assert.equal((await request(ownerToken, "GET", undefined, `/${invoice.id}/payment-history`)).status, 403);
+  const paymentHistory = await request(staffToken, "GET", undefined, `/${invoice.id}/payment-history`);
+  assert.equal(paymentHistory.status, 200);
+  assert.equal(paymentHistory.body.length, 1, "Repeated confirmation must not create another receipt");
+  assert.equal(paymentHistory.body[0].action, "payment_confirmed");
+  assert.equal(paymentHistory.body[0].actorId, staff.id);
   await close(); await start();
   assert.equal((await request(staffToken)).body.find(i => i.id === invoice.id).paidAt, paid.paidAt);
   assert.equal((await request(ownerToken)).body.length, 1);

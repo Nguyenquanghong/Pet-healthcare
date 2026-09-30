@@ -17,6 +17,7 @@ import { OwnerLoginPage } from "./routes/auth/OwnerLoginPage";
 import { AppointmentsPage } from "./routes/owner/AppointmentsPage";
 import { DashboardPage } from "./routes/owner/DashboardPage";
 import { HotelBookingPage } from "./routes/owner/HotelBookingPage";
+import { HotelBookingDetailPage } from "./routes/owner/HotelBookingDetailPage";
 import { MedicalRecordsPage } from "./routes/owner/MedicalRecordsPage";
 import { NotificationsPage } from "./routes/owner/NotificationsPage";
 import { OwnerBillingPage } from "./routes/owner/OwnerBillingPage";
@@ -61,6 +62,7 @@ export function App() {
       <Route path="/owner/appointments" element={<OwnerOnly><AppointmentsPage /></OwnerOnly>} />
       <Route path="/owner/spa-booking" element={<OwnerOnly><SpaBookingPage /></OwnerOnly>} />
       <Route path="/owner/hotel-booking" element={<OwnerOnly><HotelBookingPage /></OwnerOnly>} />
+      <Route path="/owner/hotel-bookings/:id" element={<OwnerOnly><HotelBookingDetailPage /></OwnerOnly>} />
       <Route path="/owner/notifications" element={<OwnerOnly><NotificationsPage /></OwnerOnly>} />
       <Route path="/owner/billing" element={<OwnerOnly><OwnerBillingPage /></OwnerOnly>} />
       <Route path="/admin/login" element={<AdminLoginPage />} />

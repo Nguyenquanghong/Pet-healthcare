@@ -29,6 +29,15 @@ async function change(b,status) { const res=await req(route(b)+"/status",staff,"
 async function advance(b,statuses) { for(const status of statuses)b=await change(b,status);return b; }
 const undo=(b,actor=staff,extra={})=>req(route(b)+"/undo-status",actor,"POST",{reason:"Selected wrong pet",expectedRevision:b.statusRevision,...extra});
 const history=b=>req(route(b)+"/status-history");
+async function settleHotel(b) {
+  const issued=await req("/invoices",staff,"POST",{type:"hotel_booking",relatedId:b.id});
+  assert.equal(issued.status,201,JSON.stringify(issued.body));
+  const invoice=issued.body.invoice;
+  assert.equal((await req(route(b)+"/status",staff,"PATCH",{status:"checked_out",expectedRevision:b.statusRevision})).status,409,"Unpaid invoice blocks handover");
+  const paid=await req(`/invoices/${invoice.id}/pay`,staff,"PATCH",{paymentMethod:"cash"});
+  assert.equal(paid.status,200,JSON.stringify(paid.body));
+  return invoice.id;
+}
 try {
   for(const role of ["owner","staff","admin"])users.push(await db.user.create({data:{role,fullName:`Lifecycle ${role}`,email:`${randomUUID()}@example.test`,passwordHash:"unused",passwordSalt:"unused"}}));
   [owner,staff,admin]=users;pet=await db.pet.create({data:{ownerId:owner.id,name:"Lifecycle pet",species:"dog",allergies:[]}});
@@ -57,6 +66,10 @@ try {
     await stop();await start(); assert.deepEqual((await history(b)).body,log,"Audit survives API restart");
     b=await change(b,checkin);
     if(kind==="appointment") { b=await change(b,"in_progress");assert.equal((await undo(b)).status,409); }
+    if(kind==="hotel") {
+      assert.equal((await req(route(b)+"/status",staff,"PATCH",{status:"checked_out",expectedRevision:b.statusRevision})).status,409,"No invoice blocks handover");
+      await settleHotel(b);
+    }
     b=await change(b,kind==="appointment"?"completed":"checked_out");
     assert.equal((await undo(b)).status,403,"Only admin reopens completion");
     const reopened=await undo(b,admin);assert.equal(reopened.status,200);assert.equal(reopened.body[kind==="appointment"?"appointment":"booking"].status,kind==="appointment"?"in_progress":"in_stay");
@@ -83,7 +96,24 @@ try {
   const careBlock=await advance(await fixture("hotel"),["confirmed","in_stay"]);
   assert.equal((await req(route(careBlock)+"/care-notes",staff,"POST",{note:"Fed"})).status,201);
   assert.equal((await undo(careBlock)).status,409);
-  const checkout=await change(careBlock,"checked_out"); assert.equal((await undo(checkout,admin)).status,200,"Care history is retained when reopening checkout");
+  const careInvoiceId=await settleHotel(careBlock);
+  const checkout=await change(careBlock,"checked_out");
+  const reopenedCare=await undo(checkout,admin);
+  assert.equal(reopenedCare.status,200,"Care history is retained when reopening checkout");
+  assert.equal((await db.invoice.findUniqueOrThrow({where:{id:careInvoiceId}})).paymentStatus,"paid");
+  await change(reopenedCare.body.booking,"checked_out");
+  const concurrentStay=await advance(await fixture("hotel"),["confirmed","in_stay"]);
+  const concurrentInvoice=(await req("/invoices",staff,"POST",{type:"hotel_booking",relatedId:concurrentStay.id})).body.invoice;
+  const payAndHandover=await Promise.all([
+    req(`/invoices/${concurrentInvoice.id}/pay`,staff,"PATCH",{paymentMethod:"cash"}),
+    req(route(concurrentStay)+"/status",staff,"PATCH",{status:"checked_out",expectedRevision:concurrentStay.statusRevision}),
+  ]);
+  assert.equal(payAndHandover[0].status,200);
+  assert.ok([200,409].includes(payAndHandover[1].status));
+  const afterRace=await db.hotelBooking.findUniqueOrThrow({where:{id:concurrentStay.id}});
+  assert.equal((await db.invoice.findUniqueOrThrow({where:{id:concurrentInvoice.id}})).paymentStatus,"paid");
+  if(afterRace.status==="in_stay") await change(afterRace,"checked_out");
+  assert.equal((await db.bookingStatusEvent.count({where:{kind:"hotel",bookingId:concurrentStay.id,toStatus:"checked_out"}})),1);
   // Invoice vs reopening: source row is locked by both operations.
   const bill=await advance(await fixture(),["confirmed","checked_in","in_progress","completed"]);
   const billRace=await Promise.all([req("/invoices/checkout",owner,"POST",{type:"appointment",relatedId:bill.id}),undo(bill,admin)]);

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { CheckCircle2, Hotel, PawPrint, Plus, Ban, HeartPulse, Smile, X, MessageSquareText } from "lucide-react";
 import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
 import { AdditionalServicesCard } from "../../components/owner/booking/AdditionalServicesCard";
@@ -26,14 +26,20 @@ const BOOKING_STATUS_STYLES: Record<string, string> = {
 };
 
 export function HotelBookingPage() {
+  const navigate = useNavigate();
   const { createHotelBooking, cancelHotelBooking, currentOwnerId, hotelBookings, dailyCareNotes, ownerPets } = useAppStore();
   const [petId, setPetId] = useState(ownerPets[0]?.id ?? "");
-  const [checkIn, setCheckIn] = useState("2026-11-10");
-  const [checkOut, setCheckOut] = useState("2026-11-13");
+  const today = () => new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+  const nextDay = () => new Date(new Date(`${today()}T00:00:00.000Z`).getTime() + 86_400_000).toISOString().slice(0, 10);
+  const [checkIn, setCheckIn] = useState(today);
+  const [checkOut, setCheckOut] = useState(nextDay);
   const [roomType, setRoomType] = useState<HotelRoomType>("deluxe");
   const [serviceKeys, setServiceKeys] = useState<HotelServiceKey[]>(["special_diet"]);
   const [ownerNote, setOwnerNote] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [bookingError, setBookingError] = useState("");
+  const [pending, setPending] = useState(false);
+  const sending = useRef(false);
+  const request = useRef<{ payload: string; key: string } | null>(null);
 
   const [cancelTarget, setCancelTarget] = useState<HotelBooking | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -43,8 +49,10 @@ export function HotelBookingPage() {
     if (!ownerPets.some((pet) => pet.id === petId)) setPetId(ownerPets[0]?.id ?? "");
   }, [ownerPets, petId]);
 
-  const nights = Math.max(calculateNights(checkIn, checkOut), 1);
-  const total = calculateBookingTotal(roomType, serviceKeys, nights);
+  const nights = calculateNights(checkIn, checkOut);
+  const datesValid = /^\d{4}-\d{2}-\d{2}$/.test(checkIn) && /^\d{4}-\d{2}-\d{2}$/.test(checkOut)
+    && checkIn >= today() && nights >= 1;
+  const total = datesValid ? calculateBookingTotal(roomType, serviceKeys, nights) : 0;
   const selectedPet = ownerPets.find((p) => p.id === petId);
   const ownerBookings = useMemo(
     () => hotelBookings.filter((b) => b.ownerId === currentOwnerId),
@@ -54,21 +62,28 @@ export function HotelBookingPage() {
   const toggleService = (key: HotelServiceKey) =>
     setServiceKeys((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
 
-  const handleSubmit = () => {
-    if (!petId) return;
-    createHotelBooking({ petId, checkIn, checkOut, roomType, serviceKeys, ownerNote });
-    setOwnerNote("");
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 3000);
+  const handleSubmit = async () => {
+    if (!petId || !datesValid || sending.current) return;
+    const input = { petId, checkIn, checkOut, roomType, serviceKeys, ownerNote };
+    const payload = JSON.stringify({ ...input, serviceKeys: [...serviceKeys].sort() });
+    if (request.current?.payload !== payload) request.current = { payload, key: crypto.randomUUID() };
+    sending.current = true; setPending(true); setBookingError("");
+    try {
+      const result = await createHotelBooking(input, request.current.key);
+      navigate(`/owner/hotel-bookings/${result.booking.id}`, { replace: true, state: { booking: result.booking, refreshWarning: !result.refreshed } });
+    } catch (reason) { setBookingError(reason instanceof Error ? reason.message : "Không thể gửi yêu cầu đặt phòng."); }
+    finally { sending.current = false; setPending(false); }
   };
 
-  const handleConfirmCancel = () => {
-    if (!cancelTarget) return;
-    cancelHotelBooking(cancelTarget.id, cancelReason.trim() || undefined);
-    setCancelTarget(null);
-    setCancelReason("");
-    setFeedbackMsg("Đã hủy đặt chỗ khách sạn thành công.");
-    setTimeout(() => setFeedbackMsg(""), 3500);
+  const handleConfirmCancel = async () => {
+    if (!cancelTarget || sending.current) return;
+    sending.current = true; setPending(true); setBookingError("");
+    try {
+      const refreshed = await cancelHotelBooking(cancelTarget.id, cancelReason.trim() || undefined);
+      setCancelTarget(null); setCancelReason("");
+      setFeedbackMsg(refreshed ? "Đã hủy đặt chỗ khách sạn." : "Đã hủy; danh sách chưa tải lại được. Hãy làm mới trang để đối chiếu.");
+    } catch (reason) { setBookingError(reason instanceof Error ? reason.message : "Không thể hủy đặt phòng."); }
+    finally { sending.current = false; setPending(false); }
   };
 
   return (
@@ -93,11 +108,7 @@ export function HotelBookingPage() {
                 Thông tin đặt phòng
               </h2>
 
-              {success && (
-                <div className="mb-5 flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-                  <CheckCircle2 size={16} /> Đã gửi yêu cầu! Bệnh viện sẽ xác nhận trong thời gian sớm nhất.
-                </div>
-              )}
+              {bookingError && <p role="alert" className="mb-5 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{bookingError}</p>}
 
               {feedbackMsg && (
                 <div className="mb-5 flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
@@ -108,6 +119,7 @@ export function HotelBookingPage() {
               <div className="space-y-4">
                 <SelectPetCard ownerPets={ownerPets} petId={petId} onPetChange={setPetId} />
                 <StayDatesCard checkIn={checkIn} checkOut={checkOut} onCheckInChange={setCheckIn} onCheckOutChange={setCheckOut} />
+                {!datesValid && <p role="alert" className="text-sm text-rose-700">Chọn ngày nhận từ hôm nay và ngày trả sau ngày nhận ít nhất một đêm.</p>}
                 <RoomTypeCard roomType={roomType} onRoomTypeChange={setRoomType} />
                 <AdditionalServicesCard serviceKeys={serviceKeys} onToggleService={toggleService} />
                 <Textarea
@@ -123,10 +135,10 @@ export function HotelBookingPage() {
           <div className="space-y-6">
             <BookingSummary
               selectedPet={selectedPet}
-              nights={nights}
+              nights={datesValid ? nights : 0}
               roomType={roomType}
               total={total}
-              disabled={!petId}
+              disabled={!petId || !datesValid || pending}
               onSubmit={handleSubmit}
             />
 
@@ -145,6 +157,7 @@ export function HotelBookingPage() {
 
                   return (
                     <div key={b.id} className="p-5 space-y-3.5">
+                      <Link className="text-sm font-semibold text-primary underline" to={`/owner/hotel-bookings/${b.id}`}>Xem chi tiết đặt phòng</Link>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-bold text-slate-900">{pet?.name ?? b.petId}</p>
@@ -240,6 +253,7 @@ export function HotelBookingPage() {
             </div>
 
             <div className="my-4 space-y-3 text-sm">
+              {bookingError && <p role="alert" className="text-rose-700">{bookingError}</p>}
               <p className="text-slate-600">
                 Bạn có chắc chắn muốn hủy yêu cầu lưu trú từ <strong>{cancelTarget.checkIn}</strong> đến{" "}
                 <strong>{cancelTarget.checkOut}</strong> không?
@@ -258,7 +272,8 @@ export function HotelBookingPage() {
               </Button>
               <Button
                 variant="danger"
-                onClick={handleConfirmCancel}
+                disabled={pending}
+                onClick={() => void handleConfirmCancel()}
                 className="flex-1 bg-rose-600 hover:bg-rose-700 text-white"
               >
                 Xác nhận hủy

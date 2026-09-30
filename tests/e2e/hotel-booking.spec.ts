@@ -1,0 +1,41 @@
+import { expect, test } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+
+test("owner retries a lost hotel booking response and opens the same detail URL", async ({ page, request, baseURL }) => {
+  expect(["localhost", "127.0.0.1"]).toContain(new URL(baseURL!).hostname);
+  const api = process.env.API_BASE_URL!;
+  expect(["localhost", "127.0.0.1"]).toContain(new URL(api).hostname);
+  const login = await request.post(`${api}/auth/owner/login`, { data: { email: "owner@example.com", password: "owner123" } });
+  expect(login.status()).toBe(200);
+  const { token } = await login.json();
+  const headers = { Authorization: `Bearer ${token}` };
+  const petResponse = await request.post(`${api}/pets`, { headers, data: { name: `Hotel UI ${randomUUID()}`, species: "dog" } });
+  expect(petResponse.status()).toBe(201);
+  const { pet } = await petResponse.json();
+  await page.addInitScript(value => sessionStorage.setItem("nipopeto_access_token", value), token);
+  await page.goto("/owner/hotel-booking");
+  await page.getByLabel("Thú cưng").selectOption(pet.id);
+  await page.getByLabel("Ngày nhận phòng").fill("2098-05-01");
+  await page.getByLabel("Ngày trả phòng").fill("2098-05-03");
+  let lostResponse = false;
+  await page.route("**/api/hotel-bookings", async route => {
+    if (route.request().method() !== "POST" || lostResponse) return route.continue();
+    lostResponse = true;
+    const written = await route.fetch();
+    expect(written.status()).toBe(201);
+    await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Mất phản hồi sau khi đã ghi" }) });
+  });
+  await page.getByRole("button", { name: "Xác nhận đặt phòng" }).click();
+  await expect(page.getByRole("alert")).toContainText("Mất phản hồi");
+  await expect(page.getByLabel("Thú cưng")).toHaveValue(pet.id);
+  await page.getByRole("button", { name: "Xác nhận đặt phòng" }).click();
+  await expect(page).toHaveURL(/\/owner\/hotel-bookings\/[^/]+$/);
+  const id = page.url().split("/").at(-1)!;
+  await expect(page.getByText(id, { exact: true })).toBeVisible();
+  await expect(page.getByText("Bạn chưa cần thanh toán lúc đặt phòng.", { exact: false })).toBeVisible();
+  const bookings = await request.get(`${api}/hotel-bookings`, { headers });
+  expect(bookings.status()).toBe(200);
+  expect((await bookings.json()).filter((item: { id: string; petId: string }) => item.petId === pet.id && item.id === id)).toHaveLength(1);
+  await page.reload();
+  await expect(page.getByText(id, { exact: true })).toBeVisible();
+});

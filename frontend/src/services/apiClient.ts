@@ -31,7 +31,7 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
 
 export const apiClient = {
   get: <T>(url: string) => request<T>(url, { method: "GET" }),
-  post: <T>(url: string, body?: unknown) => request<T>(url, { method: "POST", body: JSON.stringify(body) }),
+  post: <T>(url: string, body?: unknown, headers?: Record<string, string>) => request<T>(url, { method: "POST", body: JSON.stringify(body), headers }),
   patch: <T>(url: string, body?: unknown) => request<T>(url, { method: "PATCH", body: JSON.stringify(body) }),
   delete: <T>(url: string) => request<T>(url, { method: "DELETE" }),
 };

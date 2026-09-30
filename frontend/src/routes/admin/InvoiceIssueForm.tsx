@@ -6,11 +6,11 @@ import { formatCurrency } from "../../utils/formatCurrency";
 import pricing from "../../../../backend/src/domain/pricing.json";
 
 type Line = { description: string; quantity: number; unitPrice: number };
-export function InvoiceIssueForm({ invoices, onCreated, onClose }: {
-  invoices: Invoice[]; onCreated: (invoice: Invoice) => void; onClose: () => void;
+export function InvoiceIssueForm({ invoices, onCreated, onClose, initialSourceKey = "" }: {
+  invoices: Invoice[]; onCreated: (invoice: Invoice) => void; onClose: () => void; initialSourceKey?: string;
 }) {
   const { appointments, hotelBookings, pets, owners } = useAppStore();
-  const [sourceKey, setSourceKey] = useState("");
+  const [sourceKey, setSourceKey] = useState(initialSourceKey);
   const [items, setItems] = useState<Line[]>([]);
   const [tax, setTax] = useState("0");
   const [discount, setDiscount] = useState("0");
@@ -23,7 +23,7 @@ export function InvoiceIssueForm({ invoices, onCreated, onClose }: {
     ...appointments.filter(a => a.status === "completed" && !invoices.some(i => i.appointmentId === a.id))
       .map(a => ({ key: `appointment:${a.id}`, id: a.id, type: "appointment" as const, petId: a.petId, ownerId: a.ownerId,
         description: a.serviceName, label: `${a.serviceName} — ${a.date}`, amount: 0, serviceType: a.type })),
-    ...hotelBookings.filter(b => b.status === "checked_out" && !invoices.some(i => i.hotelBookingId === b.id))
+    ...hotelBookings.filter(b => (b.status === "in_stay" || b.status === "checked_out") && !invoices.some(i => i.hotelBookingId === b.id))
       .map(b => ({ key: `hotel_booking:${b.id}`, id: b.id, type: "hotel_booking" as const, petId: b.petId, ownerId: b.ownerId,
         description: "Lưu trú", label: `Lưu trú ${b.checkIn} → ${b.checkOut}`, amount: b.totalAmount, serviceType: "" })),
   ], [appointments, hotelBookings, invoices]);
@@ -51,10 +51,10 @@ export function InvoiceIssueForm({ invoices, onCreated, onClose }: {
         finally { submitting.current = false; setSaving(false); }
       }}>
       <h2 id="issue-title" className="text-xl font-bold">Lập hóa đơn</h2>
-      <p className="text-sm text-slate-600">Chọn đơn đã hoàn tất. Thông tin khách hàng và thú cưng được lấy từ đơn đặt.</p>
+      <p className="text-sm text-slate-600">Chọn lịch khám đã hoàn tất hoặc lượt lưu trú đang ở. Đơn cũ đã trả thú cưng mà chưa có hóa đơn vẫn có thể chốt phí. Thông tin khách hàng và thú cưng được lấy từ đơn đặt.</p>
       {error && <p role="alert" className="text-rose-700">{error}</p>}
       <fieldset disabled={saving} className="space-y-4">
-      <label className="block text-sm font-semibold">Dịch vụ đã hoàn tất
+      <label className="block text-sm font-semibold">Đơn cần chốt phí
         <select className={field} required value={sourceKey} onChange={e => {
           setSourceKey(e.target.value);
           const next = sources.find(s => s.key === e.target.value);
@@ -74,7 +74,7 @@ export function InvoiceIssueForm({ invoices, onCreated, onClose }: {
           <p>Đơn đặt: {source.label}</p>
         </div>
         {source.type === "hotel_booking"
-          ? <p>Tiền lưu trú theo đơn: <strong>{formatCurrency(source.amount)}</strong>. Chỉ thêm khoản phát sinh bên dưới.</p>
+          ? <p>Tiền lưu trú và dịch vụ đã đặt: <strong>{formatCurrency(source.amount)}</strong>. Chỉ thêm khoản phát sinh chưa nằm trong giá này.</p>
           : <p className="text-sm text-slate-600">Đơn giá được điền từ bảng giá tham khảo. Kiểm tra và chốt phí thực tế, bổ sung dịch vụ đã sử dụng trước khi lưu.</p>}
         {items.map((item, index) => <div key={index} className="space-y-2 rounded-lg border p-3">
           <label className="block text-sm">Dịch vụ {index + 1}<input className={field} required maxLength={300} value={item.description} onChange={e => change(index, { description: e.target.value })} /></label>

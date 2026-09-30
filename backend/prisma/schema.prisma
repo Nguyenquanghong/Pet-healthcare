@@ -236,9 +236,23 @@ model HotelBooking {
   owner          User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   dailyCareNotes DailyCareNote[]
   invoices       Invoice[]
+  createRequests HotelBookingRequest[]
 
   @@index([ownerId, checkIn])
   @@map("hotel_bookings")
+}
+
+model HotelBookingRequest {
+  actorId     String   @map("actor_id")
+  requestKey  String   @map("request_key")
+  fingerprint String
+  bookingId   String   @map("booking_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  booking     HotelBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@id([actorId, requestKey])
+  @@index([bookingId])
+  @@map("hotel_booking_requests")
 }
 
 model BookingStatusEvent {
@@ -346,9 +360,28 @@ model Invoice {
   hotelBooking   HotelBooking?  @relation(fields: [hotelBookingId], references: [id])
   items          InvoiceItem[]
   paymentAttempts PaymentAttempt[]
+  paymentEvents PaymentEvent[]
 
   @@index([ownerId, issuedAt])
   @@map("invoices")
+}
+
+model PaymentEvent {
+  id          String   @id @default(uuid())
+  invoiceId   String   @map("invoice_id")
+  action      String
+  fromStatus  String   @map("from_status")
+  toStatus    String   @map("to_status")
+  actorId     String   @map("actor_id")
+  actorName   String   @map("actor_name")
+  actorRole   String   @map("actor_role")
+  reason      String?
+  reference   String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, createdAt])
+  @@map("payment_events")
 }
 
 model InvoiceItem {

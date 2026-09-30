@@ -1374,7 +1374,22 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            },
+            "description": "Giữ nguyên key khi gửi lại cùng yêu cầu; cùng key và payload khác trả 409."
+          }
+        ],
+        "description": "Tạo một yêu cầu lưu trú chưa thanh toán. Chống gửi lặp và trùng ngày cho cùng thú cưng."
       }
     },
     "/api/hotel-bookings/{id}/status": {
@@ -1440,7 +1455,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Checkout khách sạn chỉ khi hóa đơn cuối cùng đã paid; thao tác trạng thái cần expectedRevision."
       }
     },
     "/api/hotel-bookings/{id}/cancel": {
@@ -1972,7 +1988,7 @@
             }
           }
         },
-        "description": "Staff only. One invoice per service. Appointment subtotal is the agreed fee in whole VND; hotel subtotal is read from the stored booking. Tax and discount are explicit amounts; total is computed by the server. Payment status is independent of service status."
+        "description": "Nhân viên chốt một hóa đơn cho mỗi nguồn. Hotel mới chốt khi đang lưu trú; đơn cũ đã checkout mà chưa có hóa đơn vẫn được xử lý. Tổng tiền lấy từ giá booking đã lưu và phí phát sinh."
       }
     },
     "/api/invoices/{id}/pay": {
@@ -2237,7 +2253,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Chủ nuôi tự tạo yêu cầu thanh toán cho spa có giá cố định sau khi hoàn tất. Khách sạn cần nhân viên chốt phí, không hỗ trợ endpoint này."
       }
     },
     "/api/invoices/{id}/onsite": {
@@ -3223,6 +3240,101 @@
           },
           "default": {
             "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hotel-bookings/{id}": {
+      "get": {
+        "tags": [
+          "Hotel"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "operationId": "getHotelBookingDetail",
+        "summary": "Xem chi tiết đặt phòng trong phạm vi chủ nuôi hoặc nhân viên",
+        "responses": {
+          "200": {
+            "description": "Chi tiết đặt phòng",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelBookingEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Yêu cầu thất bại",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invoices/{id}/payment-history": {
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "operationId": "getInvoicePaymentHistory",
+        "summary": "Nhân viên xem lịch sử kiểm tra và xác nhận tiền",
+        "responses": {
+          "200": {
+            "description": "Sự kiện mới nhất trước",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentEvent"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Yêu cầu thất bại",
             "content": {
               "application/json": {
                 "schema": {
@@ -4559,9 +4671,7 @@
             "type": "string",
             "enum": [
               "cash",
-              "bank_transfer",
-              "credit_card",
-              "qr_code"
+              "bank_transfer"
             ]
           }
         }
@@ -4756,6 +4866,58 @@
             "nullable": true
           },
           "reversesId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PaymentEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "invoiceId",
+          "action",
+          "fromStatus",
+          "toStatus",
+          "actorId",
+          "actorName",
+          "actorRole",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "fromStatus": {
+            "type": "string"
+          },
+          "toStatus": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "actorRole": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference": {
             "type": "string",
             "nullable": true
           },

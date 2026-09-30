@@ -35,6 +35,7 @@ test("invoice issuance rejects invalid amounts, unfinished services and owner wr
     assert.throws(() => service.create(staff, { ...input, subtotal }), { status: 422 });
   }
   assert.throws(() => service.pay(staff, "invoice", "bitcoin"), { status: 422 });
+  assert.throws(() => service.pay(staff, "invoice", "credit_card"), { status: 422 });
   assert.throws(() => service.pay(staff, "invoice", null), { status: 422 });
   await assert.rejects(service.create(staff, { ...input, discountAmount: 300000 }), { status: 422 });
   status = "pending";

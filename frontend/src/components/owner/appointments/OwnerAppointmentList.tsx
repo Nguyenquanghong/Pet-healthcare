@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Ban, CalendarClock, CheckCircle2, X } from "lucide-react";
 import type { Appointment } from "../../../types/appointment";
 import type { Pet } from "../../../types/pet";
@@ -52,6 +52,9 @@ export function OwnerAppointmentList({ mode = "medical", appointments, pets, sel
   const [cancelItem, setCancelItem] = useState<Appointment | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [toastMsg, setToastMsg] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
 
   const tabCounts = useMemo(() => {
     return appointments.reduce<Record<StatusTab, number>>(
@@ -75,29 +78,35 @@ export function OwnerAppointmentList({ mode = "medical", appointments, pets, sel
   };
 
   const openReschedule = (appointment: Appointment) => {
+    setActionError("");
     setRescheduleItem(appointment);
     setRescheduleDate(appointment.date);
     setRescheduleTime(appointment.time);
     setRescheduleNote(appointment.ownerNote ?? "");
   };
 
-  const handleConfirmReschedule = () => {
-    if (!rescheduleItem || !rescheduleDate || !rescheduleTime) return;
-    rescheduleAppointment(rescheduleItem.id, {
-      date: rescheduleDate,
-      time: rescheduleTime,
-      ownerNote: rescheduleNote.trim() || undefined,
-    });
-    setRescheduleItem(null);
-    showToast(`Đã gửi yêu cầu đổi lịch ${mode === "spa" ? "Spa" : "khám"}. Lịch hẹn đang chờ xác nhận.`);
+  const handleConfirmReschedule = async () => {
+    if (!rescheduleItem || !rescheduleDate || !rescheduleTime || submitting.current) return;
+    submitting.current = true; setBusy(true); setActionError("");
+    try {
+      const refreshed = await rescheduleAppointment(rescheduleItem.id, {
+        date: rescheduleDate, time: rescheduleTime, ownerNote: rescheduleNote.trim() || undefined,
+      });
+      setRescheduleItem(null);
+      showToast(refreshed ? "Đã gửi yêu cầu đổi lịch và chờ xác nhận." : "Đã đổi lịch; danh sách chưa tải lại được. Hãy làm mới trang.");
+    } catch (reason) { setActionError(reason instanceof Error ? reason.message : "Không thể đổi lịch."); }
+    finally { submitting.current = false; setBusy(false); }
   };
 
-  const handleConfirmCancel = () => {
-    if (!cancelItem) return;
-    cancelAppointment(cancelItem.id, cancelReason.trim() || undefined);
-    setCancelItem(null);
-    setCancelReason("");
-    showToast(`Đã hủy lịch ${mode === "spa" ? "Spa" : "khám"} thành công.`);
+  const handleConfirmCancel = async () => {
+    if (!cancelItem || submitting.current) return;
+    submitting.current = true; setBusy(true); setActionError("");
+    try {
+      const refreshed = await cancelAppointment(cancelItem.id, cancelReason.trim() || undefined);
+      setCancelItem(null); setCancelReason("");
+      showToast(refreshed ? "Đã hủy lịch." : "Đã hủy lịch; danh sách chưa tải lại được. Hãy làm mới trang.");
+    } catch (reason) { setActionError(reason instanceof Error ? reason.message : "Không thể hủy lịch."); }
+    finally { submitting.current = false; setBusy(false); }
   };
 
   return (
@@ -231,6 +240,7 @@ export function OwnerAppointmentList({ mode = "medical", appointments, pets, sel
             </div>
 
             <div className="my-4 space-y-4 text-sm">
+              {actionError && <p role="alert" className="text-rose-700">{actionError}</p>}
               <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
                 Dịch vụ: <span className="font-bold text-slate-900">{rescheduleItem.serviceName}</span>
                 <br />
@@ -254,7 +264,7 @@ export function OwnerAppointmentList({ mode = "medical", appointments, pets, sel
               <Button variant="outline" onClick={() => setRescheduleItem(null)} className="flex-1">
                 Đóng
               </Button>
-              <Button onClick={handleConfirmReschedule} disabled={!rescheduleDate || !rescheduleTime} className="flex-1">
+              <Button onClick={() => void handleConfirmReschedule()} disabled={busy || !rescheduleDate || !rescheduleTime} className="flex-1">
                 Xác nhận đổi
               </Button>
             </div>
@@ -276,6 +286,7 @@ export function OwnerAppointmentList({ mode = "medical", appointments, pets, sel
             </div>
 
             <div className="my-4 space-y-4 text-sm">
+              {actionError && <p role="alert" className="text-rose-700">{actionError}</p>}
               <p className="text-slate-600">
                 Bạn có chắc chắn muốn hủy lịch <strong>{cancelItem.serviceName}</strong> vào ngày <strong>{cancelItem.date}</strong> lúc{" "}
                 <strong>{cancelItem.time}</strong> không?
@@ -293,7 +304,7 @@ export function OwnerAppointmentList({ mode = "medical", appointments, pets, sel
               <Button variant="outline" onClick={() => setCancelItem(null)} className="flex-1">
                 Quay lại
               </Button>
-              <Button variant="danger" onClick={handleConfirmCancel} className="flex-1 bg-rose-600 text-white hover:bg-rose-700">
+              <Button variant="danger" disabled={busy} onClick={() => void handleConfirmCancel()} className="flex-1 bg-rose-600 text-white hover:bg-rose-700">
                 Hủy lịch này
               </Button>
             </div>

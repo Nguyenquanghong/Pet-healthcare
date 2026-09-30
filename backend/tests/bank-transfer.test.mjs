@@ -34,6 +34,6 @@ test("manual transfer service enforces roles, configured recipient and bounded c
   await service.reportTransfer(owner, "invoice", "  TEST-123  ");
   await service.rejectTransfer(staff, "invoice", "  Chưa thấy tiền  ");
   assert.equal(seen[0][2].isDemo, true);
-  assert.deepEqual(seen[1], ["invoice", "owner", "TEST-123"]);
-  assert.deepEqual(seen[2], ["invoice", "Chưa thấy tiền"]);
+  assert.deepEqual(seen[1], ["invoice", "owner", "TEST-123", owner]);
+  assert.deepEqual(seen[2], ["invoice", "Chưa thấy tiền", staff]);
 });

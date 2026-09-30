@@ -36,9 +36,6 @@ class PrismaAppointmentRepository implements AppointmentRepository {
     return appointmentSlotWrite(this.client.appointment.create({ data }));
   }
 
-  update(id: string, data: Parameters<AppointmentRepository["update"]>[1]) {
-    return appointmentSlotWrite(this.client.appointment.update({ where: { id }, data }));
-  }
 }
 
 class PrismaNotificationWriter implements NotificationWriter {

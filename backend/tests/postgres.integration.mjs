@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { createApp } from "../dist/src/app.js";
 import { hashPassword } from "../dist/src/lib/password.js";
@@ -88,6 +88,7 @@ try {
     const response = await fetch(base + path, { method, headers: {
       ...(token ? { authorization: `Bearer ${token}` } : {}),
       ...(body ? { "content-type": "application/json" } : {}),
+      ...(method === "POST" && path === "/api/hotel-bookings" ? { "Idempotency-Key": randomUUID() } : {}),
     }, ...(body ? { body: JSON.stringify(body) } : {}) });
     if (response.status !== 204) assert.match(response.headers.get("content-type") || "", /application\/json/, `${method} ${path} JSON`);
     return { status: response.status, body: response.status === 204 ? null : await response.json() };
@@ -117,15 +118,18 @@ try {
   assert.equal((await request(`/api/appointments/${appointmentId}/reschedule`, "PATCH", token,
     { date: "2099-01-02", time: "12:00" })).status, 200);
   assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", token, { status: "confirmed" })).status, 403);
-  assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", staffToken, { status: "confirmed" })).status, 200);
+  assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", staffToken, { status: "confirmed", internalNote: "Staff appointment note" })).status, 200);
+  assert.equal((await request("/api/appointments", "GET", token)).body.find(item => item.id === appointmentId).internalNote, undefined);
+  assert.equal((await request("/api/appointments", "GET", staffToken)).body.find(item => item.id === appointmentId).internalNote, "Staff appointment note");
   assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", staffToken, { status: "checked_in" })).status, 200);
   const record = await request("/api/medical-records", "POST", staffToken, {
     petId: pet.id, appointmentId, doctorName: "Integration doctor", visitDate: "2099-01-02",
-    title: "Checkup", diagnosis: "Healthy", treatment: "Observation",
+    title: "Checkup", diagnosis: "Healthy", treatment: "Observation", internalNote: "Doctor confidential",
   });
   assert.equal(record.status, 201, JSON.stringify(record.body));
   assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: appointmentId } })).status, "completed");
   assert.ok((await request("/api/medical-records", "GET", token)).body.some(item => item.id === record.body.record.id));
+  assert.equal((await request("/api/medical-records", "GET", token)).body.find(item => item.id === record.body.record.id).internalNote, undefined);
   assert.equal((await request(`/api/medical-records/${record.body.record.id}`, "DELETE", token)).status, 403);
   assert.equal((await request(`/api/medical-records/${record.body.record.id}`, "DELETE", staffToken)).status, 204);
   const stay = await request("/api/hotel-bookings", "POST", token, {
@@ -134,12 +138,17 @@ try {
   assert.equal(stay.status, 201, JSON.stringify(stay.body));
   assert.equal(Number(stay.body.booking.totalAmount), 820000);
   const bookingId = stay.body.booking.id;
-  assert.equal((await request(`/api/hotel-bookings/${bookingId}/status`, "PATCH", staffToken, { status: "confirmed" })).status, 200);
+  assert.equal((await request(`/api/hotel-bookings/${bookingId}/status`, "PATCH", staffToken, { status: "confirmed", internalNote: "Staff hotel note" })).status, 200);
+  assert.equal((await request(`/api/hotel-bookings/${bookingId}`, "GET", token)).body.booking.internalNote, undefined);
+  assert.equal((await request(`/api/hotel-bookings/${bookingId}`, "GET", staffToken)).body.booking.internalNote, "Staff hotel note");
   assert.equal((await request(`/api/hotel-bookings/${bookingId}/status`, "PATCH", staffToken, { status: "in_stay" })).status, 200);
   assert.equal((await request(`/api/hotel-bookings/${bookingId}/care-notes`, "POST", staffToken, { note: "Fed and walked" })).status, 201);
   assert.ok((await request("/api/hotel-bookings", "GET", token)).body.some(item => item.id === bookingId));
   assert.equal((await request(`/api/hotel-bookings/${bookingId}/cancel`, "PATCH", token, { ownerNote: "Test finished" })).status, 409);
-  assert.equal((await request("/api/bootstrap", "GET", token)).status, 200);
+  const ownerBootstrap = await request("/api/bootstrap", "GET", token);
+  assert.equal(ownerBootstrap.status, 200);
+  assert.equal(ownerBootstrap.body.hotelBookings.find(item => item.id === bookingId).internalNote, undefined);
+  assert.equal(ownerBootstrap.body.appointments.find(item => item.id === appointmentId).internalNote, undefined);
   assert.equal((await request("/api/invoices", "GET", token)).status, 200);
   const report = await request(`/api/public/pets/${marker}/rescue-reports`, "POST", undefined, { finderPhone: "000", location: "Test park" });
   assert.equal(report.status, 201);

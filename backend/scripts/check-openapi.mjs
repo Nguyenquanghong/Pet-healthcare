@@ -35,5 +35,5 @@ for (const [path, methods] of Object.entries(spec.paths)) {
   }
 }
 assert.deepEqual([...documented].sort(), [...runtime].sort(), "OpenAPI routes differ from mounted runtime routes");
-assert.equal(runtime.size, 53, "Expected route inventory including VietQR changed; review explicitly");
+assert.equal(runtime.size, 55, "Expected route inventory including hotel detail and payment history changed; review explicitly");
 process.stdout.write(`OpenAPI PASS: ${runtime.size} operations match source and schemas validate.\n`);

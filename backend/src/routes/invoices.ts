@@ -20,6 +20,10 @@ export function createInvoicesRouter(service: InvoicesService) {
     const ownerId = typeof req.query.ownerId === "string" ? req.query.ownerId : undefined;
     res.json((await service.list(req.auth!, ownerId)).map(invoiceDto));
   });
+  router.get("/:id/payment-history", async (req, res) => {
+    try { res.json(await service.paymentHistory(req.auth!, req.params.id)); }
+    catch (error) { failure(res, error); }
+  });
 
   router.post("/", async (req, res) => {
     try {

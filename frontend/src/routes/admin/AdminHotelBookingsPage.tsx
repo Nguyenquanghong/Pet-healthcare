@@ -1,7 +1,8 @@
 import { BookingStatusDialog, type StatusDialogSelection } from "./BookingStatusDialog";
 import { useBookingAction } from "./useBookingAction";
 import { apiClient } from "../../services/apiClient";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   CheckCircle2,
   LogIn,
@@ -19,6 +20,7 @@ import {
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
 import { useAppStore } from "../../store/AppStoreProvider";
 import type { DailyCareNote, HotelBooking, HotelBookingStatus } from "../../types/booking";
+import type { Invoice } from "../../types/invoice";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { bookingStatusLabels, eatingStatusLabels, moodLabels } from "../../utils/statusLabels";
 
@@ -63,7 +65,15 @@ export function AdminHotelBookingsPage() {
 
   const [toastMsg, setToastMsg] = useState("");
   const [statusDialog, setStatusDialog] = useState<StatusDialogSelection | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoiceLoadError, setInvoiceLoadError] = useState("");
   const { run: runAction, error: actionError } = useBookingAction();
+  useEffect(() => {
+    let active = true;
+    void apiClient.get<Invoice[]>("/invoices").then(items => { if (active) setInvoices(items); })
+      .catch(reason => { if (active) setInvoiceLoadError(reason instanceof Error ? reason.message : "Không tải được hóa đơn."); });
+    return () => { active = false; };
+  }, []);
 
   const toast = (msg: string) => {
     setToastMsg(msg);
@@ -138,6 +148,7 @@ export function AdminHotelBookingsPage() {
   return (
     <AdminLayout title="Quản lý Hotel Bookings">
       {actionError && <p role="alert" className="fixed right-4 top-20 z-[100] max-w-md rounded-xl border border-rose-300 bg-white p-4 text-rose-700 shadow-lg">{actionError}</p>}
+      {invoiceLoadError && <p role="alert" className="mb-4 text-sm text-rose-700">{invoiceLoadError} Không thể xác định điều kiện check-out.</p>}
       {statusDialog && <BookingStatusDialog kind="hotel" selection={statusDialog} onClose={() => setStatusDialog(null)} onSaved={() => toast("Đã lưu thao tác và lịch sử.")} />}
       {toastMsg && (
         <div className="mb-4 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-emerald-800 font-semibold animate-fadeIn">
@@ -178,6 +189,7 @@ export function AdminHotelBookingsPage() {
               <option value="all">Tất cả phòng</option>
               <option value="standard">Standard</option>
               <option value="deluxe">Deluxe</option>
+              <option value="vip">VIP</option>
             </select>
           </div>
         </div>
@@ -209,6 +221,7 @@ export function AdminHotelBookingsPage() {
           const pet = pets.find((p) => p.id === b.petId);
           const owner = owners.find((o) => o.id === b.ownerId);
           const relatedNotes = dailyCareNotes.filter((n) => n.bookingId === b.id);
+          const invoice = invoices.find(item => item.hotelBookingId === b.id);
 
           return (
             <div
@@ -299,7 +312,7 @@ export function AdminHotelBookingsPage() {
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button onClick={() => setStatusDialog({ booking: b, intent: "history" })} className="rounded-lg border px-2 py-1.5 text-xs">Lịch sử thao tác</button>
                   {(b.status === "in_stay" || (b.status === "checked_out" && userRole === "admin")) &&
-                    <button onClick={() => setStatusDialog({ booking: b, intent: "undo" })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{b.status === "in_stay" ? "Hoàn tác check-in" : "Mở lại dịch vụ"}</button>}
+                    <button onClick={() => setStatusDialog({ booking: b, intent: "undo" })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{b.status === "in_stay" ? "Hoàn tác check-in" : "Hoàn tác trả thú cưng"}</button>}
 
                   {b.status === "pending" && (
                     <>
@@ -332,6 +345,7 @@ export function AdminHotelBookingsPage() {
 
                   {b.status === "in_stay" && (
                     <>
+                      <Link to={invoice ? "/admin/billing" : `/admin/billing?hotelBookingId=${encodeURIComponent(b.id)}`} className="rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary">{invoice ? "Xem hóa đơn" : "Chốt hóa đơn"}</Link>
                       <button
                         onClick={() => {
                           setDailyNoteModal(b.id);
@@ -345,9 +359,11 @@ export function AdminHotelBookingsPage() {
                       </button>
                       <button
                         onClick={() => handleStatus(b.id, "checked_out")}
-                        className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors"
+                        disabled={invoice?.paymentStatus !== "paid"}
+                        title={invoice?.paymentStatus === "paid" ? "Xác nhận bàn giao thú cưng" : "Cần chốt hóa đơn và xác nhận đã thu đủ tiền"}
+                        className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <LogOut size={13} /> Check-out
+                        <LogOut size={13} /> {invoice?.paymentStatus === "paid" ? "Check-out" : "Chờ thanh toán"}
                       </button>
                     </>
                   )}

@@ -25,7 +25,7 @@ export function BookingStatusDialog({ kind, selection, onClose, onSaved }: {
   const path = `/${kind === "appointment" ? "appointments" : "hotel-bookings"}/${booking.id}`;
   const undo = intent === "undo", history = intent === "history";
   const checkin = booking.status === "checked_in" || booking.status === "in_stay";
-  const title = history ? "Lịch sử thao tác" : undo ? checkin ? "Hoàn tác check-in" : "Mở lại dịch vụ"
+  const title = history ? "Lịch sử thao tác" : undo ? checkin ? "Hoàn tác check-in" : kind === "hotel" ? "Hoàn tác trả thú cưng" : "Mở lại dịch vụ"
     : ["checked_in", "in_stay"].includes(intent) ? "Xác nhận đã nhận thú cưng"
     : intent === "checked_out" ? "Xác nhận đã trả thú cưng" : intent === "completed" ? "Xác nhận hoàn thành dịch vụ" : `Xác nhận: ${labels[intent] || intent}`;
   useEffect(() => { dialog.current?.showModal(); }, []);
@@ -82,7 +82,7 @@ export function BookingStatusDialog({ kind, selection, onClose, onSaved }: {
           onChange={e => setReason(e.target.value)} className="mt-1 w-full rounded-lg border p-2 font-normal" /></label>
       </> : <p className="text-sm">Kiểm tra đúng thú cưng, chủ nuôi và lịch dịch vụ trước khi xác nhận.
         {intent === "completed" && " Hoàn thành dịch vụ không đồng nghĩa đã trả thú cưng hoặc đã thu tiền."}
-        {intent === "checked_out" && " Chỉ xác nhận sau khi đã bàn giao thú cưng cho người nhận phù hợp; trạng thái thanh toán được quản lý riêng."}</p>}
+        {intent === "checked_out" && " Chỉ xác nhận sau khi hóa đơn đã được xác nhận thu đủ tiền và đã bàn giao thú cưng cho đúng người nhận."}</p>}
       <button type="submit" disabled={busy || submitting.current || (undo && !reason.trim())} className="mt-4 rounded-lg bg-primary px-4 py-2 font-semibold text-white disabled:opacity-50">
         {busy ? "Đang lưu…" : undo ? "Xác nhận hoàn tác" : title}</button>
     </form>}

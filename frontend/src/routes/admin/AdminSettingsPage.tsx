@@ -1,4 +1,4 @@
-import { Building, CheckCircle2, Clock, Database, Phone, ShieldCheck, Stethoscope } from "lucide-react";
+import { Building, Clock, Database, Phone, ShieldCheck } from "lucide-react";
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
 import { useAppStore } from "../../store/AppStoreProvider";
 
@@ -16,7 +16,8 @@ export function AdminSettingsPage() {
     <AdminLayout title="Cài đặt hệ thống">
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-lg border border-slate-200 bg-white p-6">
-          <h2 className="mb-5 flex items-center gap-2 text-lg font-semibold text-slate-900"><Building size={20} className="text-primary" /> Thông tin cơ sở</h2>
+          <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold text-slate-900"><Building size={20} className="text-primary" /> Thông tin cơ sở minh họa</h2>
+          <p className="mb-5 text-xs text-slate-500">Các thông tin dưới đây chưa được kết nối với cấu hình vận hành của cửa hàng.</p>
           <dl className="space-y-4 text-sm">
             <div><dt className="text-xs font-semibold text-slate-500">Tên cơ sở</dt><dd className="mt-1 font-medium text-slate-900">Nippon Pet Care</dd></div>
             <div><dt className="text-xs font-semibold text-slate-500">Địa chỉ</dt><dd className="mt-1 text-slate-700">18 Phạm Hùng, Mỹ Đình 2, Nam Từ Liêm, Hà Nội</dd></div>
@@ -25,18 +26,6 @@ export function AdminSettingsPage() {
               <div><dt className="text-xs font-semibold text-slate-500">Giờ làm việc</dt><dd className="mt-1 flex items-center gap-1.5 text-slate-700"><Clock size={14} /> 08:00 - 20:00</dd></div>
             </div>
           </dl>
-        </section>
-
-        <section className="rounded-lg border border-slate-200 bg-white p-6">
-          <h2 className="mb-5 flex items-center gap-2 text-lg font-semibold text-slate-900"><Stethoscope size={20} className="text-primary" /> Nhân sự trực</h2>
-          <div className="divide-y divide-slate-200">
-            {["Bs. Mai Nguyễn", "Dr. Kenji Sato"].map((name) => (
-              <div key={name} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                <div><p className="text-sm font-semibold text-slate-900">{name}</p><p className="text-xs text-slate-500">Bác sĩ thú y</p></div>
-                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700"><CheckCircle2 size={13} /> Đang trực</span>
-              </div>
-            ))}
-          </div>
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white p-6 lg:col-span-2">

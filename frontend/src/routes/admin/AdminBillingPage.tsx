@@ -15,6 +15,7 @@ import { formatInvoiceCurrency as formatCurrency } from "../../utils/formatCurre
 
 import { apiClient } from "../../services/apiClient";
 import { InvoiceIssueForm } from "./InvoiceIssueForm";
+import { useSearchParams } from "react-router-dom";
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { cash: "Tiền mặt", bank_transfer: "Chuyển khoản", credit_card: "Thẻ", qr_code: "QR", vnpay: "VNPay" };
 
@@ -30,17 +31,24 @@ const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   refunded: "Đã hoàn tiền",
 };
 
+type PaymentEvent = { id: string; action: string; fromStatus: string; toStatus: string;
+  actorName: string; actorRole: string; reason: string | null; reference: string | null; createdAt: string };
+
 export function AdminBillingPage() {
+  const [searchParams] = useSearchParams();
+  const initialHotelBookingId = searchParams.get("hotelBookingId");
   const { pets, owners } = useAppStore();
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [paymentEvents, setPaymentEvents] = useState<PaymentEvent[]>([]);
+  const [historyError, setHistoryError] = useState("");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const selectedInvoice = invoices.find(invoice => invoice.id === selectedId);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [issuing, setIssuing] = useState(false);
+  const [issuing, setIssuing] = useState(Boolean(initialHotelBookingId));
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [paymentError, setPaymentError] = useState("");
@@ -56,6 +64,22 @@ export function AdminBillingPage() {
     finally { setLoading(false); }
   };
   useEffect(() => { void loadInvoices(); }, []);
+  useEffect(() => {
+    if (!initialHotelBookingId) return;
+    const existing = invoices.find(item => item.hotelBookingId === initialHotelBookingId);
+    if (existing) { setIssuing(false); setSelectedId(existing.id); }
+  }, [initialHotelBookingId, invoices]);
+  useEffect(() => {
+    if (!selectedId) return;
+    let active = true;
+    setHistoryError(""); setPaymentEvents([]);
+    void apiClient.get<PaymentEvent[]>(`/invoices/${selectedId}/payment-history`).then(events => {
+      if (active) setPaymentEvents(events);
+    }).catch(reason => {
+      if (active) setHistoryError(reason instanceof Error ? reason.message : "Không tải được lịch sử thanh toán.");
+    });
+    return () => { active = false; };
+  }, [selectedId]);
   const [toastMsg, setToastMsg] = useState("");
 
   const toast = (msg: string) => {
@@ -117,7 +141,7 @@ export function AdminBillingPage() {
       </div>
       {loadError && <p role="alert" className="mb-4 text-rose-700">{loadError}</p>}
       {loading && <p role="status" className="mb-4">Đang tải hóa đơn...</p>}
-      {issuing && <InvoiceIssueForm invoices={invoices} onClose={() => setIssuing(false)} onCreated={invoice => {
+      {issuing && !loading && <InvoiceIssueForm invoices={invoices} initialSourceKey={initialHotelBookingId ? `hotel_booking:${initialHotelBookingId}` : ""} onClose={() => setIssuing(false)} onCreated={invoice => {
         setInvoices(previous => [invoice, ...previous]); setIssuing(false); toast("Đã lưu hóa đơn chờ thanh toán.");
       }} />}
       {paymentInvoice && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
@@ -128,7 +152,7 @@ export function AdminBillingPage() {
           <p className="text-xl font-bold">{formatCurrency(paymentInvoice.totalAmount)}</p>
           <label className="block">Phương thức thanh toán
             <select className="mt-1 w-full rounded-lg border p-2" value={paymentMethod} disabled={paying || paymentInvoice.paymentChannel === "bank_transfer"} onChange={event => setPaymentMethod(event.target.value as PaymentMethod)}>
-              {Object.entries(PAYMENT_METHOD_LABELS).filter(([value]) => value !== "vnpay").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {(["cash", "bank_transfer"] as const).map(value => <option key={value} value={value}>{PAYMENT_METHOD_LABELS[value]}</option>)}
             </select>
           </label>
           <p className="text-sm text-slate-600">Chỉ xác nhận sau khi đã nhận đủ tiền. Thao tác này ghi nhận khoản thu, không tự trừ tiền từ thẻ hoặc tài khoản ngân hàng.</p>
@@ -448,6 +472,17 @@ export function AdminBillingPage() {
                 {selectedInvoice.paidAt && <p>Thời điểm thu tiền: {new Date(selectedInvoice.paidAt).toLocaleString("vi-VN")}</p>}
                 {selectedInvoice.notes && <p>Ghi chú: {selectedInvoice.notes}</p>}
               </div>
+              <section className="rounded-lg border p-3 print:hidden">
+                <h3 className="font-semibold">Lịch sử kiểm tra thanh toán</h3>
+                {historyError && <p role="alert" className="text-rose-700">{historyError}</p>}
+                {!historyError && paymentEvents.length === 0 && <p className="text-sm text-slate-500">Chưa có sự kiện được ghi nhận. Hóa đơn cũ có thể không có lịch sử người xác nhận.</p>}
+                <ol className="mt-2 space-y-2">{paymentEvents.map(event => <li key={event.id} className="border-t pt-2 text-sm">
+                  <strong>{event.action === "payment_confirmed" ? "Đã xác nhận thu tiền" : event.action === "transfer_reported" ? "Khách báo đã chuyển khoản" : "Nhân viên yêu cầu kiểm tra lại"}</strong>
+                  <p>{event.actorName} ({event.actorRole}) · {new Date(event.createdAt).toLocaleString("vi-VN")}</p>
+                  {event.reference && <p>Mã khách báo: {event.reference}</p>}
+                  {event.reason && <p>Lý do: {event.reason}</p>}
+                </li>)}</ol>
+              </section>
 
               {/* Signatures */}
               <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs">

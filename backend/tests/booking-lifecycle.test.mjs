@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BookingLifecycleService } from "../dist/src/application/services/bookingLifecycle.js";
 const staff = { sub: "staff", role: "staff" }, admin = { sub: "admin", role: "admin" }, owner = { sub: "owner", role: "owner" };
-function fixture(status = "confirmed", linked = {}) {
+function fixture(status = "confirmed", linked = {}, paymentStatus = null) {
   const events = [], notices = [];
   let booking = { id: "b", ownerId: "owner", status, statusRevision: 0 };
   const service = new BookingLifecycleService({
     history: async () => events,
     run: async (_kind, _id, work) => work({ booking,
       dependencies: async () => ({ medical: 0, care: 0, invoices: 0, ...linked }),
+      hotelInvoiceStatus: async () => paymentStatus,
       latestTransition: async () => events.at(-1) || null,
       save: async (next) => booking = { ...booking, status: next, statusRevision: booking.statusRevision + 1 },
       event: async (actor, action, fromStatus, toStatus, revision, reason, reversesId) => events.push({ id: `event-${revision}`, actorId: actor.sub, action, fromStatus, toStatus, revision, reason, reversesId }),
@@ -24,6 +25,20 @@ test("check-in reversal keeps original event, records actor/reason and returns b
   assert.equal(f.booking.status, "confirmed"); assert.equal(f.events.length, 2); assert.equal(f.notices.length, 2);
   assert.equal(f.events[0].toStatus, "checked_in"); assert.equal(f.events[1].reversesId, f.events[0].id);
   assert.equal(f.events[1].reason, "Wrong pet"); assert.equal(f.events[1].actorId, staff.sub);
+});
+test("hotel checkout requires a paid final invoice and admin undo preserves the financial record", async () => {
+  const none = fixture("in_stay");
+  await assert.rejects(none.service.change(staff, "hotel", "b", { status: "checked_out", expectedRevision: 0 }), { status: 409 });
+  const unpaid = fixture("in_stay", { invoices: 1 }, "unpaid");
+  await assert.rejects(unpaid.service.change(staff, "hotel", "b", { status: "checked_out", expectedRevision: 0 }), { status: 409 });
+  const paid = fixture("in_stay", { invoices: 1, care: 1 }, "paid");
+  await paid.service.change(staff, "hotel", "b", { status: "checked_out", expectedRevision: 0 });
+  await assert.rejects(paid.service.undo(staff, "hotel", "b", { reason: "Wrong handover", expectedRevision: 1 }), { status: 403 });
+  await paid.service.undo(admin, "hotel", "b", { reason: "Wrong handover", expectedRevision: 1 });
+  assert.equal(paid.booking.status, "in_stay");
+  assert.equal(paid.events[1].reversesId, paid.events[0].id);
+  await paid.service.change(staff, "hotel", "b", { status: "checked_out", expectedRevision: 2 });
+  assert.equal(paid.booking.status, "checked_out");
 });
 test("guards reject missing/stale revision, skipping stages, owner actions and empty undo reason", async () => {
   const f = fixture();

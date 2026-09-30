@@ -1,3 +1,5 @@
+import type { Actor } from "../../domain/auth.js";
+
 export type InvoiceValue = {
   id: string; invoiceCode: string; type: string; ownerId: string; petId: string;
   appointmentId: string | null; hotelBookingId: string | null;
@@ -37,10 +39,12 @@ export interface InvoiceIssuance {
 export interface InvoiceRepository {
   list(ownerId?: string): Promise<InvoiceValue[]>;
   find(id: string, ownerId?: string): Promise<InvoiceValue | null>;
-  pay(id: string, paymentMethod: string, paidAt: Date): Promise<InvoiceValue>;
+  pay(id: string, paymentMethod: string, paidAt: Date, actor: Actor): Promise<InvoiceValue>;
   issue<T>(work: (transaction: InvoiceIssuance) => Promise<T>): Promise<T>;
   chooseOnsite(id: string, ownerId: string): Promise<InvoiceValue>;
   chooseTransfer(id: string, ownerId: string, details: BankTransferDetails): Promise<InvoiceValue>;
-  reportTransfer(id: string, ownerId: string, reference: string | null): Promise<InvoiceValue>;
-  rejectTransfer(id: string, reason: string): Promise<InvoiceValue>;
+  reportTransfer(id: string, ownerId: string, reference: string | null, actor: Actor): Promise<InvoiceValue>;
+  rejectTransfer(id: string, reason: string, actor: Actor): Promise<InvoiceValue>;
+  paymentHistory(id: string): Promise<Array<{ id: string; action: string; fromStatus: string; toStatus: string;
+    actorId: string; actorName: string; actorRole: string; reason: string | null; reference: string | null; createdAt: Date }>>;
 }

@@ -16,27 +16,27 @@ export function createAppointmentsRouter(service: AppointmentService) {
 
   router.get("/", async (req, res) => {
     const ownerId = typeof req.query.ownerId === "string" ? req.query.ownerId : undefined;
-    res.json((await service.list(req.auth!, ownerId)).map(appointmentDto));
+    res.json((await service.list(req.auth!, ownerId)).map(item => appointmentDto(item, req.auth!.role === "owner")));
   });
 
   router.post("/", async (req, res) => {
     try {
       const appointment = await service.create(req.auth!, req.body);
-      res.status(201).json({ appointment: appointmentDto(appointment) });
+      res.status(201).json({ appointment: appointmentDto(appointment, req.auth!.role === "owner") });
     } catch (error) { failure(res, error); }
   });
 
   router.patch("/:id/status", async (req, res) => {
     try {
       const appointment = await service.changeStatus(req.auth!, req.params.id, req.body ?? {});
-      res.json({ appointment: appointmentDto(appointment) });
+      res.json({ appointment: appointmentDto(appointment, req.auth!.role === "owner") });
     } catch (error) { failure(res, error); }
   });
 
   router.patch("/:id/reschedule", async (req, res) => {
     try {
       const appointment = await service.reschedule(req.auth!, req.params.id, req.body ?? {});
-      res.json({ appointment: appointmentDto(appointment) });
+      res.json({ appointment: appointmentDto(appointment, req.auth!.role === "owner") });
     } catch (error) { failure(res, error); }
   });
 
@@ -45,14 +45,14 @@ export function createAppointmentsRouter(service: AppointmentService) {
     catch (error) { failure(res, error); }
   });
   router.post("/:id/undo-status", async (req, res) => {
-    try { res.json({ appointment: appointmentDto(await service.undoStatus(req.auth!, req.params.id, req.body ?? {})) }); }
+    try { res.json({ appointment: appointmentDto(await service.undoStatus(req.auth!, req.params.id, req.body ?? {}), req.auth!.role === "owner") }); }
     catch (error) { failure(res, error); }
   });
 
   router.patch("/:id/cancel", async (req, res) => {
     try {
       const appointment = await service.cancel(req.auth!, req.params.id, req.body ?? {});
-      res.json({ appointment: appointmentDto(appointment) });
+      res.json({ appointment: appointmentDto(appointment, req.auth!.role === "owner") });
     } catch (error) { failure(res, error); }
   });
 

@@ -1,7 +1,15 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import type { InvoiceRepository, InvoiceIssuance, BankTransferDetails } from "../../application/ports/invoices.js";
 import { BusinessError } from "../../domain/error.js";
+import type { Actor } from "../../domain/auth.js";
+
+async function recordPaymentEvent(tx: Prisma.TransactionClient, invoiceId: string, action: string,
+  fromStatus: string, toStatus: string, actor: Actor, reason?: string | null, reference?: string | null) {
+  const user = await tx.user.findUnique({ where: { id: actor.sub }, select: { fullName: true } });
+  await tx.paymentEvent.create({ data: { invoiceId, action, fromStatus, toStatus, actorId: actor.sub,
+    actorName: user?.fullName ?? actor.sub, actorRole: actor.role, reason, reference } });
+}
 
 export class PrismaInvoiceRepository implements InvoiceRepository {
   constructor(private readonly client: PrismaClient) {}
@@ -11,7 +19,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
   find(id: string, ownerId?: string) {
     return this.client.invoice.findFirst({ where: { id, ...(ownerId ? { ownerId } : {}) }, include: { items: true } });
   }
-  pay(id: string, paymentMethod: string, paidAt: Date) {
+  pay(id: string, paymentMethod: string, paidAt: Date, actor: Actor) {
     return this.client.$transaction(async (tx) => {
       // Conditional write serializes competing payments; a retry cannot overwrite the receipt.
       await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${id} FOR UPDATE`;
@@ -22,7 +30,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       if (await tx.paymentAttempt.count({ where: { invoiceId: id, status: { in: ["pending", "review"] } } }))
         throw new BusinessError(409, "Giao dịch VNPay cần đối soát, không xác nhận thu tiền lần nữa.");
       const changed = await tx.invoice.updateMany({ where: { id, paymentStatus: "unpaid" },
-        data: { paymentStatus: "paid", paymentMethod: paymentMethod as "cash" | "bank_transfer" | "credit_card" | "qr_code", paidAt,
+        data: { paymentStatus: "paid", paymentMethod: paymentMethod as "cash" | "bank_transfer", paidAt,
           paymentChannel: before?.paymentChannel === "bank_transfer" ? "bank_transfer" : "onsite",
           ...(before?.paymentChannel === "bank_transfer" ? { transferReviewStatus: "confirmed", transferReviewNote: null } : {}) } });
       const invoice = await tx.invoice.findUnique({ where: { id }, include: { items: true } });
@@ -30,8 +38,12 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       if (invoice.paymentStatus !== "paid" || invoice.paymentMethod !== paymentMethod) {
         throw new BusinessError(409, "Hóa đơn đã được thanh toán bằng phương thức khác hoặc đã hoàn tiền.");
       }
-      if (changed.count) await tx.notification.create({ data: { recipientOwnerId: invoice.ownerId, recipientRole: "owner", type: "invoice_paid",
-        title: "Đã xác nhận thanh toán", message: `Hóa đơn ${invoice.invoiceCode} đã được xác nhận thu đủ tiền.`, actionUrl: "/owner/billing" } });
+      if (changed.count) {
+        await recordPaymentEvent(tx, id, "payment_confirmed", before!.paymentStatus, "paid", actor,
+          null, before?.paymentChannel === "bank_transfer" ? before.transferReference : null);
+        await tx.notification.create({ data: { recipientOwnerId: invoice.ownerId, recipientRole: "owner", type: "invoice_paid",
+          title: "Đã xác nhận thanh toán", message: `Hóa đơn ${invoice.invoiceCode} đã được xác nhận thu đủ tiền.`, actionUrl: "/owner/billing" } });
+      }
       return invoice;
     });
   }
@@ -88,7 +100,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
         ...(invoice.bankTransferDetails ? {} : { bankTransferDetails: details }) }, include: { items: true } });
     });
   }
-  reportTransfer(id: string, ownerId: string, reference: string | null) {
+  reportTransfer(id: string, ownerId: string, reference: string | null, actor: Actor) {
     return this.client.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${id} FOR UPDATE`;
       const invoice = await tx.invoice.findUnique({ where: { id }, include: { items: true } });
@@ -98,13 +110,14 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       if (invoice.transferReviewStatus === "pending") return invoice;
       const updated = await tx.invoice.update({ where: { id }, data: { transferReviewStatus: "pending",
         transferReportedAt: new Date(), transferReference: reference, transferReviewNote: null }, include: { items: true } });
+      await recordPaymentEvent(tx, id, "transfer_reported", invoice.transferReviewStatus ?? "none", "pending", actor, null, reference);
       await tx.notification.create({ data: { recipientRole: "admin", type: "transfer_reported",
         title: "Khách báo đã chuyển khoản", message: `Kiểm tra tiền nhận cho hóa đơn ${invoice.invoiceCode} trước khi xác nhận.`,
         actionUrl: "/admin/billing" } });
       return updated;
     });
   }
-  rejectTransfer(id: string, reason: string) {
+  rejectTransfer(id: string, reason: string, actor: Actor) {
     return this.client.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${id} FOR UPDATE`;
       const invoice = await tx.invoice.findUnique({ where: { id } });
@@ -112,9 +125,13 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       if (invoice.paymentStatus !== "unpaid" || invoice.paymentChannel !== "bank_transfer" || invoice.transferReviewStatus !== "pending")
         throw new BusinessError(409, "Báo chuyển khoản không còn chờ kiểm tra. Hãy tải lại.");
       const updated = await tx.invoice.update({ where: { id }, data: { transferReviewStatus: "rejected", transferReviewNote: reason }, include: { items: true } });
+      await recordPaymentEvent(tx, id, "transfer_rejected", "pending", "rejected", actor, reason, invoice.transferReference);
       await tx.notification.create({ data: { recipientOwnerId: invoice.ownerId, recipientRole: "owner", type: "transfer_rejected",
         title: "Chuyển khoản cần kiểm tra lại", message: `Hóa đơn ${invoice.invoiceCode}: ${reason}`, actionUrl: "/owner/billing" } });
       return updated;
     });
+  }
+  paymentHistory(id: string) {
+    return this.client.paymentEvent.findMany({ where: { invoiceId: id }, orderBy: { createdAt: "desc" } });
   }
 }

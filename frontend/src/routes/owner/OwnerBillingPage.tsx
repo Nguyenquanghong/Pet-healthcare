@@ -56,8 +56,6 @@ export function OwnerBillingPage() {
   const sources = [
     ...appointments.filter(a => a.status === "completed" && !invoices.some(i => i.appointmentId === a.id))
       .map(a => ({ id: a.id, type: "appointment", petId: a.petId, label: `${a.serviceName} · ${a.date}`, fixed: isSpaAppointmentType(a.type) })),
-    ...hotelBookings.filter(b => b.status === "checked_out" && !invoices.some(i => i.hotelBookingId === b.id))
-      .map(b => ({ id: b.id, type: "hotel_booking", petId: b.petId, label: `Lưu trú ${b.checkIn} → ${b.checkOut}`, fixed: true })),
   ];
   const button = "rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50";
   return <OwnerLayout title="Hóa đơn & Thanh toán">
@@ -70,6 +68,8 @@ export function OwnerBillingPage() {
     {loading ? <p>Đang tải hóa đơn...</p> : <>
       {!bankTransfer && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Cửa hàng chưa cấu hình tài khoản nhận chuyển khoản. Bạn vẫn có thể chọn thanh toán tại cửa hàng.</p>}
       {!invoices.length && !sources.length && <p className="rounded-xl bg-white p-6 text-slate-600">Bạn chưa có hóa đơn cần thanh toán.</p>}
+      {hotelBookings.some(b => b.status === "in_stay" && !invoices.some(i => i.hotelBookingId === b.id)) &&
+        <p className="rounded-xl bg-blue-50 p-4 text-sm text-blue-800">Cửa hàng sẽ chốt hóa đơn lưu trú và các dịch vụ phát sinh trước khi bạn thanh toán.</p>}
       <div className="space-y-5">
         {invoices.map(invoice => <article key={invoice.id} aria-label={invoice.invoiceCode} className="rounded-xl border bg-white p-5 shadow-sm">
           <div className="flex flex-wrap justify-between gap-2">

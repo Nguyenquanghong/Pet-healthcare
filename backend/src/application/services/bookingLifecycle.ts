@@ -36,7 +36,10 @@ export class BookingLifecycleService {
       }
       if (!transitions[kind][from]?.includes(to)) throw new BusinessError(409, "Không thể chuyển trạng thái theo thứ tự này. Nếu thao tác nhầm, hãy dùng Hoàn tác.");
       const linked = await tx.dependencies();
-      if (linked.invoices || linked.medical || (kind === "hotel" && from !== "in_stay" && linked.care))
+      const hotelCheckout = kind === "hotel" && from === "in_stay" && to === "checked_out";
+      if (hotelCheckout && await tx.hotelInvoiceStatus() !== "paid")
+        throw new BusinessError(409, "Chỉ trả thú cưng khi hóa đơn cuối cùng đã được xác nhận thu đủ tiền.");
+      if ((!hotelCheckout && linked.invoices) || linked.medical || (kind === "hotel" && from !== "in_stay" && linked.care))
         throw new BusinessError(409, "Lịch đã có dữ liệu nghiệp vụ liên quan. Cần quản trị viên kiểm tra trước khi điều chỉnh.");
       const saved = await tx.save(to, { internalNote: input.internalNote });
       await tx.event(actor, "transition", from, to, saved.statusRevision);
@@ -57,7 +60,8 @@ export class BookingLifecycleService {
       if (!checkin && !finished) throw new BusinessError(409, "Chỉ hoàn tác check-in khi chưa bắt đầu dịch vụ, hoặc mở lại dịch vụ vừa hoàn thành.");
       if (finished && actor.role !== "admin") throw new BusinessError(403, "Chỉ quản trị viên được mở lại dịch vụ đã hoàn thành.");
       const linked = await tx.dependencies();
-      if (linked.medical || linked.invoices || (checkin && linked.care))
+      const hotelHandoverUndo = kind === "hotel" && finished;
+      if (linked.medical || (!hotelHandoverUndo && linked.invoices) || (checkin && linked.care))
         throw new BusinessError(409, "Không thể hoàn tác nhanh vì đã có bệnh án, nhật ký chăm sóc hoặc hóa đơn liên quan. Cần quản trị viên đối chiếu; dữ liệu hiện tại được giữ nguyên.");
       const event = await tx.latestTransition();
       if (!event || event.action !== "transition" || event.toStatus !== from)

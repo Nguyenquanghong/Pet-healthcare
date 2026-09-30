@@ -76,13 +76,15 @@ export function publicPetDto(pet: PetValue) {
   };
 }
 
-export function appointmentDto(item: AppointmentRecord) {
-  return { ...item, date: dateOnly(item.appointmentDate), time: item.appointmentTime, appointmentDate: undefined, appointmentTime: undefined };
+export function appointmentDto(item: AppointmentRecord, owner = false) {
+  const { internalNote, ...visible } = item;
+  return { ...visible, ...(owner ? {} : { internalNote }), date: dateOnly(item.appointmentDate), time: item.appointmentTime, appointmentDate: undefined, appointmentTime: undefined };
 }
 
-export function medicalRecordDto(item: MedicalRecordValue) {
+export function medicalRecordDto(item: MedicalRecordValue, owner = false) {
+  const { internalNote, ...visible } = item;
   return {
-    ...item,
+    ...visible, ...(owner ? {} : { internalNote }),
     visitDate: dateOnly(item.visitDate),
     followUpDate: item.followUpDate ? dateOnly(item.followUpDate) : undefined,
     weightKg: item.weightKg === null ? undefined : Number(item.weightKg),
@@ -90,9 +92,10 @@ export function medicalRecordDto(item: MedicalRecordValue) {
   };
 }
 
-export function hotelBookingDto(item: HotelBookingValue) {
+export function hotelBookingDto(item: HotelBookingValue, owner = false) {
+  const { internalNote, ...visible } = item;
   return {
-    ...item,
+    ...visible, ...(owner ? {} : { internalNote }),
     checkIn: dateOnly(item.checkIn),
     checkOut: dateOnly(item.checkOut),
     totalAmount: Number(item.totalAmount),

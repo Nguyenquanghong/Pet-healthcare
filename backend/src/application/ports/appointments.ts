@@ -47,7 +47,6 @@ export interface AppointmentRepository {
     serviceName: string; clinicName: string; appointmentDate: Date; appointmentTime: string;
     ownerNote: string | null; createdBy: string;
   }): Promise<AppointmentRecord>;
-  update(id: string, data: Partial<Pick<AppointmentRecord, "status" | "internalNote" | "appointmentDate" | "appointmentTime" | "ownerNote">>): Promise<AppointmentRecord>;
 }
 
 export interface NotificationWriter {

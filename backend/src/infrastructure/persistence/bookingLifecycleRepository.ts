@@ -32,6 +32,15 @@ export class PrismaBookingLifecycleStore implements BookingLifecycleStore {
           care: kind === "hotel" ? await tx.dailyCareNote.count({ where: { bookingId: id } }) : 0,
           invoices: await tx.invoice.count({ where: kind === "appointment" ? { appointmentId: id } : { hotelBookingId: id } }),
         }),
+        hotelInvoiceStatus: async () => {
+          if (kind !== "hotel") return null;
+          const invoice = await tx.invoice.findUnique({ where: { hotelBookingId: id }, select: { id: true } });
+          if (!invoice) return null;
+          // Payment confirmation locks the invoice row. Reading under the same lock
+          // makes checkout observe the committed payment result.
+          await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${invoice.id} FOR UPDATE`;
+          return (await tx.invoice.findUnique({ where: { id: invoice.id }, select: { paymentStatus: true } }))?.paymentStatus ?? null;
+        },
         latestTransition: () => tx.bookingStatusEvent.findFirst({ where: { kind, bookingId: id, action: { not: "note_updated" } }, orderBy: { revision: "desc" } }),
         save: (status, patch = {}) => kind === "appointment"
           ? appointmentSlotWrite(tx.appointment.update({ where: { id }, data: { ...patch, status: status as Prisma.AppointmentUpdateInput["status"], statusRevision: { increment: 1 } } }))

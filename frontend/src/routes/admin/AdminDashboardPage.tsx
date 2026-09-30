@@ -22,10 +22,10 @@ function StatCard({ label, value, icon: Icon, subtitle }: { label: string; value
 
 export function AdminDashboardPage() {
   const navigate = useNavigate();
-  const { appointments, hotelBookings, pets, owners, notifications, medicalRecords, updateAppointmentStatus, updateHotelBookingStatus } = useAppStore();
+  const { appointments, hotelBookings, pets, owners, notifications, medicalRecords } = useAppStore();
 
-  const today = new Date().toISOString().slice(0, 10);
-  const todayAppointments = appointments.filter(a => a.date === today || a.status === "confirmed" || a.status === "pending");
+  const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+  const todayAppointments = appointments.filter(a => a.date === today);
   const pendingAppointments = appointments.filter(a => a.status === "pending");
   const pendingBookings = hotelBookings.filter(b => b.status === "pending");
   const checkedInBookings = hotelBookings.filter(b => b.status === "in_stay");
@@ -55,13 +55,11 @@ export function AdminDashboardPage() {
               return (
                 <button
                   key={a.id}
-                  onClick={() => {
-                    updateAppointmentStatus(a.id, "confirmed");
-                  }}
+                  onClick={() => navigate("/admin/appointments")}
                   className="inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100"
                 >
                   <CheckCircle2 size={14} className="text-emerald-600" />
-                  Xác nhận lịch {pet?.name} · {a.time} {a.date}
+                  Xem và xác nhận lịch {pet?.name} · {a.time} {a.date}
                 </button>
               );
             })}
@@ -70,13 +68,11 @@ export function AdminDashboardPage() {
               return (
                 <button
                   key={b.id}
-                  onClick={() => {
-                    updateHotelBookingStatus(b.id, "confirmed");
-                  }}
+                  onClick={() => navigate("/admin/hotel-bookings")}
                   className="inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100"
                 >
                   <BedDouble size={14} className="text-indigo-600" />
-                  Xác nhận hotel {pet?.name} · {b.checkIn} → {b.checkOut}
+                  Xem và xác nhận hotel {pet?.name} · {b.checkIn} → {b.checkOut}
                 </button>
               );
             })}
@@ -122,10 +118,10 @@ export function AdminDashboardPage() {
                     </span>
                     {a.status === "pending" && (
                       <button
-                        onClick={() => updateAppointmentStatus(a.id, "confirmed")}
+                        onClick={() => navigate("/admin/appointments")}
                         className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary-dark transition-colors"
                       >
-                        Xác nhận
+                        Xem và xác nhận
                       </button>
                     )}
                   </div>
@@ -165,10 +161,10 @@ export function AdminDashboardPage() {
                       {bookingStatusLabels[b.status]}
                     </span>
                     <button
-                      onClick={() => updateHotelBookingStatus(b.id, "confirmed")}
+                      onClick={() => navigate("/admin/hotel-bookings")}
                       className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary-dark transition-colors"
                     >
-                      Xác nhận
+                      Xem và xác nhận
                     </button>
                   </div>
                 </div>

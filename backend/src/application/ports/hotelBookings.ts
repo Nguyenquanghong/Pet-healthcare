@@ -24,12 +24,15 @@ export type CareNoteWrite = {
 
 export interface HotelBookingRepository {
   list(ownerId?: string): Promise<HotelBookingValue[]>;
+  find(id: string): Promise<HotelBookingValue | null>;
   findPet(id: string): Promise<{ id: string; ownerId: string; name: string } | null>;
   findWithPet(id: string): Promise<{ booking: HotelBookingValue; petName: string } | null>;
-  findForCancel(id: string): Promise<HotelBookingValue | null>;
+  lockActor(id: string): Promise<void>;
+  lockPet(id: string): Promise<void>;
+  findRequest(actorId: string, key: string): Promise<{ fingerprint: string; bookingId: string } | null>;
+  saveRequest(actorId: string, key: string, fingerprint: string, bookingId: string): Promise<void>;
+  hasOverlappingStay(petId: string, checkIn: Date, checkOut: Date): Promise<boolean>;
   create(data: HotelBookingWrite): Promise<HotelBookingValue>;
-  updateStatus(id: string, status: string, internalNote: string | null): Promise<HotelBookingValue>;
-  cancel(id: string, ownerNote: string | null): Promise<HotelBookingValue>;
   createCareNote(data: CareNoteWrite): Promise<CareNoteValue>;
 }
 

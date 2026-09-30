@@ -5,6 +5,7 @@ import pricing from "../../../backend/src/domain/pricing.json";
 export const ROOM_PRICES: Record<HotelRoomType, number> = {
   standard: pricing.roomRates.standard,
   deluxe: pricing.roomRates.deluxe,
+  vip: pricing.roomRates.vip,
 };
 
 export const HOTEL_SERVICE_PRICES: Record<HotelServiceKey, { label: string; price: number; unit: "each" | "day" }> = {

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { Appointment, AppointmentStatus, AppointmentType } from "../types/appointment";
-import type { DailyCareNote, HotelBooking, HotelBookingStatus } from "../types/booking";
+import type { Appointment, AppointmentType } from "../types/appointment";
+import type { DailyCareNote, HotelBooking } from "../types/booking";
 import type { MedicalImage } from "../types/medicalImage";
 import type { MedicalRecord } from "../types/medicalRecord";
 import type { Notification } from "../types/notification";
@@ -49,19 +49,14 @@ type AppStoreValue = AppState & {
   registerOwner: (input: RegisterOwnerInput) => Promise<void>;
   updateOwnerProfile: (input: UpdateOwnerProfileInput) => Promise<void>;
   changePassword: (input: ChangePasswordInput) => Promise<void>;
-  createPet: (input: CreatePetInput) => void;
-  updatePet: (petId: string, input: UpdatePetInput) => void;
+  createPet: (input: CreatePetInput) => Promise<boolean>;
+  updatePet: (petId: string, input: UpdatePetInput) => Promise<boolean>;
   submitRescueReport: (input: RescueReportInput) => void;
-  createHotelBooking: (input: CreateHotelBookingInput) => void;
-  updateHotelBookingStatus: (bookingId: string, status: HotelBookingStatus, internalNote?: string) => void;
-  updateHotelBookingInternalNote: (bookingId: string, internalNote: string) => void;
-  cancelHotelBooking: (bookingId: string, ownerNote?: string) => void;
-  addDailyCareNote: (bookingId: string, note: string, eatingStatus?: "good" | "normal" | "poor", mood?: "happy" | "calm" | "anxious" | "tired") => void;
+  createHotelBooking: (input: CreateHotelBookingInput, requestKey: string) => Promise<{ booking: HotelBooking; refreshed: boolean }>;
+  cancelHotelBooking: (bookingId: string, ownerNote?: string) => Promise<boolean>;
   createAppointment: (input: CreateAppointmentInput) => Promise<void>;
-  cancelAppointment: (appointmentId: string, ownerNote?: string) => void;
-  rescheduleAppointment: (appointmentId: string, input: RescheduleAppointmentInput) => void;
-  updateAppointmentStatus: (appointmentId: string, status: AppointmentStatus, internalNote?: string) => void;
-  updateAppointmentInternalNote: (appointmentId: string, internalNote: string) => void;
+  cancelAppointment: (appointmentId: string, ownerNote?: string) => Promise<boolean>;
+  rescheduleAppointment: (appointmentId: string, input: RescheduleAppointmentInput) => Promise<boolean>;
   sendReminder: (appointmentId: string) => void;
   createMedicalRecord: (input: CreateMedicalRecordInput) => void;
   updateMedicalRecord: (recordId: string, input: UpdateMedicalRecordInput) => void;
@@ -72,7 +67,6 @@ type AppStoreValue = AppState & {
   markAllNotificationsRead: () => void;
   deleteNotification: (notificationId: string) => void;
   sendCustomNotification: (recipientOwnerId: string, title: string, message: string) => void;
-  resetStoreData: () => void;
 };
 
 const emptyState: AppState = { currentOwnerId: "", owners: [], pets: [], appointments: [], medicalRecords: [], medicalImages: [], hotelBookings: [], dailyCareNotes: [], notifications: [] };
@@ -128,19 +122,21 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const runMutation = async (operation: () => Promise<unknown>) => {
+  const writeAndReload = async (operation: () => Promise<unknown>): Promise<boolean> => {
     setIsLoading(true);
     setError("");
     try {
-      await operation();
-      await loadData();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "The request could not be completed.");
-      throw reason;
-    } finally {
-      setIsLoading(false);
+      try { await operation(); }
+      catch (reason) {
+        setError(reason instanceof Error ? reason.message : "The request could not be completed.");
+        throw reason;
+      }
+      try { await loadData(); return true; }
+      catch { setError("Đã lưu thao tác nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu."); return false; }
     }
+    finally { setIsLoading(false); }
   };
+  const runMutation = async (operation: () => Promise<unknown>) => { await writeAndReload(operation); };
 
   const mutate = (operation: () => Promise<unknown>) => {
     void runMutation(operation).catch(() => undefined);
@@ -189,19 +185,34 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           setIsLoading(false);
         }
       },
-      createPet: (input) => mutate(() => apiClient.post("/pets", input)),
-      updatePet: (id, input) => mutate(() => apiClient.patch(`/pets/${id}`, input)),
+      createPet: (input) => writeAndReload(() => apiClient.post("/pets", input)),
+      updatePet: (id, input) => writeAndReload(() => apiClient.patch(`/pets/${id}`, input)),
       submitRescueReport: (input) => { const pet = state.pets.find((item) => item.id === input.petId); mutate(() => apiClient.post(`/public/pets/${pet?.qrToken || input.petId}/rescue-reports`, input)); },
-      createHotelBooking: (input) => mutate(() => apiClient.post("/hotel-bookings", input)),
-      updateHotelBookingStatus: (id, status, internalNote) => mutate(() => apiClient.patch(`/hotel-bookings/${id}/status`, { status, internalNote, expectedRevision: state.hotelBookings.find(item => item.id === id)?.statusRevision })),
-      updateHotelBookingInternalNote: (id, internalNote) => { const status = state.hotelBookings.find((item) => item.id === id)?.status; mutate(() => apiClient.patch(`/hotel-bookings/${id}/status`, { status, internalNote, expectedRevision: state.hotelBookings.find(item => item.id === id)?.statusRevision })); },
-      cancelHotelBooking: (id, ownerNote) => mutate(() => apiClient.patch(`/hotel-bookings/${id}/cancel`, { ownerNote, expectedRevision: state.hotelBookings.find(item => item.id === id)?.statusRevision })),
-      addDailyCareNote: (id, note, eatingStatus, mood) => mutate(() => apiClient.post(`/hotel-bookings/${id}/care-notes`, { note, eatingStatus, mood })),
-      createAppointment: (input) => runMutation(() => apiClient.post("/appointments", input)),
-      cancelAppointment: (id, ownerNote) => mutate(() => apiClient.patch(`/appointments/${id}/cancel`, { ownerNote, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
-      rescheduleAppointment: (id, input) => mutate(() => apiClient.patch(`/appointments/${id}/reschedule`, { ...input, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
-      updateAppointmentStatus: (id, status, internalNote) => mutate(() => apiClient.patch(`/appointments/${id}/status`, { status, internalNote, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
-      updateAppointmentInternalNote: (id, internalNote) => { const status = state.appointments.find((item) => item.id === id)?.status; mutate(() => apiClient.patch(`/appointments/${id}/status`, { status, internalNote, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })); },
+      createHotelBooking: async (input, requestKey) => {
+        setIsLoading(true); setError("");
+        try {
+          const { booking } = await apiClient.post<{ booking: HotelBooking }>("/hotel-bookings", input, { "Idempotency-Key": requestKey });
+          try { await loadData(); return { booking, refreshed: true }; }
+          catch { setError("Đã lưu đặt phòng nhưng chưa tải lại được danh sách."); return { booking, refreshed: false }; }
+        } catch (reason) {
+          setError(reason instanceof Error ? reason.message : "Không thể đặt phòng.");
+          throw reason;
+        } finally { setIsLoading(false); }
+      },
+      cancelHotelBooking: async (id, ownerNote) => {
+        setIsLoading(true); setError("");
+        try {
+          await apiClient.patch(`/hotel-bookings/${id}/cancel`, { ownerNote, expectedRevision: state.hotelBookings.find(item => item.id === id)?.statusRevision });
+          try { await loadData(); return true; }
+          catch { setError("Đã hủy đặt phòng nhưng chưa tải lại được danh sách."); return false; }
+        } catch (reason) {
+          setError(reason instanceof Error ? reason.message : "Không thể hủy đặt phòng.");
+          throw reason;
+        } finally { setIsLoading(false); }
+      },
+      createAppointment: (input) => writeAndReload(() => apiClient.post("/appointments", input)).then(() => undefined),
+      cancelAppointment: (id, ownerNote) => writeAndReload(() => apiClient.patch(`/appointments/${id}/cancel`, { ownerNote, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
+      rescheduleAppointment: (id, input) => writeAndReload(() => apiClient.patch(`/appointments/${id}/reschedule`, { ...input, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
       sendReminder: (id) => mutate(() => apiClient.post(`/appointments/${id}/reminder`)),
       createMedicalRecord: (input) => mutate(() => apiClient.post("/medical-records", input)),
       updateMedicalRecord: (id, input) => mutate(() => apiClient.patch(`/medical-records/${id}`, input)),
@@ -212,7 +223,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       markAllNotificationsRead: () => mutate(() => apiClient.patch("/notifications/read-all")),
       deleteNotification: (id) => mutate(() => apiClient.delete(`/notifications/${id}`)),
       sendCustomNotification: (recipientOwnerId, title, message) => mutate(() => apiClient.post("/notifications/send", { recipientOwnerId, title, message })),
-      resetStoreData: () => mutate(() => Promise.resolve()),
     };
   }, [state, authRole, userRole, isLoading, isAuthReady, error]);
 

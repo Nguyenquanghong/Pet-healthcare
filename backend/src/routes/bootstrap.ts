@@ -10,10 +10,10 @@ export function createBootstrapRouter(service: BootstrapService) {
       currentOwnerId: data.currentOwnerId,
       owners: data.owners.map(ownerDto),
       pets: data.pets.map(petDto),
-      appointments: data.appointments.map(appointmentDto),
-      medicalRecords: data.medicalRecords.map(medicalRecordDto),
+      appointments: data.appointments.map(item => appointmentDto(item, req.auth!.role === "owner")),
+      medicalRecords: data.medicalRecords.map(item => medicalRecordDto(item, req.auth!.role === "owner")),
       medicalImages: data.medicalImages,
-      hotelBookings: data.hotelBookings.map(hotelBookingDto),
+      hotelBookings: data.hotelBookings.map(item => hotelBookingDto(item, req.auth!.role === "owner")),
       dailyCareNotes: data.dailyCareNotes.map(careNoteDto),
       notifications: data.notifications,
     });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Edit3, ImagePlus, Plus, Sparkles, Trash2 } from "lucide-react";
 import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
 import { PetProfileHero } from "../../components/owner/pets/PetProfileHero";
@@ -86,6 +86,9 @@ export function PetsPage() {
   const [editDrafts, setEditDrafts] = useState<Record<string, PetFormState>>({});
   const [errors, setErrors] = useState<PetFormErrors>({});
   const [successMsg, setSuccessMsg] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
 
   const selectedPet = useMemo(
     () => ownerPets.find((pet) => pet.id === selectedPetId) ?? ownerPets[0],
@@ -178,9 +181,9 @@ export function PetsPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!validate()) return;
+    if (submitting.current || !validate()) return;
 
     const payload = {
       name: form.name.trim(),
@@ -197,18 +200,15 @@ export function PetsPage() {
       avatarUrl: form.avatarUrl || undefined,
     };
 
-    if (formMode === "edit" && selectedPet) {
-      updatePet(selectedPet.id, payload);
-      setSuccessMsg(`Đã cập nhật hồ sơ của ${payload.name}.`);
-    } else {
-      createPet(payload);
-      setSuccessMsg(`Đã thêm ${payload.name} vào hồ sơ của bạn.`);
-    }
-
-    setShowForm(false);
-    setForm(emptyForm);
-    setEditDrafts({});
-    setTimeout(() => setSuccessMsg(""), 3500);
+    submitting.current = true; setSaving(true); setSaveError("");
+    try {
+      const refreshed = formMode === "edit" && selectedPet
+        ? await updatePet(selectedPet.id, payload) : await createPet(payload);
+      setSuccessMsg(refreshed ? `Đã lưu hồ sơ của ${payload.name}.`
+        : `Đã lưu hồ sơ của ${payload.name}, nhưng danh sách chưa tải lại được. Hãy làm mới trang.`);
+      setShowForm(false); setForm(emptyForm); setEditDrafts({});
+    } catch (reason) { setSaveError(reason instanceof Error ? reason.message : "Không lưu được hồ sơ thú cưng."); }
+    finally { submitting.current = false; setSaving(false); }
   };
 
   return (
@@ -270,6 +270,7 @@ export function PetsPage() {
 
       {showForm && (
         <form onSubmit={handleSubmit} noValidate className="mb-8 overflow-hidden rounded-lg border border-slate-200 bg-white">
+          {saveError && <p role="alert" className="m-4 rounded bg-rose-50 p-3 text-sm text-rose-700">{saveError}</p>}
           <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/70 px-6 py-5">
             <div>
               <p className="text-xs font-semibold text-primary">
@@ -351,9 +352,9 @@ export function PetsPage() {
           </div>
 
           <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
-            <Button type="button" variant="outline" onClick={closeForm}>Hủy</Button>
-            <Button type="submit" icon={formMode === "edit" ? <Edit3 size={16} /> : <Plus size={16} />}>
-              {formMode === "edit" ? "Lưu thay đổi" : "Thêm thú cưng"}
+            <Button type="button" variant="outline" disabled={saving} onClick={closeForm}>Hủy</Button>
+            <Button type="submit" disabled={saving} icon={formMode === "edit" ? <Edit3 size={16} /> : <Plus size={16} />}>
+              {saving ? "Đang lưu..." : formMode === "edit" ? "Lưu thay đổi" : "Thêm thú cưng"}
             </Button>
           </div>
         </form>

@@ -14,7 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "test:smoke": "node scripts/smoke-test.mjs",
     "test:unit": "node --test tests/*.test.mjs",
-    "test:integration": "node tests/postgres.integration.mjs && node tests/fix-postgres.integration.mjs && node tests/invoices.integration.mjs && node tests/payments.integration.mjs && node tests/bank-transfer.integration.mjs && node tests/vietqr.integration.mjs && node tests/booking-lifecycle.integration.mjs",
+    "test:integration": "node tests/postgres.integration.mjs && node tests/fix-postgres.integration.mjs && node tests/invoices.integration.mjs && node tests/payments.integration.mjs && node tests/bank-transfer.integration.mjs && node tests/vietqr.integration.mjs && node tests/booking-lifecycle.integration.mjs && node tests/hotel-booking-idempotency.integration.mjs",
     "test:architecture": "node scripts/check-architecture.mjs",
     "test:openapi": "node scripts/check-openapi.mjs",
     "check:vnpay": "node scripts/check-vnpay.mjs"

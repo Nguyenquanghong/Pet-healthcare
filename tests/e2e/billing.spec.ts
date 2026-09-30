@@ -123,7 +123,7 @@ test("admin issues an invoice, handles payment failure and persists payment afte
   await page.goto("/admin/billing");
   await page.getByRole("button", { name: "Lập hóa đơn", exact: true }).click();
   const issue = page.getByRole("dialog", { name: "Lập hóa đơn" });
-  await issue.getByLabel("Dịch vụ đã hoàn tất").selectOption(`appointment:${appointment.id}`);
+  await issue.getByLabel("Đơn cần chốt phí").selectOption(`appointment:${appointment.id}`);
   await issue.getByLabel("Đơn giá 1 (VND)").fill("250000");
   await expect(issue).toContainText(marker);
   await issue.getByRole("button", { name: "Thêm dịch vụ / phụ phí" }).click();

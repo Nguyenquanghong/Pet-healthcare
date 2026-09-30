@@ -103,7 +103,8 @@ try {
   assert.equal((await req("/invoices", otherToken)).body.length, 0);
   // Hotel checkout uses the stored base even if the current catalog changes.
   const booking = await db.hotelBooking.create({ data: { ownerId: owner.id, petId: pet.id, checkIn: new Date("2035-01-01"), checkOut: new Date("2035-01-03"), nights: 2, roomType: "standard", serviceKeys: [], totalAmount: 700000, status: "checked_out" } });
-  const hotel = (await req("/invoices/checkout", ownerToken, "POST", { type: "hotel_booking", relatedId: booking.id })).body.invoice;
+  assert.equal((await req("/invoices/checkout", ownerToken, "POST", { type: "hotel_booking", relatedId: booking.id })).status, 403);
+  const hotel = (await req("/invoices", staffToken, "POST", { type: "hotel_booking", relatedId: booking.id })).body.invoice;
   assert.equal(hotel.totalAmount, 700000);
   const late = (await req(`/payments/${hotel.id}/vnpay`, ownerToken, "POST")).body.reference;
   assert.equal((await ipn(callback(late, { vnp_Amount: "70000000", vnp_ResponseCode: "24", vnp_TransactionStatus: "02", vnp_TransactionNo: "0" }))).body.RspCode, "00");
