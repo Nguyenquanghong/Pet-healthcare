@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 
-BENCHMARK_PROTOCOL = "phase1-kaggle-v2"
+BENCHMARK_PROTOCOL = "phase1-kaggle-v3"
 
 
 def final_stats(total):

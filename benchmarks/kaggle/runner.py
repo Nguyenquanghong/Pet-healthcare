@@ -9,7 +9,6 @@ import pwd
 import signal
 import secrets
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
@@ -19,6 +18,7 @@ from pathlib import Path
 
 import psutil
 from metrics import BENCHMARK_PROTOCOL, CpuSampler
+from ports import require_free_port
 
 
 def command(args, *, cwd=None, env=None, stdout=None):
@@ -27,11 +27,6 @@ def command(args, *, cwd=None, env=None, stdout=None):
 
 def output(args, *, cwd=None):
     return subprocess.check_output(args, cwd=cwd, text=True).strip()
-
-
-def require_free_port(port):
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", port))
 
 
 def wait_health(port, process, timeout=60):
