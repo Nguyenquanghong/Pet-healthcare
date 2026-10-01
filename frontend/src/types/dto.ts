@@ -124,7 +124,7 @@ export type CreateMedicalRecordDTO = {
   heartRateBpm?: number;
 };
 
-export type UpdateMedicalRecordDTO = Partial<CreateMedicalRecordDTO>;
+export type UpdateMedicalRecordDTO = Partial<Omit<CreateMedicalRecordDTO, "petId" | "appointmentId">>;
 
 // ---------------------------------------------------------------------------
 // Notification DTOs

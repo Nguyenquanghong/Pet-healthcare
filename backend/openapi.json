@@ -4730,13 +4730,8 @@
       },
       "MedicalRecordUpdateInput": {
         "type": "object",
+        "description": "Staff may edit medical details only. petId, ownerId and appointmentId are fixed after creation; attempts to change or clear them return 422. Older clients may send unchanged values.",
         "properties": {
-          "petId": {
-            "type": "string"
-          },
-          "appointmentId": {
-            "type": "string"
-          },
           "title": {
             "type": "string"
           },

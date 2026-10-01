@@ -3,7 +3,7 @@ import { BusinessError } from "../../domain/error.js";
 import type { MedicalDependencies, MedicalRecordValue, MedicalUpdate, MedicalWrite } from "../ports/medicalRecords.js";
 
 export type MedicalInput = {
-  petId?: string; appointmentId?: string; doctorName?: string; visitDate?: string;
+  petId?: string | null; ownerId?: string | null; appointmentId?: string | null; doctorName?: string; visitDate?: string;
   title?: string; symptoms?: string | null; diagnosis?: string; treatment?: string;
   medications?: string | null; vaccineName?: string | null; followUpDate?: string | null;
   weightKg?: unknown; temperatureC?: unknown; heartRateBpm?: unknown;
@@ -63,6 +63,13 @@ export class MedicalRecordsService {
     staffOnly(actor);
     const existing = await this.deps.records.find(id);
     if (!existing) throw new BusinessError(404, "Medical record not found.");
+    // Existing records keep their pet, owner and appointment association. Accept unchanged
+    // values from older clients, but never silently ignore a requested reassignment.
+    if ((input.petId !== undefined && input.petId !== existing.petId) ||
+        (input.ownerId !== undefined && input.ownerId !== existing.ownerId) ||
+        (input.appointmentId !== undefined && input.appointmentId !== existing.appointmentId)) {
+      throw new BusinessError(422, "Không thể đổi thú cưng, chủ nuôi hoặc lịch liên kết của bệnh án đã tạo.");
+    }
     const data: MedicalUpdate = {
       ...(input.title !== undefined ? { title: String(input.title) } : {}),
       ...(input.doctorName !== undefined ? { doctorName: String(input.doctorName) } : {}),

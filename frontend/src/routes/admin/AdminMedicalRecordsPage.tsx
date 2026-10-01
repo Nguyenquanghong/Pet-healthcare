@@ -68,10 +68,12 @@ export function AdminMedicalRecordsPage() {
   const [imageMimeType, setImageMimeType] = useState("");
 
   const [toastMsg, setToastMsg] = useState("");
+  const [toastWarning, setToastWarning] = useState(false);
   const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const toast = (msg: string) => {
+  const toast = (msg: string, warning = false) => {
+    setToastWarning(warning);
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 3500);
   };
@@ -113,10 +115,11 @@ export function AdminMedicalRecordsPage() {
   };
 
   const handleCreateSubmit = async () => {
+    if (isSubmitting) return;
     setFormError("");
     setIsSubmitting(true);
     try {
-      await createMedicalRecordRequest(
+      const refreshed = await createMedicalRecordRequest(
         {
           petId,
           appointmentId: appointmentId || undefined,
@@ -135,7 +138,7 @@ export function AdminMedicalRecordsPage() {
         },
         createMedicalRecordInStore,
       );
-      toast("Đã tạo hồ sơ y tế thành công.");
+      toast(refreshed ? "Đã tạo hồ sơ y tế thành công." : "Đã lưu bệnh án nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu.", !refreshed);
       resetForm();
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Không thể tạo hồ sơ y tế.");
@@ -145,15 +148,13 @@ export function AdminMedicalRecordsPage() {
   };
 
   const handleEditSubmit = async () => {
-    if (!editRecord) return;
+    if (!editRecord || isSubmitting) return;
     setFormError("");
     setIsSubmitting(true);
     try {
-      await updateMedicalRecordRequest(
+      const refreshed = await updateMedicalRecordRequest(
         editRecord.id,
         {
-          petId,
-          appointmentId: appointmentId || undefined,
           doctorName,
           title,
           symptoms,
@@ -168,7 +169,7 @@ export function AdminMedicalRecordsPage() {
         },
         updateMedicalRecordInStore,
       );
-      toast("Đã cập nhật hồ sơ y tế thành công.");
+      toast(refreshed ? "Đã cập nhật hồ sơ y tế thành công." : "Đã lưu bệnh án nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu.", !refreshed);
       resetForm();
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Không thể cập nhật hồ sơ y tế.");
@@ -178,13 +179,13 @@ export function AdminMedicalRecordsPage() {
   };
 
   const handleDeleteSubmit = async () => {
-    if (!deleteConfirmRecord) return;
+    if (!deleteConfirmRecord || isSubmitting) return;
     setFormError("");
     setIsSubmitting(true);
     try {
-      await deleteMedicalRecordRequest(deleteConfirmRecord.id, deleteMedicalRecordInStore);
+      const refreshed = await deleteMedicalRecordRequest(deleteConfirmRecord.id, deleteMedicalRecordInStore);
       setDeleteConfirmRecord(null);
-      toast("Đã xóa hồ sơ y tế.");
+      toast(refreshed ? "Đã xóa hồ sơ y tế." : "Đã xóa bệnh án nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu.", !refreshed);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Không thể xóa hồ sơ y tế.");
     } finally {
@@ -265,11 +266,11 @@ export function AdminMedicalRecordsPage() {
   return (
     <AdminLayout title="Quản lý Hồ sơ y tế">
       {toastMsg && (
-        <div className="mb-4 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-emerald-800 font-semibold animate-fadeIn">
-          <CheckCircle2 size={18} /> {toastMsg}
+        <div role="status" className={`mb-4 flex items-center gap-3 rounded-xl border px-5 py-4 font-semibold animate-fadeIn ${toastWarning ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
+          {toastWarning ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />} {toastMsg}
         </div>
       )}
-      {formError && (
+      {formError && !editRecord && !deleteConfirmRecord && (
         <div className="mb-4 flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-700">
           <AlertCircle size={18} /> {formError}
         </div>
@@ -613,7 +614,7 @@ export function AdminMedicalRecordsPage() {
                           <Pencil size={14} />
                         </button>
                         <button
-                          onClick={() => setDeleteConfirmRecord(r)}
+                          onClick={() => { setFormError(""); setDeleteConfirmRecord(r); }}
                           title="Xóa hồ sơ"
                           className="rounded-lg bg-rose-50 border border-rose-200 p-2 text-rose-700 hover:bg-rose-100 transition-colors"
                         >
@@ -650,18 +651,19 @@ export function AdminMedicalRecordsPage() {
                 <X size={20} />
               </button>
             </div>
+            {formError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{formError}</p>}
 
             <div className="my-4 grid gap-4 md:grid-cols-2">
               <div>
                 <label className={labelCls}>Thú cưng</label>
-                <select className={fieldCls} value={petId} onChange={(e) => setPetId(e.target.value)}>
-                  {pets.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} — {p.breed}
-                    </option>
-                  ))}
-                </select>
+                <p className={`${fieldCls} bg-slate-50`}>{pets.find((p) => p.id === editRecord.petId)?.name ?? editRecord.petId} — {owners.find((o) => o.id === editRecord.ownerId)?.fullName ?? editRecord.ownerId}</p>
               </div>
+
+              <div>
+                <label className={labelCls}>Lịch liên kết</label>
+                <p className={`${fieldCls} bg-slate-50`}>{editRecord.appointmentId ? appointments.find((a) => a.id === editRecord.appointmentId)?.serviceName ?? editRecord.appointmentId : "Không liên kết"}</p>
+              </div>
+              <p className="md:col-span-2 text-sm text-slate-500">Thú cưng, chủ nuôi và lịch liên kết được cố định sau khi tạo bệnh án. Nếu dữ liệu sai, hãy đối chiếu hồ sơ trước khi xử lý.</p>
 
               <div>
                 <label className={labelCls}>Bác sĩ phụ trách</label>
@@ -803,6 +805,7 @@ export function AdminMedicalRecordsPage() {
               </button>
             </div>
 
+            {formError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{formError}</p>}
             <div className="my-4 text-sm text-slate-600 space-y-2">
               <p>
                 Bạn có chắc chắn muốn xóa hồ sơ y tế <strong>"{deleteConfirmRecord.title}"</strong> ngày{" "}

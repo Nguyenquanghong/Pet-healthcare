@@ -13,7 +13,7 @@ type CreateHotelBookingInput = { petId: string; checkIn: string; checkOut: strin
 type CreateAppointmentInput = { petId: string; type: AppointmentType; serviceName: string; date: string; time: string; doctorId?: string; ownerNote?: string };
 type RescheduleAppointmentInput = { date: string; time: string; ownerNote?: string };
 type CreateMedicalRecordInput = Omit<MedicalRecord, "id" | "ownerId" | "createdAt" | "updatedAt">;
-type UpdateMedicalRecordInput = Partial<Omit<MedicalRecord, "id" | "ownerId" | "createdAt">>;
+type UpdateMedicalRecordInput = Partial<Omit<MedicalRecord, "id" | "petId" | "ownerId" | "appointmentId" | "createdAt">>;
 type RegisterOwnerInput = { fullName?: string; phone?: string; email: string; password: string; confirmPassword: string; address?: string };
 type UpdateOwnerProfileInput = { fullName: string; email: string; phone?: string; address?: string };
 type ChangePasswordInput = { currentPassword: string; newPassword: string; confirmPassword: string };
@@ -59,9 +59,9 @@ type AppStoreValue = AppState & {
   cancelAppointment: (appointmentId: string, ownerNote?: string) => Promise<boolean>;
   rescheduleAppointment: (appointmentId: string, input: RescheduleAppointmentInput) => Promise<boolean>;
   sendReminder: (appointmentId: string) => void;
-  createMedicalRecord: (input: CreateMedicalRecordInput) => void;
-  updateMedicalRecord: (recordId: string, input: UpdateMedicalRecordInput) => void;
-  deleteMedicalRecord: (recordId: string) => void;
+  createMedicalRecord: (input: CreateMedicalRecordInput) => Promise<boolean>;
+  updateMedicalRecord: (recordId: string, input: UpdateMedicalRecordInput) => Promise<boolean>;
+  deleteMedicalRecord: (recordId: string) => Promise<boolean>;
   uploadMedicalImage: (input: UploadMedicalImageInput) => void;
   deleteMedicalImage: (imageId: string) => void;
   markNotificationRead: (notificationId: string) => void;
@@ -257,9 +257,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       cancelAppointment: (id, ownerNote) => writeAndReload(() => apiClient.patch(`/appointments/${id}/cancel`, { ownerNote, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
       rescheduleAppointment: (id, input) => writeAndReload(() => apiClient.patch(`/appointments/${id}/reschedule`, { ...input, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
       sendReminder: (id) => mutate(() => apiClient.post(`/appointments/${id}/reminder`)),
-      createMedicalRecord: (input) => mutate(() => apiClient.post("/medical-records", input)),
-      updateMedicalRecord: (id, input) => mutate(() => apiClient.patch(`/medical-records/${id}`, input)),
-      deleteMedicalRecord: (id) => mutate(() => apiClient.delete(`/medical-records/${id}`)),
+      createMedicalRecord: (input) => writeAndReload(() => apiClient.post("/medical-records", input)),
+      updateMedicalRecord: (id, input) => writeAndReload(() => apiClient.patch(`/medical-records/${id}`, input)),
+      deleteMedicalRecord: (id) => writeAndReload(() => apiClient.delete(`/medical-records/${id}`)),
       uploadMedicalImage: (input) => mutate(() => apiClient.post("/medical-records/images", input)),
       deleteMedicalImage: (id) => mutate(() => apiClient.delete(`/medical-records/images/${id}`)),
       markNotificationRead: (id) => mutate(() => apiClient.patch(`/notifications/${id}/read`)),

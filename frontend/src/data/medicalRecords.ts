@@ -4,14 +4,13 @@ const now = new Date().toISOString();
 
 /**
  * Mock medical record data — dữ liệu hồ sơ y tế mẫu.
- * Đồng bộ với initialState trong AppStoreProvider.
+ * Dữ liệu tham khảo cũ; ứng dụng đang tải bệnh án từ API.
  */
 export const mockMedicalRecords: MedicalRecord[] = [
   {
     id: "record_1",
     petId: "pet_mochi",
     ownerId: "owner_1",
-    appointmentId: "appointment_1",
     doctorName: "Bs. Mai Nguyễn",
     visitDate: "2026-10-28",
     title: "Annual Checkup & Vaccination",

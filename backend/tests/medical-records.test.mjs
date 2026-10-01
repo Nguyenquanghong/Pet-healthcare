@@ -58,3 +58,22 @@ test("owner cannot create medical record", async () => {
   await assert.rejects(deps.service.create(owner, input), { status: 403 });
   assert.equal(deps.committed.length, 0);
 });
+
+test("medical update rejects reassignment or unlinking and accepts editable details", async () => {
+  const current = { id: "record-1", petId: "pet-1", ownerId: "owner-1", appointmentId: "appt-1", title: "Check" };
+  const writes = [];
+  const service = new MedicalRecordsService({ records: {
+    find: async () => current,
+    update: async (_id, data) => { writes.push(data); return { ...current, ...data }; },
+  } });
+  for (const change of [{ petId: "pet-2" }, { petId: null }, { ownerId: "owner-2" },
+    { appointmentId: null }, { appointmentId: "appt-2" }]) {
+    await assert.rejects(service.update(staff, current.id, change), { status: 422 });
+  }
+  assert.equal(writes.length, 0);
+  const saved = await service.update(staff, current.id, { title: "Revised", petId: current.petId,
+    ownerId: current.ownerId, appointmentId: current.appointmentId });
+  assert.equal(saved.title, "Revised");
+  assert.deepEqual(writes, [{ title: "Revised" }]);
+  await assert.rejects(service.update(owner, current.id, { title: "Invalid" }), { status: 403 });
+});

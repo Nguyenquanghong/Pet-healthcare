@@ -1,9 +1,8 @@
 /**
  * Medical record service layer.
  *
- * The current UI writes through the local app store. These functions keep
- * validation and async behavior in one place so the same screens can later be
- * swapped to the REST API without changing component logic.
+ * Validate form input and await the app store's REST write and refresh result.
+ * The read helpers below retain their local filtering behavior for callers.
  */
 
 import type { MedicalRecord } from "../types/medicalRecord";
@@ -37,8 +36,8 @@ export async function getMedicalRecordById(
 
 export async function createMedicalRecord(
   dto: CreateMedicalRecordDTO,
-  storeFn: (input: CreateMedicalRecordDTO) => void,
-): Promise<void> {
+  storeFn: (input: CreateMedicalRecordDTO) => Promise<boolean>,
+): Promise<boolean> {
   if (!dto.petId || !dto.title.trim() || !dto.visitDate || !dto.doctorName.trim() || !dto.diagnosis?.trim() || !dto.treatment?.trim()) {
     throw new ApiError(
       ApiErrorCode.VALIDATION_ERROR,
@@ -47,7 +46,7 @@ export async function createMedicalRecord(
     );
   }
 
-  storeFn({
+  return storeFn({
     ...dto,
     title: dto.title.trim(),
     doctorName: dto.doctorName.trim(),
@@ -57,14 +56,13 @@ export async function createMedicalRecord(
     medications: dto.medications?.trim(),
     vaccineName: dto.vaccineName?.trim(),
   });
-  return delay(undefined);
 }
 
 export async function updateMedicalRecord(
   recordId: string,
   dto: UpdateMedicalRecordDTO,
-  storeFn: (id: string, input: UpdateMedicalRecordDTO) => void,
-): Promise<void> {
+  storeFn: (id: string, input: UpdateMedicalRecordDTO) => Promise<boolean>,
+): Promise<boolean> {
   if (dto.title !== undefined && !dto.title.trim()) {
     throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 422, "Title is required.");
   }
@@ -78,7 +76,7 @@ export async function updateMedicalRecord(
     throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 422, "Treatment is required.");
   }
 
-  storeFn(recordId, {
+  return storeFn(recordId, {
     ...dto,
     title: dto.title?.trim(),
     doctorName: dto.doctorName?.trim(),
@@ -88,16 +86,14 @@ export async function updateMedicalRecord(
     medications: dto.medications?.trim(),
     vaccineName: dto.vaccineName?.trim(),
   });
-  return delay(undefined);
 }
 
 export async function deleteMedicalRecord(
   recordId: string,
-  storeFn: (id: string) => void,
-): Promise<void> {
+  storeFn: (id: string) => Promise<boolean>,
+): Promise<boolean> {
   if (!recordId) {
     throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 422, "Medical record ID is required.");
   }
-  storeFn(recordId);
-  return delay(undefined);
+  return storeFn(recordId);
 }

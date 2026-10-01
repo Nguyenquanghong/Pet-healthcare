@@ -57,6 +57,15 @@ test("dependent records and legacy bookings block check-in reversal", async () =
     assert.equal(f.events.length, 0);
   }
 });
+test("confirmed appointment without linked records can be marked absent; linked record explains the block", async () => {
+  const clean = fixture();
+  await clean.service.change(staff, "appointment", "b", { status: "no_show", expectedRevision: 0 });
+  assert.equal(clean.booking.status, "no_show");
+  const linked = fixture("confirmed", { medical: 1 });
+  await assert.rejects(linked.service.change(staff, "appointment", "b", { status: "no_show", expectedRevision: 0 }),
+    error => error.status === 409 && /bệnh án/.test(error.message) && /đối chiếu/.test(error.message));
+  assert.equal(linked.booking.status, "confirmed");
+});
 test("only admin reopens completed services; starting work disables quick check-in reversal", async () => {
   const f = fixture();
   for (const status of ["checked_in", "in_progress", "completed"]) {
