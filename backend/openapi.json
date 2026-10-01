@@ -43,6 +43,9 @@
     },
     {
       "name": "Payments"
+    },
+    {
+      "name": "Owners"
     }
   ],
   "paths": {
@@ -427,6 +430,93 @@
         ]
       }
     },
+    "/api/owners": {
+      "post": {
+        "tags": [
+          "Owners"
+        ],
+        "summary": "Staff creates a counter customer profile without login credentials",
+        "operationId": "createCounterOwner",
+        "description": "Admin/staff only. Name and Vietnamese phone are required; email/address are optional. Normalizes +84 phones and detects existing contacts. Creates role owner with login disabled, returns no token or password. Does not change the staff session.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CounterOwnerInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Counter customer profile created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin/staff required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Existing phone/email, including a concurrent creation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid contact information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/pets": {
       "get": {
         "tags": [
@@ -480,6 +570,7 @@
           "Pets"
         ],
         "summary": "Create pet",
+        "description": "Owners create for their authenticated account. Staff supply ownerId for an existing user with role owner; missing owners or staff accounts are rejected with 422.",
         "operationId": "post_api_pets",
         "responses": {
           "201": {
@@ -3345,6 +3436,249 @@
           }
         }
       }
+    },
+    "/api/owners/{id}/activation": {
+      "post": {
+        "tags": [
+          "Owners"
+        ],
+        "summary": "Staff issues a single-use activation link for a verified counter customer",
+        "operationId": "issueOwnerActivation",
+        "description": "Does not reset an active account or change the profile email yet. Staff must hand the link to the verified customer. Records issuer, issue/expiry/use/revocation timestamps; stores a token digest. Response Cache-Control: no-store.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationIssueInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Issued for 30 minutes; reissue revokes all pending links",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "JWT required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin/staff only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owner profile missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Existing login or duplicate email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid email or identity confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/owner/activation/inspect": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Inspect a valid activation token without exposing customer records",
+        "operationId": "inspectOwnerActivation",
+        "description": "Public token-based operation, subject to the shared auth rate limit (50 requests per IP per 15 minutes). Cache-Control: no-store. Customer logs in separately after activation; original owner ID and records remain unchanged.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationTokenInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; no JWT returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid, expired, revoked or consumed token; invalid password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Auth rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/owner/activation": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Set password on the existing owner profile; consume the token once",
+        "operationId": "activateOwnerAccount",
+        "description": "Public token-based operation, subject to the shared auth rate limit (50 requests per IP per 15 minutes). Cache-Control: no-store. Customer logs in separately after activation; original owner ID and records remain unchanged.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationPasswordInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; no JWT returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationSuccess"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid, expired, revoked or consumed token; invalid password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Auth rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email became unavailable; no credentials or token consumption committed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4228,7 +4562,7 @@
           "owners": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/User"
+              "$ref": "#/components/schemas/Owner"
             }
           },
           "pets": {
@@ -4384,13 +4718,71 @@
           "confirmPassword"
         ]
       },
+      "CounterOwnerInput": {
+        "type": "object",
+        "required": [
+          "fullName",
+          "phone"
+        ],
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "phone": {
+            "type": "string",
+            "description": "Vietnamese phone with 10 local digits, or +84/84 and 9 digits. Spaces/dots/hyphens/parentheses are normalized."
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "description": "Optional; blank means no email. Saved lowercase."
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "OwnerEnvelope": {
+        "type": "object",
+        "required": [
+          "owner"
+        ],
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/Owner"
+          }
+        }
+      },
       "PetInput": {
         "type": "object",
         "properties": {
           "ownerId": {
-            "type": "string"
+            "type": "string",
+            "description": "Required for staff creation: id of an existing owner account. Ignored for owner requests; the authenticated owner id is used."
           },
           "name": {
+            "type": "string"
+          },
+          "breed": {
+            "type": "string"
+          },
+          "ageLabel": {
+            "type": "string"
+          },
+          "healthStatus": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "stable",
+              "vaccination_due",
+              "under_treatment",
+              "critical"
+            ]
+          },
+          "notes": {
             "type": "string"
           },
           "species": {
@@ -4921,6 +5313,153 @@
             "format": "date-time"
           }
         }
+      },
+      "ActivationIssueInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "customerVerified": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "customerVerified"
+        ]
+      },
+      "ActivationTokenInput": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "description": "Single-use secret; send in JSON body, never URL query. Only its SHA-256 digest is stored."
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "ActivationPasswordInput": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "description": "Single-use secret; send in JSON body, never URL query. Only its SHA-256 digest is stored."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "writeOnly": true
+          },
+          "confirmPassword": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "token",
+          "password",
+          "confirmPassword"
+        ]
+      },
+      "ActivationDetails": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "email",
+          "expiresAt"
+        ]
+      },
+      "ActivationEnvelope": {
+        "type": "object",
+        "properties": {
+          "activation": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ActivationDetails"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{43}$",
+                    "description": "Single-use secret; send in JSON body, never URL query. Only its SHA-256 digest is stored."
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "activation"
+        ]
+      },
+      "ActivationSuccess": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "message"
+        ]
+      },
+      "Owner": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/User"
+          },
+          {
+            "type": "object",
+            "required": [
+              "petIds",
+              "loginEnabled"
+            ],
+            "properties": {
+              "petIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "loginEnabled": {
+                "type": "boolean",
+                "description": "True only when this profile has login credentials."
+              }
+            }
+          }
+        ]
       }
     }
   }

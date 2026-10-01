@@ -105,6 +105,7 @@ export function OwnerLoginPage() {
             {isSubmitting ? "Signing in..." : "Sign in"}
           </Button>
         </form>
+        <p className="mt-6 text-sm text-slate-600">Đã có hồ sơ tại cửa hàng nhưng chưa đăng nhập? Liên hệ nhân viên để xác minh và nhận liên kết kích hoạt; hồ sơ thú cưng và lịch đặt được giữ nguyên.</p>
         <div className="mt-6 flex flex-col gap-3 text-sm font-semibold sm:flex-row sm:justify-between">
           <Link to="/register" className="text-primary hover:underline">
             Create an account

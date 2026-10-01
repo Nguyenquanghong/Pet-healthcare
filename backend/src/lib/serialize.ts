@@ -20,7 +20,7 @@ export function publicUser(user: UserAccount) {
 }
 
 export function ownerDto(user: UserAccount & { pets?: Array<{ id: string }> }) {
-  return { ...publicUser(user), petIds: user.pets?.map((pet) => pet.id) ?? [] };
+  return { ...publicUser(user), petIds: user.pets?.map((pet) => pet.id) ?? [], loginEnabled: Boolean(user.passwordHash && user.passwordSalt) };
 }
 
 export function petDto(pet: PetValue) {

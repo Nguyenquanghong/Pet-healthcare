@@ -3,6 +3,7 @@ import { Search, X, Eye, FileText, Calendar, Weight, Thermometer } from "lucide-
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
 import { useAppStore } from "../../store/AppStoreProvider";
 import type { Pet } from "../../types/pet";
+import { AdminCreateButton } from "./AdminCreateDialog";
 
 const SPECIES_OPTIONS = [
   { key: "all", label: "Tất cả" },
@@ -68,6 +69,9 @@ export function AdminPetsPage() {
 
   return (
     <AdminLayout title="Quản lý thú cưng">
+      <div className="mb-4 flex justify-end">
+        <AdminCreateButton kind="pet" onCreated={() => { setSearchQuery(""); setSpeciesFilter("all"); setHealthFilter("all"); }} />
+      </div>
       {/* Filters */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center gap-4">
         {/* Search */}

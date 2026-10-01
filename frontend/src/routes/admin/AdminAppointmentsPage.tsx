@@ -23,6 +23,7 @@ import { useAppStore } from "../../store/AppStoreProvider";
 import { isSpaAppointmentType, type Appointment, type AppointmentStatus } from "../../types/appointment";
 import { appointmentStatusLabels } from "../../utils/statusLabels";
 import { compareBookingStatus } from "../../utils/bookingOrder";
+import { AdminCreateButton } from "./AdminCreateDialog";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
@@ -181,6 +182,9 @@ export function AdminAppointmentsPage() {
 
   return (
     <AdminLayout title="Quản lý lịch hẹn">
+      <div className="mb-4 flex justify-end">
+        <AdminCreateButton kind="appointment" onCreated={() => { setFilterStatus("all"); setServiceFilter("all"); setSearchQuery(""); setDateFilter("all"); }} />
+      </div>
       {actionError && <p role="alert" className="fixed right-4 top-20 z-[100] max-w-md rounded-xl border border-rose-300 bg-white p-4 text-rose-700 shadow-lg">{actionError}</p>}
       {statusDialog && <BookingStatusDialog kind="appointment" selection={statusDialog} onClose={() => setStatusDialog(null)} onSaved={() => toast("Đã lưu thao tác và lịch sử.")} />}
       {toastMsg && (
@@ -327,6 +331,7 @@ export function AdminAppointmentsPage() {
                       <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                         <Clock size={12} /> {a.time}
                       </p>
+                      <p className="mt-1 text-xs text-slate-500">{a.createdBy === "staff" ? "Nhân viên tạo" : "Khách tự đặt"}</p>
                     </td>
 
                     <td className="px-5 py-4">

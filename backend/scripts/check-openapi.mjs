@@ -9,7 +9,7 @@ await SwaggerParser.validate(spec);
 
 const mounts = {
   auth: "/api/auth", public: "/api/public", bootstrap: "/api/bootstrap",
-  pets: "/api/pets", appointments: "/api/appointments", medicalRecords: "/api/medical-records",
+  pets: "/api/pets", owners: "/api/owners", appointments: "/api/appointments", medicalRecords: "/api/medical-records",
   hotelBookings: "/api/hotel-bookings", notifications: "/api/notifications", invoices: "/api/invoices",
   payments: "/api/payments",
 };
@@ -35,5 +35,5 @@ for (const [path, methods] of Object.entries(spec.paths)) {
   }
 }
 assert.deepEqual([...documented].sort(), [...runtime].sort(), "OpenAPI routes differ from mounted runtime routes");
-assert.equal(runtime.size, 55, "Expected route inventory including hotel detail and payment history changed; review explicitly");
+assert.equal(runtime.size, 59, "Expected route inventory including counter owner activation changed; review explicitly");
 process.stdout.write(`OpenAPI PASS: ${runtime.size} operations match source and schemas validate.\n`);

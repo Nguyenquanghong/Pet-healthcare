@@ -19,6 +19,10 @@ export class PrismaPetRepository implements PetRepository {
   find(id: string) {
     return this.client.pet.findUnique({ where: { id } });
   }
+  async ownerExists(ownerId: string) {
+    const user = await this.client.user.findUnique({ where: { id: ownerId }, select: { role: true } });
+    return user?.role === "owner";
+  }
   create(data: Parameters<PetRepository["create"]>[0]) {
     return this.client.pet.create({ data: {
       ...data,

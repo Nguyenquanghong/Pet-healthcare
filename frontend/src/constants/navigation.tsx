@@ -14,6 +14,7 @@ export const ownerNav = [
 
 export const adminNav = [
   { to: "/admin/dashboard", label: "Dashboard", mobileLabel: "Home", icon: LayoutDashboard },
+  { to: "/admin/owners", label: "Khách hàng", icon: UserRound },
   { to: "/admin/appointments", label: "Appointments", mobileLabel: "Schedule", icon: CalendarDays },
   { to: "/admin/pets", label: "Pets", icon: PawPrint },
   { to: "/admin/medical-records", label: "Medical Records", mobileLabel: "Records", icon: FileText },

@@ -4,7 +4,7 @@
 
 ## Phạm vi và kiến trúc Pha 1
 
-Chủ nuôi quản lý thú cưng, đặt lịch, đặt phòng, xem bệnh án/hóa đơn của mình. Nhân viên và quản trị viên xác nhận lịch, check-in, ghi chăm sóc/bệnh án, chốt phí và đối chiếu thanh toán. VNPay tắt mặc định; không có đặt cọc, hoàn tiền hoặc tồn kho phòng tự động trong phạm vi này.
+Chủ nuôi có tài khoản quản lý thú cưng, đặt lịch, đặt phòng, xem bệnh án/hóa đơn của mình. Nhân viên và quản trị viên có thể tạo hồ sơ khách mới tại quầy, thêm thú cưng, tạo lịch khám/Spa và đặt phòng thay khách; xác nhận lịch, check-in, ghi chăm sóc/bệnh án, chốt phí và đối chiếu thanh toán. Khách đến trực tiếp không cần đăng ký tài khoản trước để dùng dịch vụ. VNPay tắt mặc định; không có đặt cọc, hoàn tiền hoặc tồn kho phòng tự động trong phạm vi này.
 
 ```text
 HTTP JSON / JWT middleware (backend/src/routes, backend/src/middleware)
@@ -23,6 +23,9 @@ Base URL: `http://localhost:5000/api`; request/response dùng JSON (DELETE thàn
 | Method và đường dẫn | Vai trò | Công dụng |
 | --- | --- | --- |
 | `POST /auth/owner/login`, `POST /auth/admin/login` | Công khai | Đăng nhập, nhận JWT |
+| `POST /owners` | JWT admin/nhân viên | Tạo hồ sơ khách tại quầy, chưa cấp đăng nhập online; không trả token |
+| `POST /owners/{id}/activation` | JWT admin/nhân viên | Cấp liên kết kích hoạt sau khi xác minh khách và email |
+| `POST /auth/owner/activation/inspect`, `POST /auth/owner/activation` | Công khai, cần mã kích hoạt | Kiểm tra liên kết và đặt mật khẩu trên hồ sơ cũ; không trả JWT |
 | `GET /pets`, `POST /pets` | JWT chủ nuôi/nhân viên theo nghiệp vụ | Xem/tạo thú cưng |
 | `GET /appointments`, `POST /appointments` | JWT | Xem/tạo lịch; chủ nuôi chỉ xem dữ liệu của mình |
 | `GET /medical-records`, `POST /medical-records` | JWT; POST chỉ nhân viên | Xem/tạo bệnh án |
@@ -66,6 +69,32 @@ npm run dev:frontend
 
 Compose khởi động PostgreSQL, chạy `migrate` rồi mới khởi động API. `migrate` thoát mã 0 là bình thường; frontend hiện chạy riêng ở `http://localhost:5173`. **Chỉ với database demo mới, trống và có thể bỏ**, tạo dữ liệu minh họa bằng `docker compose --env-file .env.docker run --rm --no-deps migrate npm run db:seed --workspace @nipopeto/backend`. Không chạy seed trên dữ liệu thật hoặc để “sửa” dữ liệu demo cũ: `upsert` với `update: {}` giữ nguyên bản ghi đã tồn tại.
 
+## Nhân viên tạo thú cưng và đặt dịch vụ tại quầy
+
+Trong admin, vào **Thú cưng → Thêm thú cưng**, **Lịch hẹn → Tạo lịch khám / Spa**, hoặc **Hotel Bookings → Tạo đặt phòng**. Với khách đã có hồ sơ, dùng **Tìm khách đã có** theo tên, số điện thoại, email hoặc mã; chọn đúng chủ nuôi rồi chọn thú cưng. Đổi chủ nuôi sẽ bỏ lựa chọn thú cưng cũ. Nếu khách mang thú cưng mới, dùng **Thêm thú cưng cho chủ nuôi này** ngay trong form đặt dịch vụ; sau khi lưu, form tự chọn thú mới và tiếp tục đặt lịch/phòng.
+
+Với khách lần đầu đến, bấm **Tạo khách mới** ngay trong form, nhập họ tên + số điện thoại; email và địa chỉ không bắt buộc. Kiểm tra thông tin rồi **Xác nhận tạo khách**. Form chuyển sang thêm thú cưng cho khách vừa tạo; lưu thú xong tiếp tục đặt phòng/lịch hẹn. Số điện thoại được chuẩn hóa về dạng 10 chữ số; phát hiện trùng số điện thoại/email sẽ trả `409`, nhân viên dùng **Tìm khách đã có** để chọn lại, không ghi đè hồ sơ. API chỉ cho admin/nhân viên tạo khách, không đổi phiên đăng nhập của nhân viên.
+
+Hồ sơ tại quầy ban đầu chưa có mật khẩu hoặc quyền đăng nhập online. Khi khách muốn đăng nhập, dùng quy trình kích hoạt bên dưới; không tạo thêm tài khoản qua trang đăng ký cho cùng khách. Các tài khoản chủ nuôi đã đăng ký vẫn đăng nhập theo luồng hiện có.
+
+Nhập thông tin, bấm **Kiểm tra thông tin**, đối chiếu tên + số điện thoại + mã chủ nuôi/thú cưng, ngày giờ/dịch vụ rồi xác nhận lưu. Lịch mới ở trạng thái `pending`; lịch khám/Spa có nhãn **Nhân viên tạo**. Các bước xác nhận, check-in, hoàn tác và lịch sử thao tác dùng luồng hiện có. Booking khách sạn được backend tính giá và kiểm tra trùng khoảng lưu trú, chưa tạo hóa đơn/VietQR khi đặt. Nhân viên vẫn chốt phí cuối kỳ và chỉ checkout khi đã xác nhận thu đủ tiền.
+
+Form khóa gửi lặp khi đang lưu. Gửi lại booking khách sạn trong cùng form dùng lại `Idempotency-Key` nếu nội dung không đổi. Khi đã lưu nhưng tải danh sách lỗi, dùng **Tải lại danh sách**, không tạo lại. Với yêu cầu tạo khách/thú cưng/lịch khám bị mất phản hồi, form yêu cầu **Tải và kiểm tra danh sách** trước khi tạo mới; các API này chưa có cơ chế idempotency như booking khách sạn. API tạo khách còn có ràng buộc unique số điện thoại/email để chặn hai yêu cầu tạo đồng thời cùng thông tin chuẩn hóa.
+
+### Kích hoạt đăng nhập cho khách đã có hồ sơ tại quầy
+
+1. Admin/nhân viên vào **Khách hàng** (`/admin/owners`), tìm và đối chiếu họ tên, số điện thoại, mã chủ nuôi với khách thực tế. Hồ sơ chưa có thú cưng vẫn xuất hiện trong danh sách.
+2. Bấm **Kích hoạt tài khoản**, nhập email đăng nhập của khách và tích xác nhận đã xác minh đúng khách/hồ sơ/email. Bấm **Cấp liên kết kích hoạt**. Email của hồ sơ chưa bị thay đổi ở bước này.
+3. Sao chép liên kết và giao riêng cho đúng khách. Hệ thống chưa gửi email tự động; nhân viên không đặt mật khẩu thay khách. Liên kết dùng một lần, hết hạn sau **30 phút**. **Cấp lại liên kết** cần xác nhận lại và thu hồi mọi liên kết chưa dùng trước đó.
+4. Khách mở liên kết, tự nhập mật khẩu 8–128 ký tự và xác nhận. Backend cập nhật email + mật khẩu trên **chính ID chủ nuôi cũ**, giữ nguyên thú cưng, bệnh án, lịch hẹn, đặt phòng và hóa đơn. Khách đăng nhập riêng tại `/login` sau khi kích hoạt thành công.
+5. Khi danh sách admin chưa phản ánh việc khách vừa kích hoạt, bấm **Tải lại danh sách**. Khách đã có mật khẩu không có nút kích hoạt; API cũng từ chối cấp lại để ngăn dùng luồng này đặt lại tài khoản đang hoạt động. Chức năng quên mật khẩu/gộp hai tài khoản không nằm trong luồng này.
+
+Mã ngẫu nhiên 256 bit được đặt trong fragment `#token=...` của liên kết; API nhận mã qua JSON body, database chỉ lưu SHA-256. Bảng `owner_activations` giữ người cấp, thời điểm cấp/hết hạn/sử dụng/thu hồi. Kiểm tra và tiêu thụ mã nằm trong giao dịch có khóa hồ sơ, chỉ một yêu cầu đồng thời có thể kích hoạt. Các endpoint công khai dùng giới hạn auth chung 50 yêu cầu/IP/15 phút và trả `Cache-Control: no-store`. Email trùng hồ sơ khác bị chặn; nhân viên kiểm tra lại thay vì tự gộp hồ sơ bằng số điện thoại.
+
+Liên kết dùng địa chỉ frontend đang mở trên máy nhân viên. `localhost` chỉ dùng được khi demo trên cùng máy; để khách mở trên thiết bị khác phải cấp liên kết từ địa chỉ frontend mà khách truy cập được. Khi triển khai thực tế, dùng HTTPS và giao liên kết riêng vì người giữ mã còn hiệu lực có thể đặt mật khẩu cho hồ sơ đó.
+
+**Cập nhật bản đang chạy:** lần bổ sung này có migration `20261002120000_owner_activation`, chỉ thêm bảng và quan hệ kích hoạt. Với Docker, chạy `docker compose --env-file .env.docker up --build -d` để rebuild backend và chạy migration rồi khởi động API; frontend dev tự tải mã mới, khởi động lại nếu cần. Không cần seed/reset database. Nếu chạy backend trực tiếp, áp dụng `npm run db:deploy -w backend` vào đúng database, rồi restart backend; với bản build chạy `npm run build` trước khi restart.
+
 ## Luồng lưu trú và thanh toán pha 1
 
 1. Chủ nuôi chọn thú cưng, ngày, phòng, dịch vụ và gửi yêu cầu. API yêu cầu header `Idempotency-Key`; lần gửi lại cùng mã và nội dung trả về booking cũ. Sau khi ghi thành công, giao diện chuyển sang `/owner/hotel-bookings/:id` để xem và mở lại yêu cầu. Lúc này chưa có hóa đơn hoặc VietQR.
@@ -87,9 +116,9 @@ Khách sạn thu đủ vào cuối kỳ lưu trú; pha này không có đặt c�
 
 `npm test` chạy build hai phần, unit/HTTP test không database, kiểm tra ranh giới kiến trúc và OpenAPI. Đọc đặc tả API ở `/api/openapi.json` hoặc `/api/docs/` khi backend đang chạy.
 
-Kiểm tra riêng helper Kaggle: `python -m unittest discover -s benchmarks/kaggle -p 'test_*.py' -v`. Browser test dùng `E2E_BROWSER_CHANNEL=msedge`, `E2E_START_FRONTEND=1` và `npm run test:e2e -- tests/e2e/medical-write-feedback.spec.ts tests/e2e/appointment-refresh.spec.ts`. Các browser test này mock API để kiểm tra giao diện, không chứng minh PostgreSQL thật.
+Kiểm tra riêng helper Kaggle: `python -m unittest discover -s benchmarks/kaggle -p 'test_*.py' -v`. Browser test dùng `E2E_BROWSER_CHANNEL=msedge`, `E2E_START_FRONTEND=1` và `npm run test:e2e -- tests/e2e/owner-activation.spec.ts tests/e2e/admin-creation.spec.ts tests/e2e/medical-write-feedback.spec.ts tests/e2e/appointment-refresh.spec.ts`. Các browser test này mock API để kiểm tra giao diện, không chứng minh PostgreSQL thật.
 
-Các ca tích hợp PostgreSQL, đồng thời và khóa giao dịch cần database **riêng** có tên kết thúc `_test`. Chỉ sau khi xác nhận database này là bản bỏ được, đặt `PG_TEST_DATABASE_URL` và chạy `npm run test:integration -w backend`; bộ test từ chối URL không phải `localhost`/`127.0.0.1` hoặc tên không kết thúc `_test`. Migration cho database test cũng phải được áp dụng **vào chính database test** trước đó. Không lấy `DATABASE_URL` đang vận hành để chạy suite. Các Playwright test dùng backend thật cần một môi trường demo/test riêng; hai test giao diện nêu trên dùng API mock nên không cần PostgreSQL.
+Các ca tích hợp PostgreSQL, đồng thời và khóa giao dịch cần database **riêng** có tên kết thúc `_test`. Chỉ sau khi xác nhận database này là bản bỏ được, đặt `PG_TEST_DATABASE_URL` và chạy `npm run test:integration -w backend`; bộ test từ chối URL không phải `localhost`/`127.0.0.1` hoặc tên không kết thúc `_test`. Migration cho database test cũng phải được áp dụng **vào chính database test** trước đó. Không lấy `DATABASE_URL` đang vận hành để chạy suite. Các Playwright test dùng backend thật cần một môi trường demo/test riêng; bốn file test giao diện nêu trên dùng API mock nên không cần PostgreSQL.
 
 ## Kaggle CPU và giới hạn kết quả
 
@@ -109,4 +138,4 @@ Mỗi lượt warmup 15 giây, đo 60 giây gồm ramp-up 5 người dùng/giây
 | GitHub và README | Nhánh `refactor` công khai; bản README tiếng Việt phải được đưa vào commit bàn giao |
 | Kaggle CPU | ZIP baseline lịch sử; cần chạy lại notebook ở full SHA bản chốt |
 
-Trên working tree ngày 01/10/2026, build và 55/55 unit/HTTP test đạt; kiểm tra kiến trúc 59 file, OpenAPI 55 operation, 8 nhóm integration PostgreSQL, 7 Playwright test và Docker runtime trên dữ liệu thử đều đạt. Đây là kết quả cho mã chưa được commit tại thời điểm ghi README. Trạng thái cuối chỉ được xác nhận sau khi README và code được đưa lên GitHub, rồi ZIP Kaggle CPU cho **đúng full SHA bản chốt** được đối chiếu. Các tài liệu lưu riêng trên máy phát triển không phải điều kiện để làm theo README này.
+Trên working tree ngày 01/10/2026 sau khi thêm luồng tạo khách/dịch vụ tại quầy và kích hoạt tài khoản, build và **67/67 unit/HTTP test** đạt; kiểm tra kiến trúc **67 file**, OpenAPI **59 operation**, **10 nhóm integration PostgreSQL** và **23 Playwright test** đều đạt. Integration xác nhận mã hết hạn/đã dùng/cấp lại, tiêu thụ đồng thời đúng một lần, tranh chấp email không ghi dở dang, đăng nhập đúng ID cũ và giữ dữ liệu dịch vụ. Docker runtime đã được kiểm tra trong đợt nghiệm thu trước; đợt này dùng container PostgreSQL riêng để áp dụng migration mới và chạy API integration từ mã build mới, không rebuild toàn bộ Compose ứng dụng. Đây là kết quả cho mã chưa được commit tại thời điểm ghi README. Trạng thái cuối chỉ được xác nhận sau khi README và code được đưa lên GitHub, rồi ZIP Kaggle CPU cho **đúng full SHA bản chốt** được đối chiếu. Các tài liệu lưu riêng trên máy phát triển không phải điều kiện để làm theo README này.

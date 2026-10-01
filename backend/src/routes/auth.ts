@@ -3,8 +3,9 @@ import { AuthService } from "../application/services/auth.js";
 import { BusinessError } from "../domain/error.js";
 import { publicUser } from "../lib/serialize.js";
 import { requireAuth } from "../middleware/auth.js";
+import { OwnerActivationService } from "../application/services/ownerActivation.js";
 
-export function createAuthRouter(service: AuthService) {
+export function createAuthRouter(service: AuthService, activation: OwnerActivationService) {
   const router = Router();
   function failure(res: Response, error: unknown) {
     if (error instanceof BusinessError) {
@@ -33,6 +34,17 @@ export function createAuthRouter(service: AuthService) {
       const result = await service.registerOwner(req.body);
       res.status(201).json({ token: result.token, user: publicUser(result.user) });
     } catch (error) { failure(res, error); }
+  });
+
+  router.post("/owner/activation/inspect", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    try { res.json(await activation.inspect(req.body ?? {})); }
+    catch (error) { failure(res, error); }
+  });
+  router.post("/owner/activation", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    try { res.json(await activation.activate(req.body ?? {})); }
+    catch (error) { failure(res, error); }
   });
 
   router.get("/me", requireAuth, async (req, res) => {

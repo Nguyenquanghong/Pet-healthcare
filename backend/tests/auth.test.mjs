@@ -39,6 +39,11 @@ test("register detects duplicate email before create", async () => {
   await assert.rejects(deps.service.registerOwner({ email: user.email, password: "valid-pass", confirmPassword: "valid-pass" }), { status: 409 });
 });
 
+test("counter profiles without credentials cannot log in online", async () => {
+  const deps = fixture({ findOwnerByEmail: async () => ({ ...user, passwordHash: "", passwordSalt: "" }) });
+  await assert.rejects(deps.service.ownerLogin({ email: user.email, password: "valid-pass" }), { status: 401 });
+});
+
 test("profile duplicate check and password validation retain responses", async () => {
   const deps = fixture({ hasOtherPhone: async () => true });
   await assert.rejects(deps.service.updateProfile(actor, { fullName: "Owner", email: user.email, phone: "123" }), { status: 409 });

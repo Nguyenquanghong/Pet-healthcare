@@ -38,6 +38,8 @@ export class PetsService {
   async create(actor: Actor, body: Record<string, unknown>) {
     const ownerId = actor.role === "owner" ? actor.sub : String(body.ownerId || "");
     if (!ownerId || !String(body.name || "").trim()) throw new BusinessError(422, "Owner and pet name are required.");
+    if (actor.role !== "owner" && !await this.pets.ownerExists(ownerId))
+      throw new BusinessError(422, "Select an existing pet owner.");
     return this.pets.create({
       ownerId, name: String(body.name).trim(), species: String(body.species || "other"),
       gender: String(body.gender || "unknown"), healthStatus: String(body.healthStatus || "healthy"),

@@ -10,10 +10,12 @@ import { AdminHotelBookingsPage } from "./routes/admin/AdminHotelBookingsPage";
 import { AdminMedicalRecordsPage } from "./routes/admin/AdminMedicalRecordsPage";
 import { AdminNotificationsPage } from "./routes/admin/AdminNotificationsPage";
 import { AdminPetsPage } from "./routes/admin/AdminPetsPage";
+import { AdminOwnersPage } from "./routes/admin/AdminOwnersPage";
 import { AdminSettingsPage } from "./routes/admin/AdminSettingsPage";
 import { AdminLoginPage } from "./routes/auth/AdminLoginPage";
 import { LandingPage } from "./routes/auth/LandingPage";
 import { OwnerLoginPage } from "./routes/auth/OwnerLoginPage";
+import { OwnerActivationPage } from "./routes/auth/OwnerActivationPage";
 import { AppointmentsPage } from "./routes/owner/AppointmentsPage";
 import { DashboardPage } from "./routes/owner/DashboardPage";
 import { HotelBookingPage } from "./routes/owner/HotelBookingPage";
@@ -52,6 +54,7 @@ export function App() {
       <Route path="/" element={<PublicEntryPage />} />
       <Route path="/login" element={<OwnerLoginPage />} />
       <Route path="/register" element={<OwnerRegisterPage />} />
+      <Route path="/activate-account" element={<OwnerActivationPage />} />
       <Route path="/rescue/:qrToken" element={<PetRescuePage />} />
       <Route path="/pet/:qrToken" element={<PetRescuePage />} />
       <Route path="/owner" element={<Navigate to="/owner/dashboard" replace />} />
@@ -70,6 +73,7 @@ export function App() {
       <Route path="/admin/dashboard" element={<AdminOnly><AdminDashboardPage /></AdminOnly>} />
       <Route path="/admin/appointments" element={<AdminOnly><AdminAppointmentsPage /></AdminOnly>} />
       <Route path="/admin/pets" element={<AdminOnly><AdminPetsPage /></AdminOnly>} />
+      <Route path="/admin/owners" element={<AdminOnly><AdminOwnersPage /></AdminOnly>} />
       <Route path="/admin/medical-records" element={<AdminOnly><AdminMedicalRecordsPage /></AdminOnly>} />
       <Route path="/admin/hotel-bookings" element={<AdminOnly><AdminHotelBookingsPage /></AdminOnly>} />
       <Route path="/admin/notifications" element={<AdminOnly><AdminNotificationsPage /></AdminOnly>} />

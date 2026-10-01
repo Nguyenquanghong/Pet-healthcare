@@ -18,6 +18,7 @@ export type PetChanges = Partial<Pick<PetValue,
 export interface PetRepository {
   list(ownerId?: string): Promise<PetValue[]>;
   find(id: string): Promise<PetValue | null>;
+  ownerExists(ownerId: string): Promise<boolean>;
   create(data: PetChanges & { ownerId: string; name: string; species: string; gender: string; healthStatus: string; allergies: string[]; qrToken: string | null }): Promise<PetValue>;
   update(id: string, changes: PetChanges): Promise<PetValue>;
 }

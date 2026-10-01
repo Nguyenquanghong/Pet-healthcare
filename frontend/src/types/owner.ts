@@ -5,4 +5,5 @@ export type Owner = {
   email?: string;
   address?: string;
   petIds: string[];
+  loginEnabled?: boolean;
 };

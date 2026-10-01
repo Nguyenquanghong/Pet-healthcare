@@ -24,3 +24,23 @@ test("owner cannot update another owner's pet", async () => {
   }, { create: () => "qr-test" });
   await assert.rejects(service.update(owner, "pet-1", { name: "New" }), { status: 403 });
 });
+
+test("staff creates a pet for an existing owner selected at reception", async () => {
+  let saved;
+  const service = new PetsService({
+    ownerExists: async (id) => id === "owner-2",
+    create: async (data) => { saved = data; return { id: "pet-2", ...data }; },
+  }, { create: () => "qr-test" });
+  await service.create({ sub: "admin-1", role: "admin" }, { ownerId: "owner-2", name: " Milo " });
+  assert.equal(saved.ownerId, "owner-2");
+  assert.equal(saved.name, "Milo");
+});
+
+test("staff cannot attach a pet to a missing user or a staff account", async () => {
+  const service = new PetsService({
+    ownerExists: async () => false,
+    create: async () => { throw new Error("must not create"); },
+  }, { create: () => "qr-test" });
+  for (const ownerId of ["missing-owner", "admin-1"])
+    await assert.rejects(service.create({ sub: "admin-1", role: "admin" }, { ownerId, name: "Milo" }), { status: 422 });
+});

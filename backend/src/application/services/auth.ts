@@ -20,7 +20,7 @@ export class AuthService {
     if (!emailPattern.test(email)) throw new BusinessError(422, "Enter a valid email address.");
     if (!password) throw new BusinessError(422, "Password is required.");
     const user = await this.deps.users.findOwnerByEmail(email);
-    if (!user || !this.deps.passwords.verify(password, user.passwordHash, user.passwordSalt)) throw new BusinessError(401, "The email or password is incorrect.");
+    if (!user || !user.passwordHash || !user.passwordSalt || !this.deps.passwords.verify(password, user.passwordHash, user.passwordSalt)) throw new BusinessError(401, "The email or password is incorrect.");
     return { token: this.deps.tokens.sign(user.id, user.role), user };
   }
 
