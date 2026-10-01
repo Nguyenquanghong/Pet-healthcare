@@ -11,13 +11,14 @@ import secrets
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 import psutil
-from metrics import CpuSampler
+from metrics import BENCHMARK_PROTOCOL, CpuSampler
 
 
 def command(args, *, cwd=None, env=None, stdout=None):
@@ -68,9 +69,9 @@ def process_usage(pid, sampler):
 
 
 def run_locust(repo, environment, profile, users, spawn_rate, duration, log_path, csv_prefix=None):
-    args = ["locust", "-f", str(repo / "benchmarks/kaggle/locustfile.py"), profile,
+    args = [sys.executable, "-m", "locust", "-f", str(repo / "benchmarks/kaggle/locustfile.py"), profile,
             "--headless", "--only-summary", "--host", "http://127.0.0.1:5001",
-            "--users", str(users), "--spawn-rate", str(spawn_rate), "--run-time", duration]
+            "--users", str(users), "--spawn-rate", str(spawn_rate), "--run-time", duration, "--stop-timeout", "12"]
     if csv_prefix:
         args.extend(["--csv", str(csv_prefix), "--csv-full-history"])
     log = open(log_path, "w", encoding="utf-8")
@@ -117,7 +118,7 @@ def main():
     parser.add_argument("--profile", choices=["ReadHeavyUser", "MixedUser"], required=True)
     parser.add_argument("--users", type=int, required=True)
     parser.add_argument("--spawn-rate", type=float, default=5)
-    parser.add_argument("--warmup", default="30s")
+    parser.add_argument("--warmup", default="45s")
     parser.add_argument("--duration", default="2m")
     parser.add_argument("--seed", default="phase1")
     args = parser.parse_args()
@@ -132,10 +133,10 @@ def main():
         raise RuntimeError("--output must be under /kaggle/working")
     if args.users < 1 or args.spawn_rate <= 0:
         raise RuntimeError("users and spawn-rate must be positive")
-    for program in ("node", "npm", "locust", "pg_config", "psql", "createdb"):
+    for program in ("node", "npm", "pg_config", "psql", "createdb"):
         if not shutil.which(program):
             raise RuntimeError(f"Missing {program}; install it in this Kaggle session before the run")
-    pg_bin = Path(output(["pg_config", "--bindir"]))
+    pg_bin = Path(os.environ["BENCH_PG_BIN"]) if os.environ.get("BENCH_PG_BIN") else Path(output(["pg_config", "--bindir"]))
     for program in ("initdb", "pg_ctl"):
         if not (pg_bin / program).is_file():
             raise RuntimeError(f"Missing PostgreSQL binary: {pg_bin / program}")
@@ -144,16 +145,20 @@ def main():
     result_dir.mkdir(parents=True, exist_ok=False)
 
     metadata = {
+        "benchmark_protocol": BENCHMARK_PROTOCOL,
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
         "commit": output(["git", "rev-parse", "HEAD"], cwd=repo),
         "dirty_worktree": bool(output(["git", "status", "--porcelain"], cwd=repo)),
         "platform": platform.platform(),
         "cpu_count": psutil.cpu_count(logical=True),
+        "cpu_affinity": psutil.Process().cpu_affinity(),
+        "cpu_model": next((line.split(":", 1)[1].strip() for line in Path("/proc/cpuinfo").read_text().splitlines() if line.startswith("model name")), platform.processor()),
         "memory_total_bytes": psutil.virtual_memory().total,
         "node_version": output(["node", "--version"]),
         "npm_version": output(["npm", "--version"]),
         "postgres_version": output([str(pg_bin / "postgres"), "--version"]),
-        "locust_version": output(["locust", "--version"]),
+        "locust_version": output([sys.executable, "-m", "locust", "--version"]),
+        "python_version": platform.python_version(),
         "profile": args.profile,
         "users": args.users,
         "spawn_rate_per_second": args.spawn_rate,
@@ -166,6 +171,9 @@ def main():
                          if args.profile == "ReadHeavyUser" else
                          {"GET bootstrap": 30, "GET pets": 20, "GET appointments": 15, "GET notifications": 5, "POST rescue report": 20, "POST appointment": 10}),
         "stop_conditions": {"error_rate_gt": 0.01, "p95_ms_gt": 2000},
+        "request_timeout_seconds": 10,
+        "stop_timeout_seconds": 12,
+        "measurement_window": "separate measured process; includes ramp-up at the stated spawn rate",
         "offered_rps": None,
         "load_model": "closed-loop users with think time; independent offered RPS is not defined",
         "generator_shares_cpu": True,
@@ -221,6 +229,7 @@ def main():
                 command(["node", str(repo / "benchmarks/kaggle/prepare_fixture.mjs")], cwd=repo, env=environment, stdout=setup_log)
 
             environment["BENCH_PHASE"] = "warmup"
+            environment.pop("BENCH_FINAL_STATS", None)
             warmup, warmup_log = run_locust(repo, environment, args.profile, args.users, args.spawn_rate, args.warmup, result_dir / "warmup.log")
             warmup_code = warmup.wait()
             warmup_log.close()
@@ -228,6 +237,7 @@ def main():
                 raise RuntimeError(f"Locust warmup exited {warmup_code}; inspect warmup.log")
 
             environment["BENCH_PHASE"] = "measured"
+            environment["BENCH_FINAL_STATS"] = str(result_dir / "locust_final.json")
             load, load_log = run_locust(repo, environment, args.profile, args.users, args.spawn_rate, args.duration, result_dir / "load.log", result_dir / "load")
             pg_pid = int((data_dir / "postmaster.pid").read_text().splitlines()[0])
             samplers = [CpuSampler(), CpuSampler(), CpuSampler()]
@@ -241,11 +251,14 @@ def main():
             load_code = load.wait()
             load_log.close()
             (result_dir / "resources.json").write_text(json.dumps(samples, indent=2), encoding="utf-8")
-            stats = aggregated_stats(result_dir / "load_stats.csv")
+            stats = json.loads((result_dir / "locust_final.json").read_text(encoding="utf-8"))
+            if stats.pop("phase", None) != "measured" or stats.get("stats_source") != "locust_quitting":
+                raise RuntimeError("Final measured Locust statistics are missing or invalid")
+            metadata["csv_snapshot"] = aggregated_stats(result_dir / "load_stats.csv")
             metadata["locust_exit_code"] = load_code
             metadata["results"] = stats
             metadata["ended_at_utc"] = datetime.now(timezone.utc).isoformat()
-            metadata["threshold_exceeded"] = (stats["error_rate"] is None or stats["error_rate"] > 0.01 or stats["p95_ms"] > 2000)
+            metadata["threshold_exceeded"] = (stats["error_rate"] is None or stats["error_rate"] > 0.01 or stats["p95_ms"] is None or stats["p95_ms"] > 2000)
             metadata["status"] = "failed" if load_code else "completed"
             (result_dir / "manifest.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
             print(f"Saved Kaggle run evidence in {result_dir}; threshold_exceeded={metadata['threshold_exceeded']}")

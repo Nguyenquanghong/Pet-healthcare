@@ -4,15 +4,24 @@ import itertools
 import json
 import os
 import random
+from pathlib import Path
 
-from locust import HttpUser, between, task
-from metrics import appointment_slot
+from locust import HttpUser, between, task, events
+from metrics import appointment_slot, final_stats
 
 with open(os.environ["BENCH_FIXTURE"], encoding="utf-8") as fixture_file:
     USERS = json.load(fixture_file)["users"]
 
 random.seed(int(os.environ.get("BENCH_SEED_NUMBER", "20260923")))
 USER_INDEX = itertools.count()
+
+
+@events.quitting.add_listener
+def save_final_stats(environment, **_kwargs):
+    path = os.environ.get("BENCH_FINAL_STATS")
+    if path:
+        data = {"phase": os.environ.get("BENCH_PHASE"), **final_stats(environment.stats.total)}
+        Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 class BasePetUser(HttpUser):
@@ -25,16 +34,16 @@ class BasePetUser(HttpUser):
         self.appointment_number = 0
 
     def get_bootstrap(self):
-        self.client.get("/api/bootstrap", name="GET /api/bootstrap")
+        self.client.get("/api/bootstrap", name="GET /api/bootstrap", timeout=10)
 
     def get_pets(self):
-        self.client.get("/api/pets", name="GET /api/pets")
+        self.client.get("/api/pets", name="GET /api/pets", timeout=10)
 
     def get_appointments(self):
-        self.client.get("/api/appointments", name="GET /api/appointments")
+        self.client.get("/api/appointments", name="GET /api/appointments", timeout=10)
 
     def get_notifications(self):
-        self.client.get("/api/notifications", name="GET /api/notifications")
+        self.client.get("/api/notifications", name="GET /api/notifications", timeout=10)
 
 
 class ReadHeavyUser(BasePetUser):
@@ -69,6 +78,7 @@ class MixedUser(BasePetUser):
         self.client.post(
             f"/api/public/pets/{self.fixture['qrToken']}/rescue-reports",
             name="POST /api/public/pets/{token}/rescue-reports",
+            timeout=10,
             json={"finderPhone": "0000000000", "location": "Synthetic test location"},
         )
 
@@ -79,5 +89,6 @@ class MixedUser(BasePetUser):
         self.client.post(
             "/api/appointments",
             name="POST /api/appointments",
+            timeout=10,
             json={"petId": self.fixture["petId"], "type": "general_checkup", "serviceName": "Synthetic checkup", "date": day, "time": slot},
         )

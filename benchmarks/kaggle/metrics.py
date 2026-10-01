@@ -2,6 +2,23 @@
 
 from datetime import date, timedelta
 
+BENCHMARK_PROTOCOL = "phase1-kaggle-v2"
+
+
+def final_stats(total):
+    """Read the final Locust aggregate, rather than a periodic CSV snapshot."""
+    requests, failures = total.num_requests, total.num_failures
+    return {
+        "stats_source": "locust_quitting",
+        "requests": requests,
+        "failures": failures,
+        "error_rate": failures / requests if requests else None,
+        "achieved_rps": total.total_rps,
+        "p50_ms": total.get_response_time_percentile(0.50) if requests else None,
+        "p95_ms": total.get_response_time_percentile(0.95) if requests else None,
+        "p99_ms": total.get_response_time_percentile(0.99) if requests else None,
+    }
+
 
 def appointment_slot(number, phase):
     if phase not in ("warmup", "measured") or number < 0:
