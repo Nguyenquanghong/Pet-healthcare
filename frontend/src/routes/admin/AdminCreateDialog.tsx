@@ -1,3 +1,5 @@
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { Plus, X } from "lucide-react";
@@ -45,7 +47,7 @@ export function AdminCreateButton({ kind, onCreated }: { kind: Kind; onCreated?:
 }
 
 function AdminCreateDialog({ kind, onClose, onCreated }: { kind: Kind; onClose: () => void; onCreated?: () => void }) {
-  const { owners, pets, refreshData } = useAppStore();
+  const { refreshData } = useAppStore();
   const dialog = useRef<HTMLDialogElement>(null);
   const submitting = useRef(false);
   const hotelRequest = useRef<{ payload: string; key: string } | null>(null);
@@ -74,6 +76,9 @@ function AdminCreateDialog({ kind, onClose, onCreated }: { kind: Kind; onClose: 
   const [saved, setSaved] = useState<{ id: string; message: string } | null>(null);
   const [uncertainWrite, setUncertainWrite] = useState(false);
   const [ownerConflict, setOwnerConflict] = useState(false);
+  const ownerPage = usePagedList<Owner>("/owners", { q: query });
+  const petPage = usePagedList<Pet>("/pets", { ownerId }, Boolean(ownerId));
+  const owners = ownerPage.items, pets = petPage.items;
   const allOwners = [...owners, ...addedOwners.filter(item => !owners.some(owner => owner.id === item.id))];
   const owner = allOwners.find(item => item.id === ownerId);
   const allPets = [...pets, ...addedPets.filter(item => !pets.some(pet => pet.id === item.id))];
@@ -82,9 +87,7 @@ function AdminCreateDialog({ kind, onClose, onCreated }: { kind: Kind; onClose: 
   const service = services.find(item => item.type === type)!;
   const nights = calculateNights(checkIn, checkOut);
   const total = calculateBookingTotal(roomType, serviceKeys, Math.max(0, nights));
-  const filteredOwners = allOwners.filter(item => item.id === ownerId ||
-    `${item.fullName} ${item.phone} ${item.email || ""} ${item.id}`.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi")) ||
-    (/^\+?\d{3,}$/.test(phoneKey(query)) && phoneKey(item.phone).includes(phoneKey(query))));
+  const filteredOwners = allOwners;
   const actionTitle = addingOwner ? "Tạo khách mới" : addingPet ? titles.pet : titles[kind];
 
   useEffect(() => { dialog.current?.showModal(); }, []);
@@ -256,7 +259,8 @@ function AdminCreateDialog({ kind, onClose, onCreated }: { kind: Kind; onClose: 
             <Input id="reception-owner-search" label="Tìm khách đã có" autoFocus placeholder="Tên, số điện thoại, email hoặc mã chủ nuôi" value={query} onChange={e => setQuery(e.target.value)} />
             <Select id="reception-owner" label="Chủ nuôi" required value={ownerId}
               options={[{ value: "", label: "Chọn hồ sơ khách đã có" }, ...filteredOwners.map(item => ({ value: item.id, label: `${item.fullName} · ${item.phone || item.email || "Chưa có liên hệ"}` }))]}
-              onChange={e => { setOwnerId(e.target.value); setPetId(""); setInfo(""); setError(""); }} />
+              onChange={e => { const selected = allOwners.find(item => item.id === e.target.value); if (selected) setAddedOwners(previous => [selected, ...previous.filter(item => item.id !== selected.id)]); setOwnerId(e.target.value); setPetId(""); setInfo(""); setError(""); }} />
+            <Pagination {...ownerPage} />
             {!allOwners.length && <p className="text-sm text-slate-600">Chưa có hồ sơ khách. Bấm Tạo khách mới để tiếp nhận khách tại quầy.</p>}
             {owner && <p className="rounded-lg bg-slate-50 p-3 text-sm">{owner.fullName} · {owner.phone || "Chưa có số điện thoại"}{owner.email ? ` · ${owner.email}` : ""}</p>}
             {addingPet ? <>
@@ -265,7 +269,8 @@ function AdminCreateDialog({ kind, onClose, onCreated }: { kind: Kind; onClose: 
             </> : <>
               <Select id="reception-pet" label="Thú cưng" required disabled={!owner} value={petId}
                 options={[{ value: "", label: "Chọn thú cưng của chủ nuôi" }, ...ownerPets.map(item => ({ value: item.id, label: `${item.name} · ${item.breed || speciesLabels[item.species]} · ${item.id}` }))]}
-                onChange={e => setPetId(e.target.value)} />
+                onChange={e => { const selected = ownerPets.find(item => item.id === e.target.value); if (selected) setAddedPets(previous => [selected, ...previous.filter(item => item.id !== selected.id)]); setPetId(e.target.value); }} />
+              <Pagination {...petPage} />
               {owner && !ownerPets.length && <p className="text-sm text-slate-600">Chủ nuôi chưa có thú cưng. Thêm thú cưng trước khi đặt dịch vụ.</p>}
               <Button type="button" variant="outline" disabled={!owner} icon={<Plus size={16} />} onClick={() => { setAddingPet(true); setError(""); }}>Thêm thú cưng cho chủ nuôi này</Button>
               {kind === "appointment" ? <>

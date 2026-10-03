@@ -109,6 +109,7 @@ model User {
   notifications  Notification[]  @relation("OwnerNotifications")
   activations    OwnerActivation[]
 
+  @@index([role, fullName, id], map: "owners_page_idx")
   @@map("users")
 }
 
@@ -163,6 +164,8 @@ model Pet {
   rescueReports     RescueReport[]
 
   @@index([ownerId])
+  @@index([createdAt, id], map: "pets_page_idx")
+  @@index([ownerId, createdAt, id], map: "pets_owner_page_idx")
   @@map("pets")
 }
 
@@ -190,6 +193,8 @@ model Appointment {
   invoices        Invoice[]
 
   @@index([ownerId, appointmentDate])
+  @@index([status, appointmentDate(sort: Desc), appointmentTime(sort: Desc), id(sort: Desc)], map: "appointments_page_idx")
+  @@index([ownerId, status, appointmentDate(sort: Desc), appointmentTime(sort: Desc), id(sort: Desc)], map: "appointments_owner_page_idx")
   @@map("appointments")
 }
 
@@ -218,6 +223,8 @@ model MedicalRecord {
   appointment   Appointment? @relation(fields: [appointmentId], references: [id])
 
   @@index([petId, visitDate])
+  @@index([ownerId, visitDate, id], map: "medical_records_owner_page_idx")
+  @@index([visitDate, id], map: "medical_records_page_idx")
   @@map("medical_records")
 }
 
@@ -231,6 +238,7 @@ model MedicalImage {
   pet       Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
 
   @@index([petId])
+  @@index([petId, createdAt, id], map: "medical_images_pet_page_idx")
   @@map("medical_images")
 }
 
@@ -257,6 +265,8 @@ model HotelBooking {
   createRequests HotelBookingRequest[]
 
   @@index([ownerId, checkIn])
+  @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "hotel_bookings_page_idx")
+  @@index([ownerId, status, createdAt(sort: Desc), id(sort: Desc)], map: "hotel_bookings_owner_page_idx")
   @@map("hotel_bookings")
 }
 
@@ -308,6 +318,7 @@ model DailyCareNote {
   booking          HotelBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([bookingId, noteDate])
+  @@index([bookingId, noteDate, id], map: "care_notes_page_idx")
   @@map("daily_care_notes")
 }
 
@@ -329,6 +340,8 @@ model Notification {
   recipientOwner       User?    @relation("OwnerNotifications", fields: [recipientOwnerId], references: [id], onDelete: Cascade)
 
   @@index([recipientOwnerId, createdAt])
+  @@index([recipientRole, createdAt, id], map: "notifications_role_page_idx")
+  @@index([recipientOwnerId, createdAt, id], map: "notifications_owner_page_idx")
   @@map("notifications")
 }
 
@@ -381,6 +394,8 @@ model Invoice {
   paymentEvents PaymentEvent[]
 
   @@index([ownerId, issuedAt])
+  @@index([issuedAt, id], map: "invoices_page_idx")
+  @@index([ownerId, issuedAt, id], map: "invoices_owner_page_idx")
   @@map("invoices")
 }
 

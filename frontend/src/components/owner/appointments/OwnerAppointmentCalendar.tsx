@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useApiQuery } from "../../../services/useApiQuery";
+import { useSession } from "../../../store/SessionContext";
+import { useEffect, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
-import type { Appointment } from "../../../types/appointment";
 import { todayIso } from "../../../utils/date";
 
 interface OwnerAppointmentCalendarProps {
-  appointments: Appointment[];
+  category?: "medical" | "spa";
   selectedDate?: string;
   onSelectDate: (date: string) => void;
   onClearDate: () => void;
@@ -39,12 +40,12 @@ function makeDateValue(monthKey: string, day: number) {
 }
 
 export function OwnerAppointmentCalendar({
-  appointments,
+  category = "medical",
   selectedDate,
   onSelectDate,
   onClearDate,
 }: OwnerAppointmentCalendarProps) {
-  const fallbackMonth = selectedDate ? toMonthKey(selectedDate) : toMonthKey(appointments[0]?.date ?? todayIso());
+  const fallbackMonth = selectedDate ? toMonthKey(selectedDate) : toMonthKey(todayIso());
   const [visibleMonth, setVisibleMonth] = useState(fallbackMonth);
 
   useEffect(() => {
@@ -54,12 +55,11 @@ export function OwnerAppointmentCalendar({
   const [visibleYear, visibleMonthNumber] = visibleMonth.split("-").map(Number);
   const daysInMonth = getDaysInMonth(visibleMonth);
 
-  const appointmentCountByDate = useMemo(() => {
-    return appointments.reduce<Record<string, number>>((acc, appointment) => {
-      acc[appointment.date] = (acc[appointment.date] ?? 0) + 1;
-      return acc;
-    }, {});
-  }, [appointments]);
+  const { authRole } = useSession();
+  const calendar = useApiQuery<Record<string, number>>("/appointments/calendar?month=" + visibleMonth + "&category=" + category, {
+    enabled: Boolean(authRole), refreshOnTick: true,
+  });
+  const appointmentCountByDate = calendar.data ?? {};
 
   const days = Array.from({ length: daysInMonth }, (_, index) => {
     const day = index + 1;
@@ -138,6 +138,8 @@ export function OwnerAppointmentCalendar({
         </div>
       </div>
 
+      {calendar.loading && <p role="status" className="text-sm text-slate-500">Đang tải lịch theo tháng...</p>}
+      {calendar.error && <p role="alert" className="text-sm text-rose-700">Chưa tải được lịch theo tháng. <button type="button" className="underline" onClick={() => void calendar.reload().catch(() => undefined)}>Thử lại</button></p>}
       <div className="grid grid-cols-7 gap-2">
         {days.map((day) => {
           const hasAppointment = day.count > 0;
@@ -149,6 +151,7 @@ export function OwnerAppointmentCalendar({
               type="button"
               onClick={() => hasAppointment && onSelectDate(day.value)}
               disabled={!hasAppointment}
+              aria-label={`${day.value}, ${day.count} lịch hẹn`}
               aria-pressed={isSelected}
               className={`relative min-h-16 rounded-md border p-3 text-center transition-colors ${
                 hasAppointment

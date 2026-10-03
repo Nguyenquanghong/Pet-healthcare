@@ -6,8 +6,8 @@ import { BrandLogo } from "../../shared/BrandLogo";
 
 export function AdminSidebar() {
   const navigate = useNavigate();
-  const { logout, notifications } = useAppStore();
-  const unreadCount = notifications.filter((n) => n.recipientRole === "admin" && n.status === "sent").length;
+  const { logout, summary } = useAppStore();
+  const unreadCount = summary.unread;
 
   const handleLogout = () => {
     logout();

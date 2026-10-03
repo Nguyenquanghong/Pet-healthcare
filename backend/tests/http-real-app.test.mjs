@@ -23,7 +23,7 @@ test("app factory serves OpenAPI/Swagger and protects GET/POST before DB access"
     const contract = await spec.json();
     assert.equal(contract.openapi, "3.0.3");
     assert.equal(
-      contract.paths["/api/health"].get.responses["503"].content["application/json"].schema.$ref,
+      contract.paths["/health"].get.responses["503"].content["application/json"].schema.$ref,
       "#/components/schemas/Health",
     );
     const health = await fetch(`${base}/api/health`);

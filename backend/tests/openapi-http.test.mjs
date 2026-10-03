@@ -13,7 +13,8 @@ test("OpenAPI JSON and Swagger UI are served without a database", async () => {
     assert.match(jsonResponse.headers.get("content-type"), /application\/json/);
     const spec = await jsonResponse.json();
     assert.equal(spec.openapi, "3.0.3");
-    assert.ok(spec.paths["/api/appointments"]);
+    assert.equal(spec.servers[0].url, "/api");
+    assert.ok(spec.paths["/appointments"]);
     const uiResponse = await fetch(`${base}/api/docs/`);
     assert.equal(uiResponse.status, 200);
     assert.match(await uiResponse.text(), /swagger-ui/);

@@ -40,6 +40,7 @@ export function OwnerRegisterPage() {
     else if (existingEmails.has(normalizedEmail)) nextErrors.email = "An account with this email already exists.";
 
     if (!password) nextErrors.password = "Password is required.";
+    else if (password.length < 8 || password.length > 128) nextErrors.password = "Password must contain 8 to 128 characters.";
     if (!confirmPassword) nextErrors.confirmPassword = "Confirm password is required.";
     else if (password && confirmPassword !== password) nextErrors.confirmPassword = "Confirm password must match the password.";
 
@@ -133,6 +134,8 @@ export function OwnerRegisterPage() {
                 clearErrors();
               }}
               placeholder="Create a password"
+              minLength={8}
+              maxLength={128}
               autoComplete="new-password"
               disabled={isSubmitting}
               className="[&_input]:pr-12"
@@ -158,6 +161,7 @@ export function OwnerRegisterPage() {
                 clearErrors();
               }}
               placeholder="Re-enter your password"
+              maxLength={128}
               autoComplete="new-password"
               disabled={isSubmitting}
               className="[&_input]:pr-12"

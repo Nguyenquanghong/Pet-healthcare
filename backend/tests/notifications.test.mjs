@@ -28,5 +28,5 @@ test("owner cannot mark another owner's notification", async () => {
     markRead: async () => { throw new Error("must not update"); },
   });
   await assert.rejects(service.markRead(owner, "n-2"), { status: 404 });
-  assert.equal(ownerId, "owner-1");
+  assert.deepEqual(ownerId, { recipientOwnerId: "owner-1" });
 });

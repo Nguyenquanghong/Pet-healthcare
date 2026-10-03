@@ -7,22 +7,30 @@ import type { Notification } from "../types/notification";
 import type { Owner } from "../types/owner";
 import type { Pet } from "../types/pet";
 import { apiClient, authToken } from "../services/apiClient";
+import { ApiError } from "../utils/apiError";
+import { useLocation } from "react-router-dom";
+import { SessionProvider, type AuthRole } from "./SessionContext";
+import { DataRefreshProvider } from "./DataRefreshContext";
 
-type AuthRole = "owner" | "admin" | null;
+export type AppSummary = { totals: Record<string, number>; species: Record<string, number>; appointmentStatus: Record<string, number>; hotelStatus: Record<string, number>; notificationCategory: Record<string, number>; unread: number; todayAppointments: number };
+const emptySummary: AppSummary = { totals: {}, species: {}, appointmentStatus: {}, hotelStatus: {}, notificationCategory: {}, unread: 0, todayAppointments: 0 };
+
 type CreateHotelBookingInput = { petId: string; checkIn: string; checkOut: string; roomType: HotelBooking["roomType"]; serviceKeys: HotelBooking["serviceKeys"]; ownerNote?: string };
 type CreateAppointmentInput = { petId: string; type: AppointmentType; serviceName: string; date: string; time: string; doctorId?: string; ownerNote?: string };
-type RescheduleAppointmentInput = { date: string; time: string; ownerNote?: string };
+type RescheduleAppointmentInput = { date: string; time: string; ownerNote?: string; expectedRevision?: number };
 type CreateMedicalRecordInput = Omit<MedicalRecord, "id" | "ownerId" | "createdAt" | "updatedAt">;
 type UpdateMedicalRecordInput = Partial<Omit<MedicalRecord, "id" | "petId" | "ownerId" | "appointmentId" | "createdAt">>;
 type RegisterOwnerInput = { fullName?: string; phone?: string; email: string; password: string; confirmPassword: string; address?: string };
 type UpdateOwnerProfileInput = { fullName: string; email: string; phone?: string; address?: string };
 type ChangePasswordInput = { currentPassword: string; newPassword: string; confirmPassword: string };
-type CreatePetInput = Omit<Pet, "id" | "ownerId">;
-type UpdatePetInput = Partial<Omit<Pet, "id" | "ownerId">>;
+type CreatePetInput = Omit<Pet, "id" | "ownerId" | "qrToken">;
+type UpdatePetInput = Partial<Omit<Pet, "id" | "ownerId" | "qrToken" | "publicProfile">> & { publicProfile?: Partial<NonNullable<Pet["publicProfile"]>> };
 type RescueReportInput = { petId: string; finderName?: string; finderPhone: string; location: string; note?: string };
 type UploadMedicalImageInput = { petId: string; title: string; imageUrl: string; mimeType: string };
+type SessionUser = Omit<Owner, "petIds"> & { role: string };
 
 type AppState = {
+  summary: AppSummary;
   currentOwnerId: string;
   owners: Owner[];
   pets: Pet[];
@@ -35,9 +43,12 @@ type AppState = {
 };
 
 type AppStoreValue = AppState & {
+  dataVersion: number;
+  rememberPet: (pet: Pet) => void;
+  petUpdates: Record<string, Pet>;
   authRole: AuthRole;
   userRole: string | null;
-  refreshData: () => Promise<void>;
+  refreshData: (publishChange?: boolean) => Promise<void>;
   isLoading: boolean;
   isAuthReady: boolean;
   error: string;
@@ -48,33 +59,43 @@ type AppStoreValue = AppState & {
   loginAdmin: (username: string, password: string) => Promise<string | null>;
   logout: () => void;
   registerOwner: (input: RegisterOwnerInput) => Promise<void>;
-  updateOwnerProfile: (input: UpdateOwnerProfileInput) => Promise<void>;
+  updateOwnerProfile: (input: UpdateOwnerProfileInput) => Promise<boolean>;
   changePassword: (input: ChangePasswordInput) => Promise<void>;
   createPet: (input: CreatePetInput) => Promise<boolean>;
   updatePet: (petId: string, input: UpdatePetInput) => Promise<boolean>;
+  rotatePetQrToken: (petId: string) => Promise<boolean>;
   submitRescueReport: (input: RescueReportInput) => void;
   createHotelBooking: (input: CreateHotelBookingInput, requestKey: string) => Promise<{ booking: HotelBooking; refreshed: boolean }>;
-  cancelHotelBooking: (bookingId: string, ownerNote?: string) => Promise<boolean>;
+  cancelHotelBooking: (bookingId: string, ownerNote?: string, expectedRevision?: number) => Promise<boolean>;
   createAppointment: (input: CreateAppointmentInput) => Promise<void>;
-  cancelAppointment: (appointmentId: string, ownerNote?: string) => Promise<boolean>;
+  cancelAppointment: (appointmentId: string, ownerNote?: string, expectedRevision?: number) => Promise<boolean>;
   rescheduleAppointment: (appointmentId: string, input: RescheduleAppointmentInput) => Promise<boolean>;
   sendReminder: (appointmentId: string) => void;
   createMedicalRecord: (input: CreateMedicalRecordInput) => Promise<boolean>;
   updateMedicalRecord: (recordId: string, input: UpdateMedicalRecordInput) => Promise<boolean>;
   deleteMedicalRecord: (recordId: string) => Promise<boolean>;
-  uploadMedicalImage: (input: UploadMedicalImageInput) => void;
+  uploadMedicalImage: (input: UploadMedicalImageInput) => Promise<boolean>;
   deleteMedicalImage: (imageId: string) => void;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
   deleteNotification: (notificationId: string) => void;
-  sendCustomNotification: (recipientOwnerId: string, title: string, message: string) => void;
+  sendCustomNotification: (recipientOwnerId: string, title: string, message: string) => Promise<boolean>;
 };
 
-const emptyState: AppState = { currentOwnerId: "", owners: [], pets: [], appointments: [], medicalRecords: [], medicalImages: [], hotelBookings: [], dailyCareNotes: [], notifications: [] };
+const emptyState: AppState = { summary: emptySummary, currentOwnerId: "", owners: [], pets: [], appointments: [], medicalRecords: [], medicalImages: [], hotelBookings: [], dailyCareNotes: [], notifications: [] };
 const fallbackOwner: Owner = { id: "", fullName: "", phone: "", petIds: [] };
 const AppStoreContext = createContext<AppStoreValue | null>(null);
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const view = /\/(dashboard|settings)$/.test(location.pathname) ? "dashboard" : "session";
+  const viewRef = useRef(view); viewRef.current = view;
+  const [refreshVersion, setRefreshVersion] = useState({ version: 0, changeVersion: 0 });
+  const dataVersion = refreshVersion.version;
+  const publishRefresh = useCallback((changed: boolean) => {
+    setRefreshVersion(previous => ({ version: previous.version + 1, changeVersion: previous.changeVersion + (changed ? 1 : 0) }));
+  }, []);
+  const [petUpdates, setPetUpdates] = useState<Record<string, Pet>>({});
   const [state, setState] = useState<AppState>(emptyState);
   const [authRole, setAuthRole] = useState<AuthRole>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -85,16 +106,29 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const loadSequence = useRef(0);
   const pendingLoads = useRef(0);
 
-  const loadData = useCallback(async () => {
+  const establishSession = useCallback((user: SessionUser) => {
+    loadSequence.current += 1;
+    setAuthRole(user.role === "owner" ? "owner" : "admin");
+    setUserRole(user.role);
+    setState(user.role === "owner" && user.id
+      ? { ...emptyState, currentOwnerId: user.id, owners: [{ ...user, petIds: [] }] }
+      : emptyState);
+    setPetUpdates({});
+    setSyncError("");
+  }, []);
+
+  const loadData = useCallback(async (changed = true) => {
     const token = authToken.get();
     if (!token) return;
+    if (changed) publishRefresh(true);
     const sequence = ++loadSequence.current;
     pendingLoads.current += 1;
     try {
-      const data = await apiClient.get<AppState>("/bootstrap", { signal: AbortSignal.timeout(15_000) });
+      const data = await apiClient.get<AppState>(`/bootstrap?view=${viewRef.current}`, { signal: AbortSignal.timeout(15_000) });
       // A response started before a mutation or logout must not replace newer data.
       if (sequence === loadSequence.current && token === authToken.get()) {
-        setState(data);
+        setState(previous => ({ ...data, summary: data.summary ?? emptySummary, pets: viewRef.current === "session" ? [...new Map([...data.pets, ...previous.pets.filter(pet => pet.ownerId === data.currentOwnerId)].map(pet => [pet.id, pet])).values()].slice(0, 100) : data.pets }));
+        setPetUpdates({});
         setSyncError("");
       }
     } catch (reason) {
@@ -102,13 +136,19 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         setSyncError("Chưa cập nhật được dữ liệu mới. Hệ thống sẽ tự thử lại khi có kết nối.");
       throw reason;
     } finally { pendingLoads.current -= 1; }
-  }, []);
+  }, [publishRefresh]);
+
+  useEffect(() => {
+    loadSequence.current += 1;
+    if (authRole) void loadData().catch(() => undefined);
+  }, [view, authRole, loadData]);
 
   useEffect(() => {
     if (!authRole || !isAuthReady) return;
     const refresh = () => {
-      if (document.visibilityState !== "visible" || !navigator.onLine || pendingLoads.current) return;
-      void loadData().catch(() => undefined);
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+      publishRefresh(false);
+      if (!pendingLoads.current) void loadData(false).catch(() => undefined);
     };
     const timer = window.setInterval(refresh, 10_000);
     window.addEventListener("focus", refresh);
@@ -120,7 +160,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("online", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [authRole, isAuthReady, loadData]);
+  }, [authRole, isAuthReady, loadData, publishRefresh]);
 
   useEffect(() => {
     let active = true;
@@ -128,14 +168,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const token = authToken.get();
       if (!token) return setIsAuthReady(true);
       try {
-        const { user } = await apiClient.get<{ user: { role: string } }>("/auth/me");
-        if (!active) return;
-        setAuthRole(user.role === "owner" ? "owner" : "admin");
-        setUserRole(user.role);
-        await loadData();
-      } catch {
+        const { user } = await apiClient.get<{ user: SessionUser }>("/auth/me", { signal: AbortSignal.timeout(15_000) });
+        if (!active || token !== authToken.get()) return;
+        establishSession(user);
+      } catch (reason) {
         if (active && token === authToken.get()) {
-          authToken.clear(); setAuthRole(null); setUserRole(null); setState(emptyState);
+          if (reason instanceof ApiError && [401, 404].includes(reason.httpStatus)) {
+            authToken.clear(); setAuthRole(null); setUserRole(null); setState(emptyState);
+          } else setError("Chưa xác minh được phiên đăng nhập. Hãy thử tải lại trang.");
         }
       } finally {
         if (active) setIsAuthReady(true);
@@ -143,17 +183,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     };
     void restore();
     return () => { active = false; loadSequence.current += 1; };
-  }, [loadData]);
+  }, [establishSession]);
 
-  const authenticate = async (endpoint: string, credentials: object, role: Exclude<AuthRole, null>) => {
+  const authenticate = async (endpoint: string, credentials: object) => {
     setIsLoading(true);
     setError("");
     try {
-      const result = await apiClient.post<{ token: string; user: { role: string } }>(endpoint, credentials);
+      const result = await apiClient.post<{ token: string; user: SessionUser }>(endpoint, credentials);
       authToken.set(result.token);
-      setAuthRole(role);
-      setUserRole(result.user.role);
-      await loadData();
+      establishSession(result.user);
       return null;
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : "Authentication failed.";
@@ -188,6 +226,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     const currentOwner = state.owners.find((owner) => owner.id === state.currentOwnerId) ?? state.owners[0] ?? fallbackOwner;
     return {
       ...state,
+      dataVersion,
+      petUpdates,
+      rememberPet: pet => setState(previous => ({ ...previous, pets: [pet, ...previous.pets.filter(item => item.id !== pet.id)].slice(0, 100) })),
       authRole,
       userRole,
       refreshData: loadData,
@@ -197,28 +238,24 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       syncError,
       currentOwner,
       ownerPets: state.pets.filter((pet) => pet.ownerId === state.currentOwnerId),
-      loginOwner: (email, password) => authenticate("/auth/owner/login", { email, password }, "owner"),
-      loginAdmin: (username, password) => authenticate("/auth/admin/login", { username, password }, "admin"),
-      logout: () => { loadSequence.current += 1; authToken.clear(); setAuthRole(null); setUserRole(null); setState(emptyState); setSyncError(""); },
+      loginOwner: (email, password) => authenticate("/auth/owner/login", { email, password }),
+      loginAdmin: (username, password) => authenticate("/auth/admin/login", { username, password }),
+      logout: () => { loadSequence.current += 1; authToken.clear(); setAuthRole(null); setUserRole(null); setState(emptyState); setPetUpdates({}); setSyncError(""); },
       registerOwner: async (input) => {
         setIsLoading(true);
         try {
-          const result = await apiClient.post<{ token: string }>("/auth/owner/register", input);
+          const result = await apiClient.post<{ token: string; user: SessionUser }>("/auth/owner/register", input);
           authToken.set(result.token);
-          setAuthRole("owner");
-          await loadData();
+          establishSession(result.user);
         } finally { setIsLoading(false); }
       },
-      updateOwnerProfile: async (input) => {
-        setIsLoading(true);
-        setError("");
-        try {
-          await apiClient.patch("/auth/me", input);
-          await loadData();
-        } finally {
-          setIsLoading(false);
-        }
-      },
+      updateOwnerProfile: (input) => writeAndReload(async () => {
+        const token = authToken.get();
+        const { user } = await apiClient.patch<{ user: SessionUser }>("/auth/me", input);
+        if (token !== authToken.get()) return;
+        loadSequence.current += 1;
+        setState(previous => ({ ...previous, owners: previous.owners.map(owner => owner.id === user.id ? { ...owner, ...user } : owner) }));
+      }),
       changePassword: async (input) => {
         setIsLoading(true);
         setError("");
@@ -229,8 +266,29 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         }
       },
       createPet: (input) => writeAndReload(() => apiClient.post("/pets", input)),
-      updatePet: (id, input) => writeAndReload(() => apiClient.patch(`/pets/${id}`, input)),
-      submitRescueReport: (input) => { const pet = state.pets.find((item) => item.id === input.petId); mutate(() => apiClient.post(`/public/pets/${pet?.qrToken || input.petId}/rescue-reports`, input)); },
+      updatePet: (id, input) => writeAndReload(async () => {
+        const token = authToken.get();
+        const { pet } = await apiClient.patch<{ pet: Pet }>(`/pets/${id}`, input);
+        if (token === authToken.get()) {
+          loadSequence.current += 1;
+          setState(previous => ({ ...previous, pets: previous.pets.map(item => item.id === id ? pet : item) }));
+          setPetUpdates(previous => Object.fromEntries([[id, pet], ...Object.entries(previous).filter(([key]) => key !== id)].slice(0, 100)));
+        }
+      }),
+      rotatePetQrToken: (id) => writeAndReload(async () => {
+        const token = authToken.get();
+        const { pet } = await apiClient.post<{ pet: Pet }>(`/pets/${id}/qr-token`, {});
+        if (token === authToken.get()) {
+          loadSequence.current += 1;
+          setState(previous => ({ ...previous, pets: previous.pets.map(item => item.id === id ? pet : item) }));
+          setPetUpdates(previous => Object.fromEntries([[id, pet], ...Object.entries(previous).filter(([key]) => key !== id)].slice(0, 100)));
+        }
+      }),
+      submitRescueReport: (input) => {
+        const pet = state.pets.find((item) => item.id === input.petId);
+        if (!pet?.qrToken) { setError("Thú cưng chưa có mã QR cứu hộ."); return; }
+        mutate(() => apiClient.post(`/public/pets/${encodeURIComponent(pet.qrToken!)}/rescue-reports`, input));
+      },
       createHotelBooking: async (input, requestKey) => {
         setIsLoading(true); setError("");
         try {
@@ -242,10 +300,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           throw reason;
         } finally { setIsLoading(false); }
       },
-      cancelHotelBooking: async (id, ownerNote) => {
+      cancelHotelBooking: async (id, ownerNote, expectedRevision) => {
         setIsLoading(true); setError("");
         try {
-          await apiClient.patch(`/hotel-bookings/${id}/cancel`, { ownerNote, expectedRevision: state.hotelBookings.find(item => item.id === id)?.statusRevision });
+          await apiClient.patch(`/hotel-bookings/${id}/cancel`, { ownerNote, expectedRevision: expectedRevision ?? state.hotelBookings.find(item => item.id === id)?.statusRevision });
           try { await loadData(); return true; }
           catch { setError("Đã hủy đặt phòng nhưng chưa tải lại được danh sách."); return false; }
         } catch (reason) {
@@ -254,22 +312,28 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         } finally { setIsLoading(false); }
       },
       createAppointment: (input) => writeAndReload(() => apiClient.post("/appointments", input)).then(() => undefined),
-      cancelAppointment: (id, ownerNote) => writeAndReload(() => apiClient.patch(`/appointments/${id}/cancel`, { ownerNote, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
-      rescheduleAppointment: (id, input) => writeAndReload(() => apiClient.patch(`/appointments/${id}/reschedule`, { ...input, expectedRevision: state.appointments.find(item => item.id === id)?.statusRevision })),
+      cancelAppointment: (id, ownerNote, expectedRevision) => writeAndReload(() => apiClient.patch(`/appointments/${id}/cancel`, { ownerNote, expectedRevision: expectedRevision ?? state.appointments.find(item => item.id === id)?.statusRevision })),
+      rescheduleAppointment: (id, input) => writeAndReload(() => apiClient.patch(`/appointments/${id}/reschedule`, { ...input, expectedRevision: input.expectedRevision ?? state.appointments.find(item => item.id === id)?.statusRevision })),
       sendReminder: (id) => mutate(() => apiClient.post(`/appointments/${id}/reminder`)),
       createMedicalRecord: (input) => writeAndReload(() => apiClient.post("/medical-records", input)),
       updateMedicalRecord: (id, input) => writeAndReload(() => apiClient.patch(`/medical-records/${id}`, input)),
       deleteMedicalRecord: (id) => writeAndReload(() => apiClient.delete(`/medical-records/${id}`)),
-      uploadMedicalImage: (input) => mutate(() => apiClient.post("/medical-records/images", input)),
+      uploadMedicalImage: (input) => writeAndReload(() => apiClient.post("/medical-records/images", input)),
       deleteMedicalImage: (id) => mutate(() => apiClient.delete(`/medical-records/images/${id}`)),
       markNotificationRead: (id) => mutate(() => apiClient.patch(`/notifications/${id}/read`)),
       markAllNotificationsRead: () => mutate(() => apiClient.patch("/notifications/read-all")),
       deleteNotification: (id) => mutate(() => apiClient.delete(`/notifications/${id}`)),
-      sendCustomNotification: (recipientOwnerId, title, message) => mutate(() => apiClient.post("/notifications/send", { recipientOwnerId, title, message })),
+      sendCustomNotification: (recipientOwnerId, title, message) => writeAndReload(() => apiClient.post("/notifications/send", { recipientOwnerId, title, message })),
     };
-  }, [state, authRole, userRole, isLoading, isAuthReady, error, syncError, loadData]);
+  }, [state, authRole, userRole, isLoading, isAuthReady, error, syncError, loadData, dataVersion, petUpdates]);
 
-  return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
+  return (
+    <SessionProvider authRole={authRole} userRole={userRole} isAuthReady={isAuthReady}>
+      <DataRefreshProvider version={dataVersion} changeVersion={refreshVersion.changeVersion}>
+        <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>
+      </DataRefreshProvider>
+    </SessionProvider>
+  );
 }
 
 export function useAppStore() {

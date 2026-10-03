@@ -1,5 +1,6 @@
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { objectInput, requiredText } from "../../domain/validation.js";
 import type { NotificationRepository } from "../ports/notifications.js";
 
 export type SendNotificationInput = { recipientOwnerId?: string; title?: string; message?: string };
@@ -20,23 +21,29 @@ export class NotificationsService {
   }
 
   async markRead(actor: Actor, id: string) {
-    const item = await this.notifications.findVisible(id, actor.role === "owner" ? actor.sub : undefined);
+    const scope = this.scope(actor);
+    const item = await this.notifications.findVisible(id, scope);
     if (!item) throw new BusinessError(404, "Notification not found.");
-    return this.notifications.markRead(item.id);
+    const updated = await this.notifications.markRead(item.id, scope);
+    if (!updated) throw new BusinessError(404, "Notification not found.");
+    return updated;
   }
 
   async delete(actor: Actor, id: string) {
-    const item = await this.notifications.findVisible(id, actor.role === "owner" ? actor.sub : undefined);
+    const scope = this.scope(actor);
+    const item = await this.notifications.findVisible(id, scope);
     if (!item) throw new BusinessError(404, "Notification not found.");
-    await this.notifications.delete(item.id);
+    if (!await this.notifications.delete(item.id, scope)) throw new BusinessError(404, "Notification not found.");
   }
 
   async send(actor: Actor, input: SendNotificationInput) {
     if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
-    if (!input.recipientOwnerId || !input.title?.trim() || !input.message?.trim()) throw new BusinessError(422, "Recipient, title, and message are required.");
+    objectInput(input);
+    const recipientOwnerId = requiredText(input.recipientOwnerId, "Recipient", 200);
+    const title = requiredText(input.title, "Title"), message = requiredText(input.message, "Message");
     return this.notifications.send({
-      recipientOwnerId: input.recipientOwnerId, recipientRole: "owner", type: "general",
-      title: input.title.trim(), message: input.message.trim(), actionUrl: "/owner/notifications",
+      recipientOwnerId, recipientRole: "owner", type: "general",
+      title, message, actionUrl: "/owner/notifications",
       sentByStaffId: actor.sub,
     });
   }

@@ -5,9 +5,10 @@ import { appointmentDto, careNoteDto, hotelBookingDto, medicalRecordDto, ownerDt
 export function createBootstrapRouter(service: BootstrapService) {
   const router = Router();
   router.get("/", async (req, res) => {
-    const data = await service.load(req.auth!);
+    const data = await service.load(req.auth!, req.query.view);
     res.json({
       currentOwnerId: data.currentOwnerId,
+      summary: data.summary,
       owners: data.owners.map(ownerDto),
       pets: data.pets.map(petDto),
       appointments: data.appointments.map(item => appointmentDto(item, req.auth!.role === "owner")),

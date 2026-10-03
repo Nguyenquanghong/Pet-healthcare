@@ -12,9 +12,6 @@ export function createNotificationsRouter(service: NotificationsService) {
     throw error;
   }
 
-  router.get("/", async (req, res) => {
-    res.json(await service.list(req.auth!));
-  });
 
   router.patch("/read-all", async (req, res) => {
     await service.markAllRead(req.auth!);

@@ -6,12 +6,14 @@ import SwaggerParser from "@apidevtools/swagger-parser";
 const backend = resolve(import.meta.dirname, "..");
 const spec = JSON.parse(readFileSync(resolve(backend, "openapi.json"), "utf8"));
 await SwaggerParser.validate(spec);
+const basePath = spec.servers?.[0]?.url;
+assert.equal(basePath, "/api", "OpenAPI must declare the shared /api base URL");
 
 const mounts = {
   auth: "/api/auth", public: "/api/public", bootstrap: "/api/bootstrap",
   pets: "/api/pets", owners: "/api/owners", appointments: "/api/appointments", medicalRecords: "/api/medical-records",
   hotelBookings: "/api/hotel-bookings", notifications: "/api/notifications", invoices: "/api/invoices",
-  payments: "/api/payments",
+  payments: "/api/payments", lists: "/api",
 };
 const runtime = new Set(["GET /api/health"]);
 for (const [file, mount] of Object.entries(mounts)) {
@@ -24,10 +26,15 @@ for (const [file, mount] of Object.entries(mounts)) {
 const documented = new Set();
 for (const [path, methods] of Object.entries(spec.paths)) {
   for (const [method, operation] of Object.entries(methods)) {
-    documented.add(`${method.toUpperCase()} ${path}`);
+    documented.add(`${method.toUpperCase()} ${basePath}${path}`);
     assert.ok(operation.operationId && operation.summary, `${method} ${path} needs operation metadata`);
     assert.ok(operation.responses.default?.content?.["application/json"]?.schema, `${method} ${path} needs JSON error`);
     assert.ok(operation.security?.length || operation.security?.length === 0, `${method} ${path} needs explicit auth contract`);
+    for (const requirement of operation.security) {
+      for (const scheme of Object.keys(requirement)) {
+        assert.ok(Object.hasOwn(spec.components?.securitySchemes ?? {}, scheme), `${method} ${path} references undefined security scheme ${scheme}`);
+      }
+    }
     if (operation.requestBody) assert.ok(operation.requestBody.content?.["application/json"]?.schema, `${method} ${path} needs JSON request schema`);
     for (const [code, response] of Object.entries(operation.responses)) {
       if (/^2\d\d$/.test(code) && code !== "204") assert.ok(response.content?.["application/json"]?.schema, `${method} ${path} needs JSON success schema`);
@@ -35,5 +42,5 @@ for (const [path, methods] of Object.entries(spec.paths)) {
   }
 }
 assert.deepEqual([...documented].sort(), [...runtime].sort(), "OpenAPI routes differ from mounted runtime routes");
-assert.equal(runtime.size, 59, "Expected route inventory including counter owner activation changed; review explicitly");
+assert.equal(runtime.size, 65, "Expected route inventory including paginated read, calendar and billing aggregate routes changed; review explicitly");
 process.stdout.write(`OpenAPI PASS: ${runtime.size} operations match source and schemas validate.\n`);

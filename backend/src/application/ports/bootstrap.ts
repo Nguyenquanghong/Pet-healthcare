@@ -17,5 +17,9 @@ export type BootstrapData = {
 };
 
 export interface BootstrapRepository {
-  load(isAdmin: boolean, ownerId?: string): Promise<BootstrapData>;
+  load(isAdmin: boolean, ownerId?: string, view?: "session" | "dashboard"): Promise<BootstrapData & { summary: BootstrapSummary }>;
 }
+
+export type BootstrapSummary = { totals: Record<keyof BootstrapData, number>; species: Record<string, number>;
+  appointmentStatus: Record<string, number>; hotelStatus: Record<string, number>;
+  notificationCategory: Record<string, number>; unread: number; todayAppointments: number };

@@ -14,7 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "test:smoke": "node scripts/smoke-test.mjs",
     "test:unit": "node --test tests/*.test.mjs",
-    "test:integration": "node tests/postgres.integration.mjs && node tests/fix-postgres.integration.mjs && node tests/invoices.integration.mjs && node tests/payments.integration.mjs && node tests/bank-transfer.integration.mjs && node tests/vietqr.integration.mjs && node tests/booking-lifecycle.integration.mjs && node tests/hotel-booking-idempotency.integration.mjs && node tests/admin-creation.integration.mjs && node tests/owner-activation.integration.mjs",
+    "test:integration": "node tests/postgres.integration.mjs && node tests/fix-postgres.integration.mjs && node tests/invoices.integration.mjs && node tests/payments.integration.mjs && node tests/bank-transfer.integration.mjs && node tests/vietqr.integration.mjs && node tests/booking-lifecycle.integration.mjs && node tests/hotel-booking-idempotency.integration.mjs && node tests/admin-creation.integration.mjs && node tests/owner-activation.integration.mjs && node tests/phase1-security.integration.mjs && node tests/pagination.integration.mjs",
     "test:architecture": "node scripts/check-architecture.mjs",
     "test:openapi": "node scripts/check-openapi.mjs",
     "check:vnpay": "node scripts/check-vnpay.mjs"
@@ -44,7 +44,6 @@
     "@types/swagger-ui-express": "^4.1.8",
     "jsqr": "1.4.0",
     "pngjs": "7.0.0",
-    "prisma": "^6.19.0",
     "tsx": "^4.23.12",
     "typescript": "latest"
   }

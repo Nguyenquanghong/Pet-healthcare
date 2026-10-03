@@ -9,8 +9,8 @@ interface AdminTopbarProps {
 }
 
 export function AdminTopbar({ title }: AdminTopbarProps) {
-  const { notifications } = useAppStore();
-  const unreadCount = notifications.filter((n) => n.recipientRole === "admin" && n.status === "sent").length;
+  const { summary } = useAppStore();
+  const unreadCount = summary.unread;
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">

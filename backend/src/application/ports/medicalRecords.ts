@@ -19,7 +19,7 @@ export type MedicalWrite = {
   doctorName: string; visitDate: Date; title: string; symptoms: string | null;
   diagnosis: string; treatment: string; medications: string | null;
   vaccineName: string | null; followUpDate: Date | null;
-  weightKg?: number; temperatureC?: number; heartRateBpm?: number;
+  weightKg?: number | null; temperatureC?: number | null; heartRateBpm?: number | null;
   internalNote: string | null;
 };
 

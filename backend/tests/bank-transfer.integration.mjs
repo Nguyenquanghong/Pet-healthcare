@@ -100,10 +100,10 @@ try {
   assert.equal((await req(path + "/transfer-report", ownerToken, "POST", {})).status, 409);
   assert.equal((await req(path + "/transfer-reject", staffToken, "POST", { reason: "late" })).status, 409);
   await stop(); await start();
-  const stored = (await req("/invoices", ownerToken)).body.find(i => i.id === invoice.id);
+  const stored = (await req("/invoices", ownerToken)).body.items.find(i => i.id === invoice.id);
   assert.equal(stored.paidAt, paid.paidAt);
   assert.equal(stored.transferReference, "DEMO-CORRECTED");
-  assert.equal((await req("/invoices", otherToken)).body.length, 0);
+  assert.equal((await req("/invoices", otherToken)).body.items.length, 0);
   console.log("Manual bank transfer integration PASS: Phase 1 gate, recipient snapshot, ownership, report remains unpaid, repeated/concurrent reporting, rejection/resubmission, pending switch lock, staff confirmation exactly once, persistence after API restart.");
 } finally {
   await stop();

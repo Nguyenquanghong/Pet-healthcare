@@ -103,14 +103,14 @@ try {
   assert.equal(verifyToken(login.body.token).sub, customer.id);
   const bootstrap = await request(login.body.token, "/bootstrap", undefined, "GET");
   assert.ok(bootstrap.body.pets.some(item => item.id === pet.id && item.ownerId === customer.id));
-  assert.ok(bootstrap.body.appointments.some(item => item.id === appointment.id));
-  assert.ok(bootstrap.body.medicalRecords.some(item => item.id === medical.id));
-  assert.ok(bootstrap.body.hotelBookings.some(item => item.id === booking.id));
+  assert.ok((await request(login.body.token, `/appointments?id=${appointment.id}`, undefined, "GET")).body.items.some(item => item.id === appointment.id));
+  assert.ok((await request(login.body.token, `/medical-records?id=${medical.id}`, undefined, "GET")).body.items.some(item => item.id === medical.id));
+  assert.ok((await request(login.body.token, `/hotel-bookings?id=${booking.id}`, undefined, "GET")).body.items.some(item => item.id === booking.id));
   const invoices = await request(login.body.token, "/invoices", undefined, "GET");
-  assert.ok(invoices.body.some(item => item.id === invoiced.body.invoice.id && item.ownerId === customer.id));
+  assert.ok(invoices.body.items.some(item => item.id === invoiced.body.invoice.id && item.ownerId === customer.id));
   assert.equal((await request(ownerToken, `/hotel-bookings/${booking.id}`, undefined, "GET")).status, 404);
-  const adminBootstrap = await request(staffToken, "/bootstrap", undefined, "GET");
-  assert.equal(adminBootstrap.body.owners.find(item => item.id === customer.id).loginEnabled, true);
+  const adminBootstrap = await request(staffToken, `/owners?id=${customer.id}`, undefined, "GET");
+  assert.equal(adminBootstrap.body.items.find(item => item.id === customer.id).loginEnabled, true);
 
   const expiredOwner = await guest(), expired = await issue(expiredOwner);
   await db.ownerActivation.update({ where: { tokenHash: digest(expired.token) }, data: { expiresAt: new Date(Date.now() - 1000) } });

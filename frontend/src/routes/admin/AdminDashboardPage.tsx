@@ -22,24 +22,24 @@ function StatCard({ label, value, icon: Icon, subtitle }: { label: string; value
 
 export function AdminDashboardPage() {
   const navigate = useNavigate();
-  const { appointments, hotelBookings, pets, owners, notifications, medicalRecords } = useAppStore();
+  const { appointments, hotelBookings, pets, owners, medicalRecords, summary } = useAppStore();
 
   const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
   const todayAppointments = appointments.filter(a => a.date === today);
   const pendingAppointments = appointments.filter(a => a.status === "pending");
   const pendingBookings = hotelBookings.filter(b => b.status === "pending");
   const checkedInBookings = hotelBookings.filter(b => b.status === "in_stay");
-  const unreadNotifications = notifications.filter(n => n.recipientRole === "admin" && n.status === "sent").length;
+  const unreadNotifications = summary.unread;
 
   return (
     <AdminLayout title="Dashboard">
       {/* Stat Cards — 6 columns */}
       <div className="grid overflow-hidden rounded-lg border border-slate-200 bg-white sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        <StatCard label="Lịch hôm nay" value={todayAppointments.length} icon={CalendarDays} />
-        <StatCard label="Chờ xác nhận" value={pendingAppointments.length} icon={Clock} subtitle="Lịch khám" />
-        <StatCard label="Pet đang lưu trú" value={checkedInBookings.length} icon={BedDouble} />
-        <StatCard label="Tổng thú cưng" value={pets.length} icon={PawPrint} subtitle={`${pets.filter(p => p.species === "dog").length} chó · ${pets.filter(p => p.species === "cat").length} mèo`} />
-        <StatCard label="Chủ nuôi" value={owners.length} icon={Users} />
+        <StatCard label="Lịch hôm nay" value={summary.todayAppointments} icon={CalendarDays} />
+        <StatCard label="Chờ xác nhận" value={summary.appointmentStatus.pending ?? 0} icon={Clock} subtitle="Lịch khám" />
+        <StatCard label="Pet đang lưu trú" value={summary.hotelStatus.in_stay ?? 0} icon={BedDouble} />
+        <StatCard label="Tổng thú cưng" value={summary.totals.pets ?? 0} icon={PawPrint} subtitle={`${summary.species.dog ?? 0} chó · ${summary.species.cat ?? 0} mèo`} />
+        <StatCard label="Chủ nuôi" value={summary.totals.owners ?? 0} icon={Users} />
         <StatCard label="Thông báo mới" value={unreadNotifications} icon={Bell} />
       </div>
 

@@ -34,16 +34,16 @@ class BasePetUser(HttpUser):
         self.appointment_number = 0
 
     def get_bootstrap(self):
-        self.client.get("/api/bootstrap", name="GET /api/bootstrap", timeout=10)
+        self.client.get("/api/bootstrap", params={"view": "dashboard"}, name="GET /api/bootstrap", timeout=10)
 
     def get_pets(self):
-        self.client.get("/api/pets", name="GET /api/pets", timeout=10)
+        self.client.get("/api/pets", params={"page": 1, "pageSize": 20}, name="GET /api/pets", timeout=10)
 
     def get_appointments(self):
-        self.client.get("/api/appointments", name="GET /api/appointments", timeout=10)
+        self.client.get("/api/appointments", params={"page": 1, "pageSize": 20}, name="GET /api/appointments", timeout=10)
 
     def get_notifications(self):
-        self.client.get("/api/notifications", name="GET /api/notifications", timeout=10)
+        self.client.get("/api/notifications", params={"page": 1, "pageSize": 20}, name="GET /api/notifications", timeout=10)
 
 
 class ReadHeavyUser(BasePetUser):

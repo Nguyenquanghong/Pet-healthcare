@@ -1,3 +1,5 @@
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
 import { BookingStatusDialog, type StatusDialogSelection } from "./BookingStatusDialog";
 import { useBookingAction } from "./useBookingAction";
 import { apiClient } from "../../services/apiClient";
@@ -48,9 +50,6 @@ const ALL_STATUSES: { key: string; label: string }[] = [
 
 export function AdminAppointmentsPage() {
   const {
-    appointments,
-    owners,
-    pets,
     userRole,
     sendReminder,
   } = useAppStore();
@@ -82,49 +81,19 @@ export function AdminAppointmentsPage() {
   const [statusDialog, setStatusDialog] = useState<StatusDialogSelection | null>(null);
   const { run: runAction, error: actionError } = useBookingAction();
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
 
   const toast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 3500);
   };
 
-  const categoryAppointments = useMemo(() => appointments.filter((appointment) => {
-    if (serviceFilter === "spa") return isSpaAppointmentType(appointment.type);
-    if (serviceFilter === "medical") return !isSpaAppointmentType(appointment.type);
-    return true;
-  }), [appointments, serviceFilter]);
-
-  const filteredAppointments = useMemo(() => {
-    return categoryAppointments.filter((a) => {
-      // Status filter
-      if (filterStatus !== "all" && a.status !== filterStatus) return false;
-
-      // Date filter
-      if (dateFilter === "today" && a.date !== todayStr) return false;
-      if (dateFilter === "custom" && customDate && a.date !== customDate) return false;
-
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const pet = pets.find((p) => p.id === a.petId);
-        const owner = owners.find((o) => o.id === a.ownerId);
-
-        const matchPet = pet?.name.toLowerCase().includes(q) || pet?.breed.toLowerCase().includes(q);
-        const matchOwner = owner?.fullName.toLowerCase().includes(q) || owner?.phone.includes(q);
-        const matchService = a.serviceName.toLowerCase().includes(q);
-        const matchDate = a.date.includes(q);
-
-        if (!matchPet && !matchOwner && !matchService && !matchDate) return false;
-      }
-
-      return true;
-    }).sort(compareBookingStatus);
-  }, [categoryAppointments, filterStatus, dateFilter, customDate, searchQuery, pets, owners, todayStr]);
+  const list = usePagedList<Appointment>("/appointments", { q: searchQuery, status: filterStatus, category: serviceFilter, date: dateFilter === "today" ? todayStr : dateFilter === "custom" ? customDate : undefined });
+  const appointments = list.items, filteredAppointments = appointments, pets = list.related.pets, owners = list.related.owners;
 
   const handleStatusUpdate = (id: string, status: AppointmentStatus) => {
     const booking = appointments.find(item => item.id === id);
-    if (booking) setStatusDialog({ booking, intent: status });
+    if (booking) setStatusDialog({ booking, intent: status, pet: pets.find(pet => pet.id === booking.petId), owner: owners.find(owner => owner.id === booking.ownerId) });
   };
 
   const handleConfirmCancel = () => {
@@ -182,6 +151,7 @@ export function AdminAppointmentsPage() {
 
   return (
     <AdminLayout title="Quản lý lịch hẹn">
+      <Pagination {...list} />
       <div className="mb-4 flex justify-end">
         <AdminCreateButton kind="appointment" onCreated={() => { setFilterStatus("all"); setServiceFilter("all"); setSearchQuery(""); setDateFilter("all"); }} />
       </div>
@@ -279,8 +249,8 @@ export function AdminAppointmentsPage() {
           {ALL_STATUSES.map((s) => {
             const count =
               s.key === "all"
-                ? categoryAppointments.length
-                : categoryAppointments.filter((a) => a.status === s.key).length;
+                ? Object.values(list.counts).reduce((sum, count) => sum + count, 0)
+                : (list.counts[s.key] ?? 0);
 
             return (
               <button
@@ -389,9 +359,9 @@ export function AdminAppointmentsPage() {
                           <StickyNote size={14} />
                         </button>
 
-                        <button onClick={() => setStatusDialog({ booking: a, intent: "history" })} className="rounded-lg border px-2 py-1.5 text-xs">Lịch sử thao tác</button>
+                        <button onClick={() => setStatusDialog({ booking: a, intent: "history", pet: pets.find(pet => pet.id === a.petId), owner: owners.find(owner => owner.id === a.ownerId) })} className="rounded-lg border px-2 py-1.5 text-xs">Lịch sử thao tác</button>
                         {(a.status === "checked_in" || (a.status === "completed" && userRole === "admin")) &&
-                          <button onClick={() => setStatusDialog({ booking: a, intent: "undo" })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{a.status === "checked_in" ? "Hoàn tác check-in" : "Mở lại dịch vụ"}</button>}
+                          <button onClick={() => setStatusDialog({ booking: a, intent: "undo", pet: pets.find(pet => pet.id === a.petId), owner: owners.find(owner => owner.id === a.ownerId) })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{a.status === "checked_in" ? "Hoàn tác check-in" : "Mở lại dịch vụ"}</button>}
                         {/* Status workflow buttons */}
                         {a.status === "pending" && (
                           <button

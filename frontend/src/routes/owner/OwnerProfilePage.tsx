@@ -52,8 +52,8 @@ export function OwnerProfilePage() {
     if (!emailPattern.test(email)) return setProfileError("Enter a valid email address.");
 
     try {
-      await updateOwnerProfile({ ...profile, fullName, email, phone: profile.phone.trim(), address: profile.address.trim() });
-      setProfileSuccess("Profile updated successfully.");
+      const refreshed = await updateOwnerProfile({ ...profile, fullName, email, phone: profile.phone.trim(), address: profile.address.trim() });
+      setProfileSuccess(refreshed ? "Profile updated successfully." : "Đã lưu hồ sơ nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu.");
     } catch (reason) {
       setProfileError(reason instanceof Error ? reason.message : "Profile could not be updated.");
     }
@@ -65,7 +65,7 @@ export function OwnerProfilePage() {
     setPasswordSuccess("");
     if (!passwords.currentPassword) return setPasswordError("Current password is required.");
     if (!passwords.newPassword) return setPasswordError("New password is required.");
-    if (passwords.newPassword.length < 8) return setPasswordError("New password must be at least 8 characters.");
+    if (passwords.newPassword.length < 8 || passwords.newPassword.length > 128) return setPasswordError("New password must contain 8 to 128 characters.");
     if (passwords.newPassword !== passwords.confirmPassword) return setPasswordError("Confirm password must match the new password.");
 
     try {
@@ -93,8 +93,8 @@ export function OwnerProfilePage() {
             </div>
           </div>
 
-          {profileError && <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700">{profileError}</div>}
-          {profileSuccess && <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700">{profileSuccess}</div>}
+          {profileError && <div role="alert" className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700">{profileError}</div>}
+          {profileSuccess && <div role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700">{profileSuccess}</div>}
 
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={submitProfile} noValidate>
             <Input label="Full name *" value={profile.fullName} onChange={(event) => setProfile((value) => ({ ...value, fullName: event.target.value }))} autoComplete="name" disabled={isLoading} />
@@ -108,7 +108,7 @@ export function OwnerProfilePage() {
         </Card>
 
         <Card title="Password and security">
-          <p className="mb-5 text-sm leading-6 text-slate-500">Use at least 8 characters and avoid reusing a password from another account.</p>
+          <p className="mb-5 text-sm leading-6 text-slate-500">Use 8 to 128 characters and avoid reusing a password from another account.</p>
           {passwordError && <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700">{passwordError}</div>}
           {passwordSuccess && <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700">{passwordSuccess}</div>}
 

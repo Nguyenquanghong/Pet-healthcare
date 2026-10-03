@@ -172,7 +172,7 @@ test("admin issues an invoice, handles payment failure and persists payment afte
   await expect(page.getByRole("dialog", { name: "Chi tiết hóa đơn", exact: true })).toBeVisible();
   await page.emulateMedia({ media: "screen" });
   const list = await request.get(`${api}/invoices`, { headers: staffHeaders });
-  const stored = (await list.json()).find((item: { id: string }) => item.id === invoice.id);
+  const stored = (await list.json()).items.find((item: { id: string }) => item.id === invoice.id);
   expect(stored.paymentStatus).toBe("paid");
   expect(stored.paymentMethod).toBe("bank_transfer");
   expect(stored.paidAt).toBeTruthy();

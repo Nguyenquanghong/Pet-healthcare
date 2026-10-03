@@ -108,7 +108,9 @@ for (const kind of ["appointment", "hotel"] as const) test(`${kind}: confirm ide
     await card.getByRole("button",{name:"Mở lại dịch vụ",exact:true}).click();
     dialog=page.getByRole("dialog",{name:"Mở lại dịch vụ",exact:true});
     await dialog.getByLabel("Lý do hoàn tác").fill("Kiểm tra điều kiện hóa đơn");
+    const blockedUndo = page.waitForResponse(response => response.url() === `${path}/undo-status` && response.request().method() === "POST");
     await dialog.getByRole("button",{name:"Xác nhận hoàn tác",exact:true}).click();
-    await expect(dialog.getByRole("alert")).toContainText("hóa đơn liên quan");
+    expect((await blockedUndo).status()).toBe(409);
+    await expect(dialog.getByRole("alert")).toContainText("liên kết hóa đơn");
   }
 });

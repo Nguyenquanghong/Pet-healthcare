@@ -119,8 +119,8 @@ try {
     { date: "2099-01-02", time: "12:00" })).status, 200);
   assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", token, { status: "confirmed" })).status, 403);
   assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", staffToken, { status: "confirmed", internalNote: "Staff appointment note" })).status, 200);
-  assert.equal((await request("/api/appointments", "GET", token)).body.find(item => item.id === appointmentId).internalNote, undefined);
-  assert.equal((await request("/api/appointments", "GET", staffToken)).body.find(item => item.id === appointmentId).internalNote, "Staff appointment note");
+  assert.equal((await request("/api/appointments", "GET", token)).body.items.find(item => item.id === appointmentId).internalNote, undefined);
+  assert.equal((await request("/api/appointments", "GET", staffToken)).body.items.find(item => item.id === appointmentId).internalNote, "Staff appointment note");
   assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", staffToken, { status: "checked_in" })).status, 200);
   const record = await request("/api/medical-records", "POST", staffToken, {
     petId: pet.id, appointmentId, doctorName: "Integration doctor", visitDate: "2099-01-02",
@@ -128,8 +128,8 @@ try {
   });
   assert.equal(record.status, 201, JSON.stringify(record.body));
   assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: appointmentId } })).status, "completed");
-  assert.ok((await request("/api/medical-records", "GET", token)).body.some(item => item.id === record.body.record.id));
-  assert.equal((await request("/api/medical-records", "GET", token)).body.find(item => item.id === record.body.record.id).internalNote, undefined);
+  assert.ok((await request("/api/medical-records", "GET", token)).body.items.some(item => item.id === record.body.record.id));
+  assert.equal((await request("/api/medical-records", "GET", token)).body.items.find(item => item.id === record.body.record.id).internalNote, undefined);
   assert.equal((await request(`/api/medical-records/${record.body.record.id}`, "DELETE", token)).status, 403);
   assert.equal((await request(`/api/medical-records/${record.body.record.id}`, "DELETE", staffToken)).status, 204);
   const stay = await request("/api/hotel-bookings", "POST", token, {
@@ -143,12 +143,12 @@ try {
   assert.equal((await request(`/api/hotel-bookings/${bookingId}`, "GET", staffToken)).body.booking.internalNote, "Staff hotel note");
   assert.equal((await request(`/api/hotel-bookings/${bookingId}/status`, "PATCH", staffToken, { status: "in_stay" })).status, 200);
   assert.equal((await request(`/api/hotel-bookings/${bookingId}/care-notes`, "POST", staffToken, { note: "Fed and walked" })).status, 201);
-  assert.ok((await request("/api/hotel-bookings", "GET", token)).body.some(item => item.id === bookingId));
+  assert.ok((await request("/api/hotel-bookings", "GET", token)).body.items.some(item => item.id === bookingId));
   assert.equal((await request(`/api/hotel-bookings/${bookingId}/cancel`, "PATCH", token, { ownerNote: "Test finished" })).status, 409);
   const ownerBootstrap = await request("/api/bootstrap", "GET", token);
   assert.equal(ownerBootstrap.status, 200);
-  assert.equal(ownerBootstrap.body.hotelBookings.find(item => item.id === bookingId).internalNote, undefined);
-  assert.equal(ownerBootstrap.body.appointments.find(item => item.id === appointmentId).internalNote, undefined);
+  assert.equal((await request(`/api/hotel-bookings?id=${bookingId}`, "GET", token)).body.items[0].internalNote, undefined);
+  assert.equal((await request(`/api/appointments?id=${appointmentId}`, "GET", token)).body.items[0].internalNote, undefined);
   assert.equal((await request("/api/invoices", "GET", token)).status, 200);
   const report = await request(`/api/public/pets/${marker}/rescue-reports`, "POST", undefined, { finderPhone: "000", location: "Test park" });
   assert.equal(report.status, 201);
@@ -156,8 +156,8 @@ try {
   assert.equal(await prisma.notification.count({ where: { recipientOwnerId: owner.id, type: "pet_rescue_report" } }), 1);
   const inbox = await request("/api/notifications", "GET", login.body.token);
   assert.equal(inbox.status, 200);
-  assert.ok(Array.isArray(inbox.body));
-  const rescueNotification = inbox.body.find((item) => item.type === "pet_rescue_report");
+  assert.ok(Array.isArray(inbox.body.items));
+  const rescueNotification = inbox.body.items.find((item) => item.type === "pet_rescue_report");
   assert.ok(rescueNotification, "rescue notification must appear in owner inbox");
   assert.equal((await request(`/api/notifications/${rescueNotification.id}`, "DELETE", login.body.token)).status, 204);
   assert.equal(await prisma.notification.count({ where: { id: rescueNotification.id } }), 0);

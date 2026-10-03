@@ -7,7 +7,7 @@ type CloudImagingCardProps = { pet: Pet; images: MedicalImage[] };
 
 export function CloudImagingCard({ pet, images }: CloudImagingCardProps) {
   const [activeImage, setActiveImage] = useState<MedicalImage | null>(null);
-  const recentImages = [...images].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 4);
+  const recentImages = [...images].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return (
     <div className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between mb-6">

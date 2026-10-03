@@ -1,5 +1,6 @@
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { calendarDate, objectInput, optionalText, positiveNumber, requiredText } from "../../domain/validation.js";
 import type { MedicalDependencies, MedicalRecordValue, MedicalUpdate, MedicalWrite } from "../ports/medicalRecords.js";
 
 export type MedicalInput = {
@@ -11,8 +12,8 @@ export type MedicalInput = {
 };
 export type ImageInput = { petId?: string; title?: string; imageUrl?: string; mimeType?: string };
 
-const optionalNumber = (value: unknown) => value === undefined || value === "" ? undefined : Number(value);
-const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
+const date = (value: unknown) => calendarDate(value, "Medical date");
+const optionalDate = (value: unknown) => value === undefined || value === null || value === "" ? null : date(value);
 const staffOnly = (actor: Actor) => {
   if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
 };
@@ -26,19 +27,20 @@ export class MedicalRecordsService {
 
   async create(actor: Actor, input: MedicalInput): Promise<MedicalRecordValue> {
     staffOnly(actor);
-    const pet = await this.deps.records.findPet(String(input.petId || ""));
+    objectInput(input);
+    const pet = await this.deps.records.findPet(requiredText(input.petId, "Pet", 200));
     if (!pet) throw new BusinessError(404, "Pet not found.");
     if (!input.title || !input.visitDate || !input.doctorName || !input.diagnosis || !input.treatment) {
       throw new BusinessError(422, "Pet, title, visit date, doctor, diagnosis, and treatment are required.");
     }
     const data: MedicalWrite = {
-      petId: pet.id, ownerId: pet.ownerId, appointmentId: input.appointmentId || null,
-      doctorName: String(input.doctorName), visitDate: date(input.visitDate), title: String(input.title),
-      symptoms: input.symptoms?.trim() || null, diagnosis: String(input.diagnosis), treatment: String(input.treatment),
-      medications: input.medications?.trim() || null, vaccineName: input.vaccineName?.trim() || null,
-      followUpDate: input.followUpDate ? date(input.followUpDate) : null,
-      weightKg: optionalNumber(input.weightKg), temperatureC: optionalNumber(input.temperatureC),
-      heartRateBpm: optionalNumber(input.heartRateBpm), internalNote: input.internalNote?.trim() || null,
+      petId: pet.id, ownerId: pet.ownerId, appointmentId: optionalText(input.appointmentId, "Appointment", 200),
+      doctorName: requiredText(input.doctorName, "Doctor"), visitDate: date(input.visitDate), title: requiredText(input.title, "Title"),
+      symptoms: optionalText(input.symptoms, "Symptoms"), diagnosis: requiredText(input.diagnosis, "Diagnosis"), treatment: requiredText(input.treatment, "Treatment"),
+      medications: optionalText(input.medications, "Medications"), vaccineName: optionalText(input.vaccineName, "Vaccine"),
+      followUpDate: optionalDate(input.followUpDate),
+      weightKg: positiveNumber(input.weightKg, "weightKg", 999.99, false, 2), temperatureC: positiveNumber(input.temperatureC, "temperatureC", 999.9, false, 1),
+      heartRateBpm: positiveNumber(input.heartRateBpm, "heartRateBpm", 2_147_483_647, true), internalNote: optionalText(input.internalNote, "Internal note"),
     };
     return this.deps.unitOfWork.run(async ({ records, notifications }) => {
       if (data.appointmentId) {
@@ -61,6 +63,7 @@ export class MedicalRecordsService {
 
   async update(actor: Actor, id: string, input: MedicalInput): Promise<MedicalRecordValue> {
     staffOnly(actor);
+    objectInput(input);
     const existing = await this.deps.records.find(id);
     if (!existing) throw new BusinessError(404, "Medical record not found.");
     // Existing records keep their pet, owner and appointment association. Accept unchanged
@@ -71,19 +74,19 @@ export class MedicalRecordsService {
       throw new BusinessError(422, "Không thể đổi thú cưng, chủ nuôi hoặc lịch liên kết của bệnh án đã tạo.");
     }
     const data: MedicalUpdate = {
-      ...(input.title !== undefined ? { title: String(input.title) } : {}),
-      ...(input.doctorName !== undefined ? { doctorName: String(input.doctorName) } : {}),
-      ...(input.visitDate ? { visitDate: date(input.visitDate) } : {}),
-      ...(input.symptoms !== undefined ? { symptoms: input.symptoms || null } : {}),
-      ...(input.diagnosis !== undefined ? { diagnosis: String(input.diagnosis) } : {}),
-      ...(input.treatment !== undefined ? { treatment: String(input.treatment) } : {}),
-      ...(input.medications !== undefined ? { medications: input.medications || null } : {}),
-      ...(input.vaccineName !== undefined ? { vaccineName: input.vaccineName || null } : {}),
-      ...(input.followUpDate !== undefined ? { followUpDate: input.followUpDate ? date(input.followUpDate) : null } : {}),
-      ...(input.weightKg !== undefined ? { weightKg: optionalNumber(input.weightKg) } : {}),
-      ...(input.temperatureC !== undefined ? { temperatureC: optionalNumber(input.temperatureC) } : {}),
-      ...(input.heartRateBpm !== undefined ? { heartRateBpm: optionalNumber(input.heartRateBpm) } : {}),
-      ...(input.internalNote !== undefined ? { internalNote: input.internalNote || null } : {}),
+      ...(input.title !== undefined ? { title: requiredText(input.title, "Title") } : {}),
+      ...(input.doctorName !== undefined ? { doctorName: requiredText(input.doctorName, "Doctor") } : {}),
+      ...(input.visitDate !== undefined ? { visitDate: date(input.visitDate) } : {}),
+      ...(input.symptoms !== undefined ? { symptoms: optionalText(input.symptoms, "Symptoms") } : {}),
+      ...(input.diagnosis !== undefined ? { diagnosis: requiredText(input.diagnosis, "Diagnosis") } : {}),
+      ...(input.treatment !== undefined ? { treatment: requiredText(input.treatment, "Treatment") } : {}),
+      ...(input.medications !== undefined ? { medications: optionalText(input.medications, "Medications") } : {}),
+      ...(input.vaccineName !== undefined ? { vaccineName: optionalText(input.vaccineName, "Vaccine") } : {}),
+      ...(input.followUpDate !== undefined ? { followUpDate: optionalDate(input.followUpDate) } : {}),
+      ...(input.weightKg !== undefined ? { weightKg: positiveNumber(input.weightKg, "weightKg", 999.99, false, 2) } : {}),
+      ...(input.temperatureC !== undefined ? { temperatureC: positiveNumber(input.temperatureC, "temperatureC", 999.9, false, 1) } : {}),
+      ...(input.heartRateBpm !== undefined ? { heartRateBpm: positiveNumber(input.heartRateBpm, "heartRateBpm", 2_147_483_647, true) } : {}),
+      ...(input.internalNote !== undefined ? { internalNote: optionalText(input.internalNote, "Internal note") } : {}),
     };
     return this.deps.records.update(existing.id, data);
   }
@@ -95,8 +98,12 @@ export class MedicalRecordsService {
 
   async createImage(actor: Actor, input: ImageInput) {
     staffOnly(actor);
-    if (!input.petId || !input.title || !input.imageUrl || !input.mimeType) throw new BusinessError(422, "Pet, title, image, and MIME type are required.");
-    return this.deps.records.createImage({ petId: input.petId, title: input.title, imageUrl: input.imageUrl, mimeType: input.mimeType });
+    objectInput(input);
+    const petId = requiredText(input.petId, "Pet", 200);
+    const title = requiredText(input.title, "Title"), imageUrl = requiredText(input.imageUrl, "Image", 7_000_000);
+    const mimeType = requiredText(input.mimeType, "MIME type", 200);
+    if (!await this.deps.records.findPet(petId)) throw new BusinessError(404, "Pet not found.");
+    return this.deps.records.createImage({ petId, title, imageUrl, mimeType });
   }
 
   async deleteImage(actor: Actor, id: string) {

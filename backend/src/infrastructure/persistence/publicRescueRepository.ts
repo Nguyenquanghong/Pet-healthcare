@@ -6,11 +6,11 @@ type Client = PrismaClient | Prisma.TransactionClient;
 class PrismaPublicRescueRepository implements PublicRescueRepository {
   constructor(private readonly client: Client) {}
   async findEnabledPetWithOwner(token: string) {
-    const row = await this.client.pet.findFirst({ where: { OR: [{ qrToken: token }, { id: token }], qrEnabled: true }, include: { owner: true } });
+    const row = await this.client.pet.findFirst({ where: { qrToken: token, qrEnabled: true }, include: { owner: true } });
     return row ? { pet: row, owner: row.owner } : null;
   }
   findEnabledPetForReport(token: string) {
-    return this.client.pet.findFirst({ where: { OR: [{ qrToken: token }, { id: token }], qrEnabled: true } });
+    return this.client.pet.findFirst({ where: { qrToken: token, qrEnabled: true } });
   }
   async createReport(data: Parameters<PublicRescueRepository["createReport"]>[0]) {
     await this.client.rescueReport.create({ data });

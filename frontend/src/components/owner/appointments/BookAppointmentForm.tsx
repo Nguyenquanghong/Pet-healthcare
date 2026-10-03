@@ -1,3 +1,4 @@
+import { PetLookup } from "../../ui/PagedSelect";
 import { CalendarPlus, CheckCircle2 } from "lucide-react";
 import type { AppointmentType } from "../../../types/appointment";
 import type { Pet } from "../../../types/pet";
@@ -33,7 +34,6 @@ interface BookAppointmentFormProps {
 }
 
 export function BookAppointmentForm({
-  ownerPets,
   petId,
   serviceType,
   date,
@@ -64,15 +64,7 @@ export function BookAppointmentForm({
       {error && <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>}
 
       <div className="space-y-4">
-        <Select
-          label="Thú cưng"
-          value={petId}
-          options={[
-            { value: "", label: "Chọn thú cưng" },
-            ...ownerPets.map((pet) => ({ value: pet.id, label: `${pet.name} — ${pet.breed}` })),
-          ]}
-          onChange={(event) => onPetChange(event.target.value)}
-        />
+        <PetLookup label="Thú cưng" value={petId} onChange={onPetChange} />
         <Select
           label="Dịch vụ"
           value={serviceType}

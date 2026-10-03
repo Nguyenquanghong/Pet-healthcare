@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import SwaggerParser from "@apidevtools/swagger-parser";
 import { createApp } from "../dist/src/app.js";
 import { hashPassword } from "../dist/src/lib/password.js";
 import { signToken } from "../dist/src/lib/token.js";
 
-const openapi = JSON.parse(readFileSync(new URL("../openapi.json", import.meta.url), "utf8"));
+const openapi = await SwaggerParser.validate(JSON.parse(readFileSync(new URL("../openapi.json", import.meta.url), "utf8")));
 function validateSchema(schema, value, location = "response") {
   if (schema.$ref) return validateSchema(openapi.components.schemas[schema.$ref.split("/").at(-1)], value, location);
   if (schema.type === "array") {
@@ -27,8 +28,11 @@ function validateSchema(schema, value, location = "response") {
 }
 
 function validateResponse(path, method, status, body) {
-  const schema = openapi.paths[path][method.toLowerCase()].responses[String(status)].content?.["application/json"]?.schema;
-  if (schema) validateSchema(schema, body, `${method} ${path}`);
+  const basePath = openapi.servers[0].url;
+  assert.ok(path.startsWith(`${basePath}/`), `${path} must use the API base URL`);
+  const schema = openapi.paths[path.slice(basePath.length)][method.toLowerCase()].responses[String(status)].content?.["application/json"]?.schema;
+  assert.ok(schema, `${method} ${path} needs a JSON response schema`);
+  validateSchema(schema, body, `${method} ${path}`);
 }
 
 test("representative routes keep JSON, auth and method contracts", async () => {
@@ -54,6 +58,10 @@ test("representative routes keep JSON, auth and method contracts", async () => {
     $transaction: async (work) => work(client),
     $queryRaw: async () => [{ "?column?": 1 }],
   };
+  for (const name of ["user", "pet", "appointment", "medicalRecord", "medicalImage", "hotelBooking", "dailyCareNote", "notification", "invoice"]) {
+    client[name].count = async () => ["user", "pet"].includes(name) ? 1 : 0;
+    client[name].groupBy = async () => [];
+  }
   const server = createApp(client).listen(0, "127.0.0.1");
   try {
     await new Promise((resolve) => server.once("listening", resolve));

@@ -9,10 +9,8 @@ interface OwnerTopbarProps {
 }
 
 export function OwnerTopbar({ title }: OwnerTopbarProps) {
-  const { notifications, currentOwner, currentOwnerId } = useAppStore();
-  const unreadCount = notifications.filter(
-    (n) => n.recipientOwnerId === currentOwnerId && n.status === "sent"
-  ).length;
+  const { summary, currentOwner } = useAppStore();
+  const unreadCount = summary.unread;
   const initials = currentOwner?.fullName
     ? currentOwner.fullName
         .split(" ")

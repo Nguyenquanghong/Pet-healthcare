@@ -7,9 +7,10 @@ import { signToken } from "../dist/src/lib/token.js";
 test("auth middleware protects appointment GET and POST, while valid owner reaches service", async () => {
   process.env.JWT_SECRET = randomBytes(32).toString("hex");
   const client = {
-    appointment: { findMany: async () => [] },
+    appointment: { findMany: async () => [], count: async () => 0, groupBy: async () => [] },
     pet: { findUnique: async () => null },
   };
+  client.$transaction = async work => work(client);
   const server = createApp(client).listen(0, "127.0.0.1");
   try {
     await new Promise((resolve) => server.once("listening", resolve));
@@ -25,7 +26,9 @@ test("auth middleware protects appointment GET and POST, while valid owner reach
     const token = signToken("owner-1", "owner");
     const getAllowed = await fetch(base, { headers: { authorization: `Bearer ${token}` } });
     assert.equal(getAllowed.status, 200);
-    assert.deepEqual(await getAllowed.json(), []);
+    const page = await getAllowed.json();
+    assert.deepEqual(page.items, []);
+    assert.deepEqual(page.pagination, { page: 1, pageSize: 20, total: 0, totalPages: 0 });
     const postAllowed = await fetch(base, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ petId: "missing" }) });
     assert.equal(postAllowed.status, 404);
     assert.deepEqual(await postAllowed.json(), { error: "Pet not found." });

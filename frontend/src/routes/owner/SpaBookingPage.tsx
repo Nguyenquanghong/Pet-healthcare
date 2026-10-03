@@ -82,7 +82,7 @@ export function SpaBookingPage() {
             onSubmit={handleSubmit}
           />
           <div className="space-y-6">
-            <OwnerAppointmentCalendar appointments={spaAppointments} selectedDate={selectedCalendarDate} onSelectDate={setSelectedCalendarDate} onClearDate={() => setSelectedCalendarDate("")} />
+            <OwnerAppointmentCalendar category="spa" selectedDate={selectedCalendarDate} onSelectDate={setSelectedCalendarDate} onClearDate={() => setSelectedCalendarDate("")} />
             <OwnerAppointmentList mode="spa" appointments={visibleAppointments} pets={pets} selectedDate={selectedCalendarDate || undefined} onClearDate={() => setSelectedCalendarDate("")} />
           </div>
         </div>

@@ -179,7 +179,7 @@ try {
   assert.equal(shown.body.owner.address, "Private address");
   const privatePets = await request("/api/pets", "GET", token);
   assert.equal(privatePets.status, 200);
-  assert.equal(privatePets.body.find(item => item.id === pet.id).notes, "SECRET_NOTE");
+  assert.equal(privatePets.body.items.find(item => item.id === pet.id).notes, "SECRET_NOTE");
   summary.scenarios.push("public alerts false/true and contact flags; private notes preserved");
 
   if (process.env.FIX_TEST_OUTPUT) await writeFile(process.env.FIX_TEST_OUTPUT, JSON.stringify(summary, null, 2));

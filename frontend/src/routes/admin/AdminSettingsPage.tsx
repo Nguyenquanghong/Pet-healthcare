@@ -3,13 +3,13 @@ import { AdminLayout } from "../../components/layout/admin/AdminLayout";
 import { useAppStore } from "../../store/AppStoreProvider";
 
 export function AdminSettingsPage() {
-  const { pets, appointments, hotelBookings, medicalRecords, owners } = useAppStore();
+  const { summary } = useAppStore();
   const metrics = [
-    ["Chủ nuôi", owners.length],
-    ["Thú cưng", pets.length],
-    ["Lịch khám", appointments.length],
-    ["Hồ sơ y tế", medicalRecords.length],
-    ["Hotel booking", hotelBookings.length],
+    ["Chủ nuôi", summary.totals.owners ?? 0],
+    ["Thú cưng", summary.totals.pets ?? 0],
+    ["Lịch khám", summary.totals.appointments ?? 0],
+    ["Hồ sơ y tế", summary.totals.medicalRecords ?? 0],
+    ["Hotel booking", summary.totals.hotelBookings ?? 0],
   ];
 
   return (

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Copy,
   Download,
@@ -14,6 +14,7 @@ import type { Pet, PetPublicProfile } from "../../../types/pet";
 import { useAppStore } from "../../../store/AppStoreProvider";
 import { Button } from "../../ui/Button";
 import { Textarea } from "../../ui/Textarea";
+import { printRescueTag } from "./printRescueTag";
 
 interface SmartQrTokenProps {
   pet?: Pet;
@@ -30,24 +31,27 @@ const publicProfileOptions: Array<{
   { key: "showMedicalAlerts", label: "Hiện cảnh báo y tế", description: "Hiển thị dị ứng và lưu ý chăm sóc quan trọng." },
 ];
 
-function createQrToken(petId: string) {
-  return `${petId}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
 export function SmartQrToken({ pet }: SmartQrTokenProps) {
-  const { currentOwner, updatePet } = useAppStore();
+  const { currentOwner, updatePet, rotatePetQrToken } = useAppStore();
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [rescueNote, setRescueNote] = useState(pet?.publicProfile?.rescueNote ?? "");
+  const [noteDirty, setNoteDirty] = useState(false);
+  useEffect(() => {
+    if (!noteDirty) setRescueNote(pet?.publicProfile?.rescueNote ?? "");
+  }, [pet?.publicProfile?.rescueNote, noteDirty]);
 
   if (!pet) return null;
 
   const origin = window.location.origin;
-  const qrToken = pet.qrToken ?? pet.id;
+  const qrToken = pet.qrToken;
   // Keep the public QR on the site root so static hosts can serve it without
   // requiring a server-side SPA rewrite for deep links.
-  const publicRescueUrl = `${origin}/?rescue=${encodeURIComponent(qrToken)}`;
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&data=${encodeURIComponent(
+  const publicRescueUrl = qrToken ? `${origin}/?rescue=${encodeURIComponent(qrToken)}` : "";
+  const qrImageUrl = qrToken ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&data=${encodeURIComponent(
     publicRescueUrl,
-  )}`;
+  )}` : "";
   const publicProfile = pet.publicProfile ?? {
     showOwnerPhone: true,
     showOwnerEmail: false,
@@ -55,55 +59,37 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
     showMedicalAlerts: true,
   };
 
+  const save = async (operation: () => Promise<boolean>) => {
+    setSaving(true); setFeedback("");
+    try {
+      const refreshed = await operation();
+      setFeedback(refreshed ? "Đã lưu thay đổi." : "Đã lưu nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu.");
+      return true;
+    } catch (reason) {
+      setFeedback(reason instanceof Error ? reason.message : "Không thể lưu thay đổi.");
+      return false;
+    } finally { setSaving(false); }
+  };
+
   const handleCopyLink = async () => {
-    await navigator.clipboard.writeText(publicRescueUrl);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2500);
+    try {
+      await navigator.clipboard.writeText(publicRescueUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2500);
+    } catch { setFeedback("Không thể sao chép. Hãy mở trang public để lấy liên kết."); }
   };
 
-  const updatePublicProfile = (input: Partial<PetPublicProfile>) => {
-    updatePet(pet.id, { publicProfile: { ...publicProfile, ...input } });
-  };
+  const updatePublicProfile = (input: Partial<PetPublicProfile>) =>
+    save(() => updatePet(pet.id, { publicProfile: input }));
 
-  const handleRegenerateToken = () => {
-    updatePet(pet.id, { qrToken: createQrToken(pet.id), qrEnabled: true });
-  };
+  const handleRegenerateToken = () => save(() => rotatePetQrToken(pet.id));
 
   const handlePrintTag = () => {
     const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>In thẻ cứu hộ - ${pet.name}</title>
-          <style>
-            body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #fff; }
-            .tag { width: 260px; border: 3px solid #003f70; border-radius: 24px; padding: 20px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-            .tag-header { font-size: 14px; font-weight: bold; color: #003f70; text-transform: uppercase; margin-bottom: 4px; }
-            .tag-pet { font-size: 22px; font-weight: 900; color: #111; margin: 6px 0; }
-            .tag-breed { font-size: 12px; color: #666; margin-bottom: 12px; }
-            .tag img { width: 180px; height: 180px; margin: 0 auto; display: block; border-radius: 12px; }
-            .tag-footer { font-size: 11px; font-weight: bold; color: #e11d48; margin-top: 12px; }
-            .tag-phone { font-size: 14px; font-weight: 800; color: #003f70; margin-top: 4px; }
-          </style>
-        </head>
-        <body>
-          <div class="tag">
-            <div class="tag-header">NIPOPETO</div>
-            <div class="tag-pet">${pet.name}</div>
-            <div class="tag-breed">${pet.breed}</div>
-            <img src="${qrImageUrl}" alt="QR Code" />
-            <div class="tag-footer">QUÉT MÃ ĐỂ BÁO TÌM THẤY</div>
-            <div class="tag-phone">Hotline: ${currentOwner?.phone || "1900 6868"}</div>
-          </div>
-          <script>
-            window.onload = () => { window.print(); window.close(); };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    if (!printWindow) { setFeedback("Cho phép cửa sổ bật lên để in thẻ QR."); return; }
+    printWindow.opener = null;
+    printRescueTag(printWindow, { name: pet.name, breed: pet.breed,
+      phone: publicProfile.showOwnerPhone ? currentOwner?.phone || "1900 6868" : "1900 6868", qrImageUrl });
   };
 
   return (
@@ -123,13 +109,13 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
             pet.qrEnabled === false ? "bg-slate-100 text-slate-500" : "bg-emerald-100 text-emerald-700"
           }`}
         >
-          {pet.qrEnabled === false ? "Paused" : "Active"}
+          {!qrToken ? "Chưa có mã" : pet.qrEnabled === false ? "Paused" : "Active"}
         </span>
       </div>
 
       <div className="flex flex-col items-center">
         <div className="relative mb-5 flex aspect-square w-48 items-center justify-center rounded-lg border border-slate-200 bg-white p-3">
-          <img src={qrImageUrl} alt={`Mã QR cứu hộ của ${pet.name}`} className="h-full w-full rounded-xl object-contain" />
+          {qrToken ? <img src={qrImageUrl} alt={`Mã QR cứu hộ của ${pet.name}`} className="h-full w-full rounded-xl object-contain" /> : <p className="text-sm text-slate-500">Tạo mã QR để chia sẻ hồ sơ cứu hộ.</p>}
           {pet.qrEnabled === false && (
             <div className="absolute inset-3 flex items-center justify-center rounded-xl bg-white/90 text-sm font-black text-slate-500">
               QR đang tạm khóa
@@ -142,12 +128,14 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
         <button
           type="button"
           onClick={handleCopyLink}
+          disabled={!qrToken || saving}
           className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
         >
           <Copy size={13} /> {copied ? "Đã copy" : "Copy link"}
         </button>
         <a
-          href={publicRescueUrl}
+          href={qrToken ? publicRescueUrl : undefined}
+          aria-disabled={!qrToken}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
@@ -157,12 +145,14 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
         <button
           type="button"
           onClick={handlePrintTag}
+          disabled={!qrToken || saving}
           className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary py-2.5 text-xs font-semibold text-white transition-colors hover:bg-primary-dark"
         >
           <Printer size={13} /> In thẻ QR
         </button>
         <a
-          href={qrImageUrl}
+          href={qrToken ? qrImageUrl : undefined}
+          aria-disabled={!qrToken}
           download={`QR_${pet.name}.png`}
           target="_blank"
           rel="noreferrer"
@@ -177,14 +167,15 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
           type="button"
           variant={pet.qrEnabled === false ? "primary" : "outline"}
           icon={pet.qrEnabled === false ? <Eye size={15} /> : <EyeOff size={15} />}
-          onClick={() => updatePet(pet.id, { qrEnabled: pet.qrEnabled === false })}
+          onClick={() => save(() => updatePet(pet.id, { qrEnabled: pet.qrEnabled === false }))}
+          disabled={saving || !qrToken}
           className="w-full"
         >
           {pet.qrEnabled === false ? "Bật lại QR cứu hộ" : "Tạm khóa QR cứu hộ"}
         </Button>
 
-        <Button type="button" variant="outline" icon={<RefreshCw size={15} />} onClick={handleRegenerateToken} className="w-full">
-          Đổi mã QR mới
+        <Button type="button" variant="outline" icon={<RefreshCw size={15} />} onClick={handleRegenerateToken} disabled={saving} className="w-full">
+          {qrToken ? "Đổi mã QR mới" : "Tạo mã QR"}
         </Button>
       </div>
 
@@ -199,6 +190,7 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
               <input
                 type="checkbox"
                 checked={Boolean(publicProfile[option.key])}
+                disabled={saving}
                 onChange={(event) => updatePublicProfile({ [option.key]: event.target.checked })}
                 className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
               />
@@ -213,12 +205,17 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
           className="mt-3"
           label="Lời nhắn cứu hộ"
           rows={3}
-          value={publicProfile.rescueNote ?? ""}
-          onChange={(event) => updatePublicProfile({ rescueNote: event.target.value })}
+          value={rescueNote}
+          disabled={saving}
+          maxLength={10_000}
+          onChange={(event) => { setRescueNote(event.target.value); setNoteDirty(true); }}
           placeholder="Ví dụ: Bé hơi nhát, vui lòng không đuổi theo..."
         />
+        <Button className="mt-3" disabled={saving || !noteDirty} onClick={async () => {
+          if (await updatePublicProfile({ rescueNote })) setNoteDirty(false);
+        }}>Lưu lời nhắn</Button>
       </div>
-
+      {feedback && <p role="status" className="mt-3 text-sm text-slate-700">{feedback}</p>}
     </div>
   );
 }

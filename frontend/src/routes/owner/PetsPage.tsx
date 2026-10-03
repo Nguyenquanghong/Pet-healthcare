@@ -1,3 +1,7 @@
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
+import type { MedicalRecord } from "../../types/medicalRecord";
+import type { MedicalImage } from "../../types/medicalImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Edit3, ImagePlus, Plus, Sparkles, Trash2 } from "lucide-react";
 import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
@@ -78,10 +82,12 @@ function formFromPet(pet: Pet): PetFormState {
 }
 
 export function PetsPage() {
-  const { createPet, medicalImages, medicalRecords, ownerPets, updatePet } = useAppStore();
+  const { createPet, updatePet, petUpdates } = useAppStore();
+  const list = usePagedList<Pet>("/pets");
+  const ownerPets = list.items.map(pet => petUpdates[pet.id] ?? pet);
   const [selectedPetId, setSelectedPetId] = useState(ownerPets[0]?.id ?? "");
   const [formMode, setFormMode] = useState<PetFormMode>("create");
-  const [showForm, setShowForm] = useState(ownerPets.length === 0);
+  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<PetFormState>(emptyForm);
   const [editDrafts, setEditDrafts] = useState<Record<string, PetFormState>>({});
   const [errors, setErrors] = useState<PetFormErrors>({});
@@ -94,6 +100,9 @@ export function PetsPage() {
     () => ownerPets.find((pet) => pet.id === selectedPetId) ?? ownerPets[0],
     [ownerPets, selectedPetId],
   );
+  const records = usePagedList<MedicalRecord>("/medical-records", { petId: selectedPet?.id }, Boolean(selectedPet));
+  const images = usePagedList<MedicalImage>("/medical-records/images", { petId: selectedPet?.id }, Boolean(selectedPet));
+  const medicalRecords = records.items, medicalImages = images.items;
   const selectedPetRecords = useMemo(
     () => medicalRecords.filter((record) => record.petId === selectedPet?.id),
     [medicalRecords, selectedPet?.id],
@@ -104,7 +113,7 @@ export function PetsPage() {
   );
 
   useEffect(() => {
-    if (!selectedPetId && ownerPets[0]) setSelectedPetId(ownerPets[0].id);
+    if (!ownerPets.some(pet => pet.id === selectedPetId) && ownerPets[0]) setSelectedPetId(ownerPets[0].id);
   }, [ownerPets, selectedPetId]);
 
   const updateField = <K extends keyof PetFormState>(key: K, value: PetFormState[K]) => {
@@ -213,6 +222,7 @@ export function PetsPage() {
 
   return (
     <OwnerLayout title="Hồ sơ thú cưng thông minh">
+      <Pagination {...list} />
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-medium text-primary">Pet Profiles</p>
@@ -375,12 +385,12 @@ export function PetsPage() {
             </div>
             <div className="grid gap-6 md:grid-cols-2">
               <DigitalHealthRecordCard pet={selectedPet} records={selectedPetRecords} />
-              <CloudImagingCard pet={selectedPet} images={selectedPetImages} />
+              <div><CloudImagingCard pet={selectedPet} images={selectedPetImages} /><Pagination {...images} /></div>
             </div>
           </div>
 
           <div className="space-y-6">
-            <SmartQrToken pet={selectedPet} />
+            <SmartQrToken key={selectedPet?.id} pet={selectedPet} />
             {selectedPet.notes && (
               <div className="rounded-lg border border-slate-200 bg-white p-5">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Ghi chú chăm sóc</p>

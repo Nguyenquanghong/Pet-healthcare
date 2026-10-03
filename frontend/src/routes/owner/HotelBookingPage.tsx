@@ -1,3 +1,6 @@
+import { CareNotesPanel } from "../../components/owner/booking/CareNotesPanel";
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckCircle2, Hotel, PawPrint, Plus, Ban, HeartPulse, Smile, X, MessageSquareText } from "lucide-react";
@@ -28,7 +31,7 @@ const BOOKING_STATUS_STYLES: Record<string, string> = {
 
 export function HotelBookingPage() {
   const navigate = useNavigate();
-  const { createHotelBooking, cancelHotelBooking, currentOwnerId, hotelBookings, dailyCareNotes, ownerPets } = useAppStore();
+  const { createHotelBooking, cancelHotelBooking, currentOwnerId, ownerPets } = useAppStore();
   const [petId, setPetId] = useState(ownerPets[0]?.id ?? "");
   const today = () => new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
   const nextDay = () => new Date(new Date(`${today()}T00:00:00.000Z`).getTime() + 86_400_000).toISOString().slice(0, 10);
@@ -55,10 +58,9 @@ export function HotelBookingPage() {
     && checkIn >= today() && nights >= 1;
   const total = datesValid ? calculateBookingTotal(roomType, serviceKeys, nights) : 0;
   const selectedPet = ownerPets.find((p) => p.id === petId);
-  const ownerBookings = useMemo(
-    () => hotelBookings.filter((b) => b.ownerId === currentOwnerId).sort(compareBookingStatus),
-    [currentOwnerId, hotelBookings]
-  );
+  const list = usePagedList<HotelBooking>("/hotel-bookings");
+  const ownerBookings = list.items;
+
 
   const toggleService = (key: HotelServiceKey) =>
     setServiceKeys((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
@@ -80,7 +82,7 @@ export function HotelBookingPage() {
     if (!cancelTarget || sending.current) return;
     sending.current = true; setPending(true); setBookingError("");
     try {
-      const refreshed = await cancelHotelBooking(cancelTarget.id, cancelReason.trim() || undefined);
+      const refreshed = await cancelHotelBooking(cancelTarget.id, cancelReason.trim() || undefined, cancelTarget.statusRevision);
       setCancelTarget(null); setCancelReason("");
       setFeedbackMsg(refreshed ? "Đã hủy đặt chỗ khách sạn." : "Đã hủy; danh sách chưa tải lại được. Hãy làm mới trang để đối chiếu.");
     } catch (reason) { setBookingError(reason instanceof Error ? reason.message : "Không thể hủy đặt phòng."); }
@@ -89,6 +91,7 @@ export function HotelBookingPage() {
 
   return (
     <OwnerLayout title="Đặt chỗ khách sạn thú cưng">
+      <Pagination {...list} />
       {ownerPets.length === 0 ? (
         <EmptyState
           icon={<PawPrint size={42} />}
@@ -150,11 +153,8 @@ export function HotelBookingPage() {
               </div>
               <div className="divide-y divide-slate-100">
                 {ownerBookings.map((b) => {
-                  const pet = ownerPets.find((p) => p.id === b.petId);
+                  const pet = list.related.pets.find((p) => p.id === b.petId);
                   const canCancel = ["pending", "confirmed"].includes(b.status);
-                  const relatedNotes = dailyCareNotes.filter(
-                    (note) => note.bookingId === b.id && note.visibleToOwner
-                  );
 
                   return (
                     <div key={b.id} className="p-5 space-y-3.5">
@@ -194,36 +194,7 @@ export function HotelBookingPage() {
                         </div>
                       </div>
 
-                      {/* Daily Care Notes Section for this Booking */}
-                      {relatedNotes.length > 0 && (
-                        <div className="space-y-2.5 border-l-2 border-primary bg-slate-50 p-3.5">
-                          <p className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
-                            <MessageSquareText size={14} className="text-indigo-600" />
-                            Nhật ký chăm sóc hàng ngày ({relatedNotes.length})
-                          </p>
-                          <div className="space-y-2">
-                            {relatedNotes.map((note) => (
-                              <div
-                                key={note.id}
-                                className="space-y-1 border-t border-slate-200 pt-3 text-xs first:border-t-0 first:pt-0"
-                              >
-                                <div className="flex items-center justify-between text-slate-500 font-medium">
-                                  <span className="font-bold text-slate-700">{note.date}</span>
-                                  <div className="flex gap-1.5">
-                                    <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700 border border-emerald-200">
-                                      <HeartPulse size={10} /> {eatingStatusLabels[note.eatingStatus]}
-                                    </span>
-                                    <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 font-bold text-indigo-700 border border-indigo-200">
-                                      <Smile size={10} /> {moodLabels[note.mood]}
-                                    </span>
-                                  </div>
-                                </div>
-                                <p className="text-slate-700 leading-relaxed pt-1">{note.note}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      <CareNotesPanel bookingId={b.id} />
                     </div>
                   );
                 })}

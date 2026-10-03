@@ -14,10 +14,6 @@ export function createAppointmentsRouter(service: AppointmentService) {
     throw error;
   }
 
-  router.get("/", async (req, res) => {
-    const ownerId = typeof req.query.ownerId === "string" ? req.query.ownerId : undefined;
-    res.json((await service.list(req.auth!, ownerId)).map(item => appointmentDto(item, req.auth!.role === "owner")));
-  });
 
   router.post("/", async (req, res) => {
     try {

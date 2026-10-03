@@ -87,7 +87,7 @@ export function UpcomingSchedule({ appointments }: { appointments: Appointment[]
           to="/owner/appointments"
           className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
         >
-          Xem tất cả lịch khám ({appointments.length}) <ArrowRight size={12} />
+          Xem tất cả lịch khám <ArrowRight size={12} />
         </Link>
       </div>
     </div>

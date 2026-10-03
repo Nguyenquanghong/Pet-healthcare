@@ -18,8 +18,21 @@
     "test": "npm run build && npm run test:unit -w backend && npm run test:architecture -w backend && npm run test:openapi -w backend",
     "test:e2e": "playwright test"
   },
+  "overrides": {
+    "deepmerge-ts": "8.0.0",
+    "prisma": {
+      ".": "6.19.3",
+      "@prisma/config": {
+        ".": "6.19.3",
+        "deepmerge-ts": "8.0.0"
+      }
+    },
+    "ip-address": "10.7.3"
+  },
   "devDependencies": {
     "@playwright/test": "1.63.0",
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "deepmerge-ts": "8.0.0",
+    "prisma": "6.19.3"
   }
 }

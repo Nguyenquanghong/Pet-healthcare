@@ -19,6 +19,7 @@ from pathlib import Path
 import psutil
 from metrics import BENCHMARK_PROTOCOL, CpuSampler
 from ports import require_free_port
+from diagnostics import DIAGNOSTIC_PROTOCOL, PROFILES as DIAGNOSTIC_PROFILES, exceeded_endpoints, observed_workload
 
 
 def command(args, *, cwd=None, env=None, stdout=None):
@@ -64,7 +65,10 @@ def process_usage(pid, sampler):
 
 
 def run_locust(repo, environment, profile, users, spawn_rate, duration, log_path, csv_prefix=None):
-    args = [sys.executable, "-m", "locust", "-f", str(repo / "benchmarks/kaggle/locustfile.py"), profile,
+    diagnostic = environment.get("BENCH_DIAGNOSTIC") == "1"
+    workload = "diagnostic_locustfile.py" if diagnostic else "locustfile.py"
+    classes = DIAGNOSTIC_PROFILES[profile] if diagnostic else [profile]
+    args = [sys.executable, "-m", "locust", "-f", str(repo / "benchmarks/kaggle" / workload), *classes,
             "--headless", "--only-summary", "--host", "http://127.0.0.1:5001",
             "--users", str(users), "--spawn-rate", str(spawn_rate), "--run-time", duration, "--stop-timeout", "12"]
     if csv_prefix:
@@ -110,13 +114,34 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--profile", choices=["ReadHeavyUser", "MixedUser"], required=True)
+    parser.add_argument("--profile", choices=["ReadHeavyUser", *DIAGNOSTIC_PROFILES], required=True)
     parser.add_argument("--users", type=int, required=True)
     parser.add_argument("--spawn-rate", type=float, default=5)
     parser.add_argument("--warmup", default="45s")
     parser.add_argument("--duration", default="2m")
     parser.add_argument("--seed", default="phase1")
+    parser.add_argument("--diagnostic", action="store_true")
+    parser.add_argument("--history-rows", type=int, default=10000)
+    parser.add_argument("--fixture-users", type=int, default=500)
+    parser.add_argument("--owner-users", type=int, default=50)
+    parser.add_argument("--admin-users", type=int, default=5)
+    parser.add_argument("--p95-limit-ms", type=float, default=2000)
+    parser.add_argument("--owner-probe-limit-ms", type=float, default=500)
     args = parser.parse_args()
+
+    if args.diagnostic:
+        if args.profile not in DIAGNOSTIC_PROFILES or not 1 <= args.history_rows <= 100000 or not 1 <= args.fixture_users <= 1000:
+            parser.error("Invalid diagnostic profile, history rows or fixture population")
+        if args.fixture_users < args.users or not 0 < args.p95_limit_ms < float("inf") or not 0 < args.owner_probe_limit_ms < float("inf"):
+            parser.error("Diagnostic population must cover users and latency limits must be positive and finite")
+        if args.profile in ("OwnerProbeUser", "AdminInterference") and (
+            args.owner_users < 1 or args.admin_users < 0 or args.owner_users + args.admin_users != args.users
+            or (args.profile == "OwnerProbeUser" and args.admin_users != 0)
+            or (args.profile == "AdminInterference" and args.admin_users < 1)
+        ):
+            parser.error("Owner/admin fixed counts must match the requested diagnostic users")
+    elif args.profile not in ("ReadHeavyUser", "MixedUser"):
+        parser.error("Admin/probe profiles require --diagnostic")
 
     repo = args.repo.resolve(strict=True)
     result_dir = args.output.resolve()
@@ -140,7 +165,7 @@ def main():
     result_dir.mkdir(parents=True, exist_ok=False)
 
     metadata = {
-        "benchmark_protocol": BENCHMARK_PROTOCOL,
+        "benchmark_protocol": DIAGNOSTIC_PROTOCOL if args.diagnostic else BENCHMARK_PROTOCOL,
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
         "commit": output(["git", "rev-parse", "HEAD"], cwd=repo),
         "dirty_worktree": bool(output(["git", "status", "--porcelain"], cwd=repo)),
@@ -161,6 +186,7 @@ def main():
         "duration": args.duration,
         "fixture_seed": args.seed,
         "fixture_owners_and_pets": max(100, args.users),
+        "read_contract": {"collection": "items-pagination-related", "page": 1, "page_size": 20, "bootstrap_view": "dashboard", "api_contract": "3.0.0"},
         "wait_seconds_uniform": [0.5, 1.5],
         "task_weights": ({"GET bootstrap": 40, "GET pets": 25, "GET appointments": 20, "GET notifications": 15}
                          if args.profile == "ReadHeavyUser" else
@@ -175,6 +201,20 @@ def main():
         "resource_sampling": "CPU time deltas, first sample null; short-lived processes between polls may be missed; RSS sums can include shared pages",
         "status": "running",
     }
+    if args.diagnostic:
+        metadata.update({"fixture_owners_and_pets": args.fixture_users, "fixture_seed": "diagnostic",
+            "history_episodes": args.history_rows, "fixture_rows_per_episode": 8,
+            "owner_users": args.users if args.profile == "MixedUser" else args.owner_users if args.profile in ("OwnerProbeUser", "AdminInterference") else 0,
+            "admin_users": args.users if args.profile == "AdminReadUser" else args.admin_users if args.profile == "AdminInterference" else 0,
+            "load_classes": DIAGNOSTIC_PROFILES[args.profile],
+            "wait_seconds_uniform": {"owner": [0.5, 1.5], "admin": [2, 4]},
+            "task_weights": ({"GET bootstrap": 4, "GET appointments": 2, "GET hotel-bookings": 2, "GET invoices": 1, "GET notifications": 1}
+                             if args.profile == "AdminReadUser" else
+                             {"OWNER probe GET pets": 1, "ADMIN GET bootstrap": 1} if args.profile == "AdminInterference" else
+                             {"OWNER probe GET pets": 1} if args.profile == "OwnerProbeUser" else metadata["task_weights"]),
+            "stop_conditions": {"error_rate_gt": 0.01, "p95_ms_gt": args.p95_limit_ms,
+                                "owner_probe_p95_ms_gt": args.owner_probe_limit_ms,
+                                "scope": "aggregate and each final endpoint; checked after each run; exploratory, not a business SLA"}})
     (result_dir / "manifest.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
     api = None
@@ -205,6 +245,9 @@ def main():
                 command(["createdb", "-h", "127.0.0.1", "-p", "55432", "-U", "postgres", "nipopeto"], stdout=setup_log)
 
             environment = os.environ.copy()
+            # A previous diagnostic invocation must not contaminate a B1 run.
+            for key in ("BENCH_DIAGNOSTIC", "BENCH_ENDPOINT_STATS", "BENCH_HISTORY_ROWS", "BENCH_FIXTURE_SUMMARY", "BENCH_OWNER_USERS", "BENCH_ADMIN_USERS"):
+                environment.pop(key, None)
             environment["DATABASE_URL"] = "postgresql://postgres@127.0.0.1:55432/nipopeto?schema=public"
             environment["JWT_SECRET"] = secrets.token_urlsafe(40)
             environment["PORT"] = "5001"
@@ -213,6 +256,10 @@ def main():
             environment["BENCH_USERS"] = str(max(100, args.users))
             environment["BENCH_SEED"] = args.seed
             environment["BENCH_SEED_NUMBER"] = "20260923"
+            if args.diagnostic:
+                environment.update({"BENCH_DIAGNOSTIC": "1", "BENCH_USERS": str(args.fixture_users),
+                    "BENCH_HISTORY_ROWS": str(args.history_rows), "BENCH_OWNER_USERS": str(args.owner_users),
+                    "BENCH_ADMIN_USERS": str(args.admin_users), "BENCH_FIXTURE_SUMMARY": str(result_dir / "fixture-summary.json")})
             with open(result_dir / "setup.log", "a", encoding="utf-8") as setup_log:
                 command(["npm", "ci"], cwd=repo, env=environment, stdout=setup_log)
                 command(["npm", "run", "build", "-w", "backend"], cwd=repo, env=environment, stdout=setup_log)
@@ -221,10 +268,13 @@ def main():
             api = subprocess.Popen(["npm", "run", "start", "-w", "backend"], cwd=repo, env=environment, stdout=api_log, stderr=subprocess.STDOUT, start_new_session=True)
             wait_health(5001, api)
             with open(result_dir / "setup.log", "a", encoding="utf-8") as setup_log:
-                command(["node", str(repo / "benchmarks/kaggle/prepare_fixture.mjs")], cwd=repo, env=environment, stdout=setup_log)
+                fixture_script = "prepare_diagnostic_fixture.mjs" if args.diagnostic else "prepare_fixture.mjs"
+                command(["node", str(repo / "benchmarks/kaggle" / fixture_script)], cwd=repo, env=environment, stdout=setup_log)
 
             environment["BENCH_PHASE"] = "warmup"
             environment.pop("BENCH_FINAL_STATS", None)
+            if args.diagnostic:
+                environment["BENCH_ENDPOINT_STATS"] = str(result_dir / "warmup_endpoint_final.json")
             warmup, warmup_log = run_locust(repo, environment, args.profile, args.users, args.spawn_rate, args.warmup, result_dir / "warmup.log")
             warmup_code = warmup.wait()
             warmup_log.close()
@@ -233,6 +283,8 @@ def main():
 
             environment["BENCH_PHASE"] = "measured"
             environment["BENCH_FINAL_STATS"] = str(result_dir / "locust_final.json")
+            if args.diagnostic:
+                environment["BENCH_ENDPOINT_STATS"] = str(result_dir / "endpoint_final.json")
             load, load_log = run_locust(repo, environment, args.profile, args.users, args.spawn_rate, args.duration, result_dir / "load.log", result_dir / "load")
             pg_pid = int((data_dir / "postmaster.pid").read_text().splitlines()[0])
             samplers = [CpuSampler(), CpuSampler(), CpuSampler()]
@@ -254,6 +306,17 @@ def main():
             metadata["results"] = stats
             metadata["ended_at_utc"] = datetime.now(timezone.utc).isoformat()
             metadata["threshold_exceeded"] = (stats["error_rate"] is None or stats["error_rate"] > 0.01 or stats["p95_ms"] is None or stats["p95_ms"] > 2000)
+            if args.diagnostic:
+                endpoint_data = json.loads((result_dir / "endpoint_final.json").read_text(encoding="utf-8"))
+                if endpoint_data.get("phase") != "measured" or not endpoint_data.get("endpoints"):
+                    raise RuntimeError("Missing final diagnostic endpoint statistics")
+                endpoints = endpoint_data["endpoints"]
+                if not observed_workload(args.profile, endpoints):
+                    raise RuntimeError("Diagnostic workload did not exercise all required roles/methods")
+                if sum(entry["requests"] for entry in endpoints) != stats["requests"] or sum(entry["failures"] for entry in endpoints) != stats["failures"]:
+                    raise RuntimeError("Diagnostic final endpoint counters do not match aggregate")
+                metadata["endpoint_limit_violations"] = exceeded_endpoints(endpoints, args.p95_limit_ms, args.owner_probe_limit_ms)
+                metadata["threshold_exceeded"] = bool(metadata["endpoint_limit_violations"]) or stats["error_rate"] is None or stats["error_rate"] > 0.01 or stats["p95_ms"] is None or stats["p95_ms"] > args.p95_limit_ms
             metadata["status"] = "failed" if load_code else "completed"
             (result_dir / "manifest.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
             print(f"Saved Kaggle run evidence in {result_dir}; threshold_exceeded={metadata['threshold_exceeded']}")

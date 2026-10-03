@@ -1,10 +1,11 @@
 import { History, Calendar, Stethoscope, HeartPulse } from "lucide-react";
 import type { MedicalRecord } from "../../../types/medicalRecord";
-import { useAppStore } from "../../../store/AppStoreProvider";
+import type { Appointment } from "../../../types/appointment";
 import { appointmentStatusLabels } from "../../../utils/statusLabels";
 
 interface ClinicalTimelineProps {
   records: MedicalRecord[];
+  appointments?: Appointment[];
 }
 
 function formatDate(value: string) {
@@ -17,8 +18,7 @@ function formatDate(value: string) {
   }
 }
 
-export function ClinicalTimeline({ records }: ClinicalTimelineProps) {
-  const { appointments } = useAppStore();
+export function ClinicalTimeline({ records, appointments = [] }: ClinicalTimelineProps) {
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">

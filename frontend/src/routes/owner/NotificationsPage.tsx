@@ -1,3 +1,5 @@
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, CheckCheck, Clock, Trash2, ArrowRight, X } from "lucide-react";
@@ -61,8 +63,7 @@ function timeAgo(iso: string): string {
 export function NotificationsPage() {
   const navigate = useNavigate();
   const {
-    notifications,
-    currentOwnerId,
+    summary,
     markNotificationRead,
     markAllNotificationsRead,
     deleteNotification,
@@ -70,19 +71,9 @@ export function NotificationsPage() {
 
   const [activeTab, setActiveTab] = useState("all");
 
-  const myNotifications = useMemo(() => {
-    return notifications.filter(
-      (n) => n.recipientOwnerId === currentOwnerId && n.recipientRole !== "admin"
-    );
-  }, [notifications, currentOwnerId]);
-
-  const filteredNotifications = useMemo(() => {
-    if (activeTab === "all") return myNotifications;
-    const allowedTypes = CATEGORY_MAP[activeTab] ?? [];
-    return myNotifications.filter((n) => allowedTypes.includes(n.type));
-  }, [myNotifications, activeTab]);
-
-  const unreadCount = myNotifications.filter((n) => n.status === "sent").length;
+  const list = usePagedList<Notification>("/notifications", { category: activeTab });
+  const filteredNotifications = list.items;
+  const unreadCount = summary.unread;
 
   const handleNotificationClick = (n: Notification) => {
     if (n.status === "sent") {
@@ -95,6 +86,7 @@ export function NotificationsPage() {
 
   return (
     <OwnerLayout title="Thông báo">
+      <Pagination {...list} />
       <div className="mx-auto max-w-3xl">
         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -122,10 +114,7 @@ export function NotificationsPage() {
         {/* Filter Tabs */}
         <div className="mb-6 flex flex-wrap gap-2 pb-2 border-b border-slate-200">
           {TABS.map((tab) => {
-            const count =
-              tab.key === "all"
-                ? myNotifications.length
-                : myNotifications.filter((n) => (CATEGORY_MAP[tab.key] ?? []).includes(n.type)).length;
+            const count = list.counts[`category:${tab.key}`] ?? 0;
 
             return (
               <button

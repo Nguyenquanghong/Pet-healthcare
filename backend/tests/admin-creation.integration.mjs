@@ -69,8 +69,8 @@ try {
   assert.equal(counterHotel.body.booking.ownerId, customer.id);
   assert.equal(counterHotel.body.booking.status, "pending");
   assert.equal(await db.invoice.count({ where: { hotelBookingId: counterHotel.body.booking.id } }), 0);
-  const customerBootstrap = await request(adminToken, "GET", "/bootstrap");
-  assert.ok(customerBootstrap.body.owners.some(item => item.id === customer.id));
+  const customerBootstrap = await request(adminToken, "GET", `/owners?id=${customer.id}`);
+  assert.ok(customerBootstrap.body.items.some(item => item.id === customer.id));
   const createPet = { ownerId: owner.id, name: "Reception pet", species: "cat", gender: "female", weightKg: 3.5 };
   for (const ownerId of ["missing-owner", admin.id, staff.id])
     assert.equal((await request(adminToken, "POST", "/pets", { ...createPet, ownerId })).status, 422, "Invalid owner is a business error, not an ORM failure");

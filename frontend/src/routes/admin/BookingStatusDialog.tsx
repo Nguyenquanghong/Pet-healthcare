@@ -4,6 +4,8 @@ import { useAppStore } from "../../store/AppStoreProvider";
 import { apiClient } from "../../services/apiClient";
 import type { Appointment } from "../../types/appointment";
 import type { HotelBooking } from "../../types/booking";
+import type { Pet } from "../../types/pet";
+import type { Owner } from "../../types/owner";
 
 const labels: Record<string, string> = { pending: "Chờ xác nhận", confirmed: "Đã xác nhận", checked_in: "Đã nhận thú cưng",
   in_progress: "Đang thực hiện", completed: "Hoàn thành dịch vụ", in_stay: "Đang lưu trú", checked_out: "Đã trả thú cưng",
@@ -12,13 +14,12 @@ const actionLabels: Record<string, string> = { transition: "Chuyển trạng th�
   note_updated: "Cập nhật ghi chú", cancelled: "Hủy lịch", rescheduled: "Đổi lịch" };
 type Entry = { id: string; action: string; fromStatus: string; toStatus: string; actorName: string; actorRole: string;
   reason: string | null; reversesId: string | null; createdAt: string };
-export type StatusDialogSelection = { booking: Appointment | HotelBooking; intent: string };
+export type StatusDialogSelection = { booking: Appointment | HotelBooking; intent: string; pet?: Pet; owner?: Owner };
 export function BookingStatusDialog({ kind, selection, onClose, onSaved }: {
   kind: "appointment" | "hotel"; selection: StatusDialogSelection; onClose: () => void; onSaved: () => void;
 }) {
-  const { booking, intent } = selection;
-  const { pets, owners, refreshData } = useAppStore();
-  const pet = pets.find(p => p.id === booking.petId), owner = owners.find(o => o.id === booking.ownerId);
+  const { booking, intent, pet, owner } = selection;
+  const { refreshData } = useAppStore();
   const dialog = useRef<HTMLDialogElement>(null), submitting = useRef(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [reason, setReason] = useState("");
   const [events, setEvents] = useState<Entry[]>([]), [loading, setLoading] = useState(false), [attempt, setAttempt] = useState(0);

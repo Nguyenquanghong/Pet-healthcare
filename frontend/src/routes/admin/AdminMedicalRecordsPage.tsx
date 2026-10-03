@@ -1,4 +1,9 @@
-import { useMemo, useState, type ChangeEvent } from "react";
+import type { MedicalImage } from "../../types/medicalImage";
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
+import { PetLookup, PagedSelect } from "../../components/ui/PagedSelect";
+import type { Appointment } from "../../types/appointment";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   CheckCircle2,
   FilePlus2,
@@ -26,20 +31,17 @@ import type { MedicalRecord } from "../../types/medicalRecord";
 
 export function AdminMedicalRecordsPage() {
   const {
-    appointments,
     createMedicalRecord: createMedicalRecordInStore,
     updateMedicalRecord: updateMedicalRecordInStore,
     deleteMedicalRecord: deleteMedicalRecordInStore,
     deleteMedicalImage,
     uploadMedicalImage,
-    pets,
-    medicalImages,
-    medicalRecords,
-    owners,
+    pets: cachedPets,
   } = useAppStore();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showImageForm, setShowImageForm] = useState(false);
+  const imageSending = useRef(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPetFilter, setSelectedPetFilter] = useState("all");
 
@@ -49,7 +51,7 @@ export function AdminMedicalRecordsPage() {
   const [viewDetailRecord, setViewDetailRecord] = useState<MedicalRecord | null>(null);
 
   // Form inputs
-  const [petId, setPetId] = useState(pets[0]?.id ?? "");
+  const [petId, setPetId] = useState(cachedPets[0]?.id ?? "");
   const [appointmentId, setAppointmentId] = useState("");
   const [title, setTitle] = useState("");
   const [symptoms, setSymptoms] = useState("");
@@ -62,7 +64,7 @@ export function AdminMedicalRecordsPage() {
   const [temperatureC, setTemperatureC] = useState("");
   const [heartRateBpm, setHeartRateBpm] = useState("");
   const [doctorName, setDoctorName] = useState("Bs. Mai Nguyễn");
-  const [imagePetId, setImagePetId] = useState(pets[0]?.id ?? "");
+  const [imagePetId, setImagePetId] = useState(cachedPets[0]?.id ?? "");
   const [imageTitle, setImageTitle] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState("");
   const [imageMimeType, setImageMimeType] = useState("");
@@ -215,19 +217,30 @@ export function AdminMedicalRecordsPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleImageUpload = () => {
+  const handleImageUpload = async () => {
+    if (imageSending.current || isSubmitting) return;
     if (!imagePetId || !imageDataUrl || !imageTitle.trim()) {
       setFormError("Select a pet, enter an image title, and choose an image to upload.");
       return;
     }
-    uploadMedicalImage({ petId: imagePetId, title: imageTitle.trim(), imageUrl: imageDataUrl, mimeType: imageMimeType });
-    setImageTitle("");
-    setImageDataUrl("");
-    setImageMimeType("");
-    setShowImageForm(false);
-    setFormError("");
-    toast("Diagnostic image uploaded successfully.");
+    imageSending.current = true;
+    setIsSubmitting(true); setFormError("");
+    try {
+      const refreshed = await uploadMedicalImage({ petId: imagePetId, title: imageTitle.trim(), imageUrl: imageDataUrl, mimeType: imageMimeType });
+      setImageTitle(""); setImageDataUrl(""); setImageMimeType("");
+      setShowImageForm(false);
+      toast(refreshed ? "Đã lưu ảnh chẩn đoán." : "Đã lưu ảnh nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu.", !refreshed);
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : "Không thể lưu ảnh chẩn đoán.");
+    } finally { imageSending.current = false; setIsSubmitting(false); }
   };
+
+  const list = usePagedList<MedicalRecord>("/medical-records", { q: searchQuery, petId: selectedPetFilter });
+  const pets = [...new Map([...list.related.pets, ...cachedPets].map(pet => [pet.id, pet])).values()], owners = list.related.owners, medicalRecords = list.items;
+  const appointmentList = usePagedList<Appointment>("/appointments", { petId }, Boolean(petId && showCreateForm));
+  const appointments = appointmentList.items;
+  const imagePage = usePagedList<MedicalImage>("/medical-records/images", { petId: imagePetId }, showImageForm);
+  const medicalImages = imagePage.items;
 
   const imageList = useMemo(
     () => medicalImages.filter((image) => image.petId === imagePetId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -239,25 +252,7 @@ export function AdminMedicalRecordsPage() {
     return appointments.filter((a) => a.petId === petId);
   }, [appointments, petId]);
 
-  const filteredRecords = useMemo(() => {
-    return medicalRecords.filter((r) => {
-      if (selectedPetFilter !== "all" && r.petId !== selectedPetFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const pet = pets.find((p) => p.id === r.petId);
-        const owner = owners.find((o) => o.id === r.ownerId);
-
-        const matchTitle = r.title.toLowerCase().includes(q);
-        const matchDiagnosis = r.diagnosis.toLowerCase().includes(q);
-        const matchPet = pet?.name.toLowerCase().includes(q) || pet?.breed.toLowerCase().includes(q);
-        const matchOwner = owner?.fullName.toLowerCase().includes(q);
-        const matchDoctor = r.doctorName.toLowerCase().includes(q);
-
-        if (!matchTitle && !matchDiagnosis && !matchPet && !matchOwner && !matchDoctor) return false;
-      }
-      return true;
-    });
-  }, [medicalRecords, selectedPetFilter, searchQuery, pets, owners]);
+  const filteredRecords = medicalRecords;
 
   const fieldCls =
     "w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary focus:outline-none bg-white";
@@ -265,6 +260,7 @@ export function AdminMedicalRecordsPage() {
 
   return (
     <AdminLayout title="Quản lý Hồ sơ y tế">
+      <Pagination {...list} />
       {toastMsg && (
         <div role="status" className={`mb-4 flex items-center gap-3 rounded-xl border px-5 py-4 font-semibold animate-fadeIn ${toastWarning ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
           {toastWarning ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />} {toastMsg}
@@ -298,18 +294,7 @@ export function AdminMedicalRecordsPage() {
             )}
           </div>
 
-          <select
-            value={selectedPetFilter}
-            onChange={(e) => setSelectedPetFilter(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold focus:border-primary focus:outline-none"
-          >
-            <option value="all">Tất cả thú cưng ({medicalRecords.length})</option>
-            {pets.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.breed})
-              </option>
-            ))}
-          </select>
+          <PetLookup label="Lọc thú cưng" value={selectedPetFilter} onChange={setSelectedPetFilter} emptyValue="all" emptyLabel="Tất cả thú cưng" />
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -344,12 +329,10 @@ export function AdminMedicalRecordsPage() {
               <p className="mt-1 text-sm text-slate-500">Upload X-ray, ultrasound, or microscope images. The owner can view them from the pet profile.</p>
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <fieldset disabled={isSubmitting} className="grid gap-4 md:grid-cols-2">
             <div>
               <label className={labelCls}>Pet *</label>
-              <select className={fieldCls} value={imagePetId} onChange={(event) => setImagePetId(event.target.value)}>
-                {pets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name} - {pet.breed}</option>)}
-              </select>
+              <PetLookup label="Pet *" value={imagePetId} onChange={setImagePetId} />
             </div>
             <div>
               <label className={labelCls}>Image title *</label>
@@ -359,16 +342,18 @@ export function AdminMedicalRecordsPage() {
               <label className={labelCls}>Image file * (JPG, PNG, WEBP; max 5 MB)</label>
               <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageFileChange} className={fieldCls} />
             </div>
-          </div>
+          </fieldset>
           {imageDataUrl && <img src={imageDataUrl} alt="Diagnostic image preview" className="mt-4 h-48 w-full rounded-xl border border-slate-200 bg-slate-50 object-contain" />}
+          {formError && <p role="alert" className="mt-3 text-sm text-rose-700">{formError}</p>}
           <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-3">
-            <button onClick={() => { setShowImageForm(false); setImageDataUrl(""); }} className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</button>
-            <button onClick={handleImageUpload} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark shadow-soft">Save image</button>
+            <button disabled={isSubmitting} onClick={() => { setShowImageForm(false); setImageDataUrl(""); }} className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button disabled={isSubmitting} onClick={() => void handleImageUpload()} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark shadow-soft">{isSubmitting ? "Đang lưu ảnh..." : "Save image"}</button>
           </div>
           {imageList.length > 0 && (
             <div className="mt-6 border-t border-slate-100 pt-5">
               <p className="mb-3 text-sm font-bold text-slate-900">Uploaded images ({imageList.length})</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Pagination {...imagePage} />
                 {imageList.map((image) => (
                   <div key={image.id} className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                     <img src={image.imageUrl} alt={image.title} className="h-24 w-full object-cover" />
@@ -392,25 +377,12 @@ export function AdminMedicalRecordsPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className={labelCls}>Chọn Thú cưng *</label>
-              <select className={fieldCls} value={petId} onChange={(e) => setPetId(e.target.value)}>
-                {pets.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — {p.breed} (Chủ: {owners.find((o) => o.id === p.ownerId)?.fullName})
-                  </option>
-                ))}
-              </select>
+              <PetLookup label="Thú cưng *" value={petId} onChange={setPetId} />
             </div>
 
             <div>
               <label className={labelCls}>Liên kết lịch khám</label>
-              <select className={fieldCls} value={appointmentId} onChange={(e) => setAppointmentId(e.target.value)}>
-                <option value="">Không liên kết (Khám tự do)</option>
-                {relevantAppointments.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.date} {a.time} — {a.serviceName} ({a.status})
-                  </option>
-                ))}
-              </select>
+              <PagedSelect<Appointment> label="Lịch hẹn" endpoint="/appointments" filters={{ petId }} value={appointmentId} onChange={setAppointmentId} itemLabel={item => `${item.date} ${item.time} - ${item.serviceName}`} emptyLabel="Không liên kết lịch hẹn" />
             </div>
 
             <div>

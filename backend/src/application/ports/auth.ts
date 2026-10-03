@@ -19,8 +19,8 @@ export interface UserRepository {
 }
 
 export interface PasswordPort {
-  hash(password: string): { passwordHash: string; passwordSalt: string };
-  verify(password: string, hash: string, salt: string): boolean;
+  hash(password: string): { passwordHash: string; passwordSalt: string } | Promise<{ passwordHash: string; passwordSalt: string }>;
+  verify(password: string, hash: string, salt: string): boolean | Promise<boolean>;
 }
 
 export interface TokenPort {

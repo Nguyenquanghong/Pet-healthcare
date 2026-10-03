@@ -12,7 +12,7 @@ import { useAppStore } from "../../store/AppStoreProvider";
 import { bookingStatusLabels } from "../../utils/statusLabels";
 
 export function DashboardPage() {
-  const { currentOwner, ownerPets, appointments, hotelBookings, medicalRecords, notifications } = useAppStore();
+  const { currentOwner, ownerPets, appointments, hotelBookings, medicalRecords, summary } = useAppStore();
 
   // Upcoming appointments for the owner (both pending and confirmed)
   const upcomingAppointments = useMemo(() => {
@@ -34,9 +34,7 @@ export function DashboardPage() {
     return records.sort((a, b) => b.visitDate.localeCompare(a.visitDate))[0];
   }, [medicalRecords, ownerPets]);
 
-  const unreadNotiCount = notifications.filter(
-    (n) => n.recipientOwnerId === currentOwner.id && n.status === "sent"
-  ).length;
+  const unreadNotiCount = summary.unread;
 
   return (
     <OwnerLayout title="Tổng quan">
@@ -110,7 +108,7 @@ export function DashboardPage() {
         <div className="space-y-6">
           <div>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">Thú cưng của bạn ({ownerPets.length})</h3>
+              <h3 className="text-base font-semibold text-slate-900">Thú cưng của bạn ({summary.totals.pets ?? 0})</h3>
               <Link to="/owner/pets" className="text-sm font-semibold text-primary hover:underline">
                 Quản lý
               </Link>

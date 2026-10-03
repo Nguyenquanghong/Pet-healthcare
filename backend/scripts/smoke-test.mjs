@@ -19,8 +19,8 @@ if (!ownerData.owners.length || !ownerData.pets.length) throw new Error("Owner b
 if (!ownerData.appointments.some((appointment) => appointment.type === "spa_bath")) throw new Error("Spa booking data is unavailable.");
 
 const admin = await request("/auth/admin/login", { method: "POST", body: JSON.stringify({ username: "admin", password: "admin123" }) });
-const adminData = await request("/bootstrap", { headers: { Authorization: `Bearer ${admin.token}` } });
-if (!adminData.owners.length) throw new Error("Admin bootstrap data is incomplete.");
+const adminData = await request("/owners", { headers: { Authorization: `Bearer ${admin.token}` } });
+if (!adminData.items.length) throw new Error("Admin bootstrap data is incomplete.");
 
 const rescue = await request("/public/pets/mochi-rescue-demo");
 if (rescue.pet?.name !== "Mochi") throw new Error("Public rescue profile is unavailable.");

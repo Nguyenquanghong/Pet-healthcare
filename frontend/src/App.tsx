@@ -1,42 +1,42 @@
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Navigate, Route, Routes, useSearchParams } from "react-router-dom";
-import { useAppStore } from "./store/AppStoreProvider";
+import { useSession } from "./store/SessionContext";
 import { LoadingSpinner } from "./components/ui/LoadingSpinner";
-import { AdminAppointmentsPage } from "./routes/admin/AdminAppointmentsPage";
-import { AdminAnalyticsPage } from "./routes/admin/AdminAnalyticsPage";
-import { AdminBillingPage } from "./routes/admin/AdminBillingPage";
-import { AdminDashboardPage } from "./routes/admin/AdminDashboardPage";
-import { AdminHotelBookingsPage } from "./routes/admin/AdminHotelBookingsPage";
-import { AdminMedicalRecordsPage } from "./routes/admin/AdminMedicalRecordsPage";
-import { AdminNotificationsPage } from "./routes/admin/AdminNotificationsPage";
-import { AdminPetsPage } from "./routes/admin/AdminPetsPage";
-import { AdminOwnersPage } from "./routes/admin/AdminOwnersPage";
-import { AdminSettingsPage } from "./routes/admin/AdminSettingsPage";
-import { AdminLoginPage } from "./routes/auth/AdminLoginPage";
-import { LandingPage } from "./routes/auth/LandingPage";
-import { OwnerLoginPage } from "./routes/auth/OwnerLoginPage";
-import { OwnerActivationPage } from "./routes/auth/OwnerActivationPage";
-import { AppointmentsPage } from "./routes/owner/AppointmentsPage";
-import { DashboardPage } from "./routes/owner/DashboardPage";
-import { HotelBookingPage } from "./routes/owner/HotelBookingPage";
-import { HotelBookingDetailPage } from "./routes/owner/HotelBookingDetailPage";
-import { MedicalRecordsPage } from "./routes/owner/MedicalRecordsPage";
-import { NotificationsPage } from "./routes/owner/NotificationsPage";
-import { OwnerBillingPage } from "./routes/owner/OwnerBillingPage";
-import { OwnerRegisterPage } from "./routes/owner/OwnerRegisterPage";
-import { PetsPage } from "./routes/owner/PetsPage";
-import { OwnerProfilePage } from "./routes/owner/OwnerProfilePage";
-import { SpaBookingPage } from "./routes/owner/SpaBookingPage";
-import { PetRescuePage } from "./routes/public/PetRescuePage";
+const AdminAppointmentsPage = lazy(() => import("./routes/admin/AdminAppointmentsPage").then(module => ({ default: module.AdminAppointmentsPage })));
+const AdminAnalyticsPage = lazy(() => import("./routes/admin/AdminAnalyticsPage").then(module => ({ default: module.AdminAnalyticsPage })));
+const AdminBillingPage = lazy(() => import("./routes/admin/AdminBillingPage").then(module => ({ default: module.AdminBillingPage })));
+const AdminDashboardPage = lazy(() => import("./routes/admin/AdminDashboardPage").then(module => ({ default: module.AdminDashboardPage })));
+const AdminHotelBookingsPage = lazy(() => import("./routes/admin/AdminHotelBookingsPage").then(module => ({ default: module.AdminHotelBookingsPage })));
+const AdminMedicalRecordsPage = lazy(() => import("./routes/admin/AdminMedicalRecordsPage").then(module => ({ default: module.AdminMedicalRecordsPage })));
+const AdminNotificationsPage = lazy(() => import("./routes/admin/AdminNotificationsPage").then(module => ({ default: module.AdminNotificationsPage })));
+const AdminPetsPage = lazy(() => import("./routes/admin/AdminPetsPage").then(module => ({ default: module.AdminPetsPage })));
+const AdminOwnersPage = lazy(() => import("./routes/admin/AdminOwnersPage").then(module => ({ default: module.AdminOwnersPage })));
+const AdminSettingsPage = lazy(() => import("./routes/admin/AdminSettingsPage").then(module => ({ default: module.AdminSettingsPage })));
+const AdminLoginPage = lazy(() => import("./routes/auth/AdminLoginPage").then(module => ({ default: module.AdminLoginPage })));
+const LandingPage = lazy(() => import("./routes/auth/LandingPage").then(module => ({ default: module.LandingPage })));
+const OwnerLoginPage = lazy(() => import("./routes/auth/OwnerLoginPage").then(module => ({ default: module.OwnerLoginPage })));
+const OwnerActivationPage = lazy(() => import("./routes/auth/OwnerActivationPage").then(module => ({ default: module.OwnerActivationPage })));
+const AppointmentsPage = lazy(() => import("./routes/owner/AppointmentsPage").then(module => ({ default: module.AppointmentsPage })));
+const DashboardPage = lazy(() => import("./routes/owner/DashboardPage").then(module => ({ default: module.DashboardPage })));
+const HotelBookingPage = lazy(() => import("./routes/owner/HotelBookingPage").then(module => ({ default: module.HotelBookingPage })));
+const HotelBookingDetailPage = lazy(() => import("./routes/owner/HotelBookingDetailPage").then(module => ({ default: module.HotelBookingDetailPage })));
+const MedicalRecordsPage = lazy(() => import("./routes/owner/MedicalRecordsPage").then(module => ({ default: module.MedicalRecordsPage })));
+const NotificationsPage = lazy(() => import("./routes/owner/NotificationsPage").then(module => ({ default: module.NotificationsPage })));
+const OwnerBillingPage = lazy(() => import("./routes/owner/OwnerBillingPage").then(module => ({ default: module.OwnerBillingPage })));
+const OwnerRegisterPage = lazy(() => import("./routes/owner/OwnerRegisterPage").then(module => ({ default: module.OwnerRegisterPage })));
+const PetsPage = lazy(() => import("./routes/owner/PetsPage").then(module => ({ default: module.PetsPage })));
+const OwnerProfilePage = lazy(() => import("./routes/owner/OwnerProfilePage").then(module => ({ default: module.OwnerProfilePage })));
+const SpaBookingPage = lazy(() => import("./routes/owner/SpaBookingPage").then(module => ({ default: module.SpaBookingPage })));
+const PetRescuePage = lazy(() => import("./routes/public/PetRescuePage").then(module => ({ default: module.PetRescuePage })));
 
 function OwnerOnly({ children }: { children: ReactNode }) {
-  const { authRole, isAuthReady } = useAppStore();
+  const { authRole, isAuthReady } = useSession();
   if (!isAuthReady) return <div className="flex min-h-screen items-center justify-center"><LoadingSpinner label="Loading session..." /></div>;
   return authRole === "owner" ? children : <Navigate to="/login" replace />;
 }
 
 function AdminOnly({ children }: { children: ReactNode }) {
-  const { authRole, isAuthReady } = useAppStore();
+  const { authRole, isAuthReady } = useSession();
   if (!isAuthReady) return <div className="flex min-h-screen items-center justify-center"><LoadingSpinner label="Loading session..." /></div>;
   return authRole === "admin" ? children : <Navigate to="/admin/login" replace />;
 }
@@ -50,6 +50,7 @@ function PublicEntryPage() {
 
 export function App() {
   return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><LoadingSpinner label="Đang tải trang..." /></div>}>
     <Routes>
       <Route path="/" element={<PublicEntryPage />} />
       <Route path="/login" element={<OwnerLoginPage />} />
@@ -88,5 +89,6 @@ export function App() {
       <Route path="/notifications" element={<Navigate to="/owner/notifications" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   );
 }

@@ -13,10 +13,6 @@ export function createHotelBookingsRouter(service: HotelBookingsService) {
     throw error;
   }
 
-  router.get("/", async (req, res) => {
-    const ownerId = typeof req.query.ownerId === "string" ? req.query.ownerId : undefined;
-    res.json((await service.list(req.auth!, ownerId)).map(item => hotelBookingDto(item, req.auth!.role === "owner")));
-  });
   router.get("/:id", async (req, res) => {
     try { res.json({ booking: hotelBookingDto(await service.find(req.auth!, req.params.id), req.auth!.role === "owner") }); }
     catch (error) { failure(res, error); }

@@ -76,10 +76,10 @@ try {
   assert.equal(paymentHistory.body[0].action, "payment_confirmed");
   assert.equal(paymentHistory.body[0].actorId, staff.id);
   await close(); await start();
-  assert.equal((await request(staffToken)).body.find(i => i.id === invoice.id).paidAt, paid.paidAt);
-  assert.equal((await request(ownerToken)).body.length, 1);
-  assert.equal((await request(outsiderToken)).body.length, 0);
-  assert.equal((await request(outsiderToken, "GET", undefined, `?ownerId=${owner.id}`)).body.length, 0);
+  assert.equal((await request(staffToken)).body.items.find(i => i.id === invoice.id).paidAt, paid.paidAt);
+  assert.equal((await request(ownerToken)).body.items.length, 1);
+  assert.equal((await request(outsiderToken)).body.items.length, 0);
+  assert.equal((await request(outsiderToken, "GET", undefined, `?ownerId=${owner.id}`)).body.items.length, 0);
   assert.equal((await request(staffToken, "POST", { type: "hotel_booking", relatedId: booking.id, subtotal: 1 })).status, 422);
   const hotel = await request(staffToken, "POST", { type: "hotel_booking", relatedId: booking.id });
   assert.equal(hotel.status, 201);

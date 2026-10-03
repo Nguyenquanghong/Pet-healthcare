@@ -1,3 +1,5 @@
+import { usePagedList } from "../../../services/usePagedList";
+import { Pagination } from "../../ui/Pagination";
 import { useMemo, useRef, useState } from "react";
 import { Ban, CalendarClock, CheckCircle2, X } from "lucide-react";
 import type { Appointment } from "../../../types/appointment";
@@ -43,7 +45,7 @@ function getStatusTab(status: Appointment["status"]): Exclude<StatusTab, "all"> 
   return "pending";
 }
 
-export function OwnerAppointmentList({ mode = "medical", appointments, pets, selectedDate, onClearDate }: OwnerAppointmentListProps) {
+export function OwnerAppointmentList({ mode = "medical", selectedDate, onClearDate }: OwnerAppointmentListProps) {
   const { cancelAppointment, rescheduleAppointment } = useAppStore();
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [rescheduleItem, setRescheduleItem] = useState<Appointment | null>(null);
@@ -57,21 +59,10 @@ export function OwnerAppointmentList({ mode = "medical", appointments, pets, sel
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
 
-  const tabCounts = useMemo(() => {
-    return appointments.reduce<Record<StatusTab, number>>(
-      (acc, appointment) => {
-        acc.all += 1;
-        acc[getStatusTab(appointment.status)] += 1;
-        return acc;
-      },
-      { all: 0, pending: 0, completed: 0, cancelled: 0 },
-    );
-  }, [appointments]);
-
-  const visibleAppointments = useMemo(() => {
-    return appointments.filter((appointment) => activeTab === "all" || getStatusTab(appointment.status) === activeTab)
-      .sort(compareBookingStatus);
-  }, [activeTab, appointments]);
+  const list = usePagedList<Appointment>("/appointments", { category: mode, date: selectedDate, statusGroup: activeTab });
+  const appointments = list.items, pets = list.related.pets;
+  const tabCounts: Record<StatusTab, number> = { all: Object.values(list.counts).reduce((sum, count) => sum + count, 0), pending: ["pending", "confirmed", "checked_in", "in_progress"].reduce((sum, status) => sum + (list.counts[status] ?? 0), 0), completed: list.counts.completed ?? 0, cancelled: (list.counts.cancelled ?? 0) + (list.counts.no_show ?? 0) };
+  const visibleAppointments = appointments;
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -91,7 +82,7 @@ export function OwnerAppointmentList({ mode = "medical", appointments, pets, sel
     submitting.current = true; setBusy(true); setActionError("");
     try {
       const refreshed = await rescheduleAppointment(rescheduleItem.id, {
-        date: rescheduleDate, time: rescheduleTime, ownerNote: rescheduleNote.trim() || undefined,
+        expectedRevision: rescheduleItem.statusRevision, date: rescheduleDate, time: rescheduleTime, ownerNote: rescheduleNote.trim() || undefined,
       });
       setRescheduleItem(null);
       showToast(refreshed ? "Đã gửi yêu cầu đổi lịch và chờ xác nhận." : "Đã đổi lịch; danh sách chưa tải lại được. Hãy làm mới trang.");
@@ -103,7 +94,7 @@ export function OwnerAppointmentList({ mode = "medical", appointments, pets, sel
     if (!cancelItem || submitting.current) return;
     submitting.current = true; setBusy(true); setActionError("");
     try {
-      const refreshed = await cancelAppointment(cancelItem.id, cancelReason.trim() || undefined);
+      const refreshed = await cancelAppointment(cancelItem.id, cancelReason.trim() || undefined, cancelItem.statusRevision);
       setCancelItem(null); setCancelReason("");
       showToast(refreshed ? "Đã hủy lịch." : "Đã hủy lịch; danh sách chưa tải lại được. Hãy làm mới trang.");
     } catch (reason) { setActionError(reason instanceof Error ? reason.message : "Không thể hủy lịch."); }
@@ -112,11 +103,12 @@ export function OwnerAppointmentList({ mode = "medical", appointments, pets, sel
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <Pagination {...list} />
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
         <div>
           <h2 className="text-xl font-bold text-slate-900">{mode === "spa" ? "Lịch Spa của bạn" : "Lịch khám của bạn"}</h2>
           <p className="mt-0.5 text-sm text-slate-500">
-            {selectedDate ? `${appointments.length} lịch hẹn vào ngày ${selectedDate}` : `${appointments.length} lịch hẹn`}
+            {selectedDate ? `${list.pagination.total} lịch hẹn vào ngày ${selectedDate}` : `${list.pagination.total} lịch hẹn`}
           </p>
         </div>
         {selectedDate && onClearDate && (

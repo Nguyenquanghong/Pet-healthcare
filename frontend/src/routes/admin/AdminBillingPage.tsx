@@ -1,3 +1,5 @@
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -37,17 +39,18 @@ type PaymentEvent = { id: string; action: string; fromStatus: string; toStatus: 
 export function AdminBillingPage() {
   const [searchParams] = useSearchParams();
   const initialHotelBookingId = searchParams.get("hotelBookingId");
-  const { pets, owners } = useAppStore();
+
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [paymentEvents, setPaymentEvents] = useState<PaymentEvent[]>([]);
   const [historyError, setHistoryError] = useState("");
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const selectedInvoice = invoices.find(invoice => invoice.id === selectedId);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const list = usePagedList<Invoice>("/invoices", { q: searchQuery, status: statusFilter });
+  const lookup = usePagedList<Invoice>("/invoices", { bookingId: initialHotelBookingId ?? undefined }, Boolean(initialHotelBookingId));
+  const invoices = list.items, setInvoices = list.setItems, loading = list.loading, loadError = list.error;
+  const selectedInvoice = [...invoices, ...lookup.items].find(invoice => invoice.id === selectedId);
+  const pets = [...list.related.pets, ...lookup.related.pets], owners = [...list.related.owners, ...lookup.related.owners];
   const [issuing, setIssuing] = useState(Boolean(initialHotelBookingId));
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
@@ -57,18 +60,12 @@ export function AdminBillingPage() {
   const [rejectReason, setRejectReason] = useState("");
   const submitting = useRef(false);
 
-  const loadInvoices = async () => {
-    setLoading(true); setLoadError("");
-    try { setInvoices(await apiClient.get<Invoice[]>("/invoices")); }
-    catch (reason) { setLoadError(reason instanceof Error ? reason.message : "Không tải được hóa đơn."); }
-    finally { setLoading(false); }
-  };
-  useEffect(() => { void loadInvoices(); }, []);
+  const loadInvoices = list.reload;
   useEffect(() => {
     if (!initialHotelBookingId) return;
-    const existing = invoices.find(item => item.hotelBookingId === initialHotelBookingId);
+    const existing = lookup.items.find(item => item.hotelBookingId === initialHotelBookingId);
     if (existing) { setIssuing(false); setSelectedId(existing.id); }
-  }, [initialHotelBookingId, invoices]);
+  }, [initialHotelBookingId, lookup.items]);
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
@@ -87,25 +84,7 @@ export function AdminBillingPage() {
     setTimeout(() => setToastMsg(""), 3500);
   };
 
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter((inv) => {
-      const currentStatus = inv.paymentStatus;
-      if (statusFilter !== "all" && currentStatus !== statusFilter) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const pet = pets.find((p) => p.id === inv.petId);
-        const owner = owners.find((o) => o.id === inv.ownerId);
-
-        const matchCode = inv.invoiceCode.toLowerCase().includes(q) || inv.transferContent.toLowerCase().includes(q);
-        const matchOwner = owner?.fullName.toLowerCase().includes(q) || owner?.phone.includes(q);
-        const matchPet = pet?.name.toLowerCase().includes(q);
-
-        if (!matchCode && !matchOwner && !matchPet) return false;
-      }
-      return true;
-    });
-  }, [invoices, statusFilter, searchQuery, pets, owners]);
+  const filteredInvoices = invoices;
 
   const handleMarkAsPaid = async () => {
     if (!paymentInvoice || submitting.current) return;
@@ -114,6 +93,7 @@ export function AdminBillingPage() {
       const { invoice } = await apiClient.patch<{ invoice: Invoice }>(`/invoices/${paymentInvoice.id}/pay`, { paymentMethod });
       setInvoices(previous => previous.map(item => item.id === invoice.id ? invoice : item));
       setPaymentInvoice(null);
+      void list.reload().catch(() => undefined);
       toast("Đã lưu xác nhận thu tiền.");
     } catch (reason) {
       setPaymentError(reason instanceof Error ? reason.message : "Không thể ghi nhận thanh toán. Hãy tải lại để đối chiếu trước khi thử lại.");
@@ -126,6 +106,7 @@ export function AdminBillingPage() {
 
   return (
     <AdminLayout title="Quản lý Hóa đơn & Thanh toán">
+      <Pagination {...list} />
       {toastMsg && (
         <div className="mb-4 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-emerald-800 font-semibold animate-fadeIn">
           <CheckCircle2 size={18} /> {toastMsg}
@@ -143,6 +124,7 @@ export function AdminBillingPage() {
       {loading && <p role="status" className="mb-4">Đang tải hóa đơn...</p>}
       {issuing && !loading && <InvoiceIssueForm invoices={invoices} initialSourceKey={initialHotelBookingId ? `hotel_booking:${initialHotelBookingId}` : ""} onClose={() => setIssuing(false)} onCreated={invoice => {
         setInvoices(previous => [invoice, ...previous]); setIssuing(false); toast("Đã lưu hóa đơn chờ thanh toán.");
+        void list.reload().catch(() => undefined);
       }} />}
       {paymentInvoice && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
         <form role="dialog" aria-modal="true" aria-labelledby="payment-title" className="w-full max-w-md space-y-4 rounded-xl bg-white p-6"
@@ -178,6 +160,7 @@ export function AdminBillingPage() {
           try {
             const result = await apiClient.post<{ invoice: Invoice }>(`/invoices/${rejectInvoice.id}/transfer-reject`, { reason: rejectReason });
             setInvoices(previous => previous.map(i => i.id === result.invoice.id ? result.invoice : i));
+            void list.reload().catch(() => undefined);
             setRejectInvoice(null); toast("Đã gửi lý do cho chủ nuôi; hóa đơn vẫn chưa thanh toán.");
           } catch (reason) { setPaymentError(reason instanceof Error ? reason.message : "Không lưu được kết quả kiểm tra."); }
           finally { submitting.current = false; setPaying(false); }
@@ -299,7 +282,7 @@ export function AdminBillingPage() {
                           try {
                             const result = await apiClient.post<{ message: string }>(`/payments/${inv.id}/reconcile`);
                             toast(result.message); await loadInvoices();
-                          } catch (reason) { setLoadError(reason instanceof Error ? reason.message : "Không thể đối soát VNPay."); }
+                          } catch (reason) { setPaymentError(reason instanceof Error ? reason.message : "Không thể đối soát VNPay."); }
                           finally { setPaying(false); }
                         }}>Đối soát VNPay</button>}
                         <button

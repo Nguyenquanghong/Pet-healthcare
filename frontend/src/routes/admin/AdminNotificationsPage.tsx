@@ -1,4 +1,8 @@
-import { useState, useMemo } from "react";
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
+import { PagedSelect } from "../../components/ui/PagedSelect";
+import type { Owner } from "../../types/owner";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Bell,
@@ -58,8 +62,7 @@ function timeAgo(iso: string): string {
 export function AdminNotificationsPage() {
   const navigate = useNavigate();
   const {
-    notifications,
-    owners,
+    summary,
     markAllNotificationsRead,
     sendCustomNotification,
     markNotificationRead,
@@ -68,30 +71,34 @@ export function AdminNotificationsPage() {
 
   const [activeTab, setActiveTab] = useState<"inbox" | "compose">("inbox");
   const [templateId, setTemplateId] = useState("reminder");
-  const [recipientId, setRecipientId] = useState(owners[0]?.id ?? "");
+  const [recipientId, setRecipientId] = useState("");
   const [customTitle, setCustomTitle] = useState("");
   const [customBody, setCustomBody] = useState("");
   const [sentMsg, setSentMsg] = useState("");
+  const [sendError, setSendError] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const sending = useRef(false);
 
-  const adminNotifications = useMemo(() => {
-    return notifications.filter((n) => n.recipientRole === "admin");
-  }, [notifications]);
-
-  const unreadAdminCount = useMemo(() => {
-    return adminNotifications.filter((n) => n.status === "sent").length;
-  }, [adminNotifications]);
+  const list = usePagedList<Notification>("/notifications", {}, activeTab === "inbox");
+  const adminNotifications = list.items;
+  const unreadAdminCount = summary.unread;
 
   const selectedTemplate = TEMPLATES.find((t) => t.id === templateId) ?? TEMPLATES[0];
   const title = templateId === "custom" ? customTitle : selectedTemplate.label;
   const body = templateId === "custom" ? customBody : selectedTemplate.body;
 
-  const handleSend = () => {
-    if (!recipientId || !title || !body) return;
-    sendCustomNotification(recipientId, title, body);
-    setSentMsg("Đã gửi thông báo cho chủ nuôi thành công!");
-    setCustomTitle("");
-    setCustomBody("");
-    setTimeout(() => setSentMsg(""), 3500);
+  const handleSend = async () => {
+    if (sending.current || !recipientId || !title.trim() || !body.trim()) return;
+    sending.current = true; setIsSending(true); setSendError(""); setSentMsg("");
+    try {
+      const refreshed = await sendCustomNotification(recipientId, title.trim(), body.trim());
+      setRefreshFailed(!refreshed);
+      setSentMsg(refreshed ? "Đã gửi thông báo cho chủ nuôi thành công!" : "Đã gửi thông báo nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu.");
+      setCustomTitle(""); setCustomBody("");
+    } catch (reason) {
+      setSendError(reason instanceof Error ? reason.message : "Không thể gửi thông báo.");
+    } finally { sending.current = false; setIsSending(false); }
   };
 
   const handleNotificationClick = (n: Notification) => {
@@ -105,6 +112,7 @@ export function AdminNotificationsPage() {
 
   return (
     <AdminLayout title="Thông báo hệ thống">
+      {activeTab === "inbox" && <Pagination {...list} />}
       {/* Top Tabs */}
       <div className="mb-6 flex items-center justify-between border-b border-slate-200 pb-3">
         <div className="flex items-center gap-3">
@@ -149,7 +157,7 @@ export function AdminNotificationsPage() {
       </div>
 
       {sentMsg && (
-        <div className="mb-6 flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-emerald-800 font-semibold animate-fadeIn">
+        <div role="status" className={`mb-6 flex items-center gap-3 rounded-xl border px-5 py-4 font-semibold animate-fadeIn ${refreshFailed ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
           <CheckCircle2 size={18} /> {sentMsg}
         </div>
       )}
@@ -237,22 +245,13 @@ export function AdminNotificationsPage() {
             Gửi thông báo tới Chủ nuôi
           </h2>
 
-          <div className="space-y-4">
+          {sendError && <p role="alert" className="mb-4 text-sm text-rose-700">{sendError}</p>}
+          <fieldset disabled={isSending} className="space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                 Người nhận *
               </label>
-              <select
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-primary focus:outline-none"
-                value={recipientId}
-                onChange={(e) => setRecipientId(e.target.value)}
-              >
-                {owners.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.fullName} ({o.phone})
-                  </option>
-                ))}
-              </select>
+              <PagedSelect<Owner> endpoint="/owners" label="Người nhận *" value={recipientId} onChange={setRecipientId} itemLabel={owner => `${owner.fullName} (${owner.phone})`} />
             </div>
 
             <div>
@@ -313,13 +312,13 @@ export function AdminNotificationsPage() {
             )}
 
             <button
-              onClick={handleSend}
-              disabled={!recipientId || !title || !body}
+              onClick={() => void handleSend()}
+              disabled={isSending || !recipientId || !title.trim() || !body.trim()}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3.5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-soft"
             >
-              <Send size={16} /> Gửi thông báo ngay
+              <Send size={16} /> {isSending ? "Đang gửi thông báo..." : "Gửi thông báo ngay"}
             </button>
-          </div>
+          </fieldset>
         </div>
       )}
     </AdminLayout>

@@ -1,3 +1,4 @@
+import { pagedFixture } from "./pagination-fixture";
 import { expect, test } from "@playwright/test";
 
 test("medical write waits for HTTP and distinguishes failure from saved data with failed refresh", async ({ page }) => {
@@ -20,6 +21,8 @@ test("medical write waits for HTTP and distinguishes failure from saved data wit
     } });
     if (path.endsWith("/auth/me")) return response({ user: { role: "admin" } });
     if (path.endsWith("/bootstrap")) return failRefresh ? response({ error: "Reload unavailable" }, 503) : response(structuredClone(state));
+    if (route.request().method() === "GET") { const paged = pagedFixture(route.request().url(), state); if (paged) return response(paged); }
+
     if (path.endsWith("/medical-records") && route.request().method() === "POST") {
       writeStarted++;
       await new Promise<void>(resolve => { releaseWrite = resolve; });
@@ -34,6 +37,7 @@ test("medical write waits for HTTP and distinguishes failure from saved data wit
   });
   await page.goto("/admin/medical-records");
   await page.getByRole("button", { name: "Tạo hồ sơ mới" }).click();
+  await page.getByRole("combobox", { name: "Thú cưng *", exact: true }).selectOption("pet");
   await page.getByPlaceholder("VD: Khám tổng quát định kỳ").fill("Kiểm tra sức khỏe");
   await page.getByPlaceholder("Kết quả chẩn đoán...").fill("Khỏe");
   await page.getByPlaceholder("Hướng điều trị...").fill("Theo dõi");

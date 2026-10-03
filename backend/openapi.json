@@ -2,12 +2,12 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NIPOPETO Pet Healthcare API",
-    "version": "2.0.0",
-    "description": "Current REST/JSON backend contract. Known policy and concurrency limitations are documented in the architecture audit."
+    "version": "3.0.0",
+    "description": "REST/JSON contract with bounded session/dashboard bootstrap and paginated collections. List GET response changed from array to {items,pagination,counts,related}. Default 20, maximum 100 rows."
   },
   "servers": [
     {
-      "url": "/"
+      "url": "/api"
     }
   ],
   "tags": [
@@ -49,7 +49,7 @@
     }
   ],
   "paths": {
-    "/api/health": {
+    "/health": {
       "get": {
         "tags": [
           "Health"
@@ -78,20 +78,13 @@
             }
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": []
       }
     },
-    "/api/auth/owner/login": {
+    "/auth/owner/login": {
       "post": {
         "tags": [
           "Auth"
@@ -113,14 +106,7 @@
             "$ref": "#/components/responses/TooManyRequests"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [],
@@ -136,7 +122,7 @@
         }
       }
     },
-    "/api/auth/admin/login": {
+    "/auth/admin/login": {
       "post": {
         "tags": [
           "Auth"
@@ -158,14 +144,7 @@
             "$ref": "#/components/responses/TooManyRequests"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [],
@@ -181,7 +160,7 @@
         }
       }
     },
-    "/api/auth/owner/register": {
+    "/auth/owner/register": {
       "post": {
         "tags": [
           "Auth"
@@ -203,14 +182,7 @@
             "$ref": "#/components/responses/TooManyRequests"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [],
@@ -226,7 +198,7 @@
         }
       }
     },
-    "/api/auth/me": {
+    "/auth/me": {
       "get": {
         "tags": [
           "Auth"
@@ -245,27 +217,13 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -292,27 +250,13 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -332,7 +276,7 @@
         }
       }
     },
-    "/api/auth/me/password": {
+    "/auth/me/password": {
       "post": {
         "tags": [
           "Auth"
@@ -344,27 +288,13 @@
             "description": "No content"
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -384,12 +314,12 @@
         }
       }
     },
-    "/api/bootstrap": {
+    "/bootstrap": {
       "get": {
         "tags": [
           "Bootstrap"
         ],
-        "summary": "Load aggregate state",
+        "summary": "Load session metadata or bounded dashboard previews",
         "operationId": "get_api_bootstrap",
         "responses": {
           "200": {
@@ -403,34 +333,36 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
           {
             "BearerAuth": []
           }
+        ],
+        "parameters": [
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "session",
+                "dashboard"
+              ],
+              "default": "session"
+            },
+            "description": "Session: profile, at most 20 owner pets and unread count. Dashboard: bounded previews and database totals; never full histories."
+          }
         ]
       }
     },
-    "/api/owners": {
+    "/owners": {
       "post": {
         "tags": [
           "Owners"
@@ -505,19 +437,84 @@
             }
           },
           "default": {
-            "description": "Error",
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listOwner",
+        "summary": "List Owner",
+        "tags": [
+          "Pagination"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerIdFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of Owner",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Owner"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    }
+                  }
                 }
               }
             }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
           }
         }
       }
     },
-    "/api/pets": {
+    "/pets": {
       "get": {
         "tags": [
           "Pets"
@@ -526,42 +523,87 @@
         "operationId": "get_api_pets",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Page of Pet",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Pet"
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Pet"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    }
                   }
                 }
               }
             }
           },
-          "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
           {
             "BearerAuth": []
+          }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerIdFilter"
+          },
+          {
+            "name": "species",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "Optional database filter. Use all or omit for no filter."
+          },
+          {
+            "name": "healthStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "Optional database filter. Use all or omit for no filter."
           }
         ]
       },
@@ -584,24 +626,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -621,7 +649,7 @@
         }
       }
     },
-    "/api/pets/{id}": {
+    "/pets/{id}": {
       "patch": {
         "tags": [
           "Pets"
@@ -640,24 +668,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -667,12 +681,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "requestBody": {
@@ -687,7 +696,7 @@
         }
       }
     },
-    "/api/appointments": {
+    "/appointments": {
       "get": {
         "tags": [
           "Appointments"
@@ -696,42 +705,113 @@
         "operationId": "get_api_appointments",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Page of Appointment",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Appointment"
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Appointment"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    }
                   }
                 }
               }
             }
           },
-          "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
           {
             "BearerAuth": []
+          }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerIdFilter"
+          },
+          {
+            "$ref": "#/components/parameters/PetIdFilter"
+          },
+          {
+            "$ref": "#/components/parameters/StatusFilter"
+          },
+          {
+            "name": "statusGroup",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "pending (active), completed or cancelled (cancelled/no_show)."
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "Appointments: medical or spa. Notifications: appointments, hotel, medical or promo."
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "Valid YYYY-MM-DD."
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "unbilled: eligible sources with no existing invoice."
           }
         ]
       },
@@ -753,24 +833,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -790,7 +856,7 @@
         }
       }
     },
-    "/api/appointments/{id}/status": {
+    "/appointments/{id}/status": {
       "patch": {
         "tags": [
           "Appointments"
@@ -809,24 +875,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -836,12 +888,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "requestBody": {
@@ -856,7 +903,7 @@
         }
       }
     },
-    "/api/appointments/{id}/reschedule": {
+    "/appointments/{id}/reschedule": {
       "patch": {
         "tags": [
           "Appointments"
@@ -875,24 +922,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -902,12 +935,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "requestBody": {
@@ -922,7 +950,7 @@
         }
       }
     },
-    "/api/appointments/{id}/cancel": {
+    "/appointments/{id}/cancel": {
       "patch": {
         "tags": [
           "Appointments"
@@ -941,24 +969,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -968,12 +982,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "requestBody": {
@@ -988,7 +997,7 @@
         }
       }
     },
-    "/api/appointments/{id}/reminder": {
+    "/appointments/{id}/reminder": {
       "post": {
         "tags": [
           "Appointments"
@@ -1007,24 +1016,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1034,17 +1029,12 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ]
       }
     },
-    "/api/medical-records": {
+    "/medical-records": {
       "get": {
         "tags": [
           "Medical records"
@@ -1053,42 +1043,70 @@
         "operationId": "get_api_medical_records",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Page of MedicalRecord",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MedicalRecord"
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MedicalRecord"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    }
                   }
                 }
               }
             }
           },
-          "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
           {
             "BearerAuth": []
+          }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerIdFilter"
+          },
+          {
+            "$ref": "#/components/parameters/PetIdFilter"
           }
         ]
       },
@@ -1110,24 +1128,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1147,7 +1151,7 @@
         }
       }
     },
-    "/api/medical-records/{id}": {
+    "/medical-records/{id}": {
       "patch": {
         "tags": [
           "Medical records"
@@ -1166,24 +1170,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1193,12 +1183,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "requestBody": {
@@ -1223,24 +1208,10 @@
             "description": "No content"
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1250,17 +1221,12 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ]
       }
     },
-    "/api/medical-records/images": {
+    "/medical-records/images": {
       "post": {
         "tags": [
           "Medical records"
@@ -1279,24 +1245,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1314,9 +1266,81 @@
             }
           }
         }
+      },
+      "get": {
+        "operationId": "listMedicalImage",
+        "summary": "List MedicalImage",
+        "tags": [
+          "Pagination"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "$ref": "#/components/parameters/PetIdFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of MedicalImage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MedicalImage"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
       }
     },
-    "/api/medical-records/images/{id}": {
+    "/medical-records/images/{id}": {
       "delete": {
         "tags": [
           "Medical records"
@@ -1328,24 +1352,10 @@
             "description": "No content"
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1355,17 +1365,12 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ]
       }
     },
-    "/api/hotel-bookings": {
+    "/hotel-bookings": {
       "get": {
         "tags": [
           "Hotel"
@@ -1374,42 +1379,93 @@
         "operationId": "get_api_hotel_bookings",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Page of HotelBooking",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/HotelBooking"
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HotelBooking"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    }
                   }
                 }
               }
             }
           },
-          "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
           {
             "BearerAuth": []
+          }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerIdFilter"
+          },
+          {
+            "$ref": "#/components/parameters/PetIdFilter"
+          },
+          {
+            "$ref": "#/components/parameters/StatusFilter"
+          },
+          {
+            "name": "roomType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "Optional database filter. Use all or omit for no filter."
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "unbilled: eligible sources with no existing invoice."
           }
         ]
       },
@@ -1431,24 +1487,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1483,7 +1525,7 @@
         "description": "Tạo một yêu cầu lưu trú chưa thanh toán. Chống gửi lặp và trùng ngày cho cùng thú cưng."
       }
     },
-    "/api/hotel-bookings/{id}/status": {
+    "/hotel-bookings/{id}/status": {
       "patch": {
         "tags": [
           "Hotel"
@@ -1502,24 +1544,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1529,12 +1557,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "requestBody": {
@@ -1550,7 +1573,7 @@
         "description": "Checkout khách sạn chỉ khi hóa đơn cuối cùng đã paid; thao tác trạng thái cần expectedRevision."
       }
     },
-    "/api/hotel-bookings/{id}/cancel": {
+    "/hotel-bookings/{id}/cancel": {
       "patch": {
         "tags": [
           "Hotel"
@@ -1569,24 +1592,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1596,12 +1605,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "requestBody": {
@@ -1616,7 +1620,7 @@
         }
       }
     },
-    "/api/hotel-bookings/{id}/care-notes": {
+    "/hotel-bookings/{id}/care-notes": {
       "post": {
         "tags": [
           "Hotel"
@@ -1635,24 +1639,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1662,12 +1652,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "requestBody": {
@@ -1682,7 +1667,7 @@
         }
       }
     },
-    "/api/notifications": {
+    "/notifications": {
       "get": {
         "tags": [
           "Notifications"
@@ -1691,47 +1676,82 @@
         "operationId": "get_api_notifications",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Page of Notification",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Notification"
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Notification"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    }
                   }
                 }
               }
             }
           },
-          "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
           {
             "BearerAuth": []
           }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "$ref": "#/components/parameters/StatusFilter"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "Appointments: medical or spa. Notifications: appointments, hotel, medical or promo."
+          }
         ]
       }
     },
-    "/api/notifications/read-all": {
+    "/notifications/read-all": {
       "patch": {
         "tags": [
           "Notifications"
@@ -1750,34 +1770,21 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
           {
             "BearerAuth": []
           }
-        ]
+        ],
+        "description": " Notification mutations use the same inbox scope as listing: owner recipient ID or the admin-role staff inbox."
       }
     },
-    "/api/notifications/{id}/read": {
+    "/notifications/{id}/read": {
       "patch": {
         "tags": [
           "Notifications"
@@ -1796,24 +1803,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1823,17 +1816,13 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
-        ]
+        ],
+        "description": " Notification mutations use the same inbox scope as listing: owner recipient ID or the admin-role staff inbox."
       }
     },
-    "/api/notifications/{id}": {
+    "/notifications/{id}": {
       "delete": {
         "tags": [
           "Notifications"
@@ -1845,24 +1834,10 @@
             "description": "No content"
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1872,17 +1847,13 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
-        ]
+        ],
+        "description": " Notification mutations use the same inbox scope as listing: owner recipient ID or the admin-role staff inbox."
       }
     },
-    "/api/notifications/send": {
+    "/notifications/send": {
       "post": {
         "tags": [
           "Notifications"
@@ -1901,24 +1872,10 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -1935,10 +1892,11 @@
               }
             }
           }
-        }
+        },
+        "description": " Notification mutations use the same inbox scope as listing: owner recipient ID or the admin-role staff inbox."
       }
     },
-    "/api/invoices": {
+    "/invoices": {
       "get": {
         "tags": [
           "Invoices"
@@ -1947,42 +1905,83 @@
         "operationId": "get_api_invoices",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Page of Invoice",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Invoice"
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Invoice"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    }
                   }
                 }
               }
             }
           },
-          "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
           {
             "BearerAuth": []
+          }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerIdFilter"
+          },
+          {
+            "$ref": "#/components/parameters/PetIdFilter"
+          },
+          {
+            "$ref": "#/components/parameters/StatusFilter"
+          },
+          {
+            "name": "bookingId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "Optional database filter. Use all or omit for no filter."
           }
         ]
       },
@@ -1990,7 +1989,7 @@
         "tags": [
           "Invoices"
         ],
-        "summary": "Issue an unpaid invoice for a completed appointment or checked-out hotel booking",
+        "summary": "Staff issues invoice for a completed appointment or in-stay/checked-out hotel",
         "operationId": "post_api_invoices",
         "responses": {
           "201": {
@@ -2004,14 +2003,7 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
             "description": "Staff role required",
@@ -2054,14 +2046,7 @@
             }
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -2082,7 +2067,7 @@
         "description": "Nhân viên chốt một hóa đơn cho mỗi nguồn. Hotel mới chốt khi đang lưu trú; đơn cũ đã checkout mà chưa có hóa đơn vẫn được xử lý. Tổng tiền lấy từ giá booking đã lưu và phí phát sinh."
       }
     },
-    "/api/invoices/{id}/pay": {
+    "/invoices/{id}/pay": {
       "patch": {
         "tags": [
           "Invoices"
@@ -2101,14 +2086,7 @@
             }
           },
           "401": {
-            "description": "Authentication required or invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
             "description": "Staff role required",
@@ -2151,14 +2129,7 @@
             }
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -2168,12 +2139,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "requestBody": {
@@ -2189,7 +2155,7 @@
         "description": "Staff records receipt of funds. Unpaid becomes paid atomically. Repeating the same method preserves paidAt; a different method or refunded invoice returns 409. This endpoint does not charge an external payment provider."
       }
     },
-    "/api/public/pets/{token}": {
+    "/public/pets/{token}": {
       "get": {
         "tags": [
           "Public rescue"
@@ -2208,14 +2174,7 @@
             }
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [],
@@ -2228,10 +2187,11 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "description": " Only an enabled current QR token is accepted. Pet IDs are not rescue tokens."
       }
     },
-    "/api/public/pets/{token}/rescue-reports": {
+    "/public/pets/{token}/rescue-reports": {
       "post": {
         "tags": [
           "Public rescue"
@@ -2250,14 +2210,7 @@
             }
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [],
@@ -2280,19 +2233,20 @@
               }
             }
           }
-        }
+        },
+        "description": " Only an enabled current QR token is accepted. Pet IDs are not rescue tokens."
       }
     },
-    "/api/invoices/checkout": {
+    "/invoices/checkout": {
       "post": {
         "tags": [
           "Invoices"
         ],
         "operationId": "checkoutInvoice",
-        "summary": "Owner obtains invoice for own completed fixed-price spa or checked-out hotel",
+        "summary": "Owner obtains invoice for own completed fixed-price spa",
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "responses": {
@@ -2307,14 +2261,7 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         },
         "requestBody": {
@@ -2348,7 +2295,7 @@
         "description": "Chủ nuôi tự tạo yêu cầu thanh toán cho spa có giá cố định sau khi hoàn tất. Khách sạn cần nhân viên chốt phí, không hỗ trợ endpoint này."
       }
     },
-    "/api/invoices/{id}/onsite": {
+    "/invoices/{id}/onsite": {
       "patch": {
         "tags": [
           "Invoices"
@@ -2357,7 +2304,7 @@
         "summary": "Owner chooses payment at store; invoice remains unpaid",
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "responses": {
@@ -2372,29 +2319,17 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         },
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ]
       }
     },
-    "/api/payments/options": {
+    "/payments/options": {
       "get": {
         "tags": [
           "Payments"
@@ -2403,7 +2338,7 @@
         "summary": "Configured sandbox payment methods",
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "responses": {
@@ -2451,19 +2386,12 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         }
       }
     },
-    "/api/payments/{id}/vnpay": {
+    "/payments/{id}/vnpay": {
       "post": {
         "tags": [
           "Payments"
@@ -2472,7 +2400,7 @@
         "summary": "Owner starts or resumes VNPay Sandbox payment; amount comes from invoice",
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "responses": {
@@ -2496,29 +2424,17 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         },
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ]
       }
     },
-    "/api/payments/{id}/reconcile": {
+    "/payments/{id}/reconcile": {
       "post": {
         "tags": [
           "Payments"
@@ -2527,7 +2443,7 @@
         "summary": "Owner of invoice or staff queries VNPay and verifies signed result",
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "responses": {
@@ -2547,29 +2463,17 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         },
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ]
       }
     },
-    "/api/payments/vnpay/return": {
+    "/payments/vnpay/return": {
       "get": {
         "tags": [
           "Payments"
@@ -2594,14 +2498,7 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         },
         "parameters": [
@@ -2704,7 +2601,7 @@
         ]
       }
     },
-    "/api/payments/vnpay/ipn": {
+    "/payments/vnpay/ipn": {
       "get": {
         "tags": [
           "Payments"
@@ -2744,14 +2641,7 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         },
         "parameters": [
@@ -2854,7 +2744,7 @@
         ]
       }
     },
-    "/api/invoices/{id}/bank-transfer": {
+    "/invoices/{id}/bank-transfer": {
       "patch": {
         "tags": [
           "Invoices"
@@ -2863,17 +2753,12 @@
         "summary": "Owner chooses manual bank transfer; saves recipient details; remains unpaid",
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "responses": {
@@ -2888,19 +2773,12 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         }
       }
     },
-    "/api/invoices/{id}/transfer-report": {
+    "/invoices/{id}/transfer-report": {
       "post": {
         "tags": [
           "Invoices"
@@ -2909,17 +2787,12 @@
         "summary": "Owner reports transfer for staff review; remains unpaid",
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "responses": {
@@ -2934,14 +2807,7 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         },
         "requestBody": {
@@ -2962,7 +2828,7 @@
         }
       }
     },
-    "/api/invoices/{id}/transfer-reject": {
+    "/invoices/{id}/transfer-reject": {
       "post": {
         "tags": [
           "Invoices"
@@ -2971,17 +2837,12 @@
         "summary": "Staff requests recheck of a pending transfer; remains unpaid",
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "responses": {
@@ -2996,14 +2857,7 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         },
         "requestBody": {
@@ -3028,7 +2882,7 @@
         }
       }
     },
-    "/api/invoices/{id}/transfer-qr": {
+    "/invoices/{id}/transfer-qr": {
       "get": {
         "tags": [
           "Invoices"
@@ -3037,17 +2891,12 @@
         "summary": "Locally generated VietQR PNG for an unpaid bank transfer; owner-scoped, unavailable for pending reports or legacy/demo destinations",
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "responses": {
@@ -3080,36 +2929,24 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         }
       }
     },
-    "/api/appointments/{id}/status-history": {
+    "/appointments/{id}/status-history": {
       "get": {
         "tags": [
           "Appointments"
         ],
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "operationId": "appointmentStatusHistory",
@@ -3129,36 +2966,24 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         }
       }
     },
-    "/api/appointments/{id}/undo-status": {
+    "/appointments/{id}/undo-status": {
       "post": {
         "tags": [
           "Appointments"
         ],
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "operationId": "undoAppointmentStatus",
@@ -3205,36 +3030,24 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         }
       }
     },
-    "/api/hotel-bookings/{id}/status-history": {
+    "/hotel-bookings/{id}/status-history": {
       "get": {
         "tags": [
           "Hotel bookings"
         ],
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "operationId": "bookingStatusHistory",
@@ -3254,36 +3067,24 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         }
       }
     },
-    "/api/hotel-bookings/{id}/undo-status": {
+    "/hotel-bookings/{id}/undo-status": {
       "post": {
         "tags": [
           "Hotel bookings"
         ],
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "operationId": "undoHotelBookingStatus",
@@ -3330,19 +3131,12 @@
             }
           },
           "default": {
-            "description": "Request failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RequestFailed"
           }
         }
       }
     },
-    "/api/hotel-bookings/{id}": {
+    "/hotel-bookings/{id}": {
       "get": {
         "tags": [
           "Hotel"
@@ -3354,12 +3148,7 @@
         ],
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "operationId": "getHotelBookingDetail",
@@ -3388,7 +3177,7 @@
         }
       }
     },
-    "/api/invoices/{id}/payment-history": {
+    "/invoices/{id}/payment-history": {
       "get": {
         "tags": [
           "Invoices"
@@ -3400,12 +3189,7 @@
         ],
         "parameters": [
           {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "operationId": "getInvoicePaymentHistory",
@@ -3437,7 +3221,7 @@
         }
       }
     },
-    "/api/owners/{id}/activation": {
+    "/owners/{id}/activation": {
       "post": {
         "tags": [
           "Owners"
@@ -3452,12 +3236,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/ResourceId"
           }
         ],
         "requestBody": {
@@ -3532,19 +3311,12 @@
             }
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         }
       }
     },
-    "/api/auth/owner/activation/inspect": {
+    "/auth/owner/activation/inspect": {
       "post": {
         "tags": [
           "Auth"
@@ -3595,19 +3367,12 @@
             }
           },
           "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiError"
           }
         }
       }
     },
-    "/api/auth/owner/activation": {
+    "/auth/owner/activation": {
       "post": {
         "tags": [
           "Auth"
@@ -3637,6 +3402,16 @@
               }
             }
           },
+          "409": {
+            "description": "Email became unavailable; no credentials or token consumption committed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Invalid, expired, revoked or consumed token; invalid password",
             "content": {
@@ -3658,7 +3433,34 @@
             }
           },
           "default": {
-            "description": "Error",
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/pets/{id}/qr-token": {
+      "post": {
+        "tags": [
+          "Pets"
+        ],
+        "summary": "Rotate rescue QR token",
+        "operationId": "post_api_pets_id_qr_token",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PetEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Pet belongs to another owner",
             "content": {
               "application/json": {
                 "schema": {
@@ -3667,8 +3469,8 @@
               }
             }
           },
-          "409": {
-            "description": "Email became unavailable; no credentials or token consumption committed",
+          "404": {
+            "description": "Pet not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -3676,6 +3478,228 @@
                 }
               }
             }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "description": "Authenticated owner of the pet or staff rotates a server-generated cryptographic token. Previous tokens and pet IDs no longer grant public access. qrEnabled is unchanged; rotation does not re-enable a paused profile."
+      }
+    },
+    "/hotel-care-notes": {
+      "get": {
+        "operationId": "listCareNote",
+        "summary": "List CareNote",
+        "tags": [
+          "Pagination"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "name": "bookingId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "Optional database filter. Use all or omit for no filter."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of CareNote",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CareNote"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/appointments/calendar": {
+      "get": {
+        "operationId": "appointmentCalendar",
+        "summary": "Monthly appointment counts",
+        "tags": [
+          "Appointments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{3}-(0[1-9]|1[0-2])$"
+            },
+            "description": "Required YYYY-MM."
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "medical",
+                "spa"
+              ]
+            },
+            "description": "Service group."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "At most 31 date-to-count entries within actor scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/invoices/summary": {
+      "get": {
+        "operationId": "invoiceSummary",
+        "summary": "Billing aggregates for staff",
+        "tags": [
+          "Invoices"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{3}-(0[1-9]|1[0-2])$"
+            },
+            "description": "Optional month in UTC+7. Paid totals use paidAt; outstanding totals use issuedAt."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Database totals independent of invoice pages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "received",
+                    "hotel",
+                    "appointment",
+                    "outstanding",
+                    "paidCount",
+                    "unpaidCount"
+                  ],
+                  "properties": {
+                    "received": {
+                      "type": "number"
+                    },
+                    "hotel": {
+                      "type": "number"
+                    },
+                    "appointment": {
+                      "type": "number"
+                    },
+                    "outstanding": {
+                      "type": "number"
+                    },
+                    "paidCount": {
+                      "type": "integer"
+                    },
+                    "unpaidCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
           }
         }
       }
@@ -3699,6 +3723,120 @@
             }
           }
         }
+      },
+      "ApiError": {
+        "description": "Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Authentication required or invalid",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "RequestFailed": {
+        "description": "Request failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000,
+          "default": 1
+        },
+        "description": "1-based page."
+      },
+      "PageSize": {
+        "name": "pageSize",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20
+        },
+        "description": "Rows per page; values above 100 return 422."
+      },
+      "SearchQuery": {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "description": "Case-insensitive search applied in the database before pagination."
+      },
+      "ExactId": {
+        "name": "id",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "description": "Exact identifier lookup within the authenticated scope."
+      },
+      "OwnerIdFilter": {
+        "name": "ownerId",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "description": "Staff filter; owners are always scoped to their own JWT subject."
+      },
+      "ResourceId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "PetIdFilter": {
+        "name": "petId",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "description": "Optional database filter. Use all or omit for no filter."
+      },
+      "StatusFilter": {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "description": "Optional database filter. Use all or omit for no filter."
       }
     },
     "securitySchemes": {
@@ -4606,6 +4744,61 @@
             "items": {
               "$ref": "#/components/schemas/Notification"
             }
+          },
+          "summary": {
+            "type": "object",
+            "required": [
+              "totals",
+              "species",
+              "appointmentStatus",
+              "hotelStatus",
+              "notificationCategory",
+              "unread",
+              "todayAppointments"
+            ],
+            "properties": {
+              "totals": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "species": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "appointmentStatus": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "hotelStatus": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "notificationCategory": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "unread": {
+                "type": "integer"
+              },
+              "todayAppointments": {
+                "type": "integer"
+              }
+            }
           }
         },
         "required": [
@@ -4617,7 +4810,8 @@
           "medicalImages",
           "hotelBookings",
           "dailyCareNotes",
-          "notifications"
+          "notifications",
+          "summary"
         ]
       },
       "OwnerLoginInput": {
@@ -4657,10 +4851,14 @@
             "type": "string"
           },
           "password": {
-            "type": "string"
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
           },
           "confirmPassword": {
-            "type": "string"
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
           },
           "phone": {
             "type": "string"
@@ -4706,10 +4904,14 @@
             "type": "string"
           },
           "newPassword": {
-            "type": "string"
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
           },
           "confirmPassword": {
-            "type": "string"
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
           }
         },
         "required": [
@@ -4764,13 +4966,20 @@
             "description": "Required for staff creation: id of an existing owner account. Ignored for owner requests; the authenticated owner id is used."
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Trimmed; whitespace-only names are rejected."
           },
           "breed": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
           },
           "ageLabel": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
           },
           "healthStatus": {
             "type": "string",
@@ -4783,30 +4992,96 @@
             ]
           },
           "notes": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
           },
           "species": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "dog",
+              "cat",
+              "rabbit",
+              "other"
+            ]
           },
           "gender": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "unknown",
+              "male",
+              "female"
+            ]
           },
           "weightKg": {
-            "type": "number"
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 999.99,
+                "multipleOf": 0.01,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,2}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 2 decimal places; null or empty string clears it."
           },
           "allergies": {
             "type": "array",
+            "maxItems": 100,
             "items": {
-              "$ref": "#/components/schemas/String"
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
             }
           },
           "publicProfile": {
-            "$ref": "#/components/schemas/PublicProfile"
+            "$ref": "#/components/schemas/PublicProfileInput"
+          },
+          "qrEnabled": {
+            "type": "boolean"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 7000000
+          },
+          "microchipId": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "identifyingMarks": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "lastSeenLocation": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
           }
         },
         "required": [
           "name"
-        ]
+        ],
+        "description": "QR token is server-owned. Supplying qrToken returns 422. Boolean flags require actual JSON booleans.",
+        "not": {
+          "required": [
+            "qrToken"
+          ]
+        }
       },
       "AppointmentInput": {
         "type": "object",
@@ -4909,26 +5184,134 @@
             "type": "string"
           },
           "appointmentId": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
           },
           "visitDate": {
             "type": "string",
-            "format": "date"
+            "format": "date",
+            "description": "Real calendar date; dates such as February 30 are rejected."
           },
           "doctorName": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
           },
           "diagnosis": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
           },
           "treatment": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
           },
           "weightKg": {
-            "type": "number"
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 999.99,
+                "multipleOf": 0.01,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,2}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 2 decimal places; null or empty string clears it."
+          },
+          "symptoms": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "medications": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "vaccineName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "internalNote": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "followUpDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Real calendar date, YYYY-MM-DD; null clears it."
+          },
+          "temperatureC": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.1,
+                "maximum": 999.9,
+                "multipleOf": 0.1,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,1}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 1 decimal places; null or empty string clears it."
+          },
+          "heartRateBpm": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 2147483647,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ]
           }
         },
         "required": [
@@ -5094,30 +5477,119 @@
       "PetUpdateInput": {
         "type": "object",
         "properties": {
-          "ownerId": {
-            "type": "string"
-          },
           "name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Trimmed; whitespace-only names are rejected."
+          },
+          "breed": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "ageLabel": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "healthStatus": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "stable",
+              "vaccination_due",
+              "under_treatment",
+              "critical"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
           },
           "species": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "dog",
+              "cat",
+              "rabbit",
+              "other"
+            ]
           },
           "gender": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "unknown",
+              "male",
+              "female"
+            ]
           },
           "weightKg": {
-            "type": "number"
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 999.99,
+                "multipleOf": 0.01,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,2}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 2 decimal places; null or empty string clears it."
           },
           "allergies": {
             "type": "array",
+            "maxItems": 100,
             "items": {
-              "$ref": "#/components/schemas/String"
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
             }
           },
           "publicProfile": {
-            "$ref": "#/components/schemas/PublicProfile"
+            "$ref": "#/components/schemas/PublicProfileInput"
+          },
+          "qrEnabled": {
+            "type": "boolean"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 7000000
+          },
+          "microchipId": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "identifyingMarks": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "lastSeenLocation": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
           }
+        },
+        "description": "Partial update; ownership cannot be reassigned. qrToken is rejected; use POST /api/pets/{id}/qr-token.",
+        "not": {
+          "required": [
+            "qrToken"
+          ]
         }
       },
       "MedicalRecordUpdateInput": {
@@ -5125,23 +5597,130 @@
         "description": "Staff may edit medical details only. petId, ownerId and appointmentId are fixed after creation; attempts to change or clear them return 422. Older clients may send unchanged values.",
         "properties": {
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
           },
           "visitDate": {
             "type": "string",
-            "format": "date"
+            "format": "date",
+            "description": "Real calendar date; dates such as February 30 are rejected."
           },
           "doctorName": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
           },
           "diagnosis": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
           },
           "treatment": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
           },
           "weightKg": {
-            "type": "number"
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 999.99,
+                "multipleOf": 0.01,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,2}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 2 decimal places; null or empty string clears it."
+          },
+          "symptoms": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "medications": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "vaccineName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "internalNote": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "followUpDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Real calendar date, YYYY-MM-DD; null clears it."
+          },
+          "temperatureC": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.1,
+                "maximum": 999.9,
+                "multipleOf": 0.1,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,1}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 1 decimal places; null or empty string clears it."
+          },
+          "heartRateBpm": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 2147483647,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ]
           }
         }
       },
@@ -5459,7 +6038,123 @@
               }
             }
           }
-        ]
+        ],
+        "properties": {
+          "petCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total pet count independent of pages. petIds is empty in bounded directory/profile responses; load pet pages with ownerId."
+          }
+        }
+      },
+      "PublicProfileInput": {
+        "type": "object",
+        "properties": {
+          "showOwnerPhone": {
+            "type": "boolean"
+          },
+          "showOwnerEmail": {
+            "type": "boolean"
+          },
+          "showOwnerAddress": {
+            "type": "boolean"
+          },
+          "showMedicalAlerts": {
+            "type": "boolean"
+          },
+          "rescueNote": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "totalPages"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "RelatedPageData": {
+        "type": "object",
+        "properties": {
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Owner"
+            }
+          },
+          "pets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Pet"
+            }
+          },
+          "appointments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Appointment"
+            }
+          },
+          "hotelBookings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelBooking"
+            }
+          },
+          "medicalRecords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalRecord"
+            }
+          },
+          "medicalImages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalImage"
+            }
+          },
+          "dailyCareNotes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CareNote"
+            }
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
+          },
+          "invoices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Invoice"
+            }
+          }
+        }
       }
     }
   }

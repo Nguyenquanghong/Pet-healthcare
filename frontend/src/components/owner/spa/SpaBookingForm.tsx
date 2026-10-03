@@ -1,3 +1,4 @@
+import { PetLookup } from "../../ui/PagedSelect";
 import { CheckCircle2, Clock3, Sparkles } from "lucide-react";
 import { spaServiceOptions } from "../../../data/services";
 import type { SpaAppointmentType } from "../../../types/appointment";
@@ -30,7 +31,6 @@ type SpaBookingFormProps = {
 };
 
 export function SpaBookingForm({
-  ownerPets,
   petId,
   serviceType,
   date,
@@ -68,12 +68,7 @@ export function SpaBookingForm({
       {error && <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>}
 
       <div className="space-y-5">
-        <Select
-          label="Thú cưng *"
-          value={petId}
-          options={[{ value: "", label: "Chọn thú cưng" }, ...ownerPets.map((pet) => ({ value: pet.id, label: `${pet.name} - ${pet.breed}` }))]}
-          onChange={(event) => onPetChange(event.target.value)}
-        />
+        <PetLookup label="Thú cưng *" value={petId} onChange={onPetChange} />
 
         <fieldset>
           <legend className="mb-2 text-sm font-semibold text-slate-800">Gói dịch vụ *</legend>

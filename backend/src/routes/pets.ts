@@ -13,15 +13,18 @@ export function createPetsRouter(service: PetsService) {
     throw error;
   }
 
-  router.get("/", async (req, res) => {
-    const ownerId = typeof req.query.ownerId === "string" ? req.query.ownerId : undefined;
-    res.json((await service.list(req.auth!, ownerId)).map(petDto));
-  });
 
   router.post("/", async (req, res) => {
     try {
       const pet = await service.create(req.auth!, req.body);
       res.status(201).json({ pet: petDto(pet) });
+    } catch (error) { failure(res, error); }
+  });
+
+  router.post("/:id/qr-token", async (req, res) => {
+    try {
+      const pet = await service.rotateQrToken(req.auth!, req.params.id);
+      res.json({ pet: petDto(pet) });
     } catch (error) { failure(res, error); }
   });
 

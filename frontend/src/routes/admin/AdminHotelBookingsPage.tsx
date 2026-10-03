@@ -1,3 +1,5 @@
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
 import { BookingStatusDialog, type StatusDialogSelection } from "./BookingStatusDialog";
 import { useBookingAction } from "./useBookingAction";
 import { apiClient } from "../../services/apiClient";
@@ -40,10 +42,6 @@ type TabKey = (typeof TABS)[number];
 
 export function AdminHotelBookingsPage() {
   const {
-    hotelBookings,
-    dailyCareNotes,
-    owners,
-    pets,
     userRole,
   } = useAppStore();
 
@@ -67,15 +65,7 @@ export function AdminHotelBookingsPage() {
 
   const [toastMsg, setToastMsg] = useState("");
   const [statusDialog, setStatusDialog] = useState<StatusDialogSelection | null>(null);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [invoiceLoadError, setInvoiceLoadError] = useState("");
   const { run: runAction, error: actionError } = useBookingAction();
-  useEffect(() => {
-    let active = true;
-    void apiClient.get<Invoice[]>("/invoices").then(items => { if (active) setInvoices(items); })
-      .catch(reason => { if (active) setInvoiceLoadError(reason instanceof Error ? reason.message : "Không tải được hóa đơn."); });
-    return () => { active = false; };
-  }, []);
 
   const toast = (msg: string) => {
     setToastMsg(msg);
@@ -84,7 +74,7 @@ export function AdminHotelBookingsPage() {
 
   const handleStatus = (id: string, status: HotelBookingStatus) => {
     const booking = hotelBookings.find(item => item.id === id);
-    if (booking) setStatusDialog({ booking, intent: status });
+    if (booking) setStatusDialog({ booking, intent: status, pet: pets.find(pet => pet.id === booking.petId), owner: owners.find(owner => owner.id === booking.ownerId) });
   };
 
   const handleConfirmReject = () => {
@@ -111,31 +101,11 @@ export function AdminHotelBookingsPage() {
     });
   };
 
-  const filteredBookings = useMemo(() => {
-    return hotelBookings.filter((b) => {
-      // Tab filter
-      if (tab !== "all" && b.status !== tab) return false;
-
-      // Room type filter
-      if (roomTypeFilter !== "all" && b.roomType !== roomTypeFilter) return false;
-
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const pet = pets.find((p) => p.id === b.petId);
-        const owner = owners.find((o) => o.id === b.ownerId);
-
-        const matchPet = pet?.name.toLowerCase().includes(q) || pet?.breed.toLowerCase().includes(q);
-        const matchOwner = owner?.fullName.toLowerCase().includes(q) || owner?.phone.includes(q);
-        const matchRoom = b.roomType.toLowerCase().includes(q);
-        const matchDates = b.checkIn.includes(q) || b.checkOut.includes(q);
-
-        if (!matchPet && !matchOwner && !matchRoom && !matchDates) return false;
-      }
-
-      return true;
-    }).sort(compareBookingStatus);
-  }, [hotelBookings, tab, roomTypeFilter, searchQuery, pets, owners]);
+  const list = usePagedList<HotelBooking>("/hotel-bookings", { q: searchQuery, status: tab, roomType: roomTypeFilter });
+  const hotelBookings = list.items, filteredBookings = hotelBookings, pets = list.related.pets, owners = list.related.owners;
+  const invoices = list.related.invoices, invoiceLoadError = list.error;
+  const careList = usePagedList<DailyCareNote>("/hotel-care-notes", { bookingId: careHistoryModal?.id }, Boolean(careHistoryModal));
+  const dailyCareNotes = careList.items;
 
   const tabLabel: Record<TabKey, string> = {
     all: "Tất cả",
@@ -149,6 +119,7 @@ export function AdminHotelBookingsPage() {
 
   return (
     <AdminLayout title="Quản lý Hotel Bookings">
+      <Pagination {...list} />
       <div className="mb-4 flex justify-end">
         <AdminCreateButton kind="hotel" onCreated={() => { setTab("all"); setRoomTypeFilter("all"); setSearchQuery(""); }} />
       </div>
@@ -169,7 +140,7 @@ export function AdminHotelBookingsPage() {
             <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Tìm theo thú cưng, chủ nuôi, sđt, phòng, ngày..."
+              placeholder="Tìm theo thú cưng, chủ nuôi, sđt, mã đặt phòng..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm focus:border-primary focus:outline-none shadow-xs"
@@ -213,7 +184,7 @@ export function AdminHotelBookingsPage() {
             >
               {tabLabel[t]}
               <span className="ml-1.5 rounded-full bg-black/10 px-1.5 py-0.5 text-[10px]">
-                {t === "all" ? hotelBookings.length : hotelBookings.filter((b) => b.status === t).length}
+                {t === "all" ? Object.values(list.counts).reduce((sum, count) => sum + count, 0) : (list.counts[t] ?? 0)}
               </span>
             </button>
           ))}
@@ -315,9 +286,9 @@ export function AdminHotelBookingsPage() {
                 </button>
 
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <button onClick={() => setStatusDialog({ booking: b, intent: "history" })} className="rounded-lg border px-2 py-1.5 text-xs">Lịch sử thao tác</button>
+                  <button onClick={() => setStatusDialog({ booking: b, intent: "history", pet: pets.find(pet => pet.id === b.petId), owner: owners.find(owner => owner.id === b.ownerId) })} className="rounded-lg border px-2 py-1.5 text-xs">Lịch sử thao tác</button>
                   {(b.status === "in_stay" || (b.status === "checked_out" && userRole === "admin")) &&
-                    <button onClick={() => setStatusDialog({ booking: b, intent: "undo" })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{b.status === "in_stay" ? "Hoàn tác check-in" : "Hoàn tác trả thú cưng"}</button>}
+                    <button onClick={() => setStatusDialog({ booking: b, intent: "undo", pet: pets.find(pet => pet.id === b.petId), owner: owners.find(owner => owner.id === b.ownerId) })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{b.status === "in_stay" ? "Hoàn tác check-in" : "Hoàn tác trả thú cưng"}</button>}
 
                   {b.status === "pending" && (
                     <>
@@ -540,6 +511,7 @@ export function AdminHotelBookingsPage() {
               </button>
             </div>
             <div className="my-4 space-y-3">
+              <Pagination {...careList} />
               <p className="text-xs text-slate-500">Ghi chú này chỉ hiển thị cho nhân viên bệnh viện/khách sạn.</p>
               <textarea
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-primary focus:outline-none min-h-28"

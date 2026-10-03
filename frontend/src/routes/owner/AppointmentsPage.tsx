@@ -78,7 +78,6 @@ export function AppointmentsPage() {
         />
         <div className="space-y-6">
           <OwnerAppointmentCalendar
-            appointments={ownerAppointments}
             selectedDate={selectedCalendarDate}
             onSelectDate={setSelectedCalendarDate}
             onClearDate={() => setSelectedCalendarDate("")}

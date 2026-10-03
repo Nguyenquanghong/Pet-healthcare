@@ -76,7 +76,7 @@ try {
   const legacy = invoices[1];
   await db.invoice.update({ where: { id: legacy.id }, data: { transferCode: null, paymentChannel: "bank_transfer",
     bankTransferDetails: { isDemo: false, bankName: "Legacy bank", accountNumber: "123456789", accountHolder: "TEST ONLY" } } });
-  const stored = (await req("/invoices", ownerToken)).body;
+  const stored = (await req("/invoices", ownerToken)).body.items;
   assert.equal(stored.find(i => i.id === legacy.id).transferContent, legacy.invoiceCode.replaceAll("-", ""));
   assert.equal((await req(`/invoices/${legacy.id}/transfer-qr`, ownerToken)).status, 409);
   console.log("VietQR integration PASS: 10 concurrent unique codes, DB uniqueness, owner authorization, decoded PNG bank/amount/purpose, immutable snapshot, restart persistence, no QR after report/payment, legacy fallback.");

@@ -11,6 +11,9 @@ import { HotelBookingsService } from "./application/services/hotelBookings.js";
 import { NotificationsService } from "./application/services/notifications.js";
 import { AuthService } from "./application/services/auth.js";
 import { PetsService } from "./application/services/pets.js";
+import { ListsService } from "./application/services/lists.js";
+import { PrismaListsRepository } from "./infrastructure/persistence/listsRepository.js";
+import { createListsRouter } from "./routes/lists.js";
 import { OwnersService } from "./application/services/owners.js";
 import { OwnerActivationService } from "./application/services/ownerActivation.js";
 import { PrismaOwnerActivationRepository } from "./infrastructure/persistence/ownerActivationRepository.js";
@@ -39,6 +42,7 @@ import { PrismaBootstrapRepository } from "./infrastructure/persistence/bootstra
 import { databaseHealthCheck } from "./infrastructure/persistence/healthRepository.js";
 import { passwordAdapter, tokenAdapter } from "./infrastructure/security/authAdapters.js";
 import { qrTokenAdapter } from "./infrastructure/security/qrToken.js";
+import { BusinessError } from "./domain/error.js";
 import { requireAuth, requireRole } from "./middleware/auth.js";
 import { createAppointmentsRouter } from "./routes/appointments.js";
 import { createAuthRouter } from "./routes/auth.js";
@@ -62,6 +66,16 @@ export function createApp(client: PrismaClient) {
   app.use(helmet());
   app.use(cors({ origin: origins?.length ? origins : false, credentials: true }));
   app.use(express.json({ limit: "10mb" }));
+  app.use((req, res, next) => {
+    if (req.method === "POST" || req.method === "PATCH" || req.method === "PUT") {
+      req.body ??= {};
+      if (typeof req.body !== "object" || Array.isArray(req.body)) {
+        res.status(422).json({ error: "Request body must be a JSON object." });
+        return;
+      }
+    }
+    next();
+  });
 
   app.get("/api/openapi.json", (_req, res) => res.json(openapi));
   app.use("/api/docs", (_req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -80,6 +94,7 @@ export function createApp(client: PrismaClient) {
 
   app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, limit: 50, standardHeaders: "draft-8", legacyHeaders: false, message: { error: "Too many requests, please try again later." } }), createAuthRouter(new AuthService({ users: new PrismaUserRepository(client), passwords: passwordAdapter, tokens: tokenAdapter }), activation));
   app.use("/api/public", createPublicRouter(new PublicRescueService(createPublicRescueDependencies(client))));
+  app.use("/api", createListsRouter(new ListsService(new PrismaListsRepository(client))));
   app.use("/api/bootstrap", requireAuth, createBootstrapRouter(new BootstrapService(new PrismaBootstrapRepository(client))));
   app.use("/api/pets", requireAuth, createPetsRouter(new PetsService(new PrismaPetRepository(client), qrTokenAdapter)));
   app.use("/api/owners", requireAuth, requireRole("admin", "staff"), createOwnersRouter(new OwnersService(new PrismaOwnerRepository(client)), activation));
@@ -97,6 +112,10 @@ export function createApp(client: PrismaClient) {
 
   app.use((req, res) => res.status(404).json({ error: `Route ${req.originalUrl} was not found.` }));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    if (error instanceof BusinessError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
     const bodyError = error as { type?: string } | null;
     if (bodyError?.type === "entity.parse.failed") {
       res.status(400).json({ error: "Request body must be valid JSON." });

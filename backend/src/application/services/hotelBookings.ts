@@ -1,6 +1,7 @@
 import { BookingLifecycleService, type LifecycleInput, type UndoInput } from "./bookingLifecycle.js";
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { todayInVietnam as vietnamDate } from "../../domain/validation.js";
 import { createHash } from "node:crypto";
 import pricing from "../../domain/pricing.json" with { type: "json" };
 import type { HotelDependencies, HotelBookingValue, CareNoteValue } from "../ports/hotelBookings.js";
@@ -45,7 +46,7 @@ export class HotelBookingsService {
         checkIn.toISOString().slice(0, 10) !== input.checkIn || checkOut.toISOString().slice(0, 10) !== input.checkOut) {
       throw new BusinessError(422, "Enter valid check-in and check-out dates.");
     }
-    const todayInVietnam = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+    const todayInVietnam = vietnamDate();
     const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / 86_400_000);
     if (!Number.isFinite(nights) || nights < 1) throw new BusinessError(422, "Check-out must be after check-in.");
     const roomType = input.roomType === undefined ? "standard" : input.roomType;

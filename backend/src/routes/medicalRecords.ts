@@ -13,11 +13,6 @@ export function createMedicalRecordsRouter(service: MedicalRecordsService) {
     throw error;
   }
 
-  router.get("/", async (req, res) => {
-    const ownerId = typeof req.query.ownerId === "string" ? req.query.ownerId : undefined;
-    const petId = typeof req.query.petId === "string" ? req.query.petId : undefined;
-    res.json((await service.list(req.auth!, ownerId, petId)).map(item => medicalRecordDto(item, req.auth!.role === "owner")));
-  });
 
   router.post("/", async (req, res) => {
     try {

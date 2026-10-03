@@ -100,7 +100,7 @@ try {
   const notice = await db.notification.findFirstOrThrow({ where: { type: "payment_review", message: { contains: reference } } });
   notices.push(notice.id);
   assert.equal((await db.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).paidAt.toISOString(), paid.paidAt.toISOString());
-  assert.equal((await req("/invoices", otherToken)).body.length, 0);
+  assert.equal((await req("/invoices", otherToken)).body.items.length, 0);
   // Hotel checkout uses the stored base even if the current catalog changes.
   const booking = await db.hotelBooking.create({ data: { ownerId: owner.id, petId: pet.id, checkIn: new Date("2035-01-01"), checkOut: new Date("2035-01-03"), nights: 2, roomType: "standard", serviceKeys: [], totalAmount: 700000, status: "checked_out" } });
   assert.equal((await req("/invoices/checkout", ownerToken, "POST", { type: "hotel_booking", relatedId: booking.id })).status, 403);

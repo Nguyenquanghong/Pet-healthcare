@@ -1,3 +1,9 @@
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
+import type { Appointment } from "../../types/appointment";
+import type { HotelBooking } from "../../types/booking";
+import type { Pet } from "../../types/pet";
+import type { Owner } from "../../types/owner";
 import { useMemo, useRef, useState } from "react";
 import { useAppStore } from "../../store/AppStoreProvider";
 import { apiClient } from "../../services/apiClient";
@@ -9,7 +15,11 @@ type Line = { description: string; quantity: number; unitPrice: number };
 export function InvoiceIssueForm({ invoices, onCreated, onClose, initialSourceKey = "" }: {
   invoices: Invoice[]; onCreated: (invoice: Invoice) => void; onClose: () => void; initialSourceKey?: string;
 }) {
-  const { appointments, hotelBookings, pets, owners } = useAppStore();
+  const [q, setQuery] = useState("");
+  const appointmentPage = usePagedList<Appointment>("/appointments", { mode: "unbilled", q, id: initialSourceKey.startsWith("appointment:") ? initialSourceKey.slice(12) : undefined });
+  const hotelPage = usePagedList<HotelBooking>("/hotel-bookings", { mode: "unbilled", q, id: initialSourceKey.startsWith("hotel_booking:") ? initialSourceKey.slice(14) : undefined });
+  const appointments = appointmentPage.items, hotelBookings = hotelPage.items;
+  const pets = [...appointmentPage.related.pets, ...hotelPage.related.pets], owners = [...appointmentPage.related.owners, ...hotelPage.related.owners];
   const [sourceKey, setSourceKey] = useState(initialSourceKey);
   const [items, setItems] = useState<Line[]>([]);
   const [tax, setTax] = useState("0");
@@ -20,16 +30,18 @@ export function InvoiceIssueForm({ invoices, onCreated, onClose, initialSourceKe
   const submitting = useRef(false);
   const rates: Record<string, number> = { ...pricing.appointmentEstimates, ...pricing.fixedSpaRates };
   const sources = useMemo(() => [
-    ...appointments.filter(a => a.status === "completed" && !invoices.some(i => i.appointmentId === a.id))
+    ...appointments.filter(a => a.status === "completed")
       .map(a => ({ key: `appointment:${a.id}`, id: a.id, type: "appointment" as const, petId: a.petId, ownerId: a.ownerId,
         description: a.serviceName, label: `${a.serviceName} — ${a.date}`, amount: 0, serviceType: a.type })),
-    ...hotelBookings.filter(b => (b.status === "in_stay" || b.status === "checked_out") && !invoices.some(i => i.hotelBookingId === b.id))
+    ...hotelBookings.filter(b => (b.status === "in_stay" || b.status === "checked_out"))
       .map(b => ({ key: `hotel_booking:${b.id}`, id: b.id, type: "hotel_booking" as const, petId: b.petId, ownerId: b.ownerId,
         description: "Lưu trú", label: `Lưu trú ${b.checkIn} → ${b.checkOut}`, amount: b.totalAmount, serviceType: "" })),
   ], [appointments, hotelBookings, invoices]);
-  const source = sources.find(s => s.key === sourceKey);
-  const owner = owners.find(o => o.id === source?.ownerId);
-  const pet = pets.find(p => p.id === source?.petId);
+  const [savedSource, setSavedSource] = useState<{ source: (typeof sources)[number]; owner?: Owner; pet?: Pet } | null>(null);
+  const source = sources.find(s => s.key === sourceKey) ?? (savedSource?.source.key === sourceKey ? savedSource.source : undefined);
+  const owner = owners.find(o => o.id === source?.ownerId) ?? savedSource?.owner;
+  const pet = pets.find(p => p.id === source?.petId) ?? savedSource?.pet;
+  const sourceOptions = savedSource && !sources.some(item => item.key === savedSource.source.key) ? [savedSource.source, ...sources] : sources;
   const subtotal = (source?.amount ?? 0) + items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const total = subtotal + Number(tax) - Number(discount);
   const field = "mt-1 w-full rounded-lg border border-slate-300 p-2";
@@ -54,15 +66,19 @@ export function InvoiceIssueForm({ invoices, onCreated, onClose, initialSourceKe
       <p className="text-sm text-slate-600">Chọn lịch khám đã hoàn tất hoặc lượt lưu trú đang ở. Đơn cũ đã trả thú cưng mà chưa có hóa đơn vẫn có thể chốt phí. Thông tin khách hàng và thú cưng được lấy từ đơn đặt.</p>
       {error && <p role="alert" className="text-rose-700">{error}</p>}
       <fieldset disabled={saving} className="space-y-4">
+      <label className="block text-sm">Tìm dịch vụ chưa lập hóa đơn<input aria-label="Tìm dịch vụ chưa lập hóa đơn" className={field} value={q} onChange={event => setQuery(event.target.value)} /></label>
+      <p className="text-sm font-semibold">Lịch khám chưa lập hóa đơn</p><Pagination {...appointmentPage} />
+      <p className="text-sm font-semibold">Lưu trú chưa lập hóa đơn</p><Pagination {...hotelPage} />
       <label className="block text-sm font-semibold">Đơn cần chốt phí
         <select className={field} required value={sourceKey} onChange={e => {
           setSourceKey(e.target.value);
           const next = sources.find(s => s.key === e.target.value);
+          setSavedSource(next ? { source: next, owner: owners.find(owner => owner.id === next.ownerId), pet: pets.find(pet => pet.id === next.petId) } : null);
           setItems(next?.type === "appointment" ? [{ description: next.description, quantity: 1, unitPrice: rates[next.serviceType] ?? 0 }] : []);
           setTax("0"); setDiscount("0"); setError("");
         }}>
           <option value="">Chọn dịch vụ</option>
-          {sources.map(s => <option key={s.key} value={s.key}>{s.label} — {pets.find(p => p.id === s.petId)?.name} — {owners.find(o => o.id === s.ownerId)?.fullName}</option>)}
+          {sourceOptions.map(s => <option key={s.key} value={s.key}>{s.label} — {pets.find(p => p.id === s.petId)?.name ?? savedSource?.pet?.name} — {owners.find(o => o.id === s.ownerId)?.fullName ?? savedSource?.owner?.fullName}</option>)}
         </select>
       </label>
       {!sources.length && <p className="text-sm text-slate-500">Chưa có dịch vụ hoàn tất chưa lập hóa đơn.</p>}

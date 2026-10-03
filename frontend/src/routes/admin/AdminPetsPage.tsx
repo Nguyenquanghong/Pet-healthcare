@@ -1,3 +1,7 @@
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
+import type { MedicalRecord } from "../../types/medicalRecord";
+import type { Appointment } from "../../types/appointment";
 import { useMemo, useState } from "react";
 import { Search, X, Eye, FileText, Calendar, Weight, Thermometer } from "lucide-react";
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
@@ -37,31 +41,18 @@ const statusLabels: Record<string, string> = {
 };
 
 export function AdminPetsPage() {
-  const { pets, owners, medicalRecords, appointments } = useAppStore();
+
 
   const [searchQuery, setSearchQuery] = useState("");
   const [speciesFilter, setSpeciesFilter] = useState("all");
   const [healthFilter, setHealthFilter] = useState("all");
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
 
-  const filteredPets = useMemo(() => {
-    return pets.filter((pet) => {
-      if (speciesFilter !== "all" && pet.species !== speciesFilter) return false;
-      if (healthFilter !== "all" && pet.healthStatus !== healthFilter) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const owner = owners.find((o) => o.id === pet.ownerId);
-        const matchName = pet.name.toLowerCase().includes(q);
-        const matchBreed = pet.breed.toLowerCase().includes(q);
-        const matchOwner = owner?.fullName.toLowerCase().includes(q) || owner?.phone.includes(q);
-        const matchChip = pet.microchipId?.toLowerCase().includes(q);
-        if (!matchName && !matchBreed && !matchOwner && !matchChip) return false;
-      }
-
-      return true;
-    });
-  }, [pets, speciesFilter, healthFilter, searchQuery, owners]);
+  const list = usePagedList<Pet>("/pets", { q: searchQuery, species: speciesFilter, healthStatus: healthFilter });
+  const pets = list.items, filteredPets = pets, owners = list.related.owners;
+  const records = usePagedList<MedicalRecord>("/medical-records", { petId: selectedPet?.id }, Boolean(selectedPet));
+  const schedules = usePagedList<Appointment>("/appointments", { petId: selectedPet?.id }, Boolean(selectedPet));
+  const medicalRecords = records.items, appointments = schedules.items;
 
   const selectedOwner = selectedPet ? owners.find((o) => o.id === selectedPet.ownerId) : null;
   const selectedPetRecords = selectedPet ? medicalRecords.filter((r) => r.petId === selectedPet.id) : [];
@@ -69,6 +60,7 @@ export function AdminPetsPage() {
 
   return (
     <AdminLayout title="Quản lý thú cưng">
+      <Pagination {...list} />
       <div className="mb-4 flex justify-end">
         <AdminCreateButton kind="pet" onCreated={() => { setSearchQuery(""); setSpeciesFilter("all"); setHealthFilter("all"); }} />
       </div>
@@ -125,7 +117,7 @@ export function AdminPetsPage() {
       {/* Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-100 px-6 py-5">
-          <p className="text-slate-500">{filteredPets.length} / {pets.length} thú cưng</p>
+          <p className="text-slate-500">{list.pagination.total} thú cưng phù hợp</p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-[760px] w-full text-left text-sm">
@@ -265,7 +257,8 @@ export function AdminPetsPage() {
               </h3>
               {selectedPetRecords.length > 0 ? (
                 <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {selectedPetRecords.slice(0, 5).map((r) => (
+                  <Pagination {...records} />
+                  {selectedPetRecords.map((r) => (
                     <div key={r.id} className="rounded-xl bg-slate-50 border border-slate-100 p-3">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-bold text-slate-800">{r.title}</p>
@@ -287,7 +280,8 @@ export function AdminPetsPage() {
               </h3>
               {selectedPetAppointments.length > 0 ? (
                 <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {selectedPetAppointments.slice(0, 4).map((a) => (
+                  <Pagination {...schedules} />
+                  {selectedPetAppointments.map((a) => (
                     <div key={a.id} className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-100 p-3">
                       <div>
                         <p className="text-sm font-semibold text-slate-800">{a.serviceName}</p>

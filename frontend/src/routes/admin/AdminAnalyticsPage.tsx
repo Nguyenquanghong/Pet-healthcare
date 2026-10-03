@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
 import { apiClient } from "../../services/apiClient";
 import type { Invoice } from "../../types/invoice";
@@ -8,32 +8,23 @@ type Range = "all" | "this_month" | "last_month";
 const vietnamMonth = (date: Date) => new Date(date.getTime() + 7 * 3_600_000).toISOString().slice(0, 7);
 
 export function AdminAnalyticsPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [range, setRange] = useState<Range>("all");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const refresh = async () => {
-    setLoading(true); setError("");
-    try { setInvoices(await apiClient.get<Invoice[]>("/invoices")); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Không tải được hóa đơn."); }
-    finally { setLoading(false); }
-  };
-  useEffect(() => { void refresh(); }, []);
-
-  const now = new Date();
-  const currentMonth = vietnamMonth(now);
+  const [figures, setFigures] = useState({ received: 0, hotel: 0, appointment: 0, outstanding: 0, paidCount: 0, unpaidCount: 0 });
+  const sequence = useRef(0);
+  const currentMonth = vietnamMonth(new Date());
   const previousMonth = vietnamMonth(new Date(Date.UTC(Number(currentMonth.slice(0, 4)), Number(currentMonth.slice(5, 7)) - 2, 1)));
   const selectedMonth = range === "this_month" ? currentMonth : range === "last_month" ? previousMonth : null;
-  const figures = useMemo(() => {
-    const paid = invoices.filter(invoice => invoice.paymentStatus === "paid" &&
-      (!selectedMonth || (invoice.paidAt && vietnamMonth(new Date(invoice.paidAt)) === selectedMonth)));
-    const unpaid = invoices.filter(invoice => invoice.paymentStatus === "unpaid" &&
-      (!selectedMonth || vietnamMonth(new Date(invoice.issuedAt)) === selectedMonth));
-    const sum = (rows: Invoice[]) => rows.reduce((total, invoice) => total + invoice.totalAmount, 0);
-    return { received: sum(paid), hotel: sum(paid.filter(invoice => invoice.type === "hotel_booking")),
-      appointment: sum(paid.filter(invoice => invoice.type === "appointment")),
-      outstanding: sum(unpaid), paidCount: paid.length, unpaidCount: unpaid.length };
-  }, [invoices, selectedMonth]);
+  const refresh = useCallback(async () => {
+    setLoading(true); setError("");
+    const request = ++sequence.current;
+    try { const result = await apiClient.get<typeof figures>("/invoices/summary" + (selectedMonth ? "?month=" + selectedMonth : "")); if (request === sequence.current) setFigures(result); }
+    catch (reason) { if (request === sequence.current) setError(reason instanceof Error ? reason.message : "Không tải được báo cáo."); }
+    finally { if (request === sequence.current) setLoading(false); }
+  }, [selectedMonth]);
+  useEffect(() => { void refresh(); }, [refresh]);
+
   const card = "rounded-xl border bg-white p-5";
   return <AdminLayout title="Báo cáo & Thống kê">
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">

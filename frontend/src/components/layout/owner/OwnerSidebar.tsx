@@ -6,10 +6,8 @@ import { BrandLogo } from "../../shared/BrandLogo";
 
 export function OwnerSidebar() {
   const navigate = useNavigate();
-  const { logout, notifications, currentOwnerId } = useAppStore();
-  const unreadCount = notifications.filter(
-    (n) => n.recipientOwnerId === currentOwnerId && n.status === "sent"
-  ).length;
+  const { logout, summary } = useAppStore();
+  const unreadCount = summary.unread;
 
   const handleLogout = () => {
     logout();

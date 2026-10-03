@@ -1,3 +1,4 @@
+import { pagedFixture } from "./pagination-fixture";
 import { expect, test, type Page } from "@playwright/test";
 
 const token = "A".repeat(43);
@@ -13,10 +14,12 @@ async function mockApi(page: Page) {
       "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*",
     } });
     if (path.endsWith("/auth/me")) return json({ user: { role: "staff" } });
-    if (path.endsWith("/bootstrap")) return json({ currentOwnerId: "", owners: [
+    const state = { currentOwnerId: "", owners: [
       { id: "counter-owner", fullName: "Khách tại quầy", phone: "0912345678", petIds: [], loginEnabled: false },
       { id: "active-owner", fullName: "Khách online", phone: "0900000002", email: "active@example.test", petIds: [], loginEnabled: true },
-    ], pets: [], appointments: [], hotelBookings: [], medicalRecords: [], medicalImages: [], dailyCareNotes: [], notifications: [] });
+    ], pets: [], appointments: [], hotelBookings: [], medicalRecords: [], medicalImages: [], dailyCareNotes: [], notifications: [] };
+    if (path.endsWith("/bootstrap")) return json(state);
+    if (req.method() === "GET") { const paged = pagedFixture(req.url(), state); if (paged) return json(paged); }
     if (path.endsWith("/owners/counter-owner/activation")) {
       controls.issueCalls.push(req.postDataJSON());
       if (controls.holdIssue) await new Promise<void>(resolve => { controls.release = resolve; });

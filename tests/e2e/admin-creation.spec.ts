@@ -1,3 +1,4 @@
+import { pagedFixture } from "./pagination-fixture";
 import { expect, test, type Page } from "@playwright/test";
 import type { Appointment } from "../../frontend/src/types/appointment";
 import type { HotelBooking } from "../../frontend/src/types/booking";
@@ -34,6 +35,8 @@ async function mockApi(page: Page) {
     } });
     if (path.endsWith("/auth/me")) return json({ user: { role: "admin" } });
     if (path.endsWith("/bootstrap")) return control.failRefresh ? json({ error: "Refresh unavailable" }, 503) : json(state);
+    if (req.method() === "GET") { const paged = pagedFixture(req.url(), state); if (paged) return json(paged); }
+
     if (path.endsWith("/invoices")) return json([]);
     if (req.method() === "POST") {
       const body = req.postDataJSON(), key = req.headers()["idempotency-key"];

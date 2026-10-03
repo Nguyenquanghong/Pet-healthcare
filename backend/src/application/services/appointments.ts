@@ -1,5 +1,6 @@
 import { BookingLifecycleService, type LifecycleInput, type UndoInput } from "./bookingLifecycle.js";
 import { BusinessError } from "../../domain/error.js";
+import { todayInVietnam } from "../../domain/validation.js";
 import type { Actor } from "../../domain/auth.js";
 import {
   appointmentStatuses, appointmentTypes,
@@ -47,7 +48,7 @@ export class AppointmentService {
     if (!appointmentTypes.includes(type as AppointmentType)) throw new BusinessError(422, "Select a valid appointment service.");
     if (!validDate(date)) throw new BusinessError(422, "Enter a valid appointment date.");
     if (!timePattern.test(time)) throw new BusinessError(422, "Enter a valid appointment time.");
-    if (date < new Date().toISOString().slice(0, 10)) throw new BusinessError(422, "The appointment date cannot be in the past.");
+    if (date < todayInVietnam()) throw new BusinessError(422, "The appointment date cannot be in the past.");
     if (await this.deps.appointments.hasSlot(pet.id, appointmentDate(date), time)) throw new BusinessError(409, "This pet already has an appointment at the selected time.");
 
     return this.deps.unitOfWork.run(async ({ appointments, notifications }) => {
@@ -88,7 +89,7 @@ export class AppointmentService {
     const time = String(input.time || "");
     if (!validDate(date)) throw new BusinessError(422, "Enter a valid appointment date.");
     if (!timePattern.test(time)) throw new BusinessError(422, "Enter a valid appointment time.");
-    if (date < new Date().toISOString().slice(0, 10)) throw new BusinessError(422, "The appointment date cannot be in the past.");
+    if (date < todayInVietnam()) throw new BusinessError(422, "The appointment date cannot be in the past.");
     if (await this.deps.appointments.hasSlot(existing.petId, appointmentDate(date), time, existing.id)) throw new BusinessError(409, "This pet already has an appointment at the selected time.");
     return await this.lifecycle.reschedule(actor, id, input.expectedRevision, {
       appointmentDate: appointmentDate(date), appointmentTime: time,

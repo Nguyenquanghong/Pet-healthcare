@@ -1,3 +1,7 @@
+import { usePagedList } from "../../services/usePagedList";
+import { Pagination } from "../../components/ui/Pagination";
+import type { Appointment } from "../../types/appointment";
+import type { HotelBooking } from "../../types/booking";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
 import { useAppStore } from "../../store/AppStoreProvider";
@@ -9,8 +13,11 @@ import { isSpaAppointmentType } from "../../types/appointment";
 
 const statusLabel = { unpaid: "Chờ thanh toán", paid: "Đã thanh toán", refunded: "Đã hoàn tiền" };
 export function OwnerBillingPage() {
-  const { appointments, hotelBookings, pets } = useAppStore();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const { refreshData } = useAppStore();
+  const list = usePagedList<Invoice>("/invoices");
+  const sourcePage = usePagedList<Appointment>("/appointments", { mode: "unbilled" });
+  const hotelPage = usePagedList<HotelBooking>("/hotel-bookings", { mode: "unbilled" });
+  const invoices = list.items, appointments = sourcePage.items, pets = [...list.related.pets, ...sourcePage.related.pets];
   const [enabled, setEnabled] = useState(false);
   const [bankTransfer, setBankTransfer] = useState<BankTransferDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -19,11 +26,8 @@ export function OwnerBillingPage() {
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const refresh = useCallback(async () => {
-    const [rows, options] = await Promise.all([
-      apiClient.get<Invoice[]>("/invoices"),
-      apiClient.get<{ vnpayEnabled: boolean; bankTransfer: BankTransferDetails | null }>("/payments/options"),
-    ]);
-    setInvoices(rows); setEnabled(options.vnpayEnabled); setBankTransfer(options.bankTransfer);
+    const options = await apiClient.get<{ vnpayEnabled: boolean; bankTransfer: BankTransferDetails | null }>("/payments/options", { signal: AbortSignal.timeout(15_000) });
+    setEnabled(options.vnpayEnabled); setBankTransfer(options.bankTransfer);
   }, []);
   useEffect(() => {
     let active = true;
@@ -46,29 +50,38 @@ export function OwnerBillingPage() {
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 15000);
     return () => { active = false; window.clearInterval(timer); };
   }, [refresh]);
-  const act = async (work: () => Promise<void>) => {
+  const act = async (work: () => Promise<void>, writes = true) => {
     if (submitting.current) return;
     submitting.current = true; setBusy(true); setError(""); setMessage("");
-    try { await work(); await refresh(); }
+    try {
+      await work();
+      // This screen reloads its queries explicitly; a second broadcast would replace those requests.
+      const results = await Promise.allSettled([refresh(), list.reload(), sourcePage.reload(), hotelPage.reload(), refreshData(false)]);
+      if (results.some(result => result.status === "rejected")) setError(writes
+        ? "Đã ghi nhận thao tác nhưng chưa tải lại được dữ liệu. Kiểm tra trạng thái trước khi gửi lại."
+        : "Chưa tải lại được dữ liệu. Hãy thử tải lại.");
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Không thực hiện được thanh toán."); }
     finally { submitting.current = false; setBusy(false); }
   };
   const sources = [
-    ...appointments.filter(a => a.status === "completed" && !invoices.some(i => i.appointmentId === a.id))
+    ...appointments.filter(a => a.status === "completed")
       .map(a => ({ id: a.id, type: "appointment", petId: a.petId, label: `${a.serviceName} · ${a.date}`, fixed: isSpaAppointmentType(a.type) })),
   ];
   const button = "rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50";
   return <OwnerLayout title="Hóa đơn & Thanh toán">
+    <p className="text-sm font-semibold">Hóa đơn</p><Pagination {...list} />
+    <p className="text-sm font-semibold">Dịch vụ chưa lập hóa đơn</p><Pagination {...sourcePage} />
     <div className="mb-5 flex items-start justify-between gap-3">
       <p className="max-w-2xl text-sm text-slate-600">Xem các khoản phí sau khi hoàn tất dịch vụ. Với dịch vụ khám có phí phát sinh, cửa hàng sẽ chốt hóa đơn trước khi bạn thanh toán.</p>
-      <button className={button} disabled={busy} onClick={() => void act(async () => {})}>Tải lại</button>
+      <button className={button} disabled={busy} onClick={() => void act(async () => {}, false)}>Tải lại</button>
     </div>
     {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-rose-700">{error}</p>}
     {message && <p role="status" className="mb-4 rounded-lg bg-blue-50 p-3 text-blue-800">{message}</p>}
     {loading ? <p>Đang tải hóa đơn...</p> : <>
       {!bankTransfer && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Cửa hàng chưa cấu hình tài khoản nhận chuyển khoản. Bạn vẫn có thể chọn thanh toán tại cửa hàng.</p>}
       {!invoices.length && !sources.length && <p className="rounded-xl bg-white p-6 text-slate-600">Bạn chưa có hóa đơn cần thanh toán.</p>}
-      {hotelBookings.some(b => b.status === "in_stay" && !invoices.some(i => i.hotelBookingId === b.id)) &&
+      {hotelPage.pagination.total > 0 &&
         <p className="rounded-xl bg-blue-50 p-4 text-sm text-blue-800">Cửa hàng sẽ chốt hóa đơn lưu trú và các dịch vụ phát sinh trước khi bạn thanh toán.</p>}
       <div className="space-y-5">
         {invoices.map(invoice => <article key={invoice.id} aria-label={invoice.invoiceCode} className="rounded-xl border bg-white p-5 shadow-sm">
