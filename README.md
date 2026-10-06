@@ -33,18 +33,40 @@ Base URL: `http://localhost:5000/api`; request/response dùng JSON (DELETE thàn
 
 JWT gửi bằng header `Authorization: Bearer <token>`. Middleware `requireAuth` bảo vệ các nhóm route riêng tư trước khi route xử lý. Khi sửa bệnh án đã tạo, thú cưng, chủ nuôi và lịch liên kết cố định; gửi giá trị khác hoặc `null` để gỡ sẽ nhận `422`. Bản ghi demo `record_1` là lần khám độc lập; lịch sắp tới `appointment_1` không liên kết bệnh án đó.
 
-## Chạy trên máy không cần Docker
+## Chạy toàn bộ ứng dụng bằng Docker Compose trên máy mới
 
-Cần Node.js 24, npm và PostgreSQL cục bộ. Không dùng database đang vận hành để thử migration hoặc test tích hợp.
+Cần Git và Docker Desktop đang chạy với Linux containers. Node.js/npm và PostgreSQL được cung cấp trong Docker, không cần cài trên Windows. Bản được mô tả trong README này thuộc nhánh `main`:
 
-1. Clone nhánh `refactor` bằng `git clone -b refactor https://github.com/Nguyenquanghong/Pet-healthcare.git`, vào thư mục `Pet-healthcare` rồi chạy `npm ci`.
-2. Sao chép `backend/.env.example` thành `backend/.env`, `frontend/.env.example` thành `frontend/.env`.
-3. Trong `backend/.env`, đặt `DATABASE_URL` trỏ tới database PostgreSQL của môi trường này và đặt `JWT_SECRET` ngẫu nhiên dài ít nhất 32 ký tự. Thiếu `DATABASE_URL` sẽ gây Prisma P1012 khi chạy `db:deploy`.
-4. Tạo database tương ứng bằng PostgreSQL cục bộ, rồi chạy `npm run db:generate` và `npm run db:deploy -w backend`. Chỉ chạy deploy migration sau khi đã kiểm tra đúng URL và có bản sao lưu nếu đó là dữ liệu cần giữ.
-5. Chạy `npm run dev` hoặc mở riêng `npm run dev:backend` và `npm run dev:frontend`. Giao diện mặc định ở `http://localhost:5173`; API health ở `http://localhost:5000/api/health`.
+```powershell
+git clone -b main https://github.com/Nguyenquanghong/Pet-healthcare.git
+Set-Location Pet-healthcare
+if (-not (Test-Path .env.docker)) {
+    Copy-Item .env.docker.example .env.docker
+}
+```
 
-`db:seed` chỉ dành cho database demo mới, trống và có thể bỏ. Không chạy seed trên dữ liệu thật. Người dùng và quản trị viên có thể tạo hoặc cấu hình theo quy trình riêng của môi trường.
+Thư mục sau khi clone cần có `Dockerfile.backend`, `Dockerfile.frontend`, `docker-compose.yml` và `frontend/nginx/default.conf.template`. Cấu hình Docker toàn bộ ứng dụng phải được commit/push cùng bản bàn giao để máy mới chạy được theo hướng dẫn này.
 
+Trong `.env.docker`, điền `POSTGRES_PASSWORD`, `DATABASE_URL=postgresql://nipopeto:<cùng-mật-khẩu>@postgres:5432/nipopeto?schema=public` và `JWT_SECRET` ngẫu nhiên ít nhất 32 ký tự. Nếu mật khẩu chứa ký tự đặc biệt, phải URL encode trong `DATABASE_URL`. `postgres` là tên dịch vụ trong mạng Compose; không đổi thành `localhost`. Giữ file môi trường riêng ngoài Git; không gửi bí mật lên repository. Các cổng mặc định `5432`, `5000` và `5173` cần chưa bị ứng dụng khác sử dụng.
+
+```powershell
+docker compose --env-file .env.docker config --quiet
+docker compose --env-file .env.docker up --build -d
+docker compose --env-file .env.docker ps -a
+Invoke-RestMethod http://localhost:5000/api/health
+```
+
+Mở `http://localhost:5173`. Compose khởi động PostgreSQL, chạy `migrate` rồi khởi động API và frontend. `migrate` thoát mã 0 là bình thường. Frontend được build trong Docker và phục vụ bằng Nginx; `/api/` được chuyển tiếp tới API qua mạng Compose. Có thể đổi cổng giao diện bằng `FRONTEND_PORT` trong `.env.docker`; bản frontend Docker luôn gọi `/api` cùng địa chỉ web. Đặc tả API ở `http://localhost:5000/api/docs/` khi dùng cổng mặc định.
+
+**Chỉ với database demo mới, trống và có thể bỏ**, tạo dữ liệu minh họa sau khi Compose khởi động thành công:
+
+```powershell
+docker compose --env-file .env.docker run --rm --no-deps migrate npm run db:seed --workspace @nipopeto/backend
+```
+
+Sau seed, đăng nhập chủ nuôi tại `/login` bằng `owner@example.com` / `owner123`; đăng nhập admin tại `/admin/login` bằng `admin` / `admin123`. Seed có hai thú cưng Mochi/Yuki, lịch khám/Spa, một bệnh án độc lập và một booking khách sạn; chưa có hóa đơn mẫu. Ngày dữ liệu mẫu cố định trong tháng 10–11/2026, nên dashboard hôm nay có thể trống.
+
+Không chạy seed trên dữ liệu thật hoặc để “sửa” dữ liệu demo cũ: seed cập nhật mật khẩu các tài khoản mẫu, còn các bản ghi thú cưng/lịch/bệnh án/booking dùng `update: {}` nên giữ nội dung đã tồn tại. Dừng ứng dụng bằng `docker compose --env-file .env.docker down`; lệnh này giữ volume database. Không dùng `down -v` nếu cần giữ dữ liệu.
 
 ## Phân trang và tải theo màn hình (02/10/2026)
 
@@ -57,30 +79,6 @@ Tìm kiếm/lọc chạy ở DB trước skip/take; id là khóa cuối để th
 Chạy `npm run db:deploy -w backend` trên đúng DB trước khi khởi động bản mới: migration phân trang bổ sung 15 index, tổng hiện có 12 migration. OpenAPI/Swagger đã mô tả 65 operation. Các bản ghi lịch sử và payment/status-history theo từng đơn vẫn là contract mảng; chúng được tải khi mở chi tiết, không nằm trong bootstrap.
 
 Kaggle ZIP cũ đo mã trước phân trang. Workload `phase1-kaggle-v4` / `architecture-diagnostics-v2` hiện gửi `view=dashboard` và đọc envelope collection để khớp luồng mới; chưa có số tải Kaggle cho SHA mới. Khi so sánh trước/sau phải giữ hành trình nghiệp vụ và ghi rõ contract/workload version, không lấy RPS từ việc đọc ít dữ liệu rồi suy ra dung lượng toàn hệ thống.
-
-## Chạy backend bằng Docker Compose trên máy mới
-
-Cần Docker Desktop đang chạy với Linux containers, Node.js 24 và npm cho frontend. Tại thư mục gốc sau khi clone nhánh `refactor`:
-
-```powershell
-git clone -b refactor https://github.com/Nguyenquanghong/Pet-healthcare.git
-Set-Location Pet-healthcare
-npm ci
-Copy-Item .env.docker.example .env.docker
-Copy-Item frontend/.env.example frontend/.env
-```
-
-Chỉ sao chép nếu file đích chưa tồn tại. Trong `.env.docker`, điền `POSTGRES_PASSWORD`, `DATABASE_URL=postgresql://nipopeto:<cùng-mật-khẩu>@postgres:5432/nipopeto?schema=public` và `JWT_SECRET` ngẫu nhiên ít nhất 32 ký tự. Nếu mật khẩu chứa ký tự đặc biệt, phải URL encode trong `DATABASE_URL`. Giữ file môi trường riêng ngoài Git; không gửi bí mật lên repository.
-
-```powershell
-docker compose --env-file .env.docker config --quiet
-docker compose --env-file .env.docker up --build -d
-docker compose --env-file .env.docker ps -a
-Invoke-RestMethod http://localhost:5000/api/health
-npm run dev:frontend
-```
-
-Compose khởi động PostgreSQL, chạy `migrate` rồi mới khởi động API. `migrate` thoát mã 0 là bình thường; frontend hiện chạy riêng ở `http://localhost:5173`. **Chỉ với database demo mới, trống và có thể bỏ**, tạo dữ liệu minh họa bằng `docker compose --env-file .env.docker run --rm --no-deps migrate npm run db:seed --workspace @nipopeto/backend`. Không chạy seed trên dữ liệu thật hoặc để “sửa” dữ liệu demo cũ: `upsert` với `update: {}` giữ nguyên bản ghi đã tồn tại.
 
 ## Nhân viên tạo thú cưng và đặt dịch vụ tại quầy
 
@@ -106,14 +104,14 @@ Mã ngẫu nhiên 256 bit được đặt trong fragment `#token=...` của liê
 
 Liên kết dùng địa chỉ frontend đang mở trên máy nhân viên. `localhost` chỉ dùng được khi demo trên cùng máy; để khách mở trên thiết bị khác phải cấp liên kết từ địa chỉ frontend mà khách truy cập được. Khi triển khai thực tế, dùng HTTPS và giao liên kết riêng vì người giữ mã còn hiệu lực có thể đặt mật khẩu cho hồ sơ đó.
 
-**Cập nhật bản đang chạy:** lần bổ sung này có migration `20261002120000_owner_activation`, chỉ thêm bảng và quan hệ kích hoạt. Với Docker, chạy `docker compose --env-file .env.docker up --build -d` để rebuild backend và chạy migration rồi khởi động API; frontend dev tự tải mã mới, khởi động lại nếu cần. Không cần seed/reset database. Nếu chạy backend trực tiếp, áp dụng `npm run db:deploy -w backend` vào đúng database, rồi restart backend; với bản build chạy `npm run build` trước khi restart.
+**Cập nhật bản đang chạy:** migration `20261002120000_owner_activation` thêm bảng và quan hệ kích hoạt. Chạy `docker compose --env-file .env.docker up --build -d` để rebuild backend/frontend và áp dụng các migration còn thiếu rồi khởi động API; tải lại trình duyệt sau khi frontend được cập nhật. Không cần seed/reset database.
 
 ## Luồng lưu trú và thanh toán pha 1
 
 1. Chủ nuôi chọn thú cưng, ngày, phòng, dịch vụ và gửi yêu cầu. API yêu cầu header `Idempotency-Key`; lần gửi lại cùng mã và nội dung trả về booking cũ. Sau khi ghi thành công, giao diện chuyển sang `/owner/hotel-bookings/:id` để xem và mở lại yêu cầu. Lúc này chưa có hóa đơn hoặc VietQR.
 2. Nhân viên xác nhận booking và check-in thú cưng bằng màn xác nhận. Mỗi lần đổi trạng thái lưu revision, người thao tác và lịch sử; thao tác nhận nhầm có thể hoàn tác theo điều kiện nghiệp vụ.
 3. Khi booking `in_stay`, nhân viên chốt hóa đơn từ thông tin booking và giá đã lưu, bổ sung phí phát sinh nếu có. Booking cũ `checked_out` chưa có hóa đơn vẫn được chốt phí theo luồng tương thích. Chủ nuôi không thể tự phát hành hóa đơn khách sạn.
-4. Với hóa đơn `unpaid`, chủ nuôi chọn tiền mặt tại cửa hàng hoặc chuyển khoản. VietQR chỉ hiện cho hóa đơn đã chọn chuyển khoản và còn được phép thanh toán. Chủ nuôi báo đã chuyển tiền chỉ tạo yêu cầu đối chiếu, **không** đổi thành `paid`.
+4. Với hóa đơn `unpaid`, chủ nuôi chọn tiền mặt tại cửa hàng hoặc chuyển khoản. VietQR cần tài khoản nhận tiền hợp lệ, hóa đơn đã chọn chuyển khoản và còn được phép thanh toán; chế độ `BANK_TRANSFER_DEMO=true` mặc định chỉ hiển thị thông tin minh họa, không tạo VietQR. Chủ nuôi báo đã chuyển tiền chỉ tạo yêu cầu đối chiếu, **không** đổi thành `paid`.
 5. Nhân viên kiểm tra tiền thực nhận rồi xác nhận `paid`, hoặc từ chối báo chuyển khoản kèm lý do. Lịch sử thanh toán ghi người thao tác và thời điểm trong cùng giao dịch với thay đổi hóa đơn. Xác nhận lặp lại cùng phương thức không tạo biên nhận thứ hai.
 6. Chỉ khi hóa đơn khách sạn đã `paid`, nhân viên mới xác nhận bàn giao và checkout. Quản trị viên có thể hoàn tác lần bàn giao nhầm, giữ nguyên hóa đơn đã thanh toán và checkout lại mà không thu thêm.
 
@@ -121,44 +119,78 @@ Khách sạn thu đủ vào cuối kỳ lưu trú; pha này không có đặt c�
 
 ## Biến môi trường thanh toán
 
-- `BANK_TRANSFER_DEMO=true`: thông tin tài khoản minh họa. Để dùng tài khoản nhận tiền thật, đặt `false` và điền đủ `BANK_TRANSFER_BANK_NAME`, `BANK_TRANSFER_BANK_BIN` (6 chữ số), `BANK_TRANSFER_ACCOUNT_NUMBER`, `BANK_TRANSFER_ACCOUNT_HOLDER` trong `backend/.env`. Không đưa thông tin môi trường thật vào fixture hoặc tài liệu công khai. Tài khoản được chụp lại trên hóa đơn đã chọn chuyển khoản để không đổi nơi nhận của hóa đơn cũ.
+- `BANK_TRANSFER_DEMO=true`: thông tin tài khoản minh họa, không tạo VietQR. Để dùng tài khoản nhận tiền thật, đặt `false` và điền đủ `BANK_TRANSFER_BANK_NAME`, `BANK_TRANSFER_BANK_BIN` (6 chữ số), `BANK_TRANSFER_ACCOUNT_NUMBER` (6–19 chữ số), `BANK_TRANSFER_ACCOUNT_HOLDER` trong `.env.docker`, rồi chạy lại `docker compose --env-file .env.docker up -d api`. Không đưa thông tin môi trường thật vào fixture hoặc tài liệu công khai. Tài khoản được chụp lại trên hóa đơn đã chọn chuyển khoản để không đổi nơi nhận của hóa đơn cũ.
 - `VNPAY_ENABLED=false`: giữ tắt trong pha 1. Các biến `VNPAY_*` hiện có được dành cho bước tích hợp sau.
-- `VITE_API_BASE_URL` trong `frontend/.env` chỉ chứa địa chỉ API công khai. Không đưa bí mật vào biến `VITE_*` hoặc Git.
+- Frontend Docker được build với `VITE_API_BASE_URL=/api`; không cần tạo `frontend/.env`. `PORT` và `FRONTEND_PORT` trong `.env.docker` điều khiển cổng API và giao diện; các URL trong ví dụ trên dùng giá trị mặc định.
 
 ## Kiểm tra
 
-`npm test` chạy build hai phần, unit/HTTP test không database, kiểm tra ranh giới kiến trúc và OpenAPI. Đọc đặc tả API ở `/api/openapi.json` hoặc `/api/docs/` khi backend đang chạy.
+Build backend/frontend được thực hiện khi chạy `docker compose --env-file .env.docker up --build -d`. Tại thư mục gốc, kiểm tra backend trong image `migrate` đã build:
 
-Kiểm tra riêng helper Kaggle: `python -m unittest discover -s benchmarks/kaggle -p 'test_*.py' -v`. Browser test dùng `E2E_BROWSER_CHANNEL=msedge`, `E2E_START_FRONTEND=1` và `npm run test:e2e -- tests/e2e/owner-activation.spec.ts tests/e2e/admin-creation.spec.ts tests/e2e/medical-write-feedback.spec.ts tests/e2e/appointment-refresh.spec.ts`. Các browser test này mock API để kiểm tra giao diện, không chứng minh PostgreSQL thật.
+```powershell
+docker compose --env-file .env.docker run --rm --no-deps --volume "${PWD}/benchmarks/kaggle:/work/benchmarks/kaggle:ro" migrate npm run test:unit --workspace @nipopeto/backend
+docker compose --env-file .env.docker run --rm --no-deps migrate npm run test:architecture --workspace @nipopeto/backend
+docker compose --env-file .env.docker run --rm --no-deps migrate npm run test:openapi --workspace @nipopeto/backend
+```
 
-Các ca tích hợp PostgreSQL, đồng thời và khóa giao dịch cần database **riêng** có tên kết thúc `_test`. Chỉ sau khi xác nhận database này là bản bỏ được, đặt `PG_TEST_DATABASE_URL` và chạy `npm run test:integration -w backend`; bộ test từ chối URL không phải `localhost`/`127.0.0.1` hoặc tên không kết thúc `_test`. Migration cho database test cũng phải được áp dụng **vào chính database test** trước đó. Không lấy `DATABASE_URL` đang vận hành để chạy suite. Các Playwright test dùng backend thật cần một môi trường demo/test riêng; bốn file test giao diện nêu trên dùng API mock nên không cần PostgreSQL.
+Unit test có ca dùng helper Kaggle nên lệnh đầu gắn thư mục `benchmarks/kaggle` chỉ đọc vào container; `Dockerfile.backend` không sao chép thư mục này vào image. Các lệnh trên kiểm tra unit/HTTP không database, ranh giới kiến trúc và OpenAPI; không thay thế test trình duyệt hoặc test tích hợp PostgreSQL. Đọc đặc tả API ở `/api/openapi.json` hoặc `/api/docs/` khi backend đang chạy.
 
-## Kaggle CPU và giới hạn kết quả
+Test trình duyệt nằm trong `tests/e2e/`. Các file `owner-activation.spec.ts`, `admin-creation.spec.ts`, `medical-write-feedback.spec.ts` và `appointment-refresh.spec.ts` dùng API mock; các ca dùng API thật cần môi trường demo/test riêng. Image frontend Nginx chỉ phục vụ bản build, không chứa trình duyệt hoặc môi trường chạy Playwright.
+
+Các ca tích hợp PostgreSQL trong `backend/tests/*.integration.mjs` yêu cầu `PG_TEST_DATABASE_URL` trỏ tới database **riêng**, đã migrate và có tên kết thúc `_test`; bộ test từ chối host khác `localhost`/`127.0.0.1`. Vì vậy không thể chạy trực tiếp suite trong container `migrate` với URL dùng host `postgres` như cấu hình ứng dụng. Không dùng database đang vận hành để thử suite.
+
+## Kiểm thử hiệu năng trên Kaggle CPU
 
 Commit/push cả bản Pha 1 và các file harness mới trong `benchmarks/kaggle/` (gồm `ports.py`, `test_ports.py`), lấy `git rev-parse HEAD`, rồi tải [`benchmarks/kaggle/notebook.ipynb`](benchmarks/kaggle/notebook.ipynb) lên Kaggle Notebook mới, chọn Accelerator **None**, bật Internet. Điền full `COMMIT_SHA` 40 ký tự ở cell cấu hình, giữ `RUN_LABEL="B1"`, rồi Run All. Notebook kiểm SHA, working tree và protocol `phase1-kaggle-v4`; source ở SHA cũ chưa có harness này sẽ bị chặn. Cell cài đặt kiểm cả PostgreSQL server (`initdb`, `pg_ctl`), chọn Node.js 24 và cài đúng Locust 2.44.4/psutil 7.0.0 bằng Python của kernel; không cần Docker.
 
-Ma trận tối đa 16 lượt: ReadHeavyUser/MixedUser × 1/10/50/100 người dùng × hai lần. Notebook tạo thư mục bằng chứng mới cho mỗi lần chạy cell, giữ kết quả cũ. Tải ZIP ở mục **Output**, bấm refresh nếu chưa thấy. Không dùng đường dẫn `/kaggle/working/...` làm URL Jupyter proxy để tải trực tiếp. Khi một run lỗi hoặc bạn dừng ma trận, vẫn chạy cell cuối để đóng gói kết quả một phần và runner log. `COMPLETE_PASS` chỉ nghĩa là đủ ma trận này và không vi phạm điều kiện đo; `PARTIAL_OR_FAILED` nghĩa là thiếu/lỗi/vượt ngưỡng.
-
 Protocol v4 giữ thời gian, think time và ma trận của v3 nhưng đọc trang 1/20 dòng và bootstrap dashboard: warmup **45 giây**, process đo **120 giây**, tăng tải 5 người dùng/giây, think time 0,5–1,5 giây. Lượt đo khởi động Locust mới và **gồm ramp-up**; 100 users có khoảng 100 giây sau ramp, không gọi số tổng hợp là riêng steady state. HTTP timeout 10 giây, Locust cho tối đa 12 giây hoàn tất request đang chạy khi dừng. Riêng thời gian tải của 16 lượt khoảng 44 phút, cộng thời gian cài/build/migrate. Các biến profile/users/repeats/thời gian nằm ở đầu notebook; giữ nguyên khi so sánh B1/B2 trong cùng phiên Kaggle CPU.
 
-### Kết quả B1 đã đối chiếu ngày 01/10/2026
+Ứng dụng sử dụng Locust để đo hiệu năng REST API trên Kaggle với hai kịch bản:
 
-ZIP `nipopeto-evidence-B1-20261001T103019Z-4fba7fce.zip` tại SHA **`c178824e50bbdcd9c095ff706d9eb8c10a033596`**, protocol v3, working tree sạch, đạt **COMPLETE_PASS: 16/16 lượt**, tổng **72.107 request, 0 lỗi**. Đã đối chiếu đủ ma trận, manifest với `locust_final.json`, CSV lỗi, runner/API/PostgreSQL logs; cấu hình phần cứng và phiên bản công cụ thống nhất, các lượt chạy tuần tự. SHA256 ZIP: `7a2d48c38e97a97e1b6082af441be70cf97ae51ccec260331df039b2ead3b627`. Giữ ZIP cùng bài nộp hoặc đính kèm bản phát hành để người khác kiểm chứng; tài liệu phân tích local không thay thế ZIP.
+- **ReadHeavyUser:** đọc dữ liệu tổng hợp, thú cưng, lịch hẹn và thông báo.
+- **MixedUser:** kết hợp các thao tác đọc với tạo lịch khám và gửi thông tin tìm thấy thú cưng qua hồ sơ QR.
 
-| Users | ReadHeavy: RPS trung bình | ReadHeavy: p95 từng lượt (ms) | Mixed: RPS trung bình | Mixed: p95 từng lượt (ms) |
+Backend, PostgreSQL và Locust chạy trên cùng môi trường CPU. Mỗi lượt dùng database tạm và dữ liệu giả lập, tách biệt với dữ liệu vận hành.
+
+### Thực hiện kiểm thử
+
+1. Tải [notebook kiểm thử](benchmarks/kaggle/notebook.ipynb) lên Kaggle, chọn **Accelerator: None** và bật **Internet**.
+2. Điền thông tin phiên bản mã nguồn cần kiểm thử tại cell cấu hình theo hướng dẫn trong notebook.
+3. Chạy các cell theo thứ tự. Sau khi hoàn tất hoặc dừng kiểm thử, chạy cell cuối để đóng gói báo cáo và tải ZIP từ mục **Output**.
+
+### Cấu hình đo
+
+| Thông số | Giá trị |
+| --- | --- |
+| Mức tải | 1, 10, 50 và 100 người dùng đồng thời |
+| Số lần lặp | 2 lần cho mỗi kịch bản và mức tải, tổng cộng 16 lượt |
+| Thời gian khởi động tải | 45 giây mỗi lượt |
+| Thời gian đo | 120 giây mỗi lượt, bao gồm giai đoạn tăng tải |
+| Tốc độ tăng tải | 5 người dùng/giây |
+| Khoảng nghỉ giữa thao tác | 0,5–1,5 giây |
+| Thời gian chờ HTTP tối đa | 10 giây |
+| Ngưỡng đánh giá | Tỷ lệ lỗi không quá 1%; p95 không quá 2.000 ms |
+
+Môi trường ghi nhận: Intel Xeon 2,20 GHz, 4 CPU logic, RAM khoảng 31,35 GiB; Node.js 24.15.0, PostgreSQL 14.24, Python 3.12.13 và Locust 2.44.4.
+
+### Kết quả đo ngày 01/10/2026
+
+Hoàn thành **16/16 lượt**, tổng cộng **72.107 yêu cầu, 0 lỗi**. Thời gian toàn bộ đợt kiểm thử khoảng **58,38 phút**, bao gồm cài đặt, build, migration và đo tải.
+
+| Người dùng đồng thời | ReadHeavy: RPS trung bình | ReadHeavy: p95 từng lượt (ms) | Mixed: RPS trung bình | Mixed: p95 từng lượt (ms) |
 | ---: | ---: | ---: | ---: | ---: |
 | 1 | 1,05 | 8 / 8 | 1,05 | 14 / 14 |
 | 10 | 9,96 | 7 / 7 | 9,92 | 13 / 13 |
 | 50 | 48,18 | 8 / 9 | 47,89 | 13 / 13 |
 | 100 | 91,80 | 11 / 12 | 91,62 | 15 / 15 |
 
-RPS là trung bình số đo của hai lượt; p95 giữ riêng từng lượt, không lấy trung bình percentile để giả thành percentile gộp. Phần cứng Kaggle: Intel Xeon 2,20 GHz, 4 logical CPUs, affinity [0,1,2,3], RAM khoảng 31,35 GiB. Công cụ: Node 24.15.0, npm 11.12.1, PostgreSQL 14.24, Python 3.12.13, Locust 2.44.4. Warmup/đo 45s/120s mỗi lượt; toàn ma trận khoảng 58,38 phút kể cả setup/build/migrate từng lượt.
+RPS là số yêu cầu xử lý mỗi giây, lấy trung bình của hai lượt. p95 là thời gian phản hồi mà 95% yêu cầu không vượt quá; bảng giữ riêng giá trị của từng lượt.
 
-Ở 100 users, CPU API trung bình qua hai lượt khoảng 50,47% (ReadHeavy) và 56,40% (Mixed), với **100%=một core**, không phải toàn máy; PostgreSQL khoảng 6,54% và 9,08%. Chưa thấy dấu hiệu bão hòa CPU trong workload đã đo. Kết quả đáp ứng phần kiểm thử tải Kaggle CPU của Pha 1 cho SHA trên; chưa xác định giới hạn tải tối đa hoặc đủ cơ sở bắt buộc tách microservice.
+Ở mức 100 người dùng, CPU API trung bình khoảng **50,47%** với ReadHeavy và **56,40%** với Mixed; PostgreSQL lần lượt khoảng **6,54%** và **9,08%**. Các tỷ lệ này dùng quy ước **100% tương ứng một lõi CPU**. Chưa ghi nhận bão hòa CPU trong phạm vi tải đã đo.
 
-Lịch sử: ZIP tại SHA `957e693a8bf5af5dfabea83a78bf83ba2b3a9fef` chỉ đạt 4/16 lượt do kiểm tra cổng `55432` báo `Address already in use` trước khi tạo tải 50 users. V3 dùng `socket.create_server` với SO_REUSEADDR trên Linux để không báo nhầm TIME_WAIT thành listener, vẫn chặn dịch vụ đang chạy; 13/13 helper/notebook/port tests trên Linux đạt. ZIP mới đã chạy đủ ma trận, không tái diễn lỗi cổng. Nếu cổng thật sự bận, xem runner log hoặc mở phiên Kaggle mới; không chạy nhiều ma trận đồng thời và không gộp số đo khác SHA thành cùng baseline.
+### Phạm vi đánh giá
 
-Runner dừng khi lượt đo lỗi, error rate trên 1% hoặc p95 trên 2.000 ms. `manifest.results` lấy bộ đếm cuối qua sự kiện kết thúc Locust (`locust_final.json`); CSV định kỳ vẫn giữ dưới `csv_snapshot` để đối chiếu. Percentile theo histogram làm tròn của Locust. Báo cáo kèm SHA, dirty flag, protocol, CPU model/affinity, CPU/RAM, versions, requests, failures, RPS, p95 và log. ZIP cũ 16 lượt thuộc SHA `48d01c3c95d136f808b846a66a75fe08aacd92be` dùng thời gian 15s/60s và CSV snapshot; chỉ là baseline lịch sử, không so trực tiếp với v2 và không chứng minh bản sau các thay đổi booking/thanh toán. Workload hiện chủ yếu là GET của chủ nuôi và một phần POST; chưa đo luồng admin, thanh toán và dữ liệu lớn. Kết quả này không phải cam kết tải production hoặc tự đủ cơ sở để chuyển microservice.
+Các số liệu trên thuộc đợt đo ngày 01/10/2026 và phản ánh hai kịch bản API đã nêu. Kiểm thử chưa bao phủ toàn bộ luồng admin, thanh toán, giao diện hoặc dữ liệu quy mô lớn; chưa xác định giới hạn tải tối đa của hệ thống. Báo cáo ZIP gồm kết quả, cấu hình môi trường và log cần được lưu cùng tài liệu bàn giao để đối chiếu.
 
 ## Kiểm thử chẩn đoán để chọn cải tiến Pha 2
 
@@ -206,8 +238,6 @@ Password hash/verify trên HTTP dùng PBKDF2 bất đồng bộ, giữ tương t
 | OpenAPI/Swagger | `backend/openapi.json`, `/api/docs/`, `test:openapi` |
 | Phân tầng và DAL/ORM | `backend/src/application`, `backend/src/infrastructure`, Prisma, `test:architecture` |
 | Đăng nhập và GET/POST xác thực | `requireAuth`, route auth, HTTP auth tests |
-| Docker | `Dockerfile.backend`, `docker-compose.yml`; đã kiểm tra build, migration, API health và luồng GET/POST/DELETE trên Compose project thử riêng |
-| GitHub và README | Nhánh `refactor` công khai; bản README tiếng Việt phải được đưa vào commit bàn giao |
-| Kaggle CPU | SHA `c178824e50bbdcd9c095ff706d9eb8c10a033596`, protocol v3: 16/16 lượt đạt, 72.107 request, 0 lỗi; xem kết quả và SHA256 ZIP ở trên |
-
-Trên working tree ngày 01/10/2026 sau khi thêm luồng tạo khách/dịch vụ tại quầy và kích hoạt tài khoản, build và **67/67 unit/HTTP test** đạt; kiểm tra kiến trúc **67 file**, OpenAPI **59 operation**, **10 nhóm integration PostgreSQL** và **23 Playwright test** đều đạt. Integration xác nhận mã hết hạn/đã dùng/cấp lại, tiêu thụ đồng thời đúng một lần, tranh chấp email không ghi dở dang, đăng nhập đúng ID cũ và giữ dữ liệu dịch vụ. Docker runtime đã được kiểm tra trong đợt nghiệm thu trước; đợt này dùng container PostgreSQL riêng để áp dụng migration mới và chạy API integration từ mã build mới, không rebuild toàn bộ Compose ứng dụng. Các kết quả chức năng này được ghi nhận trước khi commit; đợt đối chiếu ZIP mới chỉ kiểm tra bằng chứng Kaggle, không chạy lại toàn bộ test chức năng. Đã có baseline tải đầy đủ cho **SHA `c178824e50bbdcd9c095ff706d9eb8c10a033596`**. Khi bàn giao, đưa README cập nhật lên GitHub và giữ ZIP tương ứng; các tài liệu lưu riêng trên máy phát triển không phải điều kiện để làm theo README này.
+| Docker | `Dockerfile.backend`, `Dockerfile.frontend`, `docker-compose.yml`, `frontend/nginx/default.conf.template`; Compose gồm PostgreSQL, migration, API và frontend Nginx |
+| GitHub và README | Bản hiện tại thuộc nhánh `baseline/phase1-bootstrap`; cấu hình Docker và README cập nhật cần được commit/push cùng bản bàn giao |
+| Kaggle CPU | Hai kịch bản API, 1–100 người dùng đồng thời; đợt đo ngày 01/10/2026 hoàn thành 16/16 lượt, 72.107 yêu cầu, 0 lỗi |

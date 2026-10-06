@@ -9,12 +9,13 @@ import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { useAppStore } from "../../store/AppStoreProvider";
 import { isSpaAppointmentType, type AppointmentType } from "../../types/appointment";
+import { addDaysIso } from "../../utils/date";
 
 export function AppointmentsPage() {
   const { appointments, createAppointment, currentOwnerId, error, isLoading, ownerPets, pets } = useAppStore();
   const [petId, setPetId] = useState(ownerPets[0]?.id ?? "");
   const [serviceType, setServiceType] = useState<AppointmentType>("general_checkup");
-  const [date, setDate] = useState("2026-11-05");
+  const [date, setDate] = useState(() => addDaysIso(1));
   const [time, setTime] = useState("09:00");
   const [ownerNote, setOwnerNote] = useState("");
   const [selectedCalendarDate, setSelectedCalendarDate] = useState("");

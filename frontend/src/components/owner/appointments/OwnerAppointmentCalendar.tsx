@@ -54,6 +54,7 @@ export function OwnerAppointmentCalendar({
 
   const [visibleYear, visibleMonthNumber] = visibleMonth.split("-").map(Number);
   const daysInMonth = getDaysInMonth(visibleMonth);
+  const firstDayOffset = (new Date(visibleYear, visibleMonthNumber - 1, 1).getDay() + 6) % 7;
 
   const { authRole } = useSession();
   const calendar = useApiQuery<Record<string, number>>("/appointments/calendar?month=" + visibleMonth + "&category=" + category, {
@@ -64,25 +65,28 @@ export function OwnerAppointmentCalendar({
   const days = Array.from({ length: daysInMonth }, (_, index) => {
     const day = index + 1;
     const value = makeDateValue(visibleMonth, day);
-    const date = new Date(`${value}T00:00:00`);
     return {
       value,
       day,
-      weekday: date.toLocaleDateString("vi-VN", { weekday: "short" }),
       count: appointmentCountByDate[value] ?? 0,
     };
   });
 
   const selectedCount = selectedDate ? appointmentCountByDate[selectedDate] ?? 0 : 0;
 
+  const changeMonth = (monthKey: string) => {
+    setVisibleMonth(monthKey);
+    if (selectedDate && toMonthKey(selectedDate) !== monthKey) onClearDate();
+  };
+
   const goToMonth = (offset: number) => {
     const nextMonthIndex = visibleMonthNumber - 1 + offset;
     const nextDate = new Date(visibleYear, nextMonthIndex, 1);
-    setVisibleMonth(`${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`);
+    changeMonth(`${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`);
   };
 
   const handleMonthChange = (monthIndex: number) => {
-    setVisibleMonth(`${visibleYear}-${String(monthIndex + 1).padStart(2, "0")}`);
+    changeMonth(`${visibleYear}-${String(monthIndex + 1).padStart(2, "0")}`);
   };
 
   return (
@@ -140,6 +144,11 @@ export function OwnerAppointmentCalendar({
 
       {calendar.loading && <p role="status" className="text-sm text-slate-500">Đang tải lịch theo tháng...</p>}
       {calendar.error && <p role="alert" className="text-sm text-rose-700">Chưa tải được lịch theo tháng. <button type="button" className="underline" onClick={() => void calendar.reload().catch(() => undefined)}>Thử lại</button></p>}
+      <div className="mb-2 grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-500">
+        {["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "CN"].map((weekday) => (
+          <span key={weekday}>{weekday}</span>
+        ))}
+      </div>
       <div className="grid grid-cols-7 gap-2">
         {days.map((day) => {
           const hasAppointment = day.count > 0;
@@ -153,16 +162,16 @@ export function OwnerAppointmentCalendar({
               disabled={!hasAppointment}
               aria-label={`${day.value}, ${day.count} lịch hẹn`}
               aria-pressed={isSelected}
-              className={`relative min-h-16 rounded-md border p-3 text-center transition-colors ${
+              style={day.day === 1 ? { gridColumnStart: firstDayOffset + 1 } : undefined}
+              className={`relative flex min-h-16 items-end justify-center rounded-md border px-1 pb-2 pt-6 text-center transition-colors ${
                 hasAppointment
                   ? "border-primary/35 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10"
                   : "cursor-default border-slate-100 bg-slate-50 text-slate-400"
               } ${isSelected ? "bg-primary/10 ring-2 ring-primary ring-offset-2" : ""}`}
             >
-              <p className="text-xs font-semibold uppercase">{day.weekday}</p>
-              <p className="mt-1 text-lg font-black">{day.day}</p>
+              <p className="text-lg font-black">{day.day}</p>
               {hasAppointment && (
-                <span className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-black text-white">
+                <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-black text-white">
                   {day.count}
                 </span>
               )}
