@@ -127,32 +127,54 @@ Test trình duyệt nằm trong `tests/e2e/`. Các file `owner-activation.spec.t
 
 Các ca tích hợp PostgreSQL trong `backend/tests/*.integration.mjs` yêu cầu `PG_TEST_DATABASE_URL` trỏ tới database **riêng**, đã migrate và có tên kết thúc `_test`; bộ test từ chối host khác `localhost`/`127.0.0.1`. Vì vậy không thể chạy trực tiếp suite trong container `migrate` với URL dùng host `postgres` như cấu hình ứng dụng. Không dùng database đang vận hành để thử suite.
 
-## Kaggle CPU và giới hạn kết quả
+## Kiểm thử hiệu năng trên Kaggle CPU
 
-Commit/push cả bản Pha 1 và các file harness trong `benchmarks/kaggle/` (gồm `ports.py`, `test_ports.py`), lấy `git rev-parse HEAD`, rồi tải [`benchmarks/kaggle/notebook.ipynb`](benchmarks/kaggle/notebook.ipynb) lên Kaggle Notebook mới, chọn Accelerator **None**, bật Internet. Điền full `COMMIT_SHA` 40 ký tự ở cell cấu hình, giữ `RUN_LABEL="B1"`, rồi Run All. Notebook kiểm SHA, working tree và protocol `phase1-kaggle-v3`; source ở SHA cũ chưa có harness này sẽ bị chặn. Cell cài đặt kiểm cả PostgreSQL server (`initdb`, `pg_ctl`), chọn Node.js 24 và cài đúng Locust 2.44.4/psutil 7.0.0 bằng Python của kernel. Đây là môi trường đo tải riêng trên Kaggle.
+Ứng dụng sử dụng Locust để đo hiệu năng REST API trên Kaggle với hai kịch bản:
 
-Ma trận tối đa 16 lượt: ReadHeavyUser/MixedUser × 1/10/50/100 người dùng × hai lần. Notebook tạo thư mục bằng chứng mới cho mỗi lần chạy cell, giữ kết quả cũ. Tải ZIP ở mục **Output**, bấm refresh nếu chưa thấy. Không dùng đường dẫn `/kaggle/working/...` làm URL Jupyter proxy để tải trực tiếp. Khi một run lỗi hoặc bạn dừng ma trận, vẫn chạy cell cuối để đóng gói kết quả một phần và runner log. `COMPLETE_PASS` chỉ nghĩa là đủ ma trận này và không vi phạm điều kiện đo; `PARTIAL_OR_FAILED` nghĩa là thiếu/lỗi/vượt ngưỡng.
+- **ReadHeavyUser:** đọc dữ liệu tổng hợp, thú cưng, lịch hẹn và thông báo.
+- **MixedUser:** kết hợp các thao tác đọc với tạo lịch khám và gửi thông tin tìm thấy thú cưng qua hồ sơ QR.
 
-Protocol v3 giữ cấu hình đo của v2: warmup **45 giây**, process đo **120 giây**, tăng tải 5 người dùng/giây, think time 0,5–1,5 giây. Lượt đo khởi động Locust mới và **gồm ramp-up**; 100 users có khoảng 100 giây sau ramp, không gọi số tổng hợp là riêng steady state. HTTP timeout 10 giây, Locust cho tối đa 12 giây hoàn tất request đang chạy khi dừng. Riêng thời gian tải của 16 lượt khoảng 44 phút, cộng thời gian cài/build/migrate. Các biến profile/users/repeats/thời gian nằm ở đầu notebook; giữ nguyên khi so sánh B1/B2 trong cùng phiên Kaggle CPU.
+Backend, PostgreSQL và Locust chạy trên cùng môi trường CPU. Mỗi lượt dùng database tạm và dữ liệu giả lập, tách biệt với dữ liệu vận hành.
 
-### Kết quả B1 đã đối chiếu ngày 01/10/2026
+### Thực hiện kiểm thử
 
-ZIP `nipopeto-evidence-B1-20261001T103019Z-4fba7fce.zip` tại SHA **`c178824e50bbdcd9c095ff706d9eb8c10a033596`**, protocol v3, working tree sạch, đạt **COMPLETE_PASS: 16/16 lượt**, tổng **72.107 request, 0 lỗi**. Đã đối chiếu đủ ma trận, manifest với `locust_final.json`, CSV lỗi, runner/API/PostgreSQL logs; cấu hình phần cứng và phiên bản công cụ thống nhất, các lượt chạy tuần tự. SHA256 ZIP: `7a2d48c38e97a97e1b6082af441be70cf97ae51ccec260331df039b2ead3b627`. Giữ ZIP cùng bài nộp hoặc đính kèm bản phát hành để người khác kiểm chứng; tài liệu phân tích local không thay thế ZIP.
+1. Tải [notebook kiểm thử](benchmarks/kaggle/notebook.ipynb) lên Kaggle, chọn **Accelerator: None** và bật **Internet**.
+2. Điền thông tin phiên bản mã nguồn cần kiểm thử tại cell cấu hình theo hướng dẫn trong notebook.
+3. Chạy các cell theo thứ tự. Sau khi hoàn tất hoặc dừng kiểm thử, chạy cell cuối để đóng gói báo cáo và tải ZIP từ mục **Output**.
 
-| Users | ReadHeavy: RPS trung bình | ReadHeavy: p95 từng lượt (ms) | Mixed: RPS trung bình | Mixed: p95 từng lượt (ms) |
+### Cấu hình đo
+
+| Thông số | Giá trị |
+| --- | --- |
+| Mức tải | 1, 10, 50 và 100 người dùng đồng thời |
+| Số lần lặp | 2 lần cho mỗi kịch bản và mức tải, tổng cộng 16 lượt |
+| Thời gian khởi động tải | 45 giây mỗi lượt |
+| Thời gian đo | 120 giây mỗi lượt, bao gồm giai đoạn tăng tải |
+| Tốc độ tăng tải | 5 người dùng/giây |
+| Khoảng nghỉ giữa thao tác | 0,5–1,5 giây |
+| Thời gian chờ HTTP tối đa | 10 giây |
+| Ngưỡng đánh giá | Tỷ lệ lỗi không quá 1%; p95 không quá 2.000 ms |
+
+Môi trường ghi nhận: Intel Xeon 2,20 GHz, 4 CPU logic, RAM khoảng 31,35 GiB; Node.js 24.15.0, PostgreSQL 14.24, Python 3.12.13 và Locust 2.44.4.
+
+### Kết quả đo ngày 01/10/2026
+
+Hoàn thành **16/16 lượt**, tổng cộng **72.107 yêu cầu, 0 lỗi**. Thời gian toàn bộ đợt kiểm thử khoảng **58,38 phút**, bao gồm cài đặt, build, migration và đo tải.
+
+| Người dùng đồng thời | ReadHeavy: RPS trung bình | ReadHeavy: p95 từng lượt (ms) | Mixed: RPS trung bình | Mixed: p95 từng lượt (ms) |
 | ---: | ---: | ---: | ---: | ---: |
 | 1 | 1,05 | 8 / 8 | 1,05 | 14 / 14 |
 | 10 | 9,96 | 7 / 7 | 9,92 | 13 / 13 |
 | 50 | 48,18 | 8 / 9 | 47,89 | 13 / 13 |
 | 100 | 91,80 | 11 / 12 | 91,62 | 15 / 15 |
 
-RPS là trung bình số đo của hai lượt; p95 giữ riêng từng lượt, không lấy trung bình percentile để giả thành percentile gộp. Phần cứng Kaggle: Intel Xeon 2,20 GHz, 4 logical CPUs, affinity [0,1,2,3], RAM khoảng 31,35 GiB. Công cụ: Node 24.15.0, npm 11.12.1, PostgreSQL 14.24, Python 3.12.13, Locust 2.44.4. Warmup/đo 45s/120s mỗi lượt; toàn ma trận khoảng 58,38 phút kể cả setup/build/migrate từng lượt.
+RPS là số yêu cầu xử lý mỗi giây, lấy trung bình của hai lượt. p95 là thời gian phản hồi mà 95% yêu cầu không vượt quá; bảng giữ riêng giá trị của từng lượt.
 
-Ở 100 users, CPU API trung bình qua hai lượt khoảng 50,47% (ReadHeavy) và 56,40% (Mixed), với **100%=một core**, không phải toàn máy; PostgreSQL khoảng 6,54% và 9,08%. Chưa thấy dấu hiệu bão hòa CPU trong workload đã đo. Kết quả đáp ứng phần kiểm thử tải Kaggle CPU của Pha 1 cho SHA trên; chưa xác định giới hạn tải tối đa hoặc đủ cơ sở bắt buộc tách microservice.
+Ở mức 100 người dùng, CPU API trung bình khoảng **50,47%** với ReadHeavy và **56,40%** với Mixed; PostgreSQL lần lượt khoảng **6,54%** và **9,08%**. Các tỷ lệ này dùng quy ước **100% tương ứng một lõi CPU**. Chưa ghi nhận bão hòa CPU trong phạm vi tải đã đo.
 
-Lịch sử: ZIP tại SHA `957e693a8bf5af5dfabea83a78bf83ba2b3a9fef` chỉ đạt 4/16 lượt do kiểm tra cổng `55432` báo `Address already in use` trước khi tạo tải 50 users. V3 dùng `socket.create_server` với SO_REUSEADDR trên Linux để không báo nhầm TIME_WAIT thành listener, vẫn chặn dịch vụ đang chạy; 13/13 helper/notebook/port tests trên Linux đạt. ZIP mới đã chạy đủ ma trận, không tái diễn lỗi cổng. Nếu cổng thật sự bận, xem runner log hoặc mở phiên Kaggle mới; không chạy nhiều ma trận đồng thời và không gộp số đo khác SHA thành cùng baseline.
+### Phạm vi đánh giá
 
-Runner dừng khi lượt đo lỗi, error rate trên 1% hoặc p95 trên 2.000 ms. `manifest.results` lấy bộ đếm cuối qua sự kiện kết thúc Locust (`locust_final.json`); CSV định kỳ vẫn giữ dưới `csv_snapshot` để đối chiếu. Percentile theo histogram làm tròn của Locust. Báo cáo kèm SHA, dirty flag, protocol, CPU model/affinity, CPU/RAM, versions, requests, failures, RPS, p95 và log. ZIP cũ 16 lượt thuộc SHA `48d01c3c95d136f808b846a66a75fe08aacd92be` dùng thời gian 15s/60s và CSV snapshot; chỉ là baseline lịch sử, không so trực tiếp với v2 và không chứng minh bản sau các thay đổi booking/thanh toán. Workload hiện chủ yếu là GET của chủ nuôi và một phần POST; chưa đo luồng admin, thanh toán và dữ liệu lớn. Kết quả này không phải cam kết tải production hoặc tự đủ cơ sở để chuyển microservice.
+Các số liệu trên thuộc đợt đo ngày 01/10/2026 và phản ánh hai kịch bản API đã nêu. Kiểm thử chưa bao phủ toàn bộ luồng admin, thanh toán, giao diện hoặc dữ liệu quy mô lớn; chưa xác định giới hạn tải tối đa của hệ thống. Báo cáo ZIP gồm kết quả, cấu hình môi trường và log cần được lưu cùng tài liệu bàn giao để đối chiếu.
 
 ## Tình trạng nghiệm thu
 
@@ -164,12 +186,5 @@ Runner dừng khi lượt đo lỗi, error rate trên 1% hoặc p95 trên 2.000 
 | Đăng nhập và GET/POST xác thực | `requireAuth`, route auth, HTTP auth tests |
 | Docker | `Dockerfile.backend`, `Dockerfile.frontend`, `docker-compose.yml`, `frontend/nginx/default.conf.template`; Compose gồm PostgreSQL, migration, API và frontend Nginx |
 | GitHub và README | Bản hiện tại thuộc nhánh `baseline/phase1-bootstrap`; cấu hình Docker và README cập nhật cần được commit/push cùng bản bàn giao |
-| Kaggle CPU | SHA `c178824e50bbdcd9c095ff706d9eb8c10a033596`, protocol v3: 16/16 lượt đạt, 72.107 request, 0 lỗi; xem kết quả và SHA256 ZIP ở trên |
+| Kaggle CPU | Hai kịch bản API, 1–100 người dùng đồng thời; đợt đo ngày 01/10/2026 hoàn thành 16/16 lượt, 72.107 yêu cầu, 0 lỗi |
 
-Đợt kiểm tra ngày **05/10/2026** trên working tree tại commit `3619e02`: build backend/frontend, **67/67 unit/HTTP test**, kiểm tra kiến trúc **67 file**, OpenAPI **59 operation** và **10 nhóm integration PostgreSQL** đều đạt. PostgreSQL chạy trong Docker thử riêng; đây chưa phải kết quả kiểm tra toàn bộ Compose có frontend Nginx.
-
-Toàn bộ Playwright: **37 đạt, 5 lỗi, 2 bỏ qua**. Bốn ca lỗi do giới hạn xác thực; một ca lệch câu thông báo mong đợi trong test hoàn tác có hóa đơn. Chạy riêng sau khi khởi động lại API thử, bốn ca trang demo/QR và ca đặt hotel–gửi lại–tải lại đều đạt. Không coi bộ browser test hiện tại là đã đạt toàn bộ.
-
-Các vấn đề đã tái hiện và còn cần sửa: hạn mức 50 yêu cầu/15 phút áp dụng cả `/auth/me` có thể làm mất phiên khi tải lại nhiều lần; đăng ký trùng số điện thoại trả `500`; tạo lịch nhận giờ đã qua trong hôm nay; đăng ký nhận mật khẩu một ký tự; đăng ký/sửa hồ sơ nhận số điện thoại có chữ. Tạo khách tại quầy dùng quy trình kiểm tra riêng và trả `409` khi trùng liên hệ như mô tả ở trên.
-
-Kết quả Kaggle B1 ở trên thuộc **SHA `c178824e50bbdcd9c095ff706d9eb8c10a033596`**, không chứng minh các thay đổi sau SHA đó. Khi bàn giao, giữ ZIP tương ứng cùng bài nộp hoặc bản phát hành.
