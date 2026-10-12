@@ -9,8 +9,15 @@ vite.config.d.ts
 frontend/.env
 backend/.env
 backend/uploads/
+backend/src/generated/
+services/*/src/generated/
 .DS_Store
 playwright-report/
 test-results/
 __pycache__/
 MANUAL_TEST_CHECKLIST.md
+# Keep phase 2 handoff instructions despite machine-local *.md exclusions.
+!phase2-plan/*.md
+!phase2-plan/evidence/*.md
+!deploy/phase2/*.md
+!tools/vendor/braces/PATCH-NOTES.md

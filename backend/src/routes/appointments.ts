@@ -55,7 +55,7 @@ export function createAppointmentsRouter(service: AppointmentService) {
   router.post("/:id/reminder", async (req, res) => {
     try {
       await service.sendReminder(req.auth!, req.params.id);
-      res.status(201).json({ message: "Reminder sent." });
+      res.status(201).json({ message: "Reminder request accepted." });
     } catch (error) { failure(res, error); }
   });
 

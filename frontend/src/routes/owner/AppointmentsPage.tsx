@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { useRequestIntent } from '../../services/useRequestIntent';
 import { Link } from "react-router-dom";
 import { Plus, PawPrint } from "lucide-react";
 import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
@@ -8,11 +9,19 @@ import { OwnerAppointmentList } from "../../components/owner/appointments/OwnerA
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { useAppStore } from "../../store/AppStoreProvider";
-import { isSpaAppointmentType, type AppointmentType } from "../../types/appointment";
+import { type AppointmentType } from "../../types/appointment";
 import { addDaysIso } from "../../utils/date";
 
+import { useApiQuery } from '../../services/useApiQuery';
+import type { ListPage } from '../../types/list';
+import type { Pet } from '../../types/pet';
+import { QueryStatus } from '../../components/ui/QueryStatus';
+
 export function AppointmentsPage() {
-  const { appointments, createAppointment, currentOwnerId, error, isLoading, ownerPets, pets } = useAppStore();
+  const intent=useRequestIntent(),sending=useRef(false);
+  const { createAppointment, error, isLoading } = useAppStore();
+  const petQuery = useApiQuery<ListPage<Pet>>('/pets?pageSize=1', { refreshOnTick: true });
+  const ownerPets = petQuery.data?.items ?? [];
   const [petId, setPetId] = useState(ownerPets[0]?.id ?? "");
   const [serviceType, setServiceType] = useState<AppointmentType>("general_checkup");
   const [date, setDate] = useState(() => addDaysIso(1));
@@ -21,37 +30,25 @@ export function AppointmentsPage() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState("");
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    if (!ownerPets.some((pet) => pet.id === petId)) setPetId(ownerPets[0]?.id ?? "");
-  }, [ownerPets, petId]);
-
-  const ownerAppointments = useMemo(
-    () => appointments.filter(a => a.ownerId === currentOwnerId && !isSpaAppointmentType(a.type)),
-    [appointments, currentOwnerId],
-  );
-  const visibleAppointments = useMemo(
-    () => selectedCalendarDate
-      ? ownerAppointments.filter((appointment) => appointment.date === selectedCalendarDate)
-      : ownerAppointments,
-    [ownerAppointments, selectedCalendarDate],
-  );
   const selectedService = OWNER_APPOINTMENT_SERVICES.find(s => s.type === serviceType) ?? OWNER_APPOINTMENT_SERVICES[0];
 
   const handleSubmit = async () => {
-    if (!petId) return;
+    if (!petId||sending.current) return;
+    sending.current=true;
     try {
-      await createAppointment({ petId, type: serviceType, serviceName: selectedService.label, date, time, doctorId: "doctor_mai", ownerNote });
+      const input={ petId, type: serviceType, serviceName: selectedService.label, date, time, ownerNote };
+      await createAppointment(input,intent.key(input));intent.complete();
       setOwnerNote("");
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch {
       setSuccess(false);
-    }
+    }finally{sending.current=false;}
   };
 
   return (
     <OwnerLayout title="Quản lý lịch khám">
-      {ownerPets.length === 0 ? (
+      {!petQuery.data ? <QueryStatus label="thú cưng" query={petQuery} /> : ownerPets.length === 0 ? (
         <EmptyState
           icon={<PawPrint size={42} />}
           title="Cần thêm thú cưng trước khi đặt lịch"
@@ -84,8 +81,6 @@ export function AppointmentsPage() {
             onClearDate={() => setSelectedCalendarDate("")}
           />
           <OwnerAppointmentList
-            appointments={visibleAppointments}
-            pets={pets}
             selectedDate={selectedCalendarDate || undefined}
             onClearDate={() => setSelectedCalendarDate("")}
           />

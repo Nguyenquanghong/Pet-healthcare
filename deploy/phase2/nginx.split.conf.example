@@ -1,0 +1,41 @@
+# API gateway example only. Supply frontend/TLS routing in the deployment
+# configuration reviewed during P7. The user's existing nginx file is untouched.
+worker_processes 1;
+events { worker_connections 1024; }
+http {
+    log_format safe '{"status":"$status","upstream":"$upstream_status","requestId":"$http_x_request_id"}';
+    access_log logs/access.log safe;
+    # Raw URLs may contain public rescue tokens. Avoid routine request URLs.
+    error_log logs/error.log crit;
+    upstream core { server 127.0.0.1:5000; }
+    upstream clinic {
+        server 127.0.0.1:5101 max_fails=1 fail_timeout=2s;
+        server 127.0.0.1:5103 max_fails=1 fail_timeout=2s;
+    }
+    upstream notification { server 127.0.0.1:5102; }
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header X-Request-Id $http_x_request_id;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_connect_timeout 1s;
+    proxy_read_timeout 12s;
+    proxy_send_timeout 12s;
+    proxy_next_upstream error timeout http_502 http_503 http_504;
+    proxy_next_upstream_tries 2;
+    # Never enable non_idempotent retries; the client retries durable keys.
+    server {
+        listen 127.0.0.1:8080;
+        location ~ ^/(internal|metrics|health) { return 404; }
+        location ~ ^/api/(appointments|medical-records|dashboard/clinic)(/|$) { proxy_pass http://clinic; }
+        location ~ ^/api/notifications(/|$) { proxy_pass http://notification; }
+        location /api/ { proxy_pass http://core; }
+        location / { return 404; }
+    }
+    # Core CLINIC_SERVICE_URL may point here for private billing/bootstrap.
+    # Each internal endpoint still verifies its scoped service/actor credential.
+    server {
+        listen 127.0.0.1:8081;
+        location = /metrics { return 404; }
+        location / { proxy_pass http://clinic; }
+    }
+}

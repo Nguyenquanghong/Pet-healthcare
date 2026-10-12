@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient, authToken } from "./apiClient";
 import { useSession } from "../store/SessionContext";
-import { useDataRefresh } from "../store/DataRefreshContext";
+import { useDataRefresh, queryScopes } from "../store/DataRefreshContext";
 
-type QueryOptions = { enabled?: boolean; debounceMs?: number; refreshOnTick?: boolean };
-type QueryState<T> = { key: string; data: T | undefined; loading: boolean; error: string };
+export type QueryOptions = { enabled?: boolean; debounceMs?: number; refreshOnTick?: boolean; pollMs?: number };
+type QueryState<T> = { key: string; data: T | undefined; loading: boolean; error: string; asOf?: string };
 
 // One request lifecycle for lists and detail/aggregate queries; callers own their data.
-export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, refreshOnTick = false }: QueryOptions = {}) {
-  const { authRole } = useSession();
+export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, refreshOnTick = false, pollMs }: QueryOptions = {}) {
+  const { authRole, sessionKey } = useSession();
   const refresh = useDataRefresh();
   const token = authToken.get();
-  const key = JSON.stringify([url, token, authRole, enabled]);
+  const key = JSON.stringify([url, sessionKey, authRole, enabled]);
   const [state, setState] = useState<QueryState<T>>({ key, data: undefined, loading: enabled, error: "" });
   const currentKey = useRef(key); currentKey.current = key;
   const mounted = useRef(false);
@@ -19,7 +19,6 @@ export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, re
   const controller = useRef<AbortController | null>(null);
   const timer = useRef<number | null>(null);
   const flight = useRef<{ key: string; sequence: number; promise: Promise<T | undefined> } | null>(null);
-  const lastRefresh = useRef(refresh);
 
   const load = useCallback((force: boolean): Promise<T | undefined> => {
     if (!enabled || !mounted.current || key !== currentKey.current || token !== authToken.get()) return Promise.resolve(undefined);
@@ -28,12 +27,12 @@ export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, re
     const active = new AbortController(); controller.current = active;
     const request = ++sequence.current;
     const isCurrent = () => mounted.current && request === sequence.current && key === currentKey.current && token === authToken.get();
-    setState(previous => ({ key, data: previous.key === key ? previous.data : undefined, loading: true, error: "" }));
+    setState(previous => ({ key, data: previous.key === key ? previous.data : undefined, asOf: previous.key === key ? previous.asOf : undefined, loading: true, error: "" }));
     const promise = (async () => {
       try {
         const result = await apiClient.get<T>(url, { signal: AbortSignal.any([active.signal, AbortSignal.timeout(15_000)]) });
         if (!isCurrent() || active.signal.aborted) return undefined;
-        setState({ key, data: result, loading: false, error: "" });
+        setState({ key, data: result, loading: false, error: "", asOf: new Date().toISOString() });
         return result;
       } catch (reason) {
         if (isCurrent() && !active.signal.aborted) {
@@ -57,7 +56,6 @@ export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, re
 
   useEffect(() => {
     mounted.current = true;
-    lastRefresh.current = refresh;
     setState({ key, data: undefined, loading: enabled, error: "" });
     if (enabled) timer.current = window.setTimeout(() => {
       timer.current = null;
@@ -71,12 +69,25 @@ export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, re
   }, [load, debounceMs]);
 
   useEffect(() => {
-    const previous = lastRefresh.current;
-    lastRefresh.current = refresh;
-    // The scheduled query already reads the latest data after its debounce.
-    if (!refreshOnTick || refresh.version === previous.version || timer.current !== null) return;
-    void load(refresh.changeVersion !== previous.changeVersion).catch(() => undefined);
-  }, [refresh, refreshOnTick, load]);
+    if (enabled && refreshOnTick) return refresh.register(queryScopes(url), reload);
+  }, [refresh, refreshOnTick, enabled, url, reload]);
+
+  useEffect(() => {
+    if (!enabled || !pollMs) return;
+    let stopped = false, running = false, next: number | undefined, failures = 0;
+    const schedule = () => { window.clearTimeout(next); if (!stopped) next = window.setTimeout(tick, Math.min(120000, pollMs * 2 ** failures) * (0.85 + Math.random() * 0.3)); };
+    const tick = async () => {
+      if (stopped || running) return;
+      running = true;
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        try { await load(false); failures = 0; } catch { failures = Math.min(3, failures + 1); }
+      }
+      running = false; schedule();
+    };
+    const resume = () => { if (document.visibilityState === 'visible' && navigator.onLine) { window.clearTimeout(next); void tick(); } };
+    schedule(); window.addEventListener('online', resume); document.addEventListener('visibilitychange', resume);
+    return () => { stopped = true; window.clearTimeout(next); window.removeEventListener('online', resume); document.removeEventListener('visibilitychange', resume); };
+  }, [enabled, pollMs, key, load]);
 
   const setData = useCallback((change: T | ((previous: T | undefined) => T | undefined)) => {
     if (!mounted.current || key !== currentKey.current || token !== authToken.get()) return;
@@ -87,6 +98,6 @@ export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, re
     });
   }, [key, token]);
 
-  const current = state.key === key ? state : { data: undefined, loading: enabled, error: "" };
-  return { data: current.data, loading: current.loading, error: current.error, reload, setData };
+  const current = state.key === key ? state : { data: undefined, loading: enabled, error: "", asOf: undefined };
+  return { data: current.data, loading: current.loading, error: current.error, asOf: current.asOf, reload, setData };
 }

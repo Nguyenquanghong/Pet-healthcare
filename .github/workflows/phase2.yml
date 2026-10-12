@@ -1,0 +1,32 @@
+name: Phase2 correctness
+on: [push, pull_request]
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run phase2:build
+      - run: npm run phase2:test:contracts
+      - run: npm run phase2:test:architecture
+      - run: npm run phase2:test:notification-writers
+      - run: npm run phase2:test:source
+      - run: npx playwright install --with-deps chromium
+      - run: npm run phase2:test:notification-ui
+      - run: npm run phase2:up
+      - run: npm run phase2:test:integration
+      - run: npm run phase2:test:notification
+      - run: npm run phase2:test:notification-runtime
+      - run: npm run phase2:test:clinic
+      - run: npm run phase2:test:billing
+      - run: sudo apt-get update && sudo apt-get install -y nginx
+      - run: npm run phase2:test:resilience
+      - run: npm run phase2:test:migration
+      - run: npm run phase2:test:e2e
+      - if: always()
+        run: docker compose -f deploy/phase2/compose.test.yml stop

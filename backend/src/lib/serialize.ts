@@ -16,6 +16,7 @@ export function publicUser(user: UserAccount) {
     role: user.role,
     address: user.address ?? undefined,
     avatarUrl: user.avatarUrl ?? undefined,
+    ...(user.directoryRevision?{directoryVersion:user.directoryRevision}:{}),
   };
 }
 
@@ -27,6 +28,7 @@ export function petDto(pet: PetValue) {
   return {
     id: pet.id,
     ownerId: pet.ownerId,
+    ...(pet.directoryRevision?{directoryVersion:pet.directoryRevision}:{}),
     name: pet.name,
     species: pet.species,
     breed: pet.breed ?? "",

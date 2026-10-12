@@ -1,0 +1,496 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nipopeto:events:v1:envelope",
+  "type": "object",
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "producer",
+    "aggregateType",
+    "aggregateId",
+    "aggregateVersion",
+    "occurredAt",
+    "correlationId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "eventType": {
+      "enum": [
+        "notification.requested.v1",
+        "billing.invoice-issued.v1",
+        "billing.operation-aborted.v1",
+        "directory.owner-upserted.v1",
+        "directory.pet-upserted.v1",
+        "directory.staff-upserted.v1"
+      ]
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "producer": {
+      "enum": [
+        "core",
+        "clinic"
+      ]
+    },
+    "aggregateType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "aggregateId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "aggregateVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "eventType": {
+            "const": "notification.requested.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "notificationId",
+              "recipientOwnerId",
+              "title",
+              "message"
+            ],
+            "properties": {
+              "notificationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "recipientOwnerId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "recipientRole": {
+                "enum": [
+                  "owner",
+                  "admin"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 10000
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 10000
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "status": {
+                "enum": [
+                  "sent",
+                  "read"
+                ]
+              },
+              "actionUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "relatedPetId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "relatedAppointmentId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "relatedBookingId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "sentByStaffId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "sentAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "oneOf": [
+              {
+                "properties": {
+                  "recipientRole": {
+                    "const": "owner"
+                  },
+                  "recipientOwnerId": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "required": [
+                  "recipientRole"
+                ],
+                "properties": {
+                  "recipientRole": {
+                    "const": "admin"
+                  },
+                  "recipientOwnerId": {
+                    "type": "null"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "eventType": {
+            "const": "billing.invoice-issued.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "operationId",
+              "invoiceId"
+            ],
+            "properties": {
+              "operationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "invoiceId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "appointmentId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "eventType": {
+            "const": "billing.operation-aborted.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "operationId"
+            ],
+            "properties": {
+              "operationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "appointmentId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "eventType": {
+            "const": "directory.owner-upserted.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "producer": {
+            "const": "core"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "sourceVersion",
+              "displayName"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sourceVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "displayName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "ownerId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "species": {
+                "enum": [
+                  "dog",
+                  "cat",
+                  "rabbit",
+                  "other"
+                ]
+              },
+              "deletedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 200
+              },
+              "breed": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 200
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "eventType": {
+            "const": "directory.pet-upserted.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "producer": {
+            "const": "core"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "sourceVersion",
+              "displayName",
+              "ownerId"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sourceVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "displayName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "ownerId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "species": {
+                "enum": [
+                  "dog",
+                  "cat",
+                  "rabbit",
+                  "other"
+                ]
+              },
+              "deletedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 200
+              },
+              "breed": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 200
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "eventType": {
+            "const": "directory.staff-upserted.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "producer": {
+            "const": "core"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "sourceVersion",
+              "displayName"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sourceVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "displayName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "ownerId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "species": {
+                "enum": [
+                  "dog",
+                  "cat",
+                  "rabbit",
+                  "other"
+                ]
+              },
+              "deletedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 200
+              },
+              "breed": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 200
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

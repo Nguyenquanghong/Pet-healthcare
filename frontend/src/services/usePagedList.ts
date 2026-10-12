@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "../store/SessionContext";
 import { emptyRelated, type ListPage } from "../types/list";
-import { useApiQuery } from "./useApiQuery";
+import { useApiQuery, type QueryOptions } from "./useApiQuery";
 
 export type { PaginationInfo, RelatedData, ListPage } from "../types/list";
 export { emptyRelated } from "../types/list";
 
-export function usePagedList<T>(endpoint: string, filters: Record<string, string | undefined> = {}, enabled = true) {
+export function usePagedList<T>(endpoint: string, filters: Record<string, string | undefined> = {}, enabled = true, options: Pick<QueryOptions, 'pollMs'> = {}) {
   const { authRole } = useSession();
   const params = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1]) && (entry[1] !== "all" || entry[0] === "q" || entry[0] === "id")).sort(([a], [b]) => a.localeCompare(b)));
   const key = endpoint + "?" + params.toString();
@@ -15,7 +15,7 @@ export function usePagedList<T>(endpoint: string, filters: Record<string, string
   const pageSize = position.pageSize;
   params.set("page", String(page)); params.set("pageSize", String(pageSize));
   const query = useApiQuery<ListPage<T>>(endpoint + "?" + params.toString(), {
-    enabled: enabled && Boolean(authRole), debounceMs: filters.q ? 250 : 0, refreshOnTick: true,
+    enabled: enabled && Boolean(authRole), debounceMs: filters.q ? 250 : 0, refreshOnTick: true, ...options,
   });
   const data: ListPage<T> = query.data ?? { items: [], pagination: { page, pageSize, total: 0, totalPages: 0 }, counts: {}, related: emptyRelated };
   useEffect(() => {
@@ -28,7 +28,7 @@ export function usePagedList<T>(endpoint: string, filters: Record<string, string
     const current = previous ?? data;
     return { ...current, items: (typeof change === "function" ? change(current.items) : change).slice(0, pageSize) };
   });
-  return { ...data, loading: query.loading, error: query.error, reload, setItems, page, pageSize,
+  return { ...data, loading: query.loading, error: query.error, asOf: query.asOf, reload, setItems, page, pageSize,
     setPage: (next: number) => setPosition({ key, page: next, pageSize }),
     setPageSize: (size: number) => setPosition({ key, page: 1, pageSize: size }) };
 }

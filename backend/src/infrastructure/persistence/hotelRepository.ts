@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { BusinessError } from "../../domain/error.js";
+import { writeNotification } from './notificationOutbox.js';
 import type { HotelBookingRepository, HotelDependencies, HotelNotificationWriter, HotelTransaction, HotelUnitOfWork } from "../../application/ports/hotelBookings.js";
 
 type Client = PrismaClient | Prisma.TransactionClient;
@@ -51,7 +52,7 @@ class PrismaHotelBookingRepository implements HotelBookingRepository {
 class PrismaHotelNotificationWriter implements HotelNotificationWriter {
   constructor(private readonly client: Client) {}
   async create(draft: Parameters<HotelNotificationWriter["create"]>[0]) {
-    await this.client.notification.create({ data: draft });
+    await writeNotification(this.client, draft);
   }
 }
 

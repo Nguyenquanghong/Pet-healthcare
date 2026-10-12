@@ -4,6 +4,7 @@ export type UserAccount = {
   id: string; username: string | null; phone: string | null; email: string | null;
   passwordHash: string; passwordSalt: string; fullName: string; role: Role;
   address: string | null; avatarUrl: string | null; createdAt: Date; updatedAt: Date;
+  directoryRevision?:number;
 };
 
 export interface UserRepository {

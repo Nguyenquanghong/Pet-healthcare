@@ -29,9 +29,16 @@ const BOOKING_STATUS_STYLES: Record<string, string> = {
   cancelled: "bg-slate-100 text-slate-500 border border-slate-200",
 };
 
+import { useApiQuery } from '../../services/useApiQuery';
+import type { ListPage } from '../../types/list';
+import type { Pet } from '../../types/pet';
+import { QueryStatus } from '../../components/ui/QueryStatus';
+
 export function HotelBookingPage() {
   const navigate = useNavigate();
-  const { createHotelBooking, cancelHotelBooking, currentOwnerId, ownerPets } = useAppStore();
+  const { createHotelBooking, cancelHotelBooking, petUpdates } = useAppStore();
+  const petQuery = useApiQuery<ListPage<Pet>>('/pets?pageSize=1', { refreshOnTick: true });
+  const ownerPets = petQuery.data?.items ?? [];
   const [petId, setPetId] = useState(ownerPets[0]?.id ?? "");
   const today = () => new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
   const nextDay = () => new Date(new Date(`${today()}T00:00:00.000Z`).getTime() + 86_400_000).toISOString().slice(0, 10);
@@ -49,15 +56,11 @@ export function HotelBookingPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [feedbackMsg, setFeedbackMsg] = useState("");
 
-  useEffect(() => {
-    if (!ownerPets.some((pet) => pet.id === petId)) setPetId(ownerPets[0]?.id ?? "");
-  }, [ownerPets, petId]);
-
-  const nights = calculateNights(checkIn, checkOut);
+const nights = calculateNights(checkIn, checkOut);
   const datesValid = /^\d{4}-\d{2}-\d{2}$/.test(checkIn) && /^\d{4}-\d{2}-\d{2}$/.test(checkOut)
     && checkIn >= today() && nights >= 1;
   const total = datesValid ? calculateBookingTotal(roomType, serviceKeys, nights) : 0;
-  const selectedPet = ownerPets.find((p) => p.id === petId);
+  const selectedPet = petUpdates[petId] ?? ownerPets.find((p) => p.id === petId);
   const list = usePagedList<HotelBooking>("/hotel-bookings");
   const ownerBookings = list.items;
 
@@ -92,7 +95,7 @@ export function HotelBookingPage() {
   return (
     <OwnerLayout title="Đặt chỗ khách sạn thú cưng">
       <Pagination {...list} />
-      {ownerPets.length === 0 ? (
+      {!petQuery.data ? <QueryStatus label="thú cưng" query={petQuery} /> : ownerPets.length === 0 ? (
         <EmptyState
           icon={<PawPrint size={42} />}
           title="Cần thêm thú cưng trước khi đặt hotel"

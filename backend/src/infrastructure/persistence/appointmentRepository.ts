@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { AppointmentDependencies, AppointmentRepository, AppointmentTransaction, AppointmentUnitOfWork, NotificationWriter } from "../../application/ports/appointments.js";
 import { appointmentSlotWrite } from "./appointmentSlotConflict.js";
+import { writeNotification } from './notificationOutbox.js';
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -41,7 +42,7 @@ class PrismaAppointmentRepository implements AppointmentRepository {
 class PrismaNotificationWriter implements NotificationWriter {
   constructor(private readonly client: Client) {}
   async create(draft: Parameters<NotificationWriter["create"]>[0]) {
-    await this.client.notification.create({ data: draft });
+    await writeNotification(this.client, draft);
   }
 }
 

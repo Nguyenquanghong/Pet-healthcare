@@ -33,8 +33,6 @@ const STATUS_TABS: Array<{ key: StatusTab; label: string; description: string; c
 
 interface OwnerAppointmentListProps {
   mode?: "medical" | "spa";
-  appointments: Appointment[];
-  pets: Pet[];
   selectedDate?: string;
   onClearDate?: () => void;
 }

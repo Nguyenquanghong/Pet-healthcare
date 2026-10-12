@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+  output = "../src/generated/client"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model InboxEvent {
+  consumerName String
+  eventId String
+  createdAt DateTime @default(now())
+  @@id([consumerName, eventId])
+}
+model Notification {
+  id String @id
+  recipientOwnerId String?
+  recipientRole String @default("owner")
+  type String @default("general")
+  title String
+  message String
+  status String @default("sent")
+  actionUrl String?
+  relatedPetId String?
+  relatedAppointmentId String?
+  relatedBookingId String?
+  sentByStaffId String?
+  createdAt DateTime @default(now())
+  sentAt DateTime @default(now())
+  @@index([recipientOwnerId, createdAt, id])
+  @@index([recipientRole, createdAt, id])
+  @@map("notifications")
+}
+model RequestDedup {
+  id String @id
+  actorId String
+  operationType String
+  key String
+  requestHash String
+  resourceId String
+  responseStatus Int
+  responsePayload Json
+  createdAt DateTime @default(now())
+  @@unique([actorId, operationType, key])
+}

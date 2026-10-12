@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+  output = "../../src/generated/phase2-core"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model BillingOperation {
+  id String @id
+  actorId String
+  idempotencyKey String
+  requestHash String
+  appointmentId String
+  expectedRevision Int
+  amount Int
+  state String @default("PREPARING")
+  createdAt DateTime @default(now())
+  @@unique([actorId, idempotencyKey])
+}
+model ProofInvoice {
+  id String @id
+  operationId String @unique
+  appointmentId String @unique
+  amount Int
+  sourceSnapshot Json
+}
+model OutboxEvent {
+  id String @id
+  envelope Json
+  createdAt DateTime @default(now())
+  publishedAt DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseOwner String?
+  leaseUntil DateTime?
+  lastErrorCode String?
+  @@index([publishedAt, nextAttemptAt])
+}

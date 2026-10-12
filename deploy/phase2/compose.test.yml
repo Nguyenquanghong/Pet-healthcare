@@ -1,0 +1,41 @@
+name: pet-phase2-p1-test
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: p2_bootstrap
+      POSTGRES_PASSWORD: p2_bootstrap_fixture_only
+      POSTGRES_DB: postgres
+    ports: ["127.0.0.1:55432:5432"]
+    volumes:
+      - p2_pg_test:/var/lib/postgresql/data
+      - ./init-test.sql:/docker-entrypoint-initdb.d/01-phase2.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U p2_bootstrap -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    hostname: p2-rabbit-test
+    environment:
+      RABBITMQ_DEFAULT_USER: p2_test
+      RABBITMQ_DEFAULT_PASS: p2_broker_fixture_only
+    ports: ["127.0.0.1:5679:5672"]
+    volumes: ["p2_rabbit_test:/var/lib/rabbitmq"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  redis:
+    image: redis:7.4-alpine
+    ports: ["127.0.0.1:6389:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  p2_pg_test:
+  p2_rabbit_test:

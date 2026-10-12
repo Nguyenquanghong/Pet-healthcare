@@ -58,6 +58,8 @@ Invoke-RestMethod http://localhost:5000/api/health
 
 Mở `http://localhost:5173`. Compose khởi động PostgreSQL, chạy `migrate` rồi khởi động API và frontend. `migrate` thoát mã 0 là bình thường. Frontend được build trong Docker và phục vụ bằng Nginx; `/api/` được chuyển tiếp tới API qua mạng Compose. Có thể đổi cổng giao diện bằng `FRONTEND_PORT` trong `.env.docker`; bản frontend Docker luôn gọi `/api` cùng địa chỉ web. Đặc tả API ở `http://localhost:5000/api/docs/` khi dùng cổng mặc định.
 
+Compose bật `TRUST_PROXY_HOPS=1` cho API để giới hạn đăng nhập theo địa chỉ người dùng qua Nginx. Nginx ghi lại các header proxy; cổng API trên host chỉ mở ở `127.0.0.1` để truy cập trực tiếp từ cùng máy. Khi truy cập từ máy khác, dùng cổng frontend và `/api/` qua Nginx. Backend chạy trực tiếp mặc định không tin header proxy.
+
 **Chỉ với database demo mới, trống và có thể bỏ**, tạo dữ liệu minh họa sau khi Compose khởi động thành công:
 
 ```powershell

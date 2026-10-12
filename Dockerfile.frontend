@@ -4,6 +4,7 @@ COPY package.json package-lock.json ./
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
 RUN npm ci --workspace @nipopeto/frontend --include-workspace-root=false
+COPY backend/src/domain/pricing.json backend/src/domain/pricing.json
 COPY frontend frontend
 ENV VITE_API_BASE_URL=/api
 RUN npm run build --workspace @nipopeto/frontend

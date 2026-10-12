@@ -1,0 +1,4195 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Clinic and Scheduling API",
+    "version": "3.0.0",
+    "description": "Own appointment/Spa, records, images and status history. Current role and owner scope verified through Core. Projection search is eventually consistent; related rows use authorized Core lookup. Core outage fails closed."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health"
+    },
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Bootstrap"
+    },
+    {
+      "name": "Pets"
+    },
+    {
+      "name": "Appointments"
+    },
+    {
+      "name": "Medical records"
+    },
+    {
+      "name": "Hotel"
+    },
+    {
+      "name": "Notifications"
+    },
+    {
+      "name": "Invoices"
+    },
+    {
+      "name": "Public rescue"
+    },
+    {
+      "name": "Payments"
+    },
+    {
+      "name": "Owners"
+    }
+  ],
+  "paths": {
+    "/api/appointments": {
+      "get": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "List appointments",
+        "operationId": "get_api_appointments",
+        "responses": {
+          "200": {
+            "description": "Page of Appointment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Appointment"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    },
+                    "directory": {
+                      "$ref": "#/components/schemas/DirectoryStatus"
+                    },
+                    "searchConsistency": {
+                      "type": "string",
+                      "enum": [
+                        "eventual"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerIdFilter"
+          },
+          {
+            "$ref": "#/components/parameters/PetIdFilter"
+          },
+          {
+            "$ref": "#/components/parameters/StatusFilter"
+          },
+          {
+            "name": "statusGroup",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "pending (active), completed or cancelled (cancelled/no_show)."
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "Appointments: medical or spa. Notifications: appointments, hotel, medical or promo."
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "Valid YYYY-MM-DD."
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "unbilled: eligible sources with no existing invoice."
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Create appointment",
+        "operationId": "post_api_appointments",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Actor or owner scope denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Slot, revision or request key conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or missing key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable; result may be uncertain, retry same key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            },
+            "description": "Clinic create persists one result per actor/type/key after validation; retry an uncertain result with the same key and content. Reuse with different content returns 409."
+          }
+        ]
+      }
+    },
+    "/api/appointments/{id}/status": {
+      "patch": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Change appointment status",
+        "operationId": "patch_api_appointments_id_status",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appointments/{id}/reschedule": {
+      "patch": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Reschedule appointment",
+        "operationId": "patch_api_appointments_id_reschedule",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appointments/{id}/cancel": {
+      "patch": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Cancel appointment",
+        "operationId": "patch_api_appointments_id_cancel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appointments/{id}/reminder": {
+      "post": {
+        "tags": [
+          "Appointments"
+        ],
+        "summary": "Send reminder",
+        "operationId": "post_api_appointments_id_reminder",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ]
+      }
+    },
+    "/api/medical-records": {
+      "get": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "List medical records",
+        "operationId": "get_api_medical_records",
+        "responses": {
+          "200": {
+            "description": "Page of MedicalRecord",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MedicalRecord"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    },
+                    "directory": {
+                      "$ref": "#/components/schemas/DirectoryStatus"
+                    },
+                    "searchConsistency": {
+                      "type": "string",
+                      "enum": [
+                        "eventual"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerIdFilter"
+          },
+          {
+            "$ref": "#/components/parameters/PetIdFilter"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "Create medical record",
+        "operationId": "post_api_medical_records",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicalRecordEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Actor or owner scope denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Slot, revision or request key conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or missing key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable; result may be uncertain, retry same key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedicalRecordInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            },
+            "description": "Clinic create persists one result per actor/type/key after validation; retry an uncertain result with the same key and content. Reuse with different content returns 409."
+          }
+        ]
+      }
+    },
+    "/api/medical-records/{id}": {
+      "patch": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "Update medical record",
+        "operationId": "patch_api_medical_records_id",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicalRecordEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedicalRecordUpdateInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "Delete medical record",
+        "operationId": "delete_api_medical_records_id",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ]
+      }
+    },
+    "/api/medical-records/images": {
+      "post": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "Add medical image",
+        "operationId": "post_api_medical_records_images",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicalImageEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedicalImageInput"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listMedicalImage",
+        "summary": "List MedicalImage",
+        "tags": [
+          "Pagination"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExactId"
+          },
+          {
+            "$ref": "#/components/parameters/PetIdFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of MedicalImage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination",
+                    "counts",
+                    "related"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MedicalImage"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "related": {
+                      "$ref": "#/components/schemas/RelatedPageData"
+                    },
+                    "directory": {
+                      "$ref": "#/components/schemas/DirectoryStatus"
+                    },
+                    "searchConsistency": {
+                      "type": "string",
+                      "enum": [
+                        "eventual"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/api/medical-records/images/{id}": {
+      "delete": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "Delete medical image",
+        "operationId": "delete_api_medical_records_images_id",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ]
+      }
+    },
+    "/api/appointments/{id}/status-history": {
+      "get": {
+        "tags": [
+          "Appointments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "operationId": "appointmentStatusHistory",
+        "summary": "Staff-only immutable status history; legacy history is not synthesized",
+        "responses": {
+          "200": {
+            "description": "Events newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookingStatusEvent"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/RequestFailed"
+          }
+        }
+      }
+    },
+    "/api/appointments/{id}/undo-status": {
+      "post": {
+        "tags": [
+          "Appointments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "operationId": "undoAppointmentStatus",
+        "summary": "Reverse an eligible recorded check-in or reopen completion (admin only); reject dependent records and stale revisions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason",
+                  "expectedRevision"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated booking, original event retained and reversal appended atomically",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appointment": {
+                      "$ref": "#/components/schemas/Appointment"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/RequestFailed"
+          }
+        }
+      }
+    },
+    "/api/appointments/calendar": {
+      "get": {
+        "operationId": "appointmentCalendar",
+        "summary": "Monthly appointment counts",
+        "tags": [
+          "Appointments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{3}-(0[1-9]|1[0-2])$"
+            },
+            "description": "Required YYYY-MM."
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "medical",
+                "spa"
+              ]
+            },
+            "description": "Service group."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "At most 31 date-to-count entries within actor scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/internal/clinic/bootstrap": {
+      "get": {
+        "operationId": "clinicBootstrap",
+        "summary": "Private bounded Clinic region for the Core bootstrap compatibility adapter",
+        "parameters": [
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "session",
+                "dashboard"
+              ],
+              "default": "session"
+            }
+          }
+        ],
+        "security": [
+          {
+            "ServiceCredential": [],
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clinic region, counts and authorized relations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "appointments",
+                    "medicalRecords",
+                    "medicalImages",
+                    "pets",
+                    "owners",
+                    "summary"
+                  ],
+                  "properties": {
+                    "appointments": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Appointment"
+                      }
+                    },
+                    "medicalRecords": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MedicalRecord"
+                      }
+                    },
+                    "medicalImages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MedicalImage"
+                      }
+                    },
+                    "pets": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Pet"
+                      }
+                    },
+                    "owners": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Owner"
+                      }
+                    },
+                    "summary": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/internal/billing-reservations/{operationId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OperationId"
+        }
+      ],
+      "put": {
+        "operationId": "prepareReservation",
+        "summary": "Idempotent prepare with verified actor context and revision",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Prepare"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Persisted immutable prepared source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparedSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or dependency unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServiceCredential": [],
+            "ActorBearer": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "readReservation",
+        "summary": "Read Clinic local reservation",
+        "security": [
+          {
+            "ServiceCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Local state and immutable snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reservation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or dependency unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/billing-reservations/{operationId}/commit": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OperationId"
+        }
+      ],
+      "post": {
+        "operationId": "finalizeReservation",
+        "summary": "Finalize only from authenticated durable COMMITTED evidence",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent terminal reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "operationId",
+                    "state"
+                  ],
+                  "properties": {
+                    "operationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "INVOICED"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or dependency unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServiceCredential": []
+          }
+        ],
+        "description": "Clinic fetches authenticated read-only Core terminal evidence before the SQL transaction. Caller-provided terminal state or invoiceId is not trusted. Timeout/404 retains HELD."
+      }
+    },
+    "/internal/billing-reservations/{operationId}/release": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OperationId"
+        }
+      ],
+      "post": {
+        "operationId": "releaseReservation",
+        "summary": "Release only after verified ABORTED; timeout/404 insufficient",
+        "responses": {
+          "200": {
+            "description": "Idempotent terminal reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "operationId",
+                    "state"
+                  ],
+                  "properties": {
+                    "operationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "RELEASED"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or dependency unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServiceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "description": "Clinic fetches authenticated read-only Core terminal evidence before the SQL transaction. Caller-provided terminal state or invoiceId is not trusted. Timeout/404 retains HELD."
+      }
+    },
+    "/internal/billing-sources/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      ],
+      "get": {
+        "operationId": "readBillingSource",
+        "summary": "Read eligible Clinic appointment revision and minimal immutable source",
+        "security": [
+          {
+            "ServiceCredential": [],
+            "ActorBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current completed source; prepare checks revision again under lock",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparedSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or dependency unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/clinic": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Independent Clinic region; failure returns an error instead of fake zero counts",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicDashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current actor rejected"
+          },
+          "503": {
+            "description": "Region unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "JSON error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getClinicDashboard"
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "TooManyRequests": {
+        "description": "Auth rate limit exceeded (50 requests per 15 minutes)",
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ApiError": {
+        "description": "Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Authentication required or invalid",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "RequestFailed": {
+        "description": "Request failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000,
+          "default": 1
+        },
+        "description": "1-based page."
+      },
+      "PageSize": {
+        "name": "pageSize",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20
+        },
+        "description": "Rows per page; values above 100 return 422."
+      },
+      "SearchQuery": {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "description": "Case-insensitive search applied in the database before pagination."
+      },
+      "ExactId": {
+        "name": "id",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "description": "Exact identifier lookup within the authenticated scope."
+      },
+      "OwnerIdFilter": {
+        "name": "ownerId",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "description": "Staff filter; owners are always scoped to their own JWT subject."
+      },
+      "ResourceId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "PetIdFilter": {
+        "name": "petId",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "description": "Optional database filter. Use all or omit for no filter."
+      },
+      "StatusFilter": {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "description": "Optional database filter. Use all or omit for no filter."
+      },
+      "OperationId": {
+        "in": "path",
+        "name": "operationId",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "ServiceCredential": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Service-Token",
+        "description": "Dedicated Core/Clinic credential; browser JWT alone grants no internal access."
+      },
+      "notificationServiceToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Service-Token"
+      },
+      "actorBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "ActorBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT RS256"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "doctor",
+              "staff",
+              "admin"
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string"
+          },
+          "directoryVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Core source revision. Projection search may lag; related DTOs use current Core source."
+          }
+        },
+        "required": [
+          "id",
+          "fullName",
+          "role"
+        ]
+      },
+      "Pet": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string"
+          },
+          "breed": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string"
+          },
+          "ageLabel": {
+            "type": "string"
+          },
+          "weightKg": {
+            "type": "number"
+          },
+          "microchipId": {
+            "type": "string"
+          },
+          "healthStatus": {
+            "type": "string"
+          },
+          "allergies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "qrToken": {
+            "type": "string"
+          },
+          "qrEnabled": {
+            "type": "boolean"
+          },
+          "publicProfile": {
+            "$ref": "#/components/schemas/PublicProfile"
+          },
+          "directoryVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Core source revision. Projection search may lag; related DTOs use current Core source."
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "name",
+          "species",
+          "gender",
+          "healthStatus",
+          "allergies",
+          "qrEnabled",
+          "publicProfile"
+        ]
+      },
+      "PublicProfile": {
+        "type": "object",
+        "properties": {
+          "showOwnerPhone": {
+            "type": "boolean"
+          },
+          "showOwnerEmail": {
+            "type": "boolean"
+          },
+          "showOwnerAddress": {
+            "type": "boolean"
+          },
+          "showMedicalAlerts": {
+            "type": "boolean"
+          },
+          "rescueNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "showOwnerPhone",
+          "showOwnerEmail",
+          "showOwnerAddress",
+          "showMedicalAlerts"
+        ]
+      },
+      "Appointment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "petId": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "clinicName": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "doctorId": {
+            "type": "string"
+          },
+          "ownerNote": {
+            "type": "string"
+          },
+          "internalNote": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "statusRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "readOnly": true
+          }
+        },
+        "required": [
+          "id",
+          "petId",
+          "ownerId",
+          "type",
+          "serviceName",
+          "date",
+          "time",
+          "status"
+        ]
+      },
+      "MedicalRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "petId": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "appointmentId": {
+            "type": "string"
+          },
+          "doctorName": {
+            "type": "string"
+          },
+          "visitDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "title": {
+            "type": "string"
+          },
+          "diagnosis": {
+            "type": "string"
+          },
+          "treatment": {
+            "type": "string"
+          },
+          "weightKg": {
+            "type": "number"
+          },
+          "temperatureC": {
+            "type": "number"
+          },
+          "heartRateBpm": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "petId",
+          "ownerId",
+          "doctorName",
+          "visitDate",
+          "title",
+          "diagnosis",
+          "treatment"
+        ]
+      },
+      "MedicalImage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "petId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "petId",
+          "title",
+          "imageUrl",
+          "mimeType"
+        ]
+      },
+      "HotelBooking": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "petId": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date"
+          },
+          "nights": {
+            "type": "integer"
+          },
+          "roomType": {
+            "type": "string"
+          },
+          "serviceKeys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string"
+          },
+          "dailyCareNoteIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "statusRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "readOnly": true
+          }
+        },
+        "required": [
+          "id",
+          "petId",
+          "ownerId",
+          "checkIn",
+          "checkOut",
+          "nights",
+          "roomType",
+          "totalAmount",
+          "status"
+        ]
+      },
+      "CareNote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "bookingId": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "note": {
+            "type": "string"
+          },
+          "eatingStatus": {
+            "type": "string"
+          },
+          "mood": {
+            "type": "string"
+          },
+          "visibleToOwner": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "bookingId",
+          "date",
+          "note",
+          "visibleToOwner"
+        ]
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "recipientOwnerId": {
+            "type": "string"
+          },
+          "recipientRole": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "actionUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "recipientRole",
+          "type",
+          "title",
+          "message",
+          "status"
+        ]
+      },
+      "Invoice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "invoiceCode": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "petId": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "taxAmount": {
+            "type": "number"
+          },
+          "discountAmount": {
+            "type": "number"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "paymentStatus": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "cash",
+              "bank_transfer",
+              "credit_card",
+              "qr_code",
+              "vnpay",
+              null
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceItem"
+            }
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "appointment",
+              "hotel_booking"
+            ]
+          },
+          "appointmentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "hotelBookingId": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentChannel": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "online",
+              "onsite",
+              "bank_transfer",
+              null
+            ]
+          },
+          "bankTransferDetails": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "bankName": {
+                "type": "string"
+              },
+              "accountNumber": {
+                "type": "string"
+              },
+              "accountHolder": {
+                "type": "string"
+              },
+              "isDemo": {
+                "type": "boolean"
+              },
+              "bankBin": {
+                "type": "string",
+                "pattern": "^[0-9]{6}$"
+              }
+            }
+          },
+          "transferReviewStatus": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "pending",
+              "rejected",
+              "confirmed",
+              null
+            ]
+          },
+          "transferReportedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "transferReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "transferReviewNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "transferCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^NIPO[0-9]{10}$",
+            "readOnly": true
+          },
+          "transferContent": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Stable transfer purpose; legacy invoices retain their original instruction."
+          }
+        },
+        "required": [
+          "id",
+          "invoiceCode",
+          "ownerId",
+          "petId",
+          "subtotal",
+          "totalAmount",
+          "paymentStatus",
+          "transferContent"
+        ]
+      },
+      "InvoiceItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "description",
+          "quantity"
+        ]
+      },
+      "String": {
+        "type": "string"
+      },
+      "TokenUser": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "token",
+          "user"
+        ]
+      },
+      "UserEnvelope": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "user"
+        ]
+      },
+      "PetEnvelope": {
+        "type": "object",
+        "properties": {
+          "pet": {
+            "$ref": "#/components/schemas/Pet"
+          }
+        },
+        "required": [
+          "pet"
+        ]
+      },
+      "AppointmentEnvelope": {
+        "type": "object",
+        "properties": {
+          "appointment": {
+            "$ref": "#/components/schemas/Appointment"
+          }
+        },
+        "required": [
+          "appointment"
+        ]
+      },
+      "MedicalRecordEnvelope": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "$ref": "#/components/schemas/MedicalRecord"
+          }
+        },
+        "required": [
+          "record"
+        ]
+      },
+      "MedicalImageEnvelope": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "$ref": "#/components/schemas/MedicalImage"
+          }
+        },
+        "required": [
+          "image"
+        ]
+      },
+      "HotelBookingEnvelope": {
+        "type": "object",
+        "properties": {
+          "booking": {
+            "$ref": "#/components/schemas/HotelBooking"
+          }
+        },
+        "required": [
+          "booking"
+        ]
+      },
+      "CareNoteEnvelope": {
+        "type": "object",
+        "properties": {
+          "careNote": {
+            "$ref": "#/components/schemas/CareNote"
+          }
+        },
+        "required": [
+          "careNote"
+        ]
+      },
+      "NotificationEnvelope": {
+        "type": "object",
+        "properties": {
+          "notification": {
+            "$ref": "#/components/schemas/Notification"
+          }
+        },
+        "required": [
+          "notification"
+        ]
+      },
+      "InvoiceEnvelope": {
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "$ref": "#/components/schemas/Invoice"
+          }
+        },
+        "required": [
+          "invoice"
+        ]
+      },
+      "PublicPetProfile": {
+        "type": "object",
+        "description": "QR-safe pet projection. Medical fields appear only when publicProfile.showMedicalAlerts is true; internal notes are never public.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string"
+          },
+          "breed": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string"
+          },
+          "ageLabel": {
+            "type": "string"
+          },
+          "microchipId": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string"
+          },
+          "identifyingMarks": {
+            "type": "string"
+          },
+          "lastSeenLocation": {
+            "type": "string"
+          },
+          "qrEnabled": {
+            "type": "boolean"
+          },
+          "healthStatus": {
+            "type": "string",
+            "description": "Only when showMedicalAlerts is true"
+          },
+          "allergies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Only when showMedicalAlerts is true"
+          },
+          "publicProfile": {
+            "$ref": "#/components/schemas/PublicProfile"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "species",
+          "breed",
+          "gender",
+          "ageLabel",
+          "qrEnabled",
+          "publicProfile"
+        ]
+      },
+      "PublicPet": {
+        "type": "object",
+        "properties": {
+          "pet": {
+            "$ref": "#/components/schemas/PublicPetProfile"
+          },
+          "owner": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "fullName": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "address": {
+                "type": "string"
+              },
+              "petIds": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/String"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "fullName",
+              "phone",
+              "petIds"
+            ]
+          }
+        },
+        "required": [
+          "pet",
+          "owner"
+        ]
+      },
+      "Bootstrap": {
+        "type": "object",
+        "properties": {
+          "currentOwnerId": {
+            "type": "string"
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Owner"
+            }
+          },
+          "pets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Pet"
+            }
+          },
+          "appointments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Appointment"
+            }
+          },
+          "medicalRecords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalRecord"
+            }
+          },
+          "medicalImages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalImage"
+            }
+          },
+          "hotelBookings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelBooking"
+            }
+          },
+          "dailyCareNotes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CareNote"
+            }
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
+          },
+          "summary": {
+            "type": "object",
+            "required": [
+              "totals",
+              "species",
+              "appointmentStatus",
+              "hotelStatus",
+              "notificationCategory",
+              "unread",
+              "todayAppointments"
+            ],
+            "properties": {
+              "totals": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "species": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "appointmentStatus": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "hotelStatus": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "notificationCategory": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "unread": {
+                "type": "integer"
+              },
+              "todayAppointments": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "required": [
+          "currentOwnerId",
+          "owners",
+          "pets",
+          "appointments",
+          "medicalRecords",
+          "medicalImages",
+          "hotelBookings",
+          "dailyCareNotes",
+          "notifications",
+          "summary"
+        ]
+      },
+      "OwnerLoginInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "AdminLoginInput": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "OwnerRegisterInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "confirmPassword": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "phone": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "confirmPassword"
+        ]
+      },
+      "ProfileInput": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fullName",
+          "email"
+        ]
+      },
+      "PasswordInput": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "confirmPassword": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword",
+          "confirmPassword"
+        ]
+      },
+      "CounterOwnerInput": {
+        "type": "object",
+        "required": [
+          "fullName",
+          "phone"
+        ],
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "phone": {
+            "type": "string",
+            "description": "Vietnamese phone with 10 local digits, or +84/84 and 9 digits. Spaces/dots/hyphens/parentheses are normalized."
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "description": "Optional; blank means no email. Saved lowercase."
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "OwnerEnvelope": {
+        "type": "object",
+        "required": [
+          "owner"
+        ],
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/Owner"
+          }
+        }
+      },
+      "PetInput": {
+        "type": "object",
+        "properties": {
+          "ownerId": {
+            "type": "string",
+            "description": "Required for staff creation: id of an existing owner account. Ignored for owner requests; the authenticated owner id is used."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Trimmed; whitespace-only names are rejected."
+          },
+          "breed": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "ageLabel": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "healthStatus": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "stable",
+              "vaccination_due",
+              "under_treatment",
+              "critical"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "species": {
+            "type": "string",
+            "enum": [
+              "dog",
+              "cat",
+              "rabbit",
+              "other"
+            ]
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "male",
+              "female"
+            ]
+          },
+          "weightKg": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 999.99,
+                "multipleOf": 0.01,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,2}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 2 decimal places; null or empty string clears it."
+          },
+          "allergies": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "publicProfile": {
+            "$ref": "#/components/schemas/PublicProfileInput"
+          },
+          "qrEnabled": {
+            "type": "boolean"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 7000000
+          },
+          "microchipId": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "identifyingMarks": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "lastSeenLocation": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "description": "QR token is server-owned. Supplying qrToken returns 422. Boolean flags require actual JSON booleans.",
+        "not": {
+          "required": [
+            "qrToken"
+          ]
+        }
+      },
+      "AppointmentInput": {
+        "type": "object",
+        "properties": {
+          "petId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string"
+          },
+          "doctorId": {
+            "type": "string"
+          },
+          "ownerNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "petId",
+          "serviceName",
+          "date",
+          "time"
+        ]
+      },
+      "StatusInput": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "internalNote": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "statusRevision from the booking displayed to the user; stale values return 409."
+          }
+        },
+        "required": [
+          "status",
+          "expectedRevision"
+        ]
+      },
+      "RescheduleInput": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string"
+          },
+          "ownerNote": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "statusRevision from the booking displayed to the user; stale values return 409."
+          }
+        },
+        "required": [
+          "date",
+          "time",
+          "expectedRevision"
+        ]
+      },
+      "CancelInput": {
+        "type": "object",
+        "properties": {
+          "ownerNote": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "statusRevision from the booking displayed to the user; stale values return 409."
+          }
+        },
+        "required": [
+          "expectedRevision"
+        ]
+      },
+      "MedicalRecordInput": {
+        "type": "object",
+        "properties": {
+          "petId": {
+            "type": "string"
+          },
+          "appointmentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
+          },
+          "visitDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Real calendar date; dates such as February 30 are rejected."
+          },
+          "doctorName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
+          },
+          "diagnosis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
+          },
+          "treatment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
+          },
+          "weightKg": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 999.99,
+                "multipleOf": 0.01,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,2}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 2 decimal places; null or empty string clears it."
+          },
+          "symptoms": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "medications": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "vaccineName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "internalNote": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "followUpDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Real calendar date, YYYY-MM-DD; null clears it."
+          },
+          "temperatureC": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.1,
+                "maximum": 999.9,
+                "multipleOf": 0.1,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,1}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 1 decimal places; null or empty string clears it."
+          },
+          "heartRateBpm": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 2147483647,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ]
+          }
+        },
+        "required": [
+          "petId",
+          "title",
+          "visitDate",
+          "doctorName",
+          "diagnosis",
+          "treatment"
+        ]
+      },
+      "MedicalImageInput": {
+        "type": "object",
+        "properties": {
+          "petId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "petId",
+          "title",
+          "imageUrl",
+          "mimeType"
+        ]
+      },
+      "HotelBookingInput": {
+        "type": "object",
+        "properties": {
+          "petId": {
+            "type": "string"
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date"
+          },
+          "roomType": {
+            "type": "string"
+          },
+          "serviceKeys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "ownerNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "petId",
+          "checkIn",
+          "checkOut"
+        ]
+      },
+      "CareNoteInput": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          },
+          "eatingStatus": {
+            "type": "string"
+          },
+          "mood": {
+            "type": "string"
+          },
+          "visibleToOwner": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
+      "NotificationSendInput": {
+        "type": "object",
+        "properties": {
+          "recipientOwnerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "recipientOwnerId",
+          "title",
+          "message"
+        ]
+      },
+      "RescueReportInput": {
+        "type": "object",
+        "properties": {
+          "finderPhone": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "finderName": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "finderPhone",
+          "location"
+        ]
+      },
+      "PaymentInput": {
+        "type": "object",
+        "properties": {
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank_transfer"
+            ]
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "version",
+          "database"
+        ]
+      },
+      "PetUpdateInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Trimmed; whitespace-only names are rejected."
+          },
+          "breed": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "ageLabel": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "healthStatus": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "stable",
+              "vaccination_due",
+              "under_treatment",
+              "critical"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "species": {
+            "type": "string",
+            "enum": [
+              "dog",
+              "cat",
+              "rabbit",
+              "other"
+            ]
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "male",
+              "female"
+            ]
+          },
+          "weightKg": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 999.99,
+                "multipleOf": 0.01,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,2}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 2 decimal places; null or empty string clears it."
+          },
+          "allergies": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "publicProfile": {
+            "$ref": "#/components/schemas/PublicProfileInput"
+          },
+          "qrEnabled": {
+            "type": "boolean"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 7000000
+          },
+          "microchipId": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "identifyingMarks": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "lastSeenLocation": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          }
+        },
+        "description": "Partial update; ownership cannot be reassigned. qrToken is rejected; use POST /api/pets/{id}/qr-token.",
+        "not": {
+          "required": [
+            "qrToken"
+          ]
+        }
+      },
+      "MedicalRecordUpdateInput": {
+        "type": "object",
+        "description": "Staff may edit medical details only. petId, ownerId and appointmentId are fixed after creation; attempts to change or clear them return 422. Older clients may send unchanged values.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
+          },
+          "visitDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Real calendar date; dates such as February 30 are rejected."
+          },
+          "doctorName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
+          },
+          "diagnosis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
+          },
+          "treatment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Trimmed; whitespace-only values are rejected."
+          },
+          "weightKg": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 999.99,
+                "multipleOf": 0.01,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,2}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 2 decimal places; null or empty string clears it."
+          },
+          "symptoms": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "medications": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "vaccineName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "internalNote": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "followUpDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Real calendar date, YYYY-MM-DD; null clears it."
+          },
+          "temperatureC": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.1,
+                "maximum": 999.9,
+                "multipleOf": 0.1,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(?:\\.\\d{1,1}0*)?$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ],
+            "description": "Positive optional value with at most 1 decimal places; null or empty string clears it."
+          },
+          "heartRateBpm": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 2147483647,
+                "nullable": true
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+$",
+                "description": "Decimal string; same numeric range applies."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "description": "Empty string clears the optional value."
+              }
+            ]
+          }
+        }
+      },
+      "CreateInvoiceInput": {
+        "type": "object",
+        "required": [
+          "type",
+          "relatedId"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "appointment",
+              "hotel_booking"
+            ]
+          },
+          "relatedId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subtotal": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999999999,
+            "description": "Legacy appointment fee when items is omitted; omit for hotel bookings."
+          },
+          "taxAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999999999
+          },
+          "discountAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999999999
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "description": "Appointment final charges; hotel extras only (stored booking base is added automatically).",
+            "items": {
+              "type": "object",
+              "required": [
+                "description",
+                "quantity",
+                "unitPrice"
+              ],
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10000
+                },
+                "unitPrice": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9999999999
+                }
+              }
+            }
+          }
+        }
+      },
+      "BookingStatusEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "bookingId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "fromStatus": {
+            "type": "string"
+          },
+          "toStatus": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "actorRole": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversesId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PaymentEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "invoiceId",
+          "action",
+          "fromStatus",
+          "toStatus",
+          "actorId",
+          "actorName",
+          "actorRole",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "fromStatus": {
+            "type": "string"
+          },
+          "toStatus": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "actorRole": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ActivationIssueInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "customerVerified": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "customerVerified"
+        ]
+      },
+      "ActivationTokenInput": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "description": "Single-use secret; send in JSON body, never URL query. Only its SHA-256 digest is stored."
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "ActivationPasswordInput": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "description": "Single-use secret; send in JSON body, never URL query. Only its SHA-256 digest is stored."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "writeOnly": true
+          },
+          "confirmPassword": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "token",
+          "password",
+          "confirmPassword"
+        ]
+      },
+      "ActivationDetails": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "email",
+          "expiresAt"
+        ]
+      },
+      "ActivationEnvelope": {
+        "type": "object",
+        "properties": {
+          "activation": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ActivationDetails"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{43}$",
+                    "description": "Single-use secret; send in JSON body, never URL query. Only its SHA-256 digest is stored."
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "activation"
+        ]
+      },
+      "ActivationSuccess": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "message"
+        ]
+      },
+      "Owner": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/User"
+          },
+          {
+            "type": "object",
+            "required": [
+              "petIds",
+              "loginEnabled"
+            ],
+            "properties": {
+              "petIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "loginEnabled": {
+                "type": "boolean",
+                "description": "True only when this profile has login credentials."
+              }
+            }
+          }
+        ],
+        "properties": {
+          "petCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total pet count independent of pages. petIds is empty in bounded directory/profile responses; load pet pages with ownerId."
+          },
+          "directoryVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Core source revision. Projection search may lag; related DTOs use current Core source."
+          }
+        }
+      },
+      "PublicProfileInput": {
+        "type": "object",
+        "properties": {
+          "showOwnerPhone": {
+            "type": "boolean"
+          },
+          "showOwnerEmail": {
+            "type": "boolean"
+          },
+          "showOwnerAddress": {
+            "type": "boolean"
+          },
+          "showMedicalAlerts": {
+            "type": "boolean"
+          },
+          "rescueNote": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "totalPages"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "RelatedPageData": {
+        "type": "object",
+        "properties": {
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Owner"
+            }
+          },
+          "pets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Pet"
+            }
+          },
+          "appointments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Appointment"
+            }
+          },
+          "hotelBookings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelBooking"
+            }
+          },
+          "medicalRecords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalRecord"
+            }
+          },
+          "medicalImages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalImage"
+            }
+          },
+          "dailyCareNotes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CareNote"
+            }
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
+          },
+          "invoices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Invoice"
+            }
+          }
+        }
+      },
+      "Prepare": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "appointmentId",
+          "expectedRevision"
+        ],
+        "properties": {
+          "appointmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        }
+      },
+      "Reservation": {
+        "type": "object",
+        "required": [
+          "operationId",
+          "appointmentId",
+          "state",
+          "snapshot"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string"
+          },
+          "appointmentId": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "HELD",
+              "INVOICED",
+              "RELEASED"
+            ]
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/BillingSourceSnapshot"
+          },
+          "invoiceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "nullable": true
+          }
+        }
+      },
+      "DirectoryEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "sourceVersion",
+          "displayName"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "owner",
+              "pet",
+              "staff"
+            ]
+          },
+          "sourceVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "breed": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "microchipId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "BillingSourceSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "appointmentId",
+          "ownerId",
+          "petId",
+          "revision",
+          "type",
+          "serviceName",
+          "clinicName",
+          "date",
+          "time"
+        ],
+        "properties": {
+          "appointmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "ownerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "petId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "type": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "clinicName": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          }
+        }
+      },
+      "PreparedSource": {
+        "type": "object",
+        "required": [
+          "snapshot"
+        ],
+        "properties": {
+          "snapshot": {
+            "$ref": "#/components/schemas/BillingSourceSnapshot"
+          }
+        }
+      },
+      "ClinicDashboard": {
+        "type": "object",
+        "required": [
+          "asOf",
+          "appointments",
+          "medicalRecords",
+          "medicalImages",
+          "summary",
+          "pets",
+          "owners"
+        ],
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "appointments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Appointment"
+            }
+          },
+          "medicalRecords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalRecord"
+            }
+          },
+          "medicalImages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalImage"
+            }
+          },
+          "summary": {
+            "type": "object",
+            "required": [
+              "totals",
+              "appointmentStatus",
+              "todayAppointments"
+            ],
+            "properties": {
+              "totals": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "appointmentStatus": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "todayAppointments": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "pets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Pet"
+            }
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Owner"
+            }
+          }
+        }
+      },
+      "DirectoryStatus": {
+        "type": "object",
+        "required": [
+          "petId",
+          "sourceVersion",
+          "projectionVersion",
+          "searchReady"
+        ],
+        "properties": {
+          "petId": {
+            "type": "string"
+          },
+          "sourceVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "projectionVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "searchReady": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

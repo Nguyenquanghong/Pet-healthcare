@@ -1,11 +1,13 @@
 import { BedDouble, CalendarDays, CheckCircle2, Clock, PawPrint, Users, Zap, Bell, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
-import { useAppStore } from "../../store/AppStoreProvider";
+import { useDashboard } from '../../services/useDashboard';
+import { useNotificationCount } from '../../store/NotificationCountContext';
+import { QueryStatus } from '../../components/ui/QueryStatus';
 import { appointmentStatusLabels, bookingStatusLabels } from "../../utils/statusLabels";
 import { formatCurrency } from "../../utils/formatCurrency";
 
-function StatCard({ label, value, icon: Icon, subtitle }: { label: string; value: number; icon: React.ElementType; subtitle?: string }) {
+function StatCard({ label, value, icon: Icon, subtitle }: { label: string; value: number | string; icon: React.ElementType; subtitle?: string }) {
   return (
     <div className="flex items-start gap-3 border-b border-slate-200 bg-white px-4 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
       <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-slate-100 text-primary">
@@ -22,24 +24,28 @@ function StatCard({ label, value, icon: Icon, subtitle }: { label: string; value
 
 export function AdminDashboardPage() {
   const navigate = useNavigate();
-  const { appointments, hotelBookings, pets, owners, medicalRecords, summary } = useAppStore();
+  const { core, clinic, appointments, hotelBookings, pets, owners, medicalRecords, summary } = useDashboard();
+  const unread = useNotificationCount();
 
   const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
   const todayAppointments = appointments.filter(a => a.date === today);
   const pendingAppointments = appointments.filter(a => a.status === "pending");
   const pendingBookings = hotelBookings.filter(b => b.status === "pending");
   const checkedInBookings = hotelBookings.filter(b => b.status === "in_stay");
-  const unreadNotifications = summary.unread;
+  const unreadNotifications = unread.data?.unread ?? '—';
 
   return (
     <AdminLayout title="Dashboard">
+      <QueryStatus label="thú cưng và lưu trú" query={core} />
+      <QueryStatus label="lịch khám và bệnh án" query={clinic} />
+      <QueryStatus label="số thông báo" query={unread} />
       {/* Stat Cards — 6 columns */}
       <div className="grid overflow-hidden rounded-lg border border-slate-200 bg-white sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        <StatCard label="Lịch hôm nay" value={summary.todayAppointments} icon={CalendarDays} />
-        <StatCard label="Chờ xác nhận" value={summary.appointmentStatus.pending ?? 0} icon={Clock} subtitle="Lịch khám" />
-        <StatCard label="Pet đang lưu trú" value={summary.hotelStatus.in_stay ?? 0} icon={BedDouble} />
-        <StatCard label="Tổng thú cưng" value={summary.totals.pets ?? 0} icon={PawPrint} subtitle={`${summary.species.dog ?? 0} chó · ${summary.species.cat ?? 0} mèo`} />
-        <StatCard label="Chủ nuôi" value={summary.totals.owners ?? 0} icon={Users} />
+        <StatCard label="Lịch hôm nay" value={summary.todayAppointments ?? '—'} icon={CalendarDays} />
+        <StatCard label="Chờ xác nhận" value={clinic.data ? summary.appointmentStatus.pending ?? 0 : '—'} icon={Clock} subtitle="Lịch khám" />
+        <StatCard label="Pet đang lưu trú" value={core.data ? summary.hotelStatus.in_stay ?? 0 : '—'} icon={BedDouble} />
+        <StatCard label="Tổng thú cưng" value={summary.totals.pets ?? '—'} icon={PawPrint} subtitle={core.data ? `${summary.species.dog ?? 0} chó · ${summary.species.cat ?? 0} mèo` : undefined} />
+        <StatCard label="Chủ nuôi" value={summary.totals.owners ?? '—'} icon={Users} />
         <StatCard label="Thông báo mới" value={unreadNotifications} icon={Bell} />
       </div>
 
@@ -128,7 +134,7 @@ export function AdminDashboardPage() {
                 </div>
               );
             })}
-            {todayAppointments.length === 0 && (
+            {clinic.data && todayAppointments.length === 0 && (
               <p className="px-6 py-8 text-center text-slate-400">Không có lịch hôm nay.</p>
             )}
           </div>
@@ -170,7 +176,7 @@ export function AdminDashboardPage() {
                 </div>
               );
             })}
-            {pendingBookings.length === 0 && (
+            {core.data && pendingBookings.length === 0 && (
               <p className="px-6 py-8 text-center text-slate-400">Không có booking chờ xử lý.</p>
             )}
           </div>
@@ -205,7 +211,7 @@ export function AdminDashboardPage() {
                 </div>
               );
             })}
-            {checkedInBookings.length === 0 && (
+            {core.data && checkedInBookings.length === 0 && (
               <p className="px-6 py-8 text-center text-slate-400">Không có pet nào đang lưu trú.</p>
             )}
           </div>
@@ -235,7 +241,7 @@ export function AdminDashboardPage() {
                 </div>
               );
             })}
-            {medicalRecords.length === 0 && (
+            {clinic.data && medicalRecords.length === 0 && (
               <p className="px-6 py-8 text-center text-slate-400">Chưa có bệnh án nào.</p>
             )}
           </div>

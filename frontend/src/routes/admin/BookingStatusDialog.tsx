@@ -46,7 +46,7 @@ export function BookingStatusDialog({ kind, selection, onClose, onSaved }: {
       const payload = { expectedRevision: booking.statusRevision, ...(undo ? { reason } : { status: intent }) };
       if (undo) await apiClient.post(`${path}/undo-status`, payload); else await apiClient.patch(`${path}/status`, payload);
       saved = true;
-      await refreshData(); onSaved(); onClose();
+      await refreshData([kind === "appointment" ? "clinic" : "hotel"]); onSaved(); onClose();
     } catch (e) {
       setError(saved ? "Thao tác đã được lưu nhưng chưa tải lại được danh sách. Đóng hộp thoại và tải lại trang để đối chiếu."
         : e instanceof Error ? e.message : "Không lưu được thao tác. Hãy tải lại để kiểm tra trước khi thử lại.");

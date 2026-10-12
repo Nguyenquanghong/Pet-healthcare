@@ -1,0 +1,33 @@
+import { execFileSync } from 'node:child_process';
+
+// Read-only infrastructure identity check, before any database client/write.
+export function assertTestProject() {
+  const ids = execFileSync('docker', ['compose', '-f', 'deploy/phase2/compose.test.yml', 'ps', '-q'], { encoding: 'utf8' }).trim().split(/\s+/).filter(Boolean);
+  if (ids.length !== 3) throw new Error('Start exactly the dedicated three-container pet-phase2-p1-test project with npm run phase2:up');
+  const expected = new Set(['postgres', 'rabbitmq', 'redis']);
+  for (const id of ids) {
+    const info = JSON.parse(execFileSync('docker', ['inspect', id], { encoding: 'utf8' }))[0];
+    const labels = info.Config.Labels;
+    if (labels['com.docker.compose.project'] !== 'pet-phase2-p1-test' || !expected.delete(labels['com.docker.compose.service'])) throw new Error('Wrong Compose project/service');
+    if (labels['com.docker.compose.service'] === 'postgres') {
+      const bindings = info.HostConfig.PortBindings['5432/tcp'];
+      if (bindings?.length !== 1 || bindings[0].HostIp !== '127.0.0.1' || bindings[0].HostPort !== '55432') throw new Error('Wrong rehearsal PostgreSQL endpoint');
+    }
+  }
+  if (expected.size) throw new Error('Missing test infrastructure service');
+}
+
+// AMQP checkQueue only reports ready messages. A worker can have zero ready
+// messages while its SQL work/ACK is still in flight; killing it then requeues.
+// Read broker counters before test teardown, without consuming/deleting data.
+export async function waitForQueueIdle(names, timeoutMs = 15000) {
+  if (!Array.isArray(names) || !names.length || names.some(n => typeof n !== 'string' || n.length > 200 || !/^p[1-7]\.[A-Za-z0-9.-]+$/.test(n))) throw new Error('Invalid test queue scope');
+  assertTestProject();
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    const rows = JSON.parse(execFileSync('docker', ['compose','-f','deploy/phase2/compose.test.yml','exec','-T','rabbitmq','rabbitmqctl','list_queues','--formatter','json','name','messages_ready','messages_unacknowledged'], { encoding:'utf8', timeout:30000 }));
+    if (names.every(name => rows.some(q => q.name === name && q.messages_ready === 0 && q.messages_unacknowledged === 0))) return;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error('Test queues still have ready or unacknowledged messages');
+}

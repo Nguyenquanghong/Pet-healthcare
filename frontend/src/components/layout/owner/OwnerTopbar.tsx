@@ -3,14 +3,14 @@ import { NavLink } from "react-router-dom";
 import { ownerNav } from "../../../constants/navigation";
 import { useAppStore } from "../../../store/AppStoreProvider";
 import { MobileBottomNav } from "../MobileBottomNav";
+import { NotificationBadge } from '../NotificationBadge';
 
 interface OwnerTopbarProps {
   title: string;
 }
 
 export function OwnerTopbar({ title }: OwnerTopbarProps) {
-  const { summary, currentOwner } = useAppStore();
-  const unreadCount = summary.unread;
+  const { currentOwner } = useAppStore();
   const initials = currentOwner?.fullName
     ? currentOwner.fullName
         .split(" ")
@@ -47,11 +47,7 @@ export function OwnerTopbar({ title }: OwnerTopbarProps) {
             className="relative flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 sm:h-9 sm:w-9"
           >
             <Bell size={18} />
-            {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold text-white">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
+            <NotificationBadge className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold text-white" />
           </NavLink>
         </div>
       </div>

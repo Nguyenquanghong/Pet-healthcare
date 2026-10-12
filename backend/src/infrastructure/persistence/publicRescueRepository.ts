@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { writeNotification } from './notificationOutbox.js';
 import type { PublicRescueDependencies, PublicRescueRepository, PublicRescueUnitOfWork } from "../../application/ports/publicRescue.js";
 
 type Client = PrismaClient | Prisma.TransactionClient;
@@ -16,7 +17,7 @@ class PrismaPublicRescueRepository implements PublicRescueRepository {
     await this.client.rescueReport.create({ data });
   }
   async notifyOwner(data: Parameters<PublicRescueRepository["notifyOwner"]>[0]) {
-    await this.client.notification.create({ data });
+    await writeNotification(this.client, data);
   }
 }
 

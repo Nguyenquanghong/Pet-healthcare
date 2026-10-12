@@ -10,53 +10,40 @@ import type { Invoice, BankTransferDetails } from "../../types/invoice";
 import { BankTransferPanel } from "./BankTransferPanel";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { isSpaAppointmentType } from "../../types/appointment";
+import {useInvoiceOperation} from '../../services/useInvoiceOperation';
+import { useApiQuery } from '../../services/useApiQuery';
 
 const statusLabel = { unpaid: "Chờ thanh toán", paid: "Đã thanh toán", refunded: "Đã hoàn tiền" };
 export function OwnerBillingPage() {
   const { refreshData } = useAppStore();
-  const list = usePagedList<Invoice>("/invoices");
+  const list = usePagedList<Invoice>("/invoices", {}, true, { pollMs: 15000 });
   const sourcePage = usePagedList<Appointment>("/appointments", { mode: "unbilled" });
   const hotelPage = usePagedList<HotelBooking>("/hotel-bookings", { mode: "unbilled" });
   const invoices = list.items, appointments = sourcePage.items, pets = [...list.related.pets, ...sourcePage.related.pets];
-  const [enabled, setEnabled] = useState(false);
-  const [bankTransfer, setBankTransfer] = useState<BankTransferDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+  const options = useApiQuery<{ vnpayEnabled: boolean; bankTransfer: BankTransferDetails | null }>('/payments/options', { refreshOnTick: true });
+  const enabled = options.data?.vnpayEnabled ?? false, bankTransfer = options.data?.bankTransfer ?? null, loading = options.loading;
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
-  const refresh = useCallback(async () => {
-    const options = await apiClient.get<{ vnpayEnabled: boolean; bankTransfer: BankTransferDetails | null }>("/payments/options", { signal: AbortSignal.timeout(15_000) });
-    setEnabled(options.vnpayEnabled); setBankTransfer(options.bankTransfer);
-  }, []);
+  const operation=useInvoiceOperation('owner');
+  const [returnQuery] = useState(() => new URLSearchParams(window.location.search));
+  const returned = useApiQuery<{ verified: boolean }>(`/payments/vnpay/return?${returnQuery.toString()}`, { enabled: returnQuery.has('vnp_TxnRef') });
   useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try { await refresh(); } catch (reason) {
-        if (active) setError(reason instanceof Error ? reason.message : "Không tải được hóa đơn.");
-      } finally { if (active) setLoading(false); }
-    };
-    void load();
     // Payment status always comes from the backend. Return query parameters cannot mark an invoice paid.
-    const query = new URLSearchParams(window.location.search);
-    if (query.has("vnp_TxnRef")) {
-      void apiClient.get<{ verified: boolean }>(`/payments/vnpay/return?${query.toString()}`).then(result => {
-        if (active) setMessage(result.verified
+    if (returned.data) {
+      setMessage(returned.data.verified
           ? "Đã trở về từ VNPay. Trạng thái hóa đơn bên dưới sẽ cập nhật khi hệ thống nhận xác nhận giao dịch."
           : "Không xác minh được kết quả chuyển hướng. Hãy kiểm tra trạng thái hóa đơn trước khi thanh toán lại.");
-      }).catch(() => { if (active) setError("Chưa xác minh được kết quả VNPay. Hãy tải lại hóa đơn."); });
       window.history.replaceState(null, "", window.location.pathname);
     }
-    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 15000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [refresh]);
+  }, [returned.data]);
   const act = async (work: () => Promise<void>, writes = true) => {
     if (submitting.current) return;
     submitting.current = true; setBusy(true); setError(""); setMessage("");
     try {
       await work();
-      // This screen reloads its queries explicitly; a second broadcast would replace those requests.
-      const results = await Promise.allSettled([refresh(), list.reload(), sourcePage.reload(), hotelPage.reload(), refreshData(false)]);
+      const results = await Promise.allSettled([refreshData(['invoices', 'clinic', 'hotel'])]);
       if (results.some(result => result.status === "rejected")) setError(writes
         ? "Đã ghi nhận thao tác nhưng chưa tải lại được dữ liệu. Kiểm tra trạng thái trước khi gửi lại."
         : "Chưa tải lại được dữ liệu. Hãy thử tải lại.");
@@ -72,12 +59,15 @@ export function OwnerBillingPage() {
   return <OwnerLayout title="Hóa đơn & Thanh toán">
     <p className="text-sm font-semibold">Hóa đơn</p><Pagination {...list} />
     <p className="text-sm font-semibold">Dịch vụ chưa lập hóa đơn</p><Pagination {...sourcePage} />
+    {sourcePage.counts.billingHeld>0&&<p role="status" className="text-sm text-amber-700">{sourcePage.counts.billingHeld} dịch vụ đang được chốt hóa đơn. Tải lại để kiểm tra kết quả.</p>}
     <div className="mb-5 flex items-start justify-between gap-3">
       <p className="max-w-2xl text-sm text-slate-600">Xem các khoản phí sau khi hoàn tất dịch vụ. Với dịch vụ khám có phí phát sinh, cửa hàng sẽ chốt hóa đơn trước khi bạn thanh toán.</p>
       <button className={button} disabled={busy} onClick={() => void act(async () => {}, false)}>Tải lại</button>
     </div>
     {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-rose-700">{error}</p>}
+    {(options.error || returned.error) && <p role="alert" className="mb-4 text-amber-800">Chưa cập nhật được thông tin thanh toán. <button className="underline" onClick={() => void Promise.allSettled([options.reload(), returned.reload()])}>Thử lại thanh toán</button></p>}
     {message && <p role="status" className="mb-4 rounded-lg bg-blue-50 p-3 text-blue-800">{message}</p>}
+    {operation.pending&&<div role="status" className="mb-4 rounded-lg bg-amber-50 p-3"><p>Hóa đơn đang xử lý hoặc chưa xác định được kết quả. Kiểm tra trạng thái trước khi gửi yêu cầu khác.</p><button className={button} disabled={busy} onClick={()=>void act(async()=>{const invoice=await operation.check();if(!invoice)throw new Error('Hóa đơn vẫn đang xử lý. Bạn có thể kiểm tra lại.');setMessage('Hóa đơn đã được lập.');})}>Kiểm tra trạng thái hóa đơn</button></div>}
     {loading ? <p>Đang tải hóa đơn...</p> : <>
       {!bankTransfer && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Cửa hàng chưa cấu hình tài khoản nhận chuyển khoản. Bạn vẫn có thể chọn thanh toán tại cửa hàng.</p>}
       {!invoices.length && !sources.length && <p className="rounded-xl bg-white p-6 text-slate-600">Bạn chưa có hóa đơn cần thanh toán.</p>}
@@ -127,8 +117,8 @@ export function OwnerBillingPage() {
         </article>)}
         {sources.map(source => <article key={source.id} className="rounded-xl border bg-white p-5">
           <h2 className="font-semibold">{source.label}</h2><p className="mb-3 text-sm text-slate-500">{pets.find(p => p.id === source.petId)?.name}</p>
-          {source.fixed ? <button className={button} disabled={busy} onClick={() => void act(async () => {
-            await apiClient.post("/invoices/checkout", { type: source.type, relatedId: source.id });
+          {source.fixed ? <button className={button} disabled={busy||Boolean(operation.pending)} onClick={() => void act(async () => {
+            const invoice=await operation.submit('/invoices/checkout',{ type: source.type, relatedId: source.id });if(!invoice)throw new Error('Hóa đơn đang được xử lý. Kiểm tra trạng thái trước khi gửi lại.');
           })}>Xem phí và thanh toán</button> : <p className="text-sm text-amber-700">Đang chờ cửa hàng chốt phí dịch vụ.</p>}
         </article>)}
       </div>

@@ -1,0 +1,6103 @@
+{
+  "version": 1,
+  "sourceModels": 18,
+  "sourceFields": 234,
+  "fields": [
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "directory_revision",
+      "type": "Int",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "directory_revision"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "username",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "username"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "phone",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "phone"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "email",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "email"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "password_hash",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "password_hash"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "password_salt",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "password_salt"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "full_name",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "full_name"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "role",
+      "type": "Role",
+      "required": true,
+      "list": false,
+      "enumValues": [
+        "owner",
+        "doctor",
+        "staff",
+        "admin"
+      ],
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "role"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "address",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "address"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "avatar_url",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "avatar_url"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "User",
+      "sourceTable": "users",
+      "sourceColumn": "updated_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "users",
+          "column": "updated_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OwnerActivation",
+      "sourceTable": "owner_activations",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "owner_activations",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OwnerActivation",
+      "sourceTable": "owner_activations",
+      "sourceColumn": "owner_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "owner_activations",
+          "column": "owner_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OwnerActivation",
+      "sourceTable": "owner_activations",
+      "sourceColumn": "token_hash",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "owner_activations",
+          "column": "token_hash"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OwnerActivation",
+      "sourceTable": "owner_activations",
+      "sourceColumn": "email",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "owner_activations",
+          "column": "email"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OwnerActivation",
+      "sourceTable": "owner_activations",
+      "sourceColumn": "expires_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "owner_activations",
+          "column": "expires_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OwnerActivation",
+      "sourceTable": "owner_activations",
+      "sourceColumn": "used_at",
+      "type": "DateTime",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "owner_activations",
+          "column": "used_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OwnerActivation",
+      "sourceTable": "owner_activations",
+      "sourceColumn": "revoked_at",
+      "type": "DateTime",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "owner_activations",
+          "column": "revoked_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OwnerActivation",
+      "sourceTable": "owner_activations",
+      "sourceColumn": "issued_by",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "owner_activations",
+          "column": "issued_by"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OwnerActivation",
+      "sourceTable": "owner_activations",
+      "sourceColumn": "issued_by_name",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "owner_activations",
+          "column": "issued_by_name"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OwnerActivation",
+      "sourceTable": "owner_activations",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "owner_activations",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "directory_revision",
+      "type": "Int",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "directory_revision"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "owner_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "owner_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "name",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "name"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "species",
+      "type": "PetSpecies",
+      "required": true,
+      "list": false,
+      "enumValues": [
+        "dog",
+        "cat",
+        "rabbit",
+        "other"
+      ],
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "species"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "breed",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "breed"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "gender",
+      "type": "PetGender",
+      "required": true,
+      "list": false,
+      "enumValues": [
+        "male",
+        "female",
+        "unknown"
+      ],
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "gender"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "age_label",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "age_label"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "weight_kg",
+      "type": "Decimal",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "weight_kg"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "microchip_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "microchip_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "health_status",
+      "type": "PetHealthStatus",
+      "required": true,
+      "list": false,
+      "enumValues": [
+        "healthy",
+        "stable",
+        "vaccination_due",
+        "under_treatment",
+        "critical"
+      ],
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "health_status"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "allergies",
+      "type": "String",
+      "required": true,
+      "list": true,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "allergies"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "notes",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "notes"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "avatar_url",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "avatar_url"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "identifying_marks",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "identifying_marks"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "last_seen_location",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "last_seen_location"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "qr_token",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "qr_token"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "qr_enabled",
+      "type": "Boolean",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "qr_enabled"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "show_owner_phone",
+      "type": "Boolean",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "show_owner_phone"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "show_owner_email",
+      "type": "Boolean",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "show_owner_email"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "show_owner_address",
+      "type": "Boolean",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "show_owner_address"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "show_medical_alerts",
+      "type": "Boolean",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "show_medical_alerts"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "rescue_note",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "rescue_note"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Pet",
+      "sourceTable": "pets",
+      "sourceColumn": "updated_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "pets",
+          "column": "updated_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "pet_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "pet_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "owner_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "owner_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "doctor_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "doctor_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "type",
+      "type": "AppointmentType",
+      "required": true,
+      "list": false,
+      "enumValues": [
+        "general_checkup",
+        "vaccination",
+        "dental",
+        "dermatology",
+        "surgery",
+        "hotel_consultation",
+        "spa_bath",
+        "spa_grooming",
+        "spa_combo",
+        "other"
+      ],
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "type"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "service_name",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "service_name"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "clinic_name",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "clinic_name"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "appointment_date",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "appointment_date"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "appointment_time",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "appointment_time"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "status",
+      "type": "AppointmentStatus",
+      "required": true,
+      "list": false,
+      "enumValues": [
+        "pending",
+        "confirmed",
+        "checked_in",
+        "in_progress",
+        "completed",
+        "cancelled",
+        "no_show"
+      ],
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "status"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "status_revision",
+      "type": "Int",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "status_revision"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "owner_note",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "owner_note"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "internal_note",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "internal_note"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "created_by",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "created_by"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Appointment",
+      "sourceTable": "appointments",
+      "sourceColumn": "updated_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "appointments",
+          "column": "updated_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "pet_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "pet_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "owner_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "owner_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "appointment_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "appointment_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "doctor_name",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "doctor_name"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "visit_date",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "visit_date"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "title",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "title"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "symptoms",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "symptoms"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "diagnosis",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "diagnosis"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "treatment",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "treatment"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "medications",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "medications"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "vaccine_name",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "vaccine_name"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "follow_up_date",
+      "type": "DateTime",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "follow_up_date"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "weight_kg",
+      "type": "Decimal",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "weight_kg"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "temperature_c",
+      "type": "Decimal",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "temperature_c"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "heart_rate_bpm",
+      "type": "Int",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "heart_rate_bpm"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "internal_note",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "internal_note"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalRecord",
+      "sourceTable": "medical_records",
+      "sourceColumn": "updated_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_records",
+          "column": "updated_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalImage",
+      "sourceTable": "medical_images",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_images",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalImage",
+      "sourceTable": "medical_images",
+      "sourceColumn": "pet_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_images",
+          "column": "pet_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalImage",
+      "sourceTable": "medical_images",
+      "sourceColumn": "title",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_images",
+          "column": "title"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalImage",
+      "sourceTable": "medical_images",
+      "sourceColumn": "image_url",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_images",
+          "column": "image_url"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalImage",
+      "sourceTable": "medical_images",
+      "sourceColumn": "mime_type",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_images",
+          "column": "mime_type"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "MedicalImage",
+      "sourceTable": "medical_images",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "clinic",
+          "table": "medical_images",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "pet_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "pet_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "owner_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "owner_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "check_in",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "check_in"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "check_out",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "check_out"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "nights",
+      "type": "Int",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "nights"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "room_type",
+      "type": "RoomType",
+      "required": true,
+      "list": false,
+      "enumValues": [
+        "standard",
+        "deluxe",
+        "vip"
+      ],
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "room_type"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "service_keys",
+      "type": "String",
+      "required": true,
+      "list": true,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "service_keys"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "total_amount",
+      "type": "Decimal",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "total_amount"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "status",
+      "type": "HotelBookingStatus",
+      "required": true,
+      "list": false,
+      "enumValues": [
+        "pending",
+        "confirmed",
+        "in_stay",
+        "checked_out",
+        "cancelled",
+        "rejected"
+      ],
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "status"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "status_revision",
+      "type": "Int",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "status_revision"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "owner_note",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "owner_note"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "internal_note",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "internal_note"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBooking",
+      "sourceTable": "hotel_bookings",
+      "sourceColumn": "updated_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_bookings",
+          "column": "updated_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBookingRequest",
+      "sourceTable": "hotel_booking_requests",
+      "sourceColumn": "actor_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_booking_requests",
+          "column": "actor_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBookingRequest",
+      "sourceTable": "hotel_booking_requests",
+      "sourceColumn": "request_key",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_booking_requests",
+          "column": "request_key"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBookingRequest",
+      "sourceTable": "hotel_booking_requests",
+      "sourceColumn": "fingerprint",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_booking_requests",
+          "column": "fingerprint"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBookingRequest",
+      "sourceTable": "hotel_booking_requests",
+      "sourceColumn": "booking_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_booking_requests",
+          "column": "booking_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "HotelBookingRequest",
+      "sourceTable": "hotel_booking_requests",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "hotel_booking_requests",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "id"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "id"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "kind",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "kind"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "kind"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "booking_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "booking_id"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "booking_id"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "revision",
+      "type": "Int",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "revision"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "revision"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "action",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "action"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "action"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "from_status",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "from_status"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "from_status"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "to_status",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "to_status"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "to_status"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "actor_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "actor_id"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "actor_id"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "actor_name",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "actor_name"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "actor_name"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "actor_role",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "actor_role"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "actor_role"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "reason",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "reason"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "reason"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "reverses_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "reverses_id"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "reverses_id"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "BookingStatusEvent",
+      "sourceTable": "booking_status_events",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "booking_status_events",
+          "column": "created_at"
+        },
+        {
+          "service": "clinic",
+          "table": "booking_status_events",
+          "column": "created_at"
+        }
+      ],
+      "rule": "hotel→Core; appointment→Clinic"
+    },
+    {
+      "sourceModel": "DailyCareNote",
+      "sourceTable": "daily_care_notes",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "daily_care_notes",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "DailyCareNote",
+      "sourceTable": "daily_care_notes",
+      "sourceColumn": "booking_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "daily_care_notes",
+          "column": "booking_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "DailyCareNote",
+      "sourceTable": "daily_care_notes",
+      "sourceColumn": "note_date",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "daily_care_notes",
+          "column": "note_date"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "DailyCareNote",
+      "sourceTable": "daily_care_notes",
+      "sourceColumn": "eating_status",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "daily_care_notes",
+          "column": "eating_status"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "DailyCareNote",
+      "sourceTable": "daily_care_notes",
+      "sourceColumn": "mood",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "daily_care_notes",
+          "column": "mood"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "DailyCareNote",
+      "sourceTable": "daily_care_notes",
+      "sourceColumn": "note",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "daily_care_notes",
+          "column": "note"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "DailyCareNote",
+      "sourceTable": "daily_care_notes",
+      "sourceColumn": "visible_to_owner",
+      "type": "Boolean",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "daily_care_notes",
+          "column": "visible_to_owner"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "DailyCareNote",
+      "sourceTable": "daily_care_notes",
+      "sourceColumn": "created_by_staff_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "daily_care_notes",
+          "column": "created_by_staff_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "DailyCareNote",
+      "sourceTable": "daily_care_notes",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "daily_care_notes",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "RescueReport",
+      "sourceTable": "rescue_reports",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "rescue_reports",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "RescueReport",
+      "sourceTable": "rescue_reports",
+      "sourceColumn": "pet_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "rescue_reports",
+          "column": "pet_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "RescueReport",
+      "sourceTable": "rescue_reports",
+      "sourceColumn": "finder_name",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "rescue_reports",
+          "column": "finder_name"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "RescueReport",
+      "sourceTable": "rescue_reports",
+      "sourceColumn": "finder_phone",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "rescue_reports",
+          "column": "finder_phone"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "RescueReport",
+      "sourceTable": "rescue_reports",
+      "sourceColumn": "location",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "rescue_reports",
+          "column": "location"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "RescueReport",
+      "sourceTable": "rescue_reports",
+      "sourceColumn": "note",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "rescue_reports",
+          "column": "note"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "RescueReport",
+      "sourceTable": "rescue_reports",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "rescue_reports",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "invoice_code",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "invoice_code"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "transfer_code",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "transfer_code"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "type",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "type"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "owner_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "owner_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "pet_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "pet_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "appointment_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "appointment_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "hotel_booking_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "hotel_booking_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "subtotal",
+      "type": "Decimal",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "subtotal"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "tax_amount",
+      "type": "Decimal",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "tax_amount"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "discount_amount",
+      "type": "Decimal",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "discount_amount"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "total_amount",
+      "type": "Decimal",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "total_amount"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "payment_status",
+      "type": "PaymentStatus",
+      "required": true,
+      "list": false,
+      "enumValues": [
+        "paid",
+        "unpaid",
+        "refunded"
+      ],
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "payment_status"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "payment_method",
+      "type": "PaymentMethod",
+      "required": false,
+      "list": false,
+      "enumValues": [
+        "cash",
+        "bank_transfer",
+        "credit_card",
+        "qr_code",
+        "vnpay"
+      ],
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "payment_method"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "payment_channel",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "payment_channel"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "bank_transfer_details",
+      "type": "Json",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "bank_transfer_details"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "transfer_review_status",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "transfer_review_status"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "transfer_reported_at",
+      "type": "DateTime",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "transfer_reported_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "transfer_reference",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "transfer_reference"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "transfer_review_note",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "transfer_review_note"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "issued_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "issued_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "paid_at",
+      "type": "DateTime",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "paid_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "notes",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "notes"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "updated_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "updated_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Invoice",
+      "sourceTable": "invoices",
+      "sourceColumn": "source_snapshot",
+      "type": "Json",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoices",
+          "column": "source_snapshot"
+        }
+      ],
+      "rule": "preserve, or reconstruct only with historical timestamp/history proof"
+    },
+    {
+      "sourceModel": "InvoiceItem",
+      "sourceTable": "invoice_items",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoice_items",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "InvoiceItem",
+      "sourceTable": "invoice_items",
+      "sourceColumn": "invoice_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoice_items",
+          "column": "invoice_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "InvoiceItem",
+      "sourceTable": "invoice_items",
+      "sourceColumn": "description",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoice_items",
+          "column": "description"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "InvoiceItem",
+      "sourceTable": "invoice_items",
+      "sourceColumn": "unit_price",
+      "type": "Decimal",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoice_items",
+          "column": "unit_price"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "InvoiceItem",
+      "sourceTable": "invoice_items",
+      "sourceColumn": "quantity",
+      "type": "Int",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoice_items",
+          "column": "quantity"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "InvoiceItem",
+      "sourceTable": "invoice_items",
+      "sourceColumn": "amount",
+      "type": "Decimal",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "invoice_items",
+          "column": "amount"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentAttempt",
+      "sourceTable": "payment_attempts",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_attempts",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentAttempt",
+      "sourceTable": "payment_attempts",
+      "sourceColumn": "invoice_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_attempts",
+          "column": "invoice_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentAttempt",
+      "sourceTable": "payment_attempts",
+      "sourceColumn": "amount",
+      "type": "Decimal",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_attempts",
+          "column": "amount"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentAttempt",
+      "sourceTable": "payment_attempts",
+      "sourceColumn": "status",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_attempts",
+          "column": "status"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentAttempt",
+      "sourceTable": "payment_attempts",
+      "sourceColumn": "transaction_no",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_attempts",
+          "column": "transaction_no"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentAttempt",
+      "sourceTable": "payment_attempts",
+      "sourceColumn": "response_code",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_attempts",
+          "column": "response_code"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentAttempt",
+      "sourceTable": "payment_attempts",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_attempts",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentAttempt",
+      "sourceTable": "payment_attempts",
+      "sourceColumn": "expires_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_attempts",
+          "column": "expires_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentEvent",
+      "sourceTable": "payment_events",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_events",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentEvent",
+      "sourceTable": "payment_events",
+      "sourceColumn": "invoice_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_events",
+          "column": "invoice_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentEvent",
+      "sourceTable": "payment_events",
+      "sourceColumn": "action",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_events",
+          "column": "action"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentEvent",
+      "sourceTable": "payment_events",
+      "sourceColumn": "from_status",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_events",
+          "column": "from_status"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentEvent",
+      "sourceTable": "payment_events",
+      "sourceColumn": "to_status",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_events",
+          "column": "to_status"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentEvent",
+      "sourceTable": "payment_events",
+      "sourceColumn": "actor_id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_events",
+          "column": "actor_id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentEvent",
+      "sourceTable": "payment_events",
+      "sourceColumn": "actor_name",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_events",
+          "column": "actor_name"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentEvent",
+      "sourceTable": "payment_events",
+      "sourceColumn": "actor_role",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_events",
+          "column": "actor_role"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentEvent",
+      "sourceTable": "payment_events",
+      "sourceColumn": "reason",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_events",
+          "column": "reason"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentEvent",
+      "sourceTable": "payment_events",
+      "sourceColumn": "reference",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_events",
+          "column": "reference"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "PaymentEvent",
+      "sourceTable": "payment_events",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "payment_events",
+          "column": "created_at"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OutboxEvent",
+      "sourceTable": "OutboxEvent",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "OutboxEvent",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OutboxEvent",
+      "sourceTable": "OutboxEvent",
+      "sourceColumn": "envelope",
+      "type": "Json",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "OutboxEvent",
+          "column": "envelope"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OutboxEvent",
+      "sourceTable": "OutboxEvent",
+      "sourceColumn": "createdAt",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "OutboxEvent",
+          "column": "createdAt"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OutboxEvent",
+      "sourceTable": "OutboxEvent",
+      "sourceColumn": "publishedAt",
+      "type": "DateTime",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "OutboxEvent",
+          "column": "publishedAt"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OutboxEvent",
+      "sourceTable": "OutboxEvent",
+      "sourceColumn": "attempts",
+      "type": "Int",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "OutboxEvent",
+          "column": "attempts"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OutboxEvent",
+      "sourceTable": "OutboxEvent",
+      "sourceColumn": "nextAttemptAt",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "OutboxEvent",
+          "column": "nextAttemptAt"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OutboxEvent",
+      "sourceTable": "OutboxEvent",
+      "sourceColumn": "leaseOwner",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "OutboxEvent",
+          "column": "leaseOwner"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OutboxEvent",
+      "sourceTable": "OutboxEvent",
+      "sourceColumn": "leaseUntil",
+      "type": "DateTime",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "OutboxEvent",
+          "column": "leaseUntil"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "OutboxEvent",
+      "sourceTable": "OutboxEvent",
+      "sourceColumn": "lastErrorCode",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "OutboxEvent",
+          "column": "lastErrorCode"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "actorId",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "actorId"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "actorRole",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "actorRole"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "operationType",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "operationType"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "idempotencyKey",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "idempotencyKey"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "requestHash",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "requestHash"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "appointmentId",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "appointmentId"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "expectedRevision",
+      "type": "Int",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "expectedRevision"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "payload",
+      "type": "Json",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "payload"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "state",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "state"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "invoiceId",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "invoiceId"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "snapshot",
+      "type": "Json",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "snapshot"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "errorCode",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "errorCode"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "errorStatus",
+      "type": "Int",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "errorStatus"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "createdAt",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "createdAt"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "updatedAt",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "updatedAt"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "terminalAt",
+      "type": "DateTime",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "terminalAt"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "finalizedAt",
+      "type": "DateTime",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "finalizedAt"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "attempts",
+      "type": "Int",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "attempts"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "nextAttemptAt",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "nextAttemptAt"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "leaseOwner",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "leaseOwner"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "AppointmentBillingOperation",
+      "sourceTable": "AppointmentBillingOperation",
+      "sourceColumn": "leaseUntil",
+      "type": "DateTime",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "core",
+          "table": "AppointmentBillingOperation",
+          "column": "leaseUntil"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "id",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "id"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "recipient_owner_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "recipientOwnerId"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "recipient_role",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "recipientRole"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "type",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "type"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "title",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "title"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "message",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "message"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "status",
+      "type": "String",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "status"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "action_url",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "actionUrl"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "related_pet_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "relatedPetId"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "related_appointment_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "relatedAppointmentId"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "related_booking_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "relatedBookingId"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "sent_by_staff_id",
+      "type": "String",
+      "required": false,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "sentByStaffId"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "created_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "createdAt"
+        }
+      ],
+      "rule": "preserve exact value"
+    },
+    {
+      "sourceModel": "Notification",
+      "sourceTable": "notifications",
+      "sourceColumn": "sent_at",
+      "type": "DateTime",
+      "required": true,
+      "list": false,
+      "destinations": [
+        {
+          "service": "notification",
+          "table": "notifications",
+          "column": "sentAt"
+        }
+      ],
+      "rule": "preserve exact value"
+    }
+  ],
+  "derived": [
+    "Clinic.MedicalImage.owner_id from current Pet.owner_id",
+    "Clinic.DirectoryProjection from User/Pet with source revision; credential fields excluded",
+    "Clinic.AppointmentReservation + AppointmentBillingTerminal for historical clinical invoices",
+    "Core.AppointmentBillingOperation for pre-protocol invoice; preserve existing operations",
+    "Notification.InboxEvent for materialized/deleted event IDs and legacy notice IDs"
+  ],
+  "sourceCatalog": {
+    "columns": [
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "actorId",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "actorRole",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "operationType",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "idempotencyKey",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "requestHash",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "appointmentId",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "expectedRevision",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "payload",
+        "data_type": "jsonb",
+        "udt_name": "jsonb",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "state",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "invoiceId",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "snapshot",
+        "data_type": "jsonb",
+        "udt_name": "jsonb",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "errorCode",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "errorStatus",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "updatedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "terminalAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "finalizedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "attempts",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "nextAttemptAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "leaseOwner",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "AppointmentBillingOperation",
+        "column_name": "leaseUntil",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "OutboxEvent",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "OutboxEvent",
+        "column_name": "envelope",
+        "data_type": "jsonb",
+        "udt_name": "jsonb",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "OutboxEvent",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "OutboxEvent",
+        "column_name": "publishedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "OutboxEvent",
+        "column_name": "attempts",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "OutboxEvent",
+        "column_name": "nextAttemptAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "OutboxEvent",
+        "column_name": "leaseOwner",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "OutboxEvent",
+        "column_name": "leaseUntil",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "OutboxEvent",
+        "column_name": "lastErrorCode",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "id",
+        "data_type": "character varying",
+        "udt_name": "varchar",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "checksum",
+        "data_type": "character varying",
+        "udt_name": "varchar",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "finished_at",
+        "data_type": "timestamp with time zone",
+        "udt_name": "timestamptz",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "migration_name",
+        "data_type": "character varying",
+        "udt_name": "varchar",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "logs",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "rolled_back_at",
+        "data_type": "timestamp with time zone",
+        "udt_name": "timestamptz",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "started_at",
+        "data_type": "timestamp with time zone",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "applied_steps_count",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "pet_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "owner_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "doctor_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "type",
+        "data_type": "USER-DEFINED",
+        "udt_name": "AppointmentType",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "service_name",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "clinic_name",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "appointment_date",
+        "data_type": "date",
+        "udt_name": "date",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "appointment_time",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "status",
+        "data_type": "USER-DEFINED",
+        "udt_name": "AppointmentStatus",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "owner_note",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "internal_note",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "created_by",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "updated_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "appointments",
+        "column_name": "status_revision",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "kind",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "booking_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "revision",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "action",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "from_status",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "to_status",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "actor_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "actor_name",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "actor_role",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "reason",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "reverses_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "booking_status_events",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "daily_care_notes",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "daily_care_notes",
+        "column_name": "booking_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "daily_care_notes",
+        "column_name": "note_date",
+        "data_type": "date",
+        "udt_name": "date",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "daily_care_notes",
+        "column_name": "eating_status",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "daily_care_notes",
+        "column_name": "mood",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "daily_care_notes",
+        "column_name": "note",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "daily_care_notes",
+        "column_name": "visible_to_owner",
+        "data_type": "boolean",
+        "udt_name": "bool",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "daily_care_notes",
+        "column_name": "created_by_staff_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "daily_care_notes",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_booking_requests",
+        "column_name": "actor_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_booking_requests",
+        "column_name": "request_key",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_booking_requests",
+        "column_name": "fingerprint",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_booking_requests",
+        "column_name": "booking_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_booking_requests",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "pet_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "owner_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "check_in",
+        "data_type": "date",
+        "udt_name": "date",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "check_out",
+        "data_type": "date",
+        "udt_name": "date",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "nights",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "room_type",
+        "data_type": "USER-DEFINED",
+        "udt_name": "RoomType",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "service_keys",
+        "data_type": "ARRAY",
+        "udt_name": "_text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "total_amount",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "status",
+        "data_type": "USER-DEFINED",
+        "udt_name": "HotelBookingStatus",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "owner_note",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "internal_note",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "updated_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "column_name": "status_revision",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoice_items",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoice_items",
+        "column_name": "invoice_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoice_items",
+        "column_name": "description",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoice_items",
+        "column_name": "unit_price",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoice_items",
+        "column_name": "quantity",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoice_items",
+        "column_name": "amount",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "invoice_code",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "type",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "owner_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "pet_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "appointment_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "hotel_booking_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "subtotal",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "tax_amount",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "discount_amount",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "total_amount",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "payment_status",
+        "data_type": "USER-DEFINED",
+        "udt_name": "PaymentStatus",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "payment_method",
+        "data_type": "USER-DEFINED",
+        "udt_name": "PaymentMethod",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "issued_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "paid_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "notes",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "updated_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "payment_channel",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "bank_transfer_details",
+        "data_type": "jsonb",
+        "udt_name": "jsonb",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "transfer_review_status",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "transfer_reported_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "transfer_reference",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "transfer_review_note",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "transfer_code",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "invoices",
+        "column_name": "source_snapshot",
+        "data_type": "jsonb",
+        "udt_name": "jsonb",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "medical_images",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_images",
+        "column_name": "pet_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_images",
+        "column_name": "title",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_images",
+        "column_name": "image_url",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_images",
+        "column_name": "mime_type",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_images",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "pet_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "owner_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "appointment_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "doctor_name",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "visit_date",
+        "data_type": "date",
+        "udt_name": "date",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "title",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "symptoms",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "diagnosis",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "treatment",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "medications",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "vaccine_name",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "follow_up_date",
+        "data_type": "date",
+        "udt_name": "date",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "weight_kg",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "temperature_c",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "heart_rate_bpm",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "internal_note",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "medical_records",
+        "column_name": "updated_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "recipient_owner_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "recipient_role",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "type",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "title",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "message",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "status",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "action_url",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "related_pet_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "related_appointment_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "related_booking_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "sent_by_staff_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "notifications",
+        "column_name": "sent_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "owner_activations",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "owner_activations",
+        "column_name": "owner_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "owner_activations",
+        "column_name": "token_hash",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "owner_activations",
+        "column_name": "email",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "owner_activations",
+        "column_name": "expires_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "owner_activations",
+        "column_name": "used_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "owner_activations",
+        "column_name": "revoked_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "owner_activations",
+        "column_name": "issued_by",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "owner_activations",
+        "column_name": "issued_by_name",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "owner_activations",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_attempts",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_attempts",
+        "column_name": "invoice_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_attempts",
+        "column_name": "amount",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_attempts",
+        "column_name": "status",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_attempts",
+        "column_name": "transaction_no",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "payment_attempts",
+        "column_name": "response_code",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "payment_attempts",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_attempts",
+        "column_name": "expires_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_events",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_events",
+        "column_name": "invoice_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_events",
+        "column_name": "action",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_events",
+        "column_name": "from_status",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_events",
+        "column_name": "to_status",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_events",
+        "column_name": "actor_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_events",
+        "column_name": "actor_name",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_events",
+        "column_name": "actor_role",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "payment_events",
+        "column_name": "reason",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "payment_events",
+        "column_name": "reference",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "payment_events",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "owner_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "name",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "species",
+        "data_type": "USER-DEFINED",
+        "udt_name": "PetSpecies",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "breed",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "gender",
+        "data_type": "USER-DEFINED",
+        "udt_name": "PetGender",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "age_label",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "weight_kg",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "microchip_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "health_status",
+        "data_type": "USER-DEFINED",
+        "udt_name": "PetHealthStatus",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "allergies",
+        "data_type": "ARRAY",
+        "udt_name": "_text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "notes",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "avatar_url",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "identifying_marks",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "last_seen_location",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "qr_token",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "qr_enabled",
+        "data_type": "boolean",
+        "udt_name": "bool",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "show_owner_phone",
+        "data_type": "boolean",
+        "udt_name": "bool",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "show_owner_email",
+        "data_type": "boolean",
+        "udt_name": "bool",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "show_owner_address",
+        "data_type": "boolean",
+        "udt_name": "bool",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "show_medical_alerts",
+        "data_type": "boolean",
+        "udt_name": "bool",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "rescue_note",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "updated_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "pets",
+        "column_name": "directory_revision",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "rescue_reports",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "rescue_reports",
+        "column_name": "pet_id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "rescue_reports",
+        "column_name": "finder_name",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "rescue_reports",
+        "column_name": "finder_phone",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "rescue_reports",
+        "column_name": "location",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "rescue_reports",
+        "column_name": "note",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "rescue_reports",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "users",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "users",
+        "column_name": "username",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "users",
+        "column_name": "phone",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "users",
+        "column_name": "email",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "users",
+        "column_name": "password_hash",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "users",
+        "column_name": "password_salt",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "users",
+        "column_name": "full_name",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "users",
+        "column_name": "role",
+        "data_type": "USER-DEFINED",
+        "udt_name": "Role",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "users",
+        "column_name": "address",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "users",
+        "column_name": "avatar_url",
+        "data_type": "text",
+        "udt_name": "text",
+        "is_nullable": "YES"
+      },
+      {
+        "table_name": "users",
+        "column_name": "created_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "users",
+        "column_name": "updated_at",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "is_nullable": "NO"
+      },
+      {
+        "table_name": "users",
+        "column_name": "directory_revision",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "is_nullable": "NO"
+      }
+    ],
+    "indexes": [
+      {
+        "tablename": "AppointmentBillingOperation",
+        "indexname": "AppointmentBillingOperation_active_source_key",
+        "indexdef": "CREATE UNIQUE INDEX \"AppointmentBillingOperation_active_source_key\" ON runtime.\"AppointmentBillingOperation\" USING btree (\"appointmentId\") WHERE (state = 'PREPARING'::text)"
+      },
+      {
+        "tablename": "AppointmentBillingOperation",
+        "indexname": "AppointmentBillingOperation_actorId_operationType_idempotencyKe",
+        "indexdef": "CREATE UNIQUE INDEX \"AppointmentBillingOperation_actorId_operationType_idempotencyKe\" ON runtime.\"AppointmentBillingOperation\" USING btree (\"actorId\", \"operationType\", \"idempotencyKey\")"
+      },
+      {
+        "tablename": "AppointmentBillingOperation",
+        "indexname": "AppointmentBillingOperation_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"AppointmentBillingOperation_pkey\" ON runtime.\"AppointmentBillingOperation\" USING btree (id)"
+      },
+      {
+        "tablename": "AppointmentBillingOperation",
+        "indexname": "AppointmentBillingOperation_state_nextAttemptAt_leaseUntil_idx",
+        "indexdef": "CREATE INDEX \"AppointmentBillingOperation_state_nextAttemptAt_leaseUntil_idx\" ON runtime.\"AppointmentBillingOperation\" USING btree (state, \"nextAttemptAt\", \"leaseUntil\")"
+      },
+      {
+        "tablename": "OutboxEvent",
+        "indexname": "OutboxEvent_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"OutboxEvent_pkey\" ON runtime.\"OutboxEvent\" USING btree (id)"
+      },
+      {
+        "tablename": "OutboxEvent",
+        "indexname": "OutboxEvent_publishedAt_nextAttemptAt_idx",
+        "indexdef": "CREATE INDEX \"OutboxEvent_publishedAt_nextAttemptAt_idx\" ON runtime.\"OutboxEvent\" USING btree (\"publishedAt\", \"nextAttemptAt\")"
+      },
+      {
+        "tablename": "_prisma_migrations",
+        "indexname": "_prisma_migrations_pkey",
+        "indexdef": "CREATE UNIQUE INDEX _prisma_migrations_pkey ON runtime._prisma_migrations USING btree (id)"
+      },
+      {
+        "tablename": "appointments",
+        "indexname": "appointments_active_pet_slot_key",
+        "indexdef": "CREATE UNIQUE INDEX appointments_active_pet_slot_key ON runtime.appointments USING btree (pet_id, appointment_date, appointment_time) WHERE (status <> ALL (ARRAY['cancelled'::\"AppointmentStatus\", 'no_show'::\"AppointmentStatus\"]))"
+      },
+      {
+        "tablename": "appointments",
+        "indexname": "appointments_owner_id_appointment_date_idx",
+        "indexdef": "CREATE INDEX appointments_owner_id_appointment_date_idx ON runtime.appointments USING btree (owner_id, appointment_date)"
+      },
+      {
+        "tablename": "appointments",
+        "indexname": "appointments_owner_page_idx",
+        "indexdef": "CREATE INDEX appointments_owner_page_idx ON runtime.appointments USING btree (owner_id, status, appointment_date DESC, appointment_time DESC, id DESC)"
+      },
+      {
+        "tablename": "appointments",
+        "indexname": "appointments_page_idx",
+        "indexdef": "CREATE INDEX appointments_page_idx ON runtime.appointments USING btree (status, appointment_date DESC, appointment_time DESC, id DESC)"
+      },
+      {
+        "tablename": "appointments",
+        "indexname": "appointments_pkey",
+        "indexdef": "CREATE UNIQUE INDEX appointments_pkey ON runtime.appointments USING btree (id)"
+      },
+      {
+        "tablename": "booking_status_events",
+        "indexname": "booking_status_events_booking_idx",
+        "indexdef": "CREATE INDEX booking_status_events_booking_idx ON runtime.booking_status_events USING btree (kind, booking_id, created_at)"
+      },
+      {
+        "tablename": "booking_status_events",
+        "indexname": "booking_status_events_kind_booking_id_revision_key",
+        "indexdef": "CREATE UNIQUE INDEX booking_status_events_kind_booking_id_revision_key ON runtime.booking_status_events USING btree (kind, booking_id, revision)"
+      },
+      {
+        "tablename": "booking_status_events",
+        "indexname": "booking_status_events_pkey",
+        "indexdef": "CREATE UNIQUE INDEX booking_status_events_pkey ON runtime.booking_status_events USING btree (id)"
+      },
+      {
+        "tablename": "booking_status_events",
+        "indexname": "booking_status_events_reverses_id_key",
+        "indexdef": "CREATE UNIQUE INDEX booking_status_events_reverses_id_key ON runtime.booking_status_events USING btree (reverses_id)"
+      },
+      {
+        "tablename": "daily_care_notes",
+        "indexname": "care_notes_page_idx",
+        "indexdef": "CREATE INDEX care_notes_page_idx ON runtime.daily_care_notes USING btree (booking_id, note_date, id)"
+      },
+      {
+        "tablename": "daily_care_notes",
+        "indexname": "daily_care_notes_booking_id_note_date_idx",
+        "indexdef": "CREATE INDEX daily_care_notes_booking_id_note_date_idx ON runtime.daily_care_notes USING btree (booking_id, note_date)"
+      },
+      {
+        "tablename": "daily_care_notes",
+        "indexname": "daily_care_notes_pkey",
+        "indexdef": "CREATE UNIQUE INDEX daily_care_notes_pkey ON runtime.daily_care_notes USING btree (id)"
+      },
+      {
+        "tablename": "hotel_booking_requests",
+        "indexname": "hotel_booking_requests_booking_id_idx",
+        "indexdef": "CREATE INDEX hotel_booking_requests_booking_id_idx ON runtime.hotel_booking_requests USING btree (booking_id)"
+      },
+      {
+        "tablename": "hotel_booking_requests",
+        "indexname": "hotel_booking_requests_pkey",
+        "indexdef": "CREATE UNIQUE INDEX hotel_booking_requests_pkey ON runtime.hotel_booking_requests USING btree (actor_id, request_key)"
+      },
+      {
+        "tablename": "hotel_bookings",
+        "indexname": "hotel_bookings_owner_id_check_in_idx",
+        "indexdef": "CREATE INDEX hotel_bookings_owner_id_check_in_idx ON runtime.hotel_bookings USING btree (owner_id, check_in)"
+      },
+      {
+        "tablename": "hotel_bookings",
+        "indexname": "hotel_bookings_owner_page_idx",
+        "indexdef": "CREATE INDEX hotel_bookings_owner_page_idx ON runtime.hotel_bookings USING btree (owner_id, status, created_at DESC, id DESC)"
+      },
+      {
+        "tablename": "hotel_bookings",
+        "indexname": "hotel_bookings_page_idx",
+        "indexdef": "CREATE INDEX hotel_bookings_page_idx ON runtime.hotel_bookings USING btree (status, created_at DESC, id DESC)"
+      },
+      {
+        "tablename": "hotel_bookings",
+        "indexname": "hotel_bookings_pkey",
+        "indexdef": "CREATE UNIQUE INDEX hotel_bookings_pkey ON runtime.hotel_bookings USING btree (id)"
+      },
+      {
+        "tablename": "invoice_items",
+        "indexname": "invoice_items_pkey",
+        "indexdef": "CREATE UNIQUE INDEX invoice_items_pkey ON runtime.invoice_items USING btree (id)"
+      },
+      {
+        "tablename": "invoices",
+        "indexname": "invoices_appointment_id_key",
+        "indexdef": "CREATE UNIQUE INDEX invoices_appointment_id_key ON runtime.invoices USING btree (appointment_id)"
+      },
+      {
+        "tablename": "invoices",
+        "indexname": "invoices_hotel_booking_id_key",
+        "indexdef": "CREATE UNIQUE INDEX invoices_hotel_booking_id_key ON runtime.invoices USING btree (hotel_booking_id)"
+      },
+      {
+        "tablename": "invoices",
+        "indexname": "invoices_invoice_code_key",
+        "indexdef": "CREATE UNIQUE INDEX invoices_invoice_code_key ON runtime.invoices USING btree (invoice_code)"
+      },
+      {
+        "tablename": "invoices",
+        "indexname": "invoices_owner_id_issued_at_idx",
+        "indexdef": "CREATE INDEX invoices_owner_id_issued_at_idx ON runtime.invoices USING btree (owner_id, issued_at)"
+      },
+      {
+        "tablename": "invoices",
+        "indexname": "invoices_owner_page_idx",
+        "indexdef": "CREATE INDEX invoices_owner_page_idx ON runtime.invoices USING btree (owner_id, issued_at, id)"
+      },
+      {
+        "tablename": "invoices",
+        "indexname": "invoices_page_idx",
+        "indexdef": "CREATE INDEX invoices_page_idx ON runtime.invoices USING btree (issued_at, id)"
+      },
+      {
+        "tablename": "invoices",
+        "indexname": "invoices_pkey",
+        "indexdef": "CREATE UNIQUE INDEX invoices_pkey ON runtime.invoices USING btree (id)"
+      },
+      {
+        "tablename": "invoices",
+        "indexname": "invoices_transfer_code_key",
+        "indexdef": "CREATE UNIQUE INDEX invoices_transfer_code_key ON runtime.invoices USING btree (transfer_code)"
+      },
+      {
+        "tablename": "medical_images",
+        "indexname": "medical_images_pet_id_idx",
+        "indexdef": "CREATE INDEX medical_images_pet_id_idx ON runtime.medical_images USING btree (pet_id)"
+      },
+      {
+        "tablename": "medical_images",
+        "indexname": "medical_images_pet_page_idx",
+        "indexdef": "CREATE INDEX medical_images_pet_page_idx ON runtime.medical_images USING btree (pet_id, created_at, id)"
+      },
+      {
+        "tablename": "medical_images",
+        "indexname": "medical_images_pkey",
+        "indexdef": "CREATE UNIQUE INDEX medical_images_pkey ON runtime.medical_images USING btree (id)"
+      },
+      {
+        "tablename": "medical_records",
+        "indexname": "medical_records_owner_page_idx",
+        "indexdef": "CREATE INDEX medical_records_owner_page_idx ON runtime.medical_records USING btree (owner_id, visit_date, id)"
+      },
+      {
+        "tablename": "medical_records",
+        "indexname": "medical_records_page_idx",
+        "indexdef": "CREATE INDEX medical_records_page_idx ON runtime.medical_records USING btree (visit_date, id)"
+      },
+      {
+        "tablename": "medical_records",
+        "indexname": "medical_records_pet_id_visit_date_idx",
+        "indexdef": "CREATE INDEX medical_records_pet_id_visit_date_idx ON runtime.medical_records USING btree (pet_id, visit_date)"
+      },
+      {
+        "tablename": "medical_records",
+        "indexname": "medical_records_pkey",
+        "indexdef": "CREATE UNIQUE INDEX medical_records_pkey ON runtime.medical_records USING btree (id)"
+      },
+      {
+        "tablename": "notifications",
+        "indexname": "notifications_owner_page_idx",
+        "indexdef": "CREATE INDEX notifications_owner_page_idx ON runtime.notifications USING btree (recipient_owner_id, created_at, id)"
+      },
+      {
+        "tablename": "notifications",
+        "indexname": "notifications_pkey",
+        "indexdef": "CREATE UNIQUE INDEX notifications_pkey ON runtime.notifications USING btree (id)"
+      },
+      {
+        "tablename": "notifications",
+        "indexname": "notifications_recipient_owner_id_created_at_idx",
+        "indexdef": "CREATE INDEX notifications_recipient_owner_id_created_at_idx ON runtime.notifications USING btree (recipient_owner_id, created_at)"
+      },
+      {
+        "tablename": "notifications",
+        "indexname": "notifications_role_page_idx",
+        "indexdef": "CREATE INDEX notifications_role_page_idx ON runtime.notifications USING btree (recipient_role, created_at, id)"
+      },
+      {
+        "tablename": "owner_activations",
+        "indexname": "owner_activations_owner_id_created_at_idx",
+        "indexdef": "CREATE INDEX owner_activations_owner_id_created_at_idx ON runtime.owner_activations USING btree (owner_id, created_at)"
+      },
+      {
+        "tablename": "owner_activations",
+        "indexname": "owner_activations_pkey",
+        "indexdef": "CREATE UNIQUE INDEX owner_activations_pkey ON runtime.owner_activations USING btree (id)"
+      },
+      {
+        "tablename": "owner_activations",
+        "indexname": "owner_activations_token_hash_key",
+        "indexdef": "CREATE UNIQUE INDEX owner_activations_token_hash_key ON runtime.owner_activations USING btree (token_hash)"
+      },
+      {
+        "tablename": "payment_attempts",
+        "indexname": "payment_attempts_invoice_id_created_at_idx",
+        "indexdef": "CREATE INDEX payment_attempts_invoice_id_created_at_idx ON runtime.payment_attempts USING btree (invoice_id, created_at)"
+      },
+      {
+        "tablename": "payment_attempts",
+        "indexname": "payment_attempts_pkey",
+        "indexdef": "CREATE UNIQUE INDEX payment_attempts_pkey ON runtime.payment_attempts USING btree (id)"
+      },
+      {
+        "tablename": "payment_attempts",
+        "indexname": "payment_attempts_transaction_no_key",
+        "indexdef": "CREATE UNIQUE INDEX payment_attempts_transaction_no_key ON runtime.payment_attempts USING btree (transaction_no)"
+      },
+      {
+        "tablename": "payment_events",
+        "indexname": "payment_events_invoice_id_created_at_idx",
+        "indexdef": "CREATE INDEX payment_events_invoice_id_created_at_idx ON runtime.payment_events USING btree (invoice_id, created_at)"
+      },
+      {
+        "tablename": "payment_events",
+        "indexname": "payment_events_pkey",
+        "indexdef": "CREATE UNIQUE INDEX payment_events_pkey ON runtime.payment_events USING btree (id)"
+      },
+      {
+        "tablename": "pets",
+        "indexname": "pets_microchip_id_key",
+        "indexdef": "CREATE UNIQUE INDEX pets_microchip_id_key ON runtime.pets USING btree (microchip_id)"
+      },
+      {
+        "tablename": "pets",
+        "indexname": "pets_owner_id_idx",
+        "indexdef": "CREATE INDEX pets_owner_id_idx ON runtime.pets USING btree (owner_id)"
+      },
+      {
+        "tablename": "pets",
+        "indexname": "pets_owner_page_idx",
+        "indexdef": "CREATE INDEX pets_owner_page_idx ON runtime.pets USING btree (owner_id, created_at, id)"
+      },
+      {
+        "tablename": "pets",
+        "indexname": "pets_page_idx",
+        "indexdef": "CREATE INDEX pets_page_idx ON runtime.pets USING btree (created_at, id)"
+      },
+      {
+        "tablename": "pets",
+        "indexname": "pets_pkey",
+        "indexdef": "CREATE UNIQUE INDEX pets_pkey ON runtime.pets USING btree (id)"
+      },
+      {
+        "tablename": "pets",
+        "indexname": "pets_qr_token_key",
+        "indexdef": "CREATE UNIQUE INDEX pets_qr_token_key ON runtime.pets USING btree (qr_token)"
+      },
+      {
+        "tablename": "rescue_reports",
+        "indexname": "rescue_reports_pet_id_created_at_idx",
+        "indexdef": "CREATE INDEX rescue_reports_pet_id_created_at_idx ON runtime.rescue_reports USING btree (pet_id, created_at)"
+      },
+      {
+        "tablename": "rescue_reports",
+        "indexname": "rescue_reports_pkey",
+        "indexdef": "CREATE UNIQUE INDEX rescue_reports_pkey ON runtime.rescue_reports USING btree (id)"
+      },
+      {
+        "tablename": "users",
+        "indexname": "owners_page_idx",
+        "indexdef": "CREATE INDEX owners_page_idx ON runtime.users USING btree (role, full_name, id)"
+      },
+      {
+        "tablename": "users",
+        "indexname": "users_email_key",
+        "indexdef": "CREATE UNIQUE INDEX users_email_key ON runtime.users USING btree (email)"
+      },
+      {
+        "tablename": "users",
+        "indexname": "users_phone_key",
+        "indexdef": "CREATE UNIQUE INDEX users_phone_key ON runtime.users USING btree (phone)"
+      },
+      {
+        "tablename": "users",
+        "indexname": "users_pkey",
+        "indexdef": "CREATE UNIQUE INDEX users_pkey ON runtime.users USING btree (id)"
+      },
+      {
+        "tablename": "users",
+        "indexname": "users_username_key",
+        "indexdef": "CREATE UNIQUE INDEX users_username_key ON runtime.users USING btree (username)"
+      }
+    ],
+    "foreignKeys": [
+      {
+        "table_name": "\"AppointmentBillingOperation\"",
+        "conname": "AppointmentBillingOperation_invoiceId_fkey",
+        "definition": "FOREIGN KEY (\"invoiceId\") REFERENCES invoices(id) ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "appointments",
+        "conname": "appointments_doctor_id_fkey",
+        "definition": "FOREIGN KEY (doctor_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL"
+      },
+      {
+        "table_name": "appointments",
+        "conname": "appointments_owner_id_fkey",
+        "definition": "FOREIGN KEY (owner_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "appointments",
+        "conname": "appointments_pet_id_fkey",
+        "definition": "FOREIGN KEY (pet_id) REFERENCES pets(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "booking_status_events",
+        "conname": "booking_status_events_reverses_id_fkey",
+        "definition": "FOREIGN KEY (reverses_id) REFERENCES booking_status_events(id) ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "daily_care_notes",
+        "conname": "daily_care_notes_booking_id_fkey",
+        "definition": "FOREIGN KEY (booking_id) REFERENCES hotel_bookings(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "hotel_booking_requests",
+        "conname": "hotel_booking_requests_booking_id_fkey",
+        "definition": "FOREIGN KEY (booking_id) REFERENCES hotel_bookings(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "conname": "hotel_bookings_owner_id_fkey",
+        "definition": "FOREIGN KEY (owner_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "hotel_bookings",
+        "conname": "hotel_bookings_pet_id_fkey",
+        "definition": "FOREIGN KEY (pet_id) REFERENCES pets(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "invoice_items",
+        "conname": "invoice_items_invoice_id_fkey",
+        "definition": "FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "invoices",
+        "conname": "invoices_hotel_booking_id_fkey",
+        "definition": "FOREIGN KEY (hotel_booking_id) REFERENCES hotel_bookings(id) ON UPDATE CASCADE ON DELETE SET NULL"
+      },
+      {
+        "table_name": "invoices",
+        "conname": "invoices_owner_id_fkey",
+        "definition": "FOREIGN KEY (owner_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "invoices",
+        "conname": "invoices_pet_id_fkey",
+        "definition": "FOREIGN KEY (pet_id) REFERENCES pets(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "medical_images",
+        "conname": "medical_images_pet_id_fkey",
+        "definition": "FOREIGN KEY (pet_id) REFERENCES pets(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "medical_records",
+        "conname": "medical_records_appointment_id_fkey",
+        "definition": "FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON UPDATE CASCADE ON DELETE SET NULL"
+      },
+      {
+        "table_name": "medical_records",
+        "conname": "medical_records_owner_id_fkey",
+        "definition": "FOREIGN KEY (owner_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "medical_records",
+        "conname": "medical_records_pet_id_fkey",
+        "definition": "FOREIGN KEY (pet_id) REFERENCES pets(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "notifications",
+        "conname": "notifications_recipient_owner_id_fkey",
+        "definition": "FOREIGN KEY (recipient_owner_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "owner_activations",
+        "conname": "owner_activations_owner_id_fkey",
+        "definition": "FOREIGN KEY (owner_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "payment_attempts",
+        "conname": "payment_attempts_invoice_id_fkey",
+        "definition": "FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE"
+      },
+      {
+        "table_name": "payment_events",
+        "conname": "payment_events_invoice_id_fkey",
+        "definition": "FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "pets",
+        "conname": "pets_owner_id_fkey",
+        "definition": "FOREIGN KEY (owner_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "rescue_reports",
+        "conname": "rescue_reports_pet_id_fkey",
+        "definition": "FOREIGN KEY (pet_id) REFERENCES pets(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      }
+    ],
+    "migrations": [
+      {
+        "migration_name": "20260826000000_init",
+        "checksum": "8855f719fe6197a0957a4e356975fa6c99116c55a4b1fedb0eae780a560b8216"
+      },
+      {
+        "migration_name": "20260831000000_add_spa_appointment_types",
+        "checksum": "dfdfd563d5826bdfb127674de63edaadf92b3960a01249887a2ba986cedbacde"
+      },
+      {
+        "migration_name": "20260927000000_active_appointment_slot",
+        "checksum": "589640ec0e6d23f3991977e707a78b7e4d207e66eb14611fdd4affd1e8014301"
+      },
+      {
+        "migration_name": "20260929170000_invoice_source_unique",
+        "checksum": "e3d43fdf65b1207a05d85ab59a992be0d1025b68598ba86536e01ef94859aa5d"
+      },
+      {
+        "migration_name": "20260930090000_invoice_payment_request",
+        "checksum": "176bf30ee37b5d46387cf28abfdc08654689ae02882ed9923cd364655876a9fa"
+      },
+      {
+        "migration_name": "20260930120000_manual_bank_transfer",
+        "checksum": "a618d6bd46d1f6d46155ceb5efd20f73433b65143db8ec131248aceabd3805f8"
+      },
+      {
+        "migration_name": "20260930160000_invoice_transfer_code",
+        "checksum": "2a90b426b89c8e1753cba0638d230fb09d2db82c3561f1af004905e89a111110"
+      },
+      {
+        "migration_name": "20261001090000_booking_status_history",
+        "checksum": "68f1bc02b57ad3fd33f5c7b3f86cce73eca80e45c8d73dab95096e1b09abc624"
+      },
+      {
+        "migration_name": "20261002000000_paginated_reads",
+        "checksum": "d208bb4246458b0d3867141da4cbd5712ab6cafeba4157535eceab16359a0e5d"
+      },
+      {
+        "migration_name": "20261002100000_hotel_booking_requests",
+        "checksum": "5fe8c08187a368877ebeb49f43143f44bbab23bd73080c4e5f294beeb751ad9f"
+      },
+      {
+        "migration_name": "20261002110000_payment_events",
+        "checksum": "ce0f27d8573adc6e3a1246fc396616c4321392d588caf94f37a0f2e6506b1756"
+      },
+      {
+        "migration_name": "20261002120000_owner_activation",
+        "checksum": "be753ad4c14e47ad3312e824ca2f7e5f41b90c815d97fda557df66dd0f315e03"
+      },
+      {
+        "migration_name": "20261011000400_notification_outbox",
+        "checksum": "a5555e548c66ddbca8c9a8e4d0b364f9d9da18e46b205836ec3233f3dfa2ea88"
+      },
+      {
+        "migration_name": "20261011000600_directory_outbox",
+        "checksum": "cdeb48aaf8c72b6f5ae1245fe0aff24b4c95438af4352cae4108fcb7051ddb97"
+      },
+      {
+        "migration_name": "20261011000800_appointment_billing",
+        "checksum": "d8117c28362b3adb6bf563aeb01544a6d010a3980b1fa5271fea5b330017dc9e"
+      }
+    ]
+  },
+  "scope": "Synthetic source on current additive monolith schema; only guarded dedicated rehearsal databases. Core empty moved tables have no runtime grants."
+}

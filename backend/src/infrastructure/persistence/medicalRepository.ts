@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { MedicalDependencies, MedicalNotificationWriter, MedicalRecordRepository, MedicalTransaction, MedicalUnitOfWork } from "../../application/ports/medicalRecords.js";
 import { appointmentSlotWrite } from "./appointmentSlotConflict.js";
+import { writeNotification } from './notificationOutbox.js';
 import { appendStatusEvent } from "./bookingLifecycleRepository.js";
 import { BusinessError } from "../../domain/error.js";
 import type { Actor } from "../../domain/auth.js";
@@ -51,7 +52,7 @@ class PrismaMedicalRecordRepository implements MedicalRecordRepository {
 class PrismaMedicalNotificationWriter implements MedicalNotificationWriter {
   constructor(private readonly client: Client) {}
   async create(draft: Parameters<MedicalNotificationWriter["create"]>[0]) {
-    await this.client.notification.create({ data: draft });
+    await writeNotification(this.client, draft);
   }
 }
 

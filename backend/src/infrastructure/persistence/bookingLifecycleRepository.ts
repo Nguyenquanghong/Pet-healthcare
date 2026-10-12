@@ -3,6 +3,7 @@ import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
 import type { BookingKind, BookingLifecycleStore, LifecycleTransaction } from "../../application/ports/bookingLifecycle.js";
 import { appointmentSlotWrite } from "./appointmentSlotConflict.js";
+import { writeNotification } from './notificationOutbox.js';
 
 export async function appendStatusEvent(tx: Prisma.TransactionClient, kind: BookingKind, bookingId: string, actor: Actor,
   action: string, fromStatus: string, toStatus: string, revision: number, reason?: string, reversesId?: string) {
@@ -47,11 +48,11 @@ export class PrismaBookingLifecycleStore implements BookingLifecycleStore {
           : tx.hotelBooking.update({ where: { id }, data: { internalNote: patch.internalNote, ownerNote: patch.ownerNote,
             status: status as Prisma.HotelBookingUpdateInput["status"], statusRevision: { increment: 1 } }, include: { dailyCareNotes: { select: { id: true } } } }),
         event: (actor, action, from, to, version, reason, original) => appendStatusEvent(tx, kind, id, actor, action, from, to, version, reason, original),
-        notify: async (message, recipientRole = "owner") => { await tx.notification.create({ data: {
+        notify: async (message, recipientRole = "owner") => { await writeNotification(tx, {
           recipientOwnerId: recipientRole === "owner" ? booking.ownerId : undefined, recipientRole, type: "booking_status_updated", title: "Cập nhật lịch dịch vụ", message,
           relatedPetId: booking.petId, ...(kind === "appointment" ? { relatedAppointmentId: id } : { relatedBookingId: id }),
           actionUrl: recipientRole === "admin" ? "/admin/appointments" : kind === "hotel" ? "/owner/hotel-booking" : "type" in booking && booking.type.startsWith("spa_") ? "/owner/spa-booking" : "/owner/appointments",
-        } }); },
+        }); },
       });
     });
   }

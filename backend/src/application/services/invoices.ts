@@ -3,12 +3,12 @@ import { BusinessError } from "../../domain/error.js";
 import type { InvoiceRepository, InvoiceLine, BankTransferDetails, TransferQrGenerator } from "../ports/invoices.js";
 import pricing from "../../domain/pricing.json" with { type: "json" };
 
-function money(value: unknown, name: string): number {
+export function money(value: unknown, name: string): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0 || value > 9_999_999_999)
     throw new BusinessError(422, `${name} phải là số tiền VND nguyên, không âm và không quá 9.999.999.999.`);
   return value;
 }
-function lines(value: unknown): InvoiceLine[] {
+export function lines(value: unknown): InvoiceLine[] {
   if (!Array.isArray(value) || value.length > 50) throw new BusinessError(422, "Tối đa 50 dòng dịch vụ.");
   return value.map(raw => {
     if (!raw || typeof raw.description !== "string" || !raw.description.trim() || raw.description.length > 300)

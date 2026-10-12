@@ -13,6 +13,7 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
   const token = authToken.get();
   const response = await fetch(`${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`, {
     ...options,
+    signal: options.signal ?? AbortSignal.timeout(15000),
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

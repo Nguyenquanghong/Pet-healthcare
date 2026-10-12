@@ -10,14 +10,19 @@ import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { useAppStore } from "../../store/AppStoreProvider";
 import { bookingStatusLabels } from "../../utils/statusLabels";
+import { useDashboard } from '../../services/useDashboard';
+import { useNotificationCount } from '../../store/NotificationCountContext';
+import { QueryStatus } from '../../components/ui/QueryStatus';
 
 export function DashboardPage() {
-  const { currentOwner, ownerPets, appointments, hotelBookings, medicalRecords, summary } = useAppStore();
+  const { currentOwner } = useAppStore();
+  const { core, clinic, pets, ownerPets, appointments, hotelBookings, medicalRecords, summary } = useDashboard();
+  const unread = useNotificationCount();
 
   // Upcoming appointments for the owner (both pending and confirmed)
   const upcomingAppointments = useMemo(() => {
     return appointments
-      .filter((a) => ownerPets.some((p) => p.id === a.petId) && ["pending", "confirmed"].includes(a.status))
+      .filter((a) => ["pending", "confirmed"].includes(a.status))
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [appointments, ownerPets]);
 
@@ -30,14 +35,16 @@ export function DashboardPage() {
 
   // Latest medical record for any of owner's pets
   const latestMedicalRecord = useMemo(() => {
-    const records = medicalRecords.filter((r) => ownerPets.some((p) => p.id === r.petId));
+    const records = [...medicalRecords];
     return records.sort((a, b) => b.visitDate.localeCompare(a.visitDate))[0];
   }, [medicalRecords, ownerPets]);
 
-  const unreadNotiCount = summary.unread;
+  const unreadNotiCount = unread.data?.unread ?? 0;
 
   return (
     <OwnerLayout title="Tổng quan">
+      <QueryStatus label="thú cưng và lưu trú" query={core} />
+      <QueryStatus label="lịch khám và bệnh án" query={clinic} />
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-slate-900">Xin chào, {currentOwner.fullName}</h2>
@@ -89,7 +96,7 @@ export function DashboardPage() {
         </Link>
       </div>
 
-      {ownerPets.length === 0 && (
+      {core.data && ownerPets.length === 0 && (
         <div className="mb-6">
           <EmptyState
             icon={<PawPrint size={42} />}
@@ -108,7 +115,7 @@ export function DashboardPage() {
         <div className="space-y-6">
           <div>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">Thú cưng của bạn ({summary.totals.pets ?? 0})</h3>
+              <h3 className="text-base font-semibold text-slate-900">Thú cưng của bạn ({summary.totals.pets ?? '—'})</h3>
               <Link to="/owner/pets" className="text-sm font-semibold text-primary hover:underline">
                 Quản lý
               </Link>
@@ -135,7 +142,7 @@ export function DashboardPage() {
               <div className="flex flex-col gap-3 text-xs text-slate-700 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-bold text-sm text-slate-900">
-                    {ownerPets.find((p) => p.id === activeHotelBookings[0].petId)?.name ?? "Thú cưng"} &bull; Phòng{" "}
+                    {pets.find((p) => p.id === activeHotelBookings[0].petId)?.name ?? "Thú cưng"} &bull; Phòng{" "}
                     <span className="capitalize">{activeHotelBookings[0].roomType}</span>
                   </p>
                   <p className="text-slate-600 mt-0.5">
@@ -196,7 +203,7 @@ export function DashboardPage() {
               <h3 className="text-base font-semibold text-slate-900">Lịch trình sắp tới</h3>
             </div>
             <div className="p-5">
-              <UpcomingSchedule appointments={upcomingAppointments} />
+              {clinic.data && <UpcomingSchedule appointments={upcomingAppointments} pets={pets} />}
             </div>
           </div>
 

@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "package": {
+    "version": 1,
+    "id": "15de4883-857a-42b9-a9f3-63ed1a2bd896",
+    "sourceHash": "8f5bbfbd2dc740d1e8cc6f99c5cfbf90f6e64ac82c6eb76ae731d59669a8dcab",
+    "manifestHash": "84b62cf87cfa3e188a60b9140d529b1de73b3293e7f81a4e960c4d04061ed2eb",
+    "files": 508,
+    "bytes": 3629738,
+    "source": "test-results/phase2/handoff-15de4883-857a-42b9-a9f3-63ed1a2bd896/source",
+    "archive": "test-results/phase2/handoff-15de4883-857a-42b9-a9f3-63ed1a2bd896/pet-healthcare-phase2-source.tgz",
+    "archiveHash": "d9f30219dc278f54b15318cdda931e3558a150a25d87dc0977ba1b859188fb4d",
+    "originalRequiredFiles": [
+      "Dockerfile.frontend",
+      "README.md",
+      "backend/README.md",
+      "backend/src/app.ts",
+      "frontend/README.md",
+      "frontend/nginx/default.conf.template",
+      "backend/tests/http-proxy.test.mjs"
+    ],
+    "originalOmittedFiles": [
+      "benchmarks/kaggle/notebook.ipynb",
+      "docker-compose.yml",
+      "benchmarks/kaggle/notebook_pcn.ipynb",
+      "benchmarks/kaggle/pcn_browser.mjs",
+      "benchmarks/kaggle/pcn_checks.mjs",
+      "benchmarks/kaggle/pcn_contract.py",
+      "benchmarks/kaggle/pcn_export.py",
+      "benchmarks/kaggle/pcn_locustfile.py",
+      "benchmarks/kaggle/pcn_runner.py",
+      "benchmarks/kaggle/test_pcn.py",
+      "phase2-plan-gpt61.zip"
+    ],
+    "gitHead": "add596e4488e3cac2584115874c2f65a97af7047",
+    "dirty": true,
+    "validation": "manifest and staged bytes verified; archive extraction/run still required"
+  },
+  "documentationDelta": {
+    "status": "passed",
+    "changedPaths": [
+      ".gitignore",
+      "tools/vendor/braces/PATCH-NOTES.md"
+    ],
+    "codeConfigurationLockSchemaParity": true,
+    "codeHash": "cddb2c51e78f28173dcc218aa38654693ab1d49770394f0157eaa754cba9031a",
+    "sourceUnchangedAfterValidation": true,
+    "detachedRoot": "C:/Users/Admin/AppData/Local/Temp/pet-healthcare-H-docs-2CCqED",
+    "provenanceKind": "verified-handoff-manifest"
+  },
+  "functionalVerification": {
+    "version": 1,
+    "id": "0b1ba992-4260-414f-a05a-6f9617a0fccb",
+    "status": "failed",
+    "sourceHash": "8330475c5331fd8b77ee45765731f5ac292d58cb1deedb48c08299f3b30b4887",
+    "manifestHash": "ad2add9d0e97341255f99ef38edd613bfdda82cf5e1e34e01a01632f63f06274",
+    "archiveHash": "0e1c90cfbad61edd23bf14041fda9404633d74915cb9d5a8b2c467e841f877a7",
+    "files": 507,
+    "detachedRoot": "C:/Users/Admin/AppData/Local/Temp/pet-healthcare-H-fjQ5rK",
+    "sameHost": true,
+    "independentReceiver": false,
+    "gitMetadata": false,
+    "commands": [
+      {
+        "command": "npm ci",
+        "exit": 0,
+        "durationMs": 43619
+      },
+      {
+        "command": "npm test",
+        "exit": 0,
+        "durationMs": 52324
+      },
+      {
+        "command": "npm run phase2:build",
+        "exit": 0,
+        "durationMs": 15842
+      },
+      {
+        "command": "npm exec -- playwright install chromium",
+        "exit": 0,
+        "durationMs": 2651
+      },
+      {
+        "command": "npm run phase2:prepare:nginx",
+        "exit": 0,
+        "durationMs": 3271
+      },
+      {
+        "command": "npm run phase2:verify",
+        "exit": 0,
+        "durationMs": 483953
+      },
+      {
+        "command": "npm run phase2:test:notification-ui",
+        "exit": 0,
+        "durationMs": 20657
+      }
+    ],
+    "node": "v24.15.0",
+    "platform": "win32",
+    "failureCode": "HANDOFF_COMMAND_FAILED",
+    "testStackStopped": true,
+    "commandResultsAllPassed": true,
+    "wrapperResult": "failed only at final documentation-link check; retained unchanged",
+    "p7SnapshotSourceHash": "8330475c5331fd8b77ee45765731f5ac292d58cb1deedb48c08299f3b30b4887",
+    "p7ProvenanceKind": "verified-handoff-manifest",
+    "counts": {
+      "unit": 81,
+      "runtime": 4,
+      "dependencies": 2,
+      "sourceGuards": 6,
+      "contracts": 8,
+      "integration": 73,
+      "realE2E": 18,
+      "uiIntercept": 9
+    }
+  },
+  "scope": "New package changes only .gitignore and PATCH-NOTES.md. Functional results are executions on the prior exact-code package, not new executions on this documentation-only delta. Fresh extraction/source guards/docs/provenance/hash checks ran on the new package. Same Windows host; no independent receiver, remote CI, native fix or live cutover claimed."
+}

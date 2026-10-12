@@ -19,6 +19,7 @@ export type Invoice = {
   petId: string;
   relatedId?: string; // appointmentId or bookingId
   appointmentId?: string | null;
+  sourceSnapshot?: {appointmentId:string;ownerId:string;petId:string;revision:number;type:string;serviceName:string;clinicName:string;date:string;time:string}|null;
   hotelBookingId?: string | null;
   items: InvoiceItem[];
   subtotal: number;

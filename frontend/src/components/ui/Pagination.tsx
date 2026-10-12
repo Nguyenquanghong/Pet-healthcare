@@ -1,13 +1,15 @@
-import type { PaginationInfo } from "../../types/list";
+import type { PaginationInfo, DirectoryStatus } from "../../types/list";
 
-export function Pagination({ pagination, page, pageSize, setPage, setPageSize, loading, error, reload }: {
+export function Pagination({ pagination, page, pageSize, setPage, setPageSize, loading, error, reload, directory, searchConsistency, asOf }: {
   pagination: PaginationInfo; page: number; pageSize: number; setPage: (page: number) => void; setPageSize: (size: number) => void;
-  loading: boolean; error: string; reload: () => Promise<void>;
+  loading: boolean; error: string; reload: () => Promise<void>; directory?: DirectoryStatus; searchConsistency?: 'eventual'; asOf?: string;
 }) {
   const totalPages = Math.max(1, pagination.totalPages);
   return <nav aria-label="Phân trang" className="my-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm">
     <div aria-live="polite">{loading ? "Đang tải danh sách..." : error ? <span role="alert" className="text-rose-700">{error} <button type="button" className="underline" onClick={() => void reload().catch(() => undefined)}>Thử lại</button></span> :
       <span>{pagination.total ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, pagination.total)} / {pagination.total} kết quả</span>}</div>
+    {directory?.searchReady === false ? <p role="status" className="text-xs text-amber-800">Tên thú cưng đã được cập nhật; danh mục tìm kiếm đang đồng bộ. <button type="button" className="underline" onClick={() => void reload().catch(() => undefined)}>Kiểm tra đồng bộ</button></p> : searchConsistency === 'eventual' && <p className="text-xs text-slate-500">Tên mới có thể cần chờ đồng bộ trước khi tìm kiếm.</p>}
+    {error && asOf && <p className="text-xs text-amber-800">Đang hiển thị dữ liệu lúc {new Date(asOf).toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}.</p>}
     <div className="flex items-center gap-3">
       <label>Số dòng <select aria-label="Số dòng mỗi trang" className="rounded border p-1" value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>{[10, 20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
       <button type="button" aria-label="Trang trước" className="rounded border px-3 py-1 disabled:opacity-40" disabled={loading || page <= 1} onClick={() => setPage(page - 1)}>Trước</button>

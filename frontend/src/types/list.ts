@@ -10,5 +10,6 @@ import type { Invoice } from "./invoice";
 export type PaginationInfo = { page: number; pageSize: number; total: number; totalPages: number };
 export type RelatedData = { owners: Owner[]; pets: Pet[]; appointments: Appointment[]; hotelBookings: HotelBooking[];
   medicalRecords: MedicalRecord[]; medicalImages: MedicalImage[]; dailyCareNotes: DailyCareNote[]; notifications: Notification[]; invoices: Invoice[] };
-export type ListPage<T> = { items: T[]; pagination: PaginationInfo; counts: Record<string, number>; related: RelatedData };
+export type DirectoryStatus = { petId: string; sourceVersion: number; projectionVersion: number; searchReady: boolean };
+export type ListPage<T> = { items: T[]; pagination: PaginationInfo; counts: Record<string, number>; related: RelatedData; directory?: DirectoryStatus; searchConsistency?: 'eventual' };
 export const emptyRelated: RelatedData = { owners: [], pets: [], appointments: [], hotelBookings: [], medicalRecords: [], medicalImages: [], dailyCareNotes: [], notifications: [], invoices: [] };

@@ -65,7 +65,7 @@ export function AdminHotelBookingsPage() {
 
   const [toastMsg, setToastMsg] = useState("");
   const [statusDialog, setStatusDialog] = useState<StatusDialogSelection | null>(null);
-  const { run: runAction, error: actionError } = useBookingAction();
+  const { run: runAction, error: actionError } = useBookingAction("hotel");
 
   const toast = (msg: string) => {
     setToastMsg(msg);

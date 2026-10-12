@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+  output = "../src/generated/client"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model ProofAppointment {
+  id String @id
+  ownerId String
+  petId String
+  date String
+  time String
+  type String
+  status String
+  revision Int @default(1)
+}
+model BillingReservation {
+  operationId String @id
+  appointmentId String
+  revisionAtPrepare Int
+  snapshot Json
+  state String @default("HELD")
+  invoiceId String?
+}
+model OutboxEvent {
+  id String @id
+  envelope Json
+  createdAt DateTime @default(now())
+  publishedAt DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseOwner String?
+  leaseUntil DateTime?
+  lastErrorCode String?
+  @@index([publishedAt, nextAttemptAt])
+}
+model InboxEvent {
+  consumerName String
+  eventId String
+  createdAt DateTime @default(now())
+  @@id([consumerName, eventId])
+}
+model DirectoryProjection {
+  kind String
+  id String
+  sourceVersion Int
+  displayName String
+  ownerId String?
+  species String?
+  phone String?
+  breed String?
+  email String?
+  microchipId String?
+  updatedAt DateTime @default(now())
+  deletedAt DateTime?
+  @@id([kind, id])
+}
+
+enum AppointmentStatus {
+  pending
+  confirmed
+  checked_in
+  in_progress
+  completed
+  cancelled
+  no_show
+}
+
+enum AppointmentType {
+  general_checkup
+  vaccination
+  dental
+  dermatology
+  surgery
+  hotel_consultation
+  spa_bath
+  spa_grooming
+  spa_combo
+  other
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  petId           String            @map("pet_id")
+  ownerId         String            @map("owner_id")
+  doctorId        String?           @map("doctor_id")
+  type            AppointmentType
+  serviceName     String            @map("service_name")
+  clinicName      String            @map("clinic_name")
+  appointmentDate DateTime          @map("appointment_date") @db.Date
+  appointmentTime String            @map("appointment_time")
+  status          AppointmentStatus @default(pending)
+  statusRevision  Int               @default(0) @map("status_revision")
+  ownerNote       String?           @map("owner_note")
+  internalNote    String?           @map("internal_note")
+  createdBy       String            @default("owner") @map("created_by")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  medicalRecords  MedicalRecord[]
+
+  @@index([ownerId, appointmentDate])
+  @@index([status, appointmentDate(sort: Desc), appointmentTime(sort: Desc), id(sort: Desc)], map: "appointments_page_idx")
+  @@index([ownerId, status, appointmentDate(sort: Desc), appointmentTime(sort: Desc), id(sort: Desc)], map: "appointments_owner_page_idx")
+  reservations AppointmentReservation[]
+  statusEvents BookingStatusEvent[]
+  @@map("appointments")
+}
+
+model MedicalRecord {
+  id            String    @id @default(uuid())
+  petId         String    @map("pet_id")
+  ownerId       String    @map("owner_id")
+  appointmentId String?   @map("appointment_id")
+  doctorName    String    @map("doctor_name")
+  visitDate     DateTime  @map("visit_date") @db.Date
+  title         String
+  symptoms      String?
+  diagnosis     String
+  treatment     String
+  medications   String?
+  vaccineName   String?   @map("vaccine_name")
+  followUpDate  DateTime? @map("follow_up_date") @db.Date
+  weightKg      Decimal?  @map("weight_kg") @db.Decimal(5, 2)
+  temperatureC  Decimal?  @map("temperature_c") @db.Decimal(4, 1)
+  heartRateBpm  Int?      @map("heart_rate_bpm")
+  internalNote  String?   @map("internal_note")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+
+  @@index([petId, visitDate])
+  @@index([ownerId, visitDate, id], map: "medical_records_owner_page_idx")
+  @@index([visitDate, id], map: "medical_records_page_idx")
+  @@map("medical_records")
+}
+
+model MedicalImage {
+  id        String   @id @default(uuid())
+  ownerId String @map("owner_id")
+  petId     String   @map("pet_id")
+  title     String
+  imageUrl  String   @map("image_url") @db.Text
+  mimeType  String   @map("mime_type")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([petId])
+  @@index([petId, createdAt, id], map: "medical_images_pet_page_idx")
+  @@index([ownerId, createdAt, id], map: "medical_images_owner_page_idx")
+  @@map("medical_images")
+}
+
+model BookingStatusEvent {
+  id          String @id @default(uuid())
+  kind        String
+  bookingId   String @map("booking_id")
+  revision    Int
+  action      String
+  fromStatus  String @map("from_status")
+  toStatus    String @map("to_status")
+  actorId     String @map("actor_id")
+  actorName   String @map("actor_name")
+  actorRole   String @map("actor_role")
+  reason      String?
+  reversesId  String? @unique @map("reverses_id")
+  reverses    BookingStatusEvent? @relation("BookingReversal", fields: [reversesId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  reversedBy  BookingStatusEvent? @relation("BookingReversal")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([kind, bookingId, revision])
+  @@index([kind, bookingId, createdAt], map: "booking_status_events_booking_idx")
+  appointment Appointment @relation(fields: [bookingId], references: [id])
+  @@map("booking_status_events")
+}
+
+model AppointmentReservation {
+ operationId String @id
+ appointmentId String
+ revisionAtPrepare Int
+ snapshot Json
+ state String @default("HELD")
+ invoiceId String?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ appointment Appointment @relation(fields: [appointmentId], references: [id])
+ @@index([appointmentId,state])
+}
+// Terminal evidence can arrive before a delayed prepare. Retain it for replay.
+model AppointmentBillingTerminal {
+ operationId String @id
+ appointmentId String
+ state String
+ invoiceId String?
+ createdAt DateTime @default(now())
+}
+model RequestDedup {
+ id String @id
+ actorId String
+ operationType String
+ key String
+ requestHash String
+ resourceId String
+ responsePayload Json
+ createdAt DateTime @default(now())
+ @@unique([actorId,operationType,key])
+}

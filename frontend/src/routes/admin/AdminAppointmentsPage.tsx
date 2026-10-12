@@ -3,6 +3,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { BookingStatusDialog, type StatusDialogSelection } from "./BookingStatusDialog";
 import { useBookingAction } from "./useBookingAction";
 import { apiClient } from "../../services/apiClient";
+import { useRequestIntent } from '../../services/useRequestIntent';
 import { useMemo, useState } from "react";
 import {
   Bell,
@@ -79,7 +80,8 @@ export function AdminAppointmentsPage() {
 
   const [toastMsg, setToastMsg] = useState("");
   const [statusDialog, setStatusDialog] = useState<StatusDialogSelection | null>(null);
-  const { run: runAction, error: actionError } = useBookingAction();
+  const { run: runAction, error: actionError } = useBookingAction("clinic");
+  const medicalIntent = useRequestIntent();
 
   const todayStr = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
 
@@ -129,7 +131,7 @@ export function AdminAppointmentsPage() {
   const handleSaveMedicalRecord = () => {
     if (!createRecordModal || !recordTitle || !recordDiagnosis || !recordTreatment) return;
 
-    void runAction(() => apiClient.post("/medical-records", {
+    const input = {
       petId: createRecordModal.petId,
       appointmentId: createRecordModal.id,
       doctorName: "Bs. Mai Nguyễn",
@@ -143,7 +145,9 @@ export function AdminAppointmentsPage() {
       weightKg: Number(recordWeight) || undefined,
       temperatureC: Number(recordTemp) || undefined,
       heartRateBpm: Number(recordHeartRate) || undefined,
-    }), () => {
+    };
+    void runAction(() => apiClient.post("/medical-records", input, { 'Idempotency-Key': medicalIntent.key(input) }), () => {
+      medicalIntent.complete();
       setCreateRecordModal(null);
       toast("Đã tạo hồ sơ y tế thành công! Lịch khám đã chuyển sang Hoàn thành.");
     });
@@ -550,9 +554,9 @@ export function AdminAppointmentsPage() {
       {/* Create Medical Record Modal linked to Appointment */}
       {createRecordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4">
-          <div className="my-8 max-h-[90vh] w-full max-w-2xl animate-scaleUp overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
+          <div role="dialog" aria-modal="true" aria-labelledby="appointment-medical-title" className="my-8 max-h-[90vh] w-full max-w-2xl animate-scaleUp overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <h3 id="appointment-medical-title" className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <FilePlus2 size={22} className="text-primary" />
                 Tạo bệnh án từ lịch khám
               </h3>

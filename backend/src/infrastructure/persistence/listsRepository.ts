@@ -32,10 +32,11 @@ export class PrismaListsRepository implements ListsRepository {
           ...(query.species ? { species: query.species as PetSpecies } : {}), ...(query.healthStatus ? { healthStatus: query.healthStatus as PetHealthStatus } : {}), ...(query.q ? petSearch() : {}) };
         [total, data.pets] = await Promise.all([tx.pet.count({ where }), tx.pet.findMany({ where, ...bounds, orderBy: [{ createdAt: "desc" }, { id: "desc" }] })]);
       } else if (resource === "appointments") {
+        const billed = query.mode === "unbilled" ? (await tx.invoice.findMany({ where: { appointmentId: { not: null } }, select: { appointmentId: true } })).flatMap(row => row.appointmentId ? [row.appointmentId] : []) : [];
         const base: Prisma.AppointmentWhereInput = { ...owner, ...identity,
           ...(query.date ? { appointmentDate: new Date(`${query.date}T00:00:00Z`) } : {}),
           ...(query.category ? { type: query.category === "spa" ? { in: [...spaTypes] } : { notIn: [...spaTypes] } } : {}),
-          ...(query.mode === "unbilled" ? { status: "completed", invoices: { none: {} } } : {}),
+          ...(query.mode === "unbilled" ? { status: "completed", AND: [{ id: { notIn: billed } }] } : {}),
           ...(query.q ? { OR: [...joinedSearch(), text("serviceName"), text("id")] } : {}) };
         const groupStatuses: Record<string, AppointmentStatus[]> = { pending: ["pending", "confirmed", "checked_in", "in_progress"], completed: ["completed"], cancelled: ["cancelled", "no_show"] };
         const where: Prisma.AppointmentWhereInput = { AND: [base, ...(query.statusGroup ? [{ status: { in: groupStatuses[query.statusGroup] } }] : []), ...(query.status ? [{ status: query.status as AppointmentStatus }] : [])] };

@@ -1,4 +1,5 @@
 import { usePagedList } from "../../services/usePagedList";
+import { useNotificationCount } from '../../store/NotificationCountContext';
 import { Pagination } from "../../components/ui/Pagination";
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -63,7 +64,6 @@ function timeAgo(iso: string): string {
 export function NotificationsPage() {
   const navigate = useNavigate();
   const {
-    summary,
     markNotificationRead,
     markAllNotificationsRead,
     deleteNotification,
@@ -73,7 +73,8 @@ export function NotificationsPage() {
 
   const list = usePagedList<Notification>("/notifications", { category: activeTab });
   const filteredNotifications = list.items;
-  const unreadCount = summary.unread;
+  const unread = useNotificationCount();
+  const unreadCount = unread.error ? null : unread.data?.unread ?? null;
 
   const handleNotificationClick = (n: Notification) => {
     if (n.status === "sent") {
@@ -91,7 +92,9 @@ export function NotificationsPage() {
         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-black text-slate-900">Thông báo của bạn</h2>
-            {unreadCount > 0 ? (
+            {unreadCount === null ? (
+              <p className="text-sm text-slate-500 mt-0.5">{unread.error ? 'Chưa tải được số thông báo chưa đọc.' : 'Đang tải số thông báo chưa đọc…'}</p>
+            ) : unreadCount > 0 ? (
               <p className="text-sm text-primary font-semibold mt-0.5">
                 Bạn có {unreadCount} thông báo chưa đọc
               </p>
@@ -100,7 +103,7 @@ export function NotificationsPage() {
             )}
           </div>
 
-          {unreadCount > 0 && (
+          {unreadCount !== null && unreadCount > 0 && (
             <button
               onClick={markAllNotificationsRead}
               className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"

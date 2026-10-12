@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { writeNotification } from './notificationOutbox.js';
 import type { PrismaClient } from "@prisma/client";
 import { BusinessError } from "../../domain/error.js";
 import type { PaymentRepository, PaymentResult } from "../../application/ports/payments.js";
@@ -52,12 +53,12 @@ export class PrismaPaymentRepository implements PaymentRepository {
         const conflict = invoice.paymentStatus !== "unpaid" || attempt.status === "failed";
         await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: conflict ? "review" : "succeeded", transactionNo: result.transactionNo, responseCode: result.responseCode } });
         if (conflict) {
-          await tx.notification.create({ data: { recipientRole: "admin", type: "payment_review", title: "Cần đối soát VNPay",
-            message: `Giao dịch ${attempt.id} thành công nhưng hóa đơn ${invoice.invoiceCode} đã có trạng thái khác.`, actionUrl: "/admin/billing" } });
+          await writeNotification(tx, { recipientRole: "admin", type: "payment_review", title: "Cần đối soát VNPay",
+            message: `Giao dịch ${attempt.id} thành công nhưng hóa đơn ${invoice.invoiceCode} đã có trạng thái khác.`, actionUrl: "/admin/billing" });
         } else {
           await tx.invoice.update({ where: { id: invoice.id }, data: { paymentStatus: "paid", paymentChannel: "online", paymentMethod: "vnpay", paidAt: new Date() } });
-          await tx.notification.create({ data: { recipientOwnerId: invoice.ownerId, recipientRole: "owner", type: "invoice_paid",
-            title: "Thanh toán VNPay thành công", message: `Đã nhận thanh toán cho hóa đơn ${invoice.invoiceCode}.`, actionUrl: "/owner/billing" } });
+          await writeNotification(tx, { recipientOwnerId: invoice.ownerId, recipientRole: "owner", type: "invoice_paid",
+            title: "Thanh toán VNPay thành công", message: `Đã nhận thanh toán cho hóa đơn ${invoice.invoiceCode}.`, actionUrl: "/owner/billing" });
         }
         return { RspCode: "00", Message: "Confirm Success" };
       });

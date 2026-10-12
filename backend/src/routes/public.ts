@@ -23,7 +23,7 @@ export function createPublicRouter(service: PublicRescueService) {
   router.post("/pets/:token/rescue-reports", async (req, res) => {
     try {
       await service.report(req.params.token, req.body);
-      res.status(201).json({ message: "The owner has been notified." });
+      res.status(201).json({ message: "Report received; notification request accepted." });
     } catch (error) { failure(res, error); }
   });
 

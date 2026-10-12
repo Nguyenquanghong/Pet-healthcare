@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { NotificationRepository, NotificationScope } from "../../application/ports/notifications.js";
+import { BusinessError } from '../../domain/error.js';
 
 export class PrismaNotificationRepository implements NotificationRepository {
   constructor(private readonly client: PrismaClient) {}
@@ -21,7 +22,7 @@ export class PrismaNotificationRepository implements NotificationRepository {
     const result = await this.client.notification.deleteMany({ where: { id, ...scope } });
     return result.count > 0;
   }
-  send(data: Parameters<NotificationRepository["send"]>[0]) {
-    return this.client.notification.create({ data });
+  async send(_data: Parameters<NotificationRepository["send"]>[0]): ReturnType<NotificationRepository['send']> {
+    throw new BusinessError(503, 'Manual notifications require the Notification service.');
   }
 }

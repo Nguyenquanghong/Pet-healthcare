@@ -12,13 +12,13 @@ import { bookingStatusLabels } from "../../utils/statusLabels";
 export function HotelBookingDetailPage() {
   const { id } = useParams();
   const location = useLocation();
-  const { ownerPets, currentOwner } = useAppStore();
+  const { currentOwner } = useAppStore();
   const query = useApiQuery<{ booking: HotelBooking }>(`/hotel-bookings/${encodeURIComponent(id ?? "")}`, { enabled: Boolean(id), refreshOnTick: true });
   const snapshot: HotelBooking | null = location.state?.booking?.id === id ? location.state.booking : null;
   const booking = query.data?.booking ?? snapshot;
   const { loading, error } = query;
   const petPage = usePagedList<Pet>("/pets", { id: booking?.petId }, Boolean(booking));
-  const pet = petPage.items[0] ?? ownerPets.find(item => item.id === booking?.petId);
+  const pet = petPage.items[0];
   return <OwnerLayout title="Chi tiết đặt phòng">
     {location.state?.refreshWarning && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-amber-800">Đã lưu đặt phòng. Danh sách chưa tải lại được; thông tin bên dưới được đọc trực tiếp từ đơn.</p>}
     {loading && <p role="status">Đang tải đặt phòng...</p>}

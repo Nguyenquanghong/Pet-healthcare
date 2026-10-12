@@ -3,11 +3,11 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { adminNav } from "../../../constants/navigation";
 import { useAppStore } from "../../../store/AppStoreProvider";
 import { BrandLogo } from "../../shared/BrandLogo";
+import { NotificationBadge } from '../NotificationBadge';
 
 export function AdminSidebar() {
   const navigate = useNavigate();
-  const { logout, summary } = useAppStore();
-  const unreadCount = summary.unread;
+  const { logout, user } = useAppStore();
 
   const handleLogout = () => {
     logout();
@@ -48,11 +48,7 @@ export function AdminSidebar() {
                 <Icon size={18} />
                 {item.label}
               </span>
-              {isNotif && unreadCount > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
+              {isNotif && <NotificationBadge className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-xs font-bold text-white" />}
             </NavLink>
           );
         })}
@@ -65,8 +61,8 @@ export function AdminSidebar() {
             BS
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-900">Bs. Mai Nguyễn</p>
-            <p className="text-xs text-slate-500">Bác sĩ thú y</p>
+            <p className="text-sm font-semibold text-slate-900">{user?.fullName}</p>
+            <p className="text-xs text-slate-500">{user?.role === 'doctor' ? 'Bác sĩ thú y' : user?.role === 'staff' ? 'Nhân viên' : 'Quản trị viên'}</p>
           </div>
         </div>
         <button

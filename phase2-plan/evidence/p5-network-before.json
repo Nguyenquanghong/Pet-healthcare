@@ -1,0 +1,111 @@
+{
+  "description": "Observed P4 built UI against the same isolated P5 service architecture. Login/setup requests excluded. Separate hard navigation then network idle plus 12 seconds per flow. Only the baked API base URL in the retained artifact changed.",
+  "build": {
+    "asset": "test-results/phase2/p5-baseline-ui/assets/index-BjZR4keW.js",
+    "beforeSha256": "07583d181090978d24dce0c7e751a120907fea01104a58e284bb6f09a8787b0f",
+    "afterSha256": "8880e8d3775918c4400b78dfaf328913f217b4f083c834a0a8c3bc8942f839c8",
+    "onlyChange": "Baked-in API base URL to /api for the isolated same-origin test proxy"
+  },
+  "phases": [
+    {
+      "path": "/admin/dashboard",
+      "durationMs": 12000,
+      "initial": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/bootstrap",
+          "status": 200
+        }
+      ],
+      "background": [
+        {
+          "method": "GET",
+          "path": "/api/bootstrap",
+          "status": 200
+        }
+      ],
+      "calls": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/bootstrap",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/bootstrap",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "path": "/admin/appointments",
+      "durationMs": 12000,
+      "initial": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/bootstrap",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/appointments",
+          "status": 200
+        }
+      ],
+      "background": [
+        {
+          "method": "GET",
+          "path": "/api/bootstrap",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/appointments",
+          "status": 200
+        }
+      ],
+      "calls": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/bootstrap",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/appointments",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/bootstrap",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/appointments",
+          "status": 200
+        }
+      ]
+    }
+  ]
+}

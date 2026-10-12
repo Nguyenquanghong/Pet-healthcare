@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
 import { Bell, ArrowRight, Clock } from "lucide-react";
 import { useAppStore } from "../../../store/AppStoreProvider";
+import { useApiQuery } from '../../../services/useApiQuery';
+import type { ListPage } from '../../../types/list';
+import type { Notification } from '../../../types/notification';
+import { QueryStatus } from '../../ui/QueryStatus';
 
 const TYPE_ICON: Record<string, string> = {
   appointment_confirmed: "✅",
@@ -29,13 +33,15 @@ function timeAgo(iso: string): string {
 }
 
 export function OwnerNotificationPanel() {
-  const { notifications, currentOwnerId, markNotificationRead } = useAppStore();
-
-  const myNotifications = notifications.filter((n) => n.recipientOwnerId === currentOwnerId);
+  const { markNotificationRead } = useAppStore();
+  const query = useApiQuery<ListPage<Notification>>('/notifications?pageSize=5', { refreshOnTick: true });
+  const myNotifications = query.data?.items ?? [];
+  if (!query.data) return <QueryStatus label="thông báo" query={query} />;
 
   if (myNotifications.length === 0) {
     return (
       <div className="py-6 text-center">
+        <QueryStatus label="thông báo" query={query} />
         <Bell className="mx-auto text-slate-300 mb-2" size={32} />
         <p className="text-sm font-medium text-slate-500">Chưa có thông báo nào.</p>
       </div>
@@ -44,6 +50,7 @@ export function OwnerNotificationPanel() {
 
   return (
     <div className="divide-y divide-slate-100">
+      <QueryStatus label="thông báo" query={query} />
       {myNotifications.slice(0, 4).map((notif) => {
         const isUnread = notif.status === "sent";
 

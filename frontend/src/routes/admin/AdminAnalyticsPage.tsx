@@ -3,27 +3,19 @@ import { AdminLayout } from "../../components/layout/admin/AdminLayout";
 import { apiClient } from "../../services/apiClient";
 import type { Invoice } from "../../types/invoice";
 import { formatCurrency } from "../../utils/formatCurrency";
+import { useApiQuery } from '../../services/useApiQuery';
 
 type Range = "all" | "this_month" | "last_month";
 const vietnamMonth = (date: Date) => new Date(date.getTime() + 7 * 3_600_000).toISOString().slice(0, 7);
 
 export function AdminAnalyticsPage() {
   const [range, setRange] = useState<Range>("all");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [figures, setFigures] = useState({ received: 0, hotel: 0, appointment: 0, outstanding: 0, paidCount: 0, unpaidCount: 0 });
-  const sequence = useRef(0);
   const currentMonth = vietnamMonth(new Date());
   const previousMonth = vietnamMonth(new Date(Date.UTC(Number(currentMonth.slice(0, 4)), Number(currentMonth.slice(5, 7)) - 2, 1)));
   const selectedMonth = range === "this_month" ? currentMonth : range === "last_month" ? previousMonth : null;
-  const refresh = useCallback(async () => {
-    setLoading(true); setError("");
-    const request = ++sequence.current;
-    try { const result = await apiClient.get<typeof figures>("/invoices/summary" + (selectedMonth ? "?month=" + selectedMonth : "")); if (request === sequence.current) setFigures(result); }
-    catch (reason) { if (request === sequence.current) setError(reason instanceof Error ? reason.message : "Không tải được báo cáo."); }
-    finally { if (request === sequence.current) setLoading(false); }
-  }, [selectedMonth]);
-  useEffect(() => { void refresh(); }, [refresh]);
+  const query = useApiQuery<{ received: number; hotel: number; appointment: number; outstanding: number; paidCount: number; unpaidCount: number }>("/invoices/summary" + (selectedMonth ? "?month=" + selectedMonth : ""), { refreshOnTick: true });
+  const figures = query.data ?? { received: 0, hotel: 0, appointment: 0, outstanding: 0, paidCount: 0, unpaidCount: 0 }, { loading, error } = query;
+  const refresh = () => query.reload().catch(() => undefined);
 
   const card = "rounded-xl border bg-white p-5";
   return <AdminLayout title="Báo cáo & Thống kê">

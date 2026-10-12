@@ -1,19 +1,22 @@
 import { Building, Clock, Database, Phone, ShieldCheck } from "lucide-react";
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
-import { useAppStore } from "../../store/AppStoreProvider";
+import { useDashboard } from '../../services/useDashboard';
+import { QueryStatus } from '../../components/ui/QueryStatus';
 
 export function AdminSettingsPage() {
-  const { summary } = useAppStore();
+  const { core, clinic, summary } = useDashboard();
   const metrics = [
-    ["Chủ nuôi", summary.totals.owners ?? 0],
-    ["Thú cưng", summary.totals.pets ?? 0],
-    ["Lịch khám", summary.totals.appointments ?? 0],
-    ["Hồ sơ y tế", summary.totals.medicalRecords ?? 0],
-    ["Hotel booking", summary.totals.hotelBookings ?? 0],
+    ["Chủ nuôi", summary.totals.owners ?? '—'],
+    ["Thú cưng", summary.totals.pets ?? '—'],
+    ["Lịch khám", summary.totals.appointments ?? '—'],
+    ["Hồ sơ y tế", summary.totals.medicalRecords ?? '—'],
+    ["Hotel booking", summary.totals.hotelBookings ?? '—'],
   ];
 
   return (
     <AdminLayout title="Cài đặt hệ thống">
+      <QueryStatus label="thú cưng và lưu trú" query={core} />
+      <QueryStatus label="lịch khám và bệnh án" query={clinic} />
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-lg border border-slate-200 bg-white p-6">
           <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold text-slate-900"><Building size={20} className="text-primary" /> Thông tin cơ sở minh họa</h2>

@@ -30,15 +30,22 @@ const SpaBookingPage = lazy(() => import("./routes/owner/SpaBookingPage").then(m
 const PetRescuePage = lazy(() => import("./routes/public/PetRescuePage").then(module => ({ default: module.PetRescuePage })));
 
 function OwnerOnly({ children }: { children: ReactNode }) {
-  const { authRole, isAuthReady } = useSession();
+  const { authRole, isAuthReady, status } = useSession();
+  if (status === 'unavailable') return <SessionUnavailable />;
   if (!isAuthReady) return <div className="flex min-h-screen items-center justify-center"><LoadingSpinner label="Loading session..." /></div>;
   return authRole === "owner" ? children : <Navigate to="/login" replace />;
 }
 
 function AdminOnly({ children }: { children: ReactNode }) {
-  const { authRole, isAuthReady } = useSession();
+  const { authRole, isAuthReady, status } = useSession();
+  if (status === 'unavailable') return <SessionUnavailable />;
   if (!isAuthReady) return <div className="flex min-h-screen items-center justify-center"><LoadingSpinner label="Loading session..." /></div>;
   return authRole === "admin" ? children : <Navigate to="/admin/login" replace />;
+}
+
+function SessionUnavailable() {
+  const { error, retrySession, logout } = useSession();
+  return <main className="mx-auto max-w-xl space-y-4 p-8"><p role="alert">{error}</p><button className="rounded border px-4 py-2" onClick={() => void retrySession()}>Thử xác minh lại</button><button className="ml-3 underline" onClick={logout}>Đăng xuất</button></main>;
 }
 
 function PublicEntryPage() {

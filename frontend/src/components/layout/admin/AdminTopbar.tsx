@@ -3,14 +3,14 @@ import { NavLink } from "react-router-dom";
 import { adminNav } from "../../../constants/navigation";
 import { useAppStore } from "../../../store/AppStoreProvider";
 import { MobileBottomNav } from "../MobileBottomNav";
+import { NotificationBadge } from '../NotificationBadge';
 
 interface AdminTopbarProps {
   title: string;
 }
 
 export function AdminTopbar({ title }: AdminTopbarProps) {
-  const { summary } = useAppStore();
-  const unreadCount = summary.unread;
+  const { user } = useAppStore();
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
@@ -22,8 +22,8 @@ export function AdminTopbar({ title }: AdminTopbarProps) {
 
         <div className="flex items-center gap-3">
           <div className="hidden text-right sm:block">
-            <p className="text-sm font-medium text-slate-800">Bs. Mai Nguyễn</p>
-            <p className="text-xs text-slate-500">Quản trị viên</p>
+            <p className="text-sm font-medium text-slate-800">{user?.fullName}</p>
+            <p className="text-xs text-slate-500">{user?.role === 'doctor' ? 'Bác sĩ' : user?.role === 'staff' ? 'Nhân viên' : 'Quản trị viên'}</p>
           </div>
           <NavLink
             id="admin-topbar-bell"
@@ -32,11 +32,7 @@ export function AdminTopbar({ title }: AdminTopbarProps) {
             className="relative flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 sm:h-9 sm:w-9"
           >
             <Bell size={18} />
-            {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold text-white">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
+            <NotificationBadge className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold text-white" />
           </NavLink>
         </div>
       </div>

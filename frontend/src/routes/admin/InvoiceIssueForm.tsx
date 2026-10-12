@@ -10,6 +10,7 @@ import { apiClient } from "../../services/apiClient";
 import type { Invoice } from "../../types/invoice";
 import { formatCurrency } from "../../utils/formatCurrency";
 import pricing from "../../../../backend/src/domain/pricing.json";
+import {useInvoiceOperation} from '../../services/useInvoiceOperation';
 
 type Line = { description: string; quantity: number; unitPrice: number };
 export function InvoiceIssueForm({ invoices, onCreated, onClose, initialSourceKey = "" }: {
@@ -28,6 +29,7 @@ export function InvoiceIssueForm({ invoices, onCreated, onClose, initialSourceKe
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const submitting = useRef(false);
+  const operation=useInvoiceOperation('staff');
   const rates: Record<string, number> = { ...pricing.appointmentEstimates, ...pricing.fixedSpaRates };
   const sources = useMemo(() => [
     ...appointments.filter(a => a.status === "completed")
@@ -51,21 +53,23 @@ export function InvoiceIssueForm({ invoices, onCreated, onClose, initialSourceKe
     <form role="dialog" aria-modal="true" aria-labelledby="issue-title" className="my-8 w-full max-w-2xl space-y-4 rounded-xl bg-white p-6 shadow-lg"
       onSubmit={async event => {
         event.preventDefault();
-        if (!source || submitting.current) return;
+        if ((!source&&!operation.pending) || submitting.current) return;
         submitting.current = true; setSaving(true); setError("");
         try {
-          const result = await apiClient.post<{ invoice: Invoice }>("/invoices", {
-            type: source.type, relatedId: source.id, items,
+          const body=source?{type: source.type, relatedId: source.id, items,
             taxAmount: Number(tax), discountAmount: Number(discount), notes,
-          });
-          onCreated(result.invoice);
+          }:null;
+          const invoice=operation.pending?await operation.check():source!.type==='appointment'?await operation.submit('/invoices',body):(await apiClient.post<{invoice:Invoice}>('/invoices',body)).invoice;
+          if(invoice)onCreated(invoice);else setError('Hóa đơn đang được xử lý. Kiểm tra trạng thái trước khi lập yêu cầu khác.');
         } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể lập hóa đơn."); }
         finally { submitting.current = false; setSaving(false); }
       }}>
       <h2 id="issue-title" className="text-xl font-bold">Lập hóa đơn</h2>
       <p className="text-sm text-slate-600">Chọn lịch khám đã hoàn tất hoặc lượt lưu trú đang ở. Đơn cũ đã trả thú cưng mà chưa có hóa đơn vẫn có thể chốt phí. Thông tin khách hàng và thú cưng được lấy từ đơn đặt.</p>
       {error && <p role="alert" className="text-rose-700">{error}</p>}
-      <fieldset disabled={saving} className="space-y-4">
+      {operation.pending&&<p role="status" className="text-amber-700">Đang chờ kết quả hóa đơn. Dữ liệu và mã yêu cầu được giữ để kiểm tra lại.</p>}
+      {appointmentPage.counts.billingHeld>0&&<p className="text-sm text-amber-700">{appointmentPage.counts.billingHeld} lịch đang được lập hóa đơn; chúng tạm thời không nằm trong danh sách chưa chốt phí.</p>}
+      <fieldset disabled={saving||Boolean(operation.pending)} className="space-y-4">
       <label className="block text-sm">Tìm dịch vụ chưa lập hóa đơn<input aria-label="Tìm dịch vụ chưa lập hóa đơn" className={field} value={q} onChange={event => setQuery(event.target.value)} /></label>
       <p className="text-sm font-semibold">Lịch khám chưa lập hóa đơn</p><Pagination {...appointmentPage} />
       <p className="text-sm font-semibold">Lưu trú chưa lập hóa đơn</p><Pagination {...hotelPage} />
@@ -111,8 +115,8 @@ export function InvoiceIssueForm({ invoices, onCreated, onClose, initialSourceKe
       <p className="font-bold">Tổng tiền: {formatCurrency(Number.isFinite(total) ? total : 0)}</p>
       <p className="text-sm text-slate-600">Sau khi lưu, chủ nuôi nhận thông báo và chọn chuyển khoản hoặc thanh toán tại cửa hàng.</p>
       <div className="flex justify-end gap-3">
-        <button type="button" disabled={saving} onClick={onClose} className="rounded-lg border px-4 py-2">Hủy</button>
-        <button type="submit" disabled={saving || !source || !Number.isFinite(total) || total <= 0} className="rounded-lg bg-primary px-4 py-2 text-white disabled:opacity-50">{saving ? "Đang lưu..." : "Lưu hóa đơn"}</button>
+        <button type="button" disabled={saving} onClick={onClose} className="rounded-lg border px-4 py-2">{operation.pending?'Đóng (tiếp tục xử lý)':'Hủy'}</button>
+        <button type="submit" disabled={saving || (!operation.pending&&(!source || !Number.isFinite(total) || total <= 0))} className="rounded-lg bg-primary px-4 py-2 text-white disabled:opacity-50">{saving ? "Đang lưu..." : operation.pending?'Kiểm tra trạng thái':'Lưu hóa đơn'}</button>
       </div>
     </form>
   </div>;

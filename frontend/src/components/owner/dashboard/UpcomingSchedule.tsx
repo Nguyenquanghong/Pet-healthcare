@@ -1,11 +1,10 @@
 import { Link } from "react-router-dom";
 import { MapPin, Calendar, ArrowRight } from "lucide-react";
 import type { Appointment } from "../../../types/appointment";
-import { useAppStore } from "../../../store/AppStoreProvider";
+import type { Pet } from "../../../types/pet";
 import { appointmentStatusLabels } from "../../../utils/statusLabels";
 
-export function UpcomingSchedule({ appointments }: { appointments: Appointment[] }) {
-  const { pets } = useAppStore();
+export function UpcomingSchedule({ appointments, pets }: { appointments: Appointment[]; pets: Pet[] }) {
 
   if (appointments.length === 0) {
     return (

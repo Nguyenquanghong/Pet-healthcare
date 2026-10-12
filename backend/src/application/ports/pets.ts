@@ -6,6 +6,7 @@ export type PetValue = {
   qrToken: string | null; qrEnabled: boolean; showOwnerPhone: boolean; showOwnerEmail: boolean;
   showOwnerAddress: boolean; showMedicalAlerts: boolean; rescueNote: string | null;
   createdAt: Date; updatedAt: Date;
+  directoryRevision?:number;
 };
 
 export type PetChanges = Partial<Pick<PetValue,

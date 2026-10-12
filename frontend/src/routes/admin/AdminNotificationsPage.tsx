@@ -1,4 +1,5 @@
 import { usePagedList } from "../../services/usePagedList";
+import { useNotificationCount } from '../../store/NotificationCountContext';
 import { Pagination } from "../../components/ui/Pagination";
 import { PagedSelect } from "../../components/ui/PagedSelect";
 import type { Owner } from "../../types/owner";
@@ -62,7 +63,6 @@ function timeAgo(iso: string): string {
 export function AdminNotificationsPage() {
   const navigate = useNavigate();
   const {
-    summary,
     markAllNotificationsRead,
     sendCustomNotification,
     markNotificationRead,
@@ -79,10 +79,12 @@ export function AdminNotificationsPage() {
   const [isSending, setIsSending] = useState(false);
   const [refreshFailed, setRefreshFailed] = useState(false);
   const sending = useRef(false);
+  const sendRequest = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const list = usePagedList<Notification>("/notifications", {}, activeTab === "inbox");
   const adminNotifications = list.items;
-  const unreadAdminCount = summary.unread;
+  const unread = useNotificationCount();
+  const unreadAdminCount = unread.error ? null : unread.data?.unread ?? null;
 
   const selectedTemplate = TEMPLATES.find((t) => t.id === templateId) ?? TEMPLATES[0];
   const title = templateId === "custom" ? customTitle : selectedTemplate.label;
@@ -91,8 +93,11 @@ export function AdminNotificationsPage() {
   const handleSend = async () => {
     if (sending.current || !recipientId || !title.trim() || !body.trim()) return;
     sending.current = true; setIsSending(true); setSendError(""); setSentMsg("");
+    const fingerprint = JSON.stringify([recipientId, title.trim(), body.trim()]);
+    if (!sendRequest.current || sendRequest.current.fingerprint !== fingerprint) sendRequest.current = { fingerprint, key: crypto.randomUUID() };
     try {
-      const refreshed = await sendCustomNotification(recipientId, title.trim(), body.trim());
+      const refreshed = await sendCustomNotification(recipientId, title.trim(), body.trim(), sendRequest.current.key);
+      sendRequest.current = null;
       setRefreshFailed(!refreshed);
       setSentMsg(refreshed ? "Đã gửi thông báo cho chủ nuôi thành công!" : "Đã gửi thông báo nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu.");
       setCustomTitle(""); setCustomBody("");
@@ -114,6 +119,7 @@ export function AdminNotificationsPage() {
     <AdminLayout title="Thông báo hệ thống">
       {activeTab === "inbox" && <Pagination {...list} />}
       {/* Top Tabs */}
+      {unread.error && <p className="mb-3 text-sm text-amber-700">Chưa tải được số thông báo chưa đọc.</p>}
       <div className="mb-6 flex items-center justify-between border-b border-slate-200 pb-3">
         <div className="flex items-center gap-3">
           <button
@@ -126,7 +132,7 @@ export function AdminNotificationsPage() {
           >
             <Inbox size={18} />
             Hộp thư Admin
-            {unreadAdminCount > 0 && (
+            {unreadAdminCount !== null && unreadAdminCount > 0 && (
               <span className="rounded-full bg-rose-500 px-2 py-0.5 text-xs font-bold text-white">
                 {unreadAdminCount}
               </span>
@@ -146,7 +152,7 @@ export function AdminNotificationsPage() {
           </button>
         </div>
 
-        {activeTab === "inbox" && unreadAdminCount > 0 && (
+        {activeTab === "inbox" && unreadAdminCount !== null && unreadAdminCount > 0 && (
           <button
             onClick={markAllNotificationsRead}
             className="flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"

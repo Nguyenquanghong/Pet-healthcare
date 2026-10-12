@@ -1,0 +1,32 @@
+{
+  "name": "@nipopeto/notification",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:deploy": "prisma migrate deploy",
+    "prebuild": "prisma generate",
+    "build": "tsc -p tsconfig.json && node ../../tools/phase2/copy-client.mjs",
+    "start": "tsx src/index.ts",
+    "start:built": "node dist/index.js",
+    "worker:built": "node dist/worker.js"
+  },
+  "dependencies": {
+    "@nipopeto/contracts": "1.0.0",
+    "@nipopeto/messaging": "1.0.0",
+    "@prisma/client": "^6.19.0",
+    "amqplib": "0.10.9",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "@nipopeto/runtime": "1.0.0"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.7",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.3.0",
+    "tsx": "^4.23.12",
+    "typescript": "latest"
+  }
+}

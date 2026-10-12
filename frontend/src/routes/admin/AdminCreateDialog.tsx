@@ -19,6 +19,7 @@ import { formatCurrency } from "../../utils/formatCurrency";
 import { ApiError } from "../../utils/apiError";
 import { emptyPetDraft, genderLabels, healthLabels, PetDraftFields, speciesLabels } from "./PetDraftFields";
 import { emptyOwnerDraft, OwnerDraftFields } from "./OwnerDraftFields";
+import { useRequestIntent } from '../../services/useRequestIntent';
 
 type Kind = "pet" | "appointment" | "hotel";
 const titles: Record<Kind, string> = { pet: "Thêm thú cưng", appointment: "Tạo lịch khám / Spa", hotel: "Tạo đặt phòng" };
@@ -47,6 +48,7 @@ export function AdminCreateButton({ kind, onCreated }: { kind: Kind; onCreated?:
 }
 
 function AdminCreateDialog({ kind, onClose, onCreated }: { kind: Kind; onClose: () => void; onCreated?: () => void }) {
+  const appointmentIntent=useRequestIntent();
   const { refreshData } = useAppStore();
   const dialog = useRef<HTMLDialogElement>(null);
   const submitting = useRef(false);
@@ -120,7 +122,7 @@ function AdminCreateDialog({ kind, onClose, onCreated }: { kind: Kind; onClose: 
   }
 
   async function reload() {
-    try { await refreshData(); setWarning(""); return true; }
+    try { await refreshData(addingOwner ? ["owners"] : addingPet || kind === "pet" ? ["pets"] : [kind === "appointment" ? "clinic" : "hotel"]); setWarning(""); return true; }
     catch {
       setWarning("Chưa tải lại được danh sách. Nếu đã lưu, không tạo lại; hãy mở lại trang khi kết nối ổn định.");
       return false;
@@ -158,9 +160,11 @@ function AdminCreateDialog({ kind, onClose, onCreated }: { kind: Kind; onClose: 
           setInfo(`Đã thêm ${created.name}. Tiếp tục nhập thông tin đặt dịch vụ.`);
         }
       } else if (kind === "appointment") {
-        const { appointment } = await apiClient.post<{ appointment: Appointment }>("/appointments", {
+        const payload={
           petId: pet!.id, type, serviceName: service.label, date, time, ownerNote: ownerNote.trim(),
-        });
+        };
+        const { appointment } = await apiClient.post<{ appointment: Appointment }>("/appointments",payload,{"Idempotency-Key":appointmentIntent.key(payload)});
+        appointmentIntent.complete();
         setSaved({ id: appointment.id, message: "Đã tạo lịch ở trạng thái Chờ xác nhận. Tiếp tục xác nhận và check-in từ danh sách lịch hẹn." });
         onCreated?.();
       } else {
@@ -174,7 +178,7 @@ function AdminCreateDialog({ kind, onClose, onCreated }: { kind: Kind; onClose: 
       }
       await reload();
     } catch (reason) {
-      if ((addingOwner || addingPet || kind === "appointment") && reason instanceof ApiError && reason.httpStatus >= 500) {
+      if ((addingOwner || addingPet) && reason instanceof ApiError && reason.httpStatus >= 500) {
         setUncertainWrite(true);
         setError("Chưa xác định yêu cầu đã được lưu hay chưa do mất kết nối hoặc lỗi máy chủ. Tải và kiểm tra danh sách trước khi tạo mới để tránh trùng.");
       } else {

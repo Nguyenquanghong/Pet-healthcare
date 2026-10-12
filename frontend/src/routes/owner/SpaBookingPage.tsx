@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { useRequestIntent } from '../../services/useRequestIntent';
 import { Link } from "react-router-dom";
 import { PawPrint, Plus } from "lucide-react";
 import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
@@ -12,8 +13,16 @@ import { useAppStore } from "../../store/AppStoreProvider";
 import { isSpaAppointmentType, type SpaAppointmentType } from "../../types/appointment";
 import { addDaysIso, todayIso } from "../../utils/date";
 
+import { useApiQuery } from '../../services/useApiQuery';
+import type { ListPage } from '../../types/list';
+import type { Pet } from '../../types/pet';
+import { QueryStatus } from '../../components/ui/QueryStatus';
+
 export function SpaBookingPage() {
-  const { appointments, createAppointment, currentOwnerId, error, isLoading, ownerPets, pets } = useAppStore();
+  const intent=useRequestIntent(),sending=useRef(false);
+  const { createAppointment, error, isLoading } = useAppStore();
+  const petQuery = useApiQuery<ListPage<Pet>>('/pets?pageSize=1', { refreshOnTick: true });
+  const ownerPets = petQuery.data?.items ?? [];
   const [petId, setPetId] = useState(ownerPets[0]?.id ?? "");
   const [serviceType, setServiceType] = useState<SpaAppointmentType>("spa_bath");
   const [date, setDate] = useState(() => addDaysIso(1));
@@ -23,39 +32,30 @@ export function SpaBookingPage() {
   const [success, setSuccess] = useState(false);
   const [formError, setFormError] = useState("");
 
-  useEffect(() => {
-    if (!ownerPets.some((pet) => pet.id === petId)) setPetId(ownerPets[0]?.id ?? "");
-  }, [ownerPets, petId]);
-
-  const spaAppointments = useMemo(
-    () => appointments.filter((appointment) => appointment.ownerId === currentOwnerId && isSpaAppointmentType(appointment.type)),
-    [appointments, currentOwnerId],
-  );
-  const visibleAppointments = useMemo(
-    () => selectedCalendarDate ? spaAppointments.filter((appointment) => appointment.date === selectedCalendarDate) : spaAppointments,
-    [selectedCalendarDate, spaAppointments],
-  );
   const selectedService = spaServiceOptions.find((service) => service.type === serviceType) ?? spaServiceOptions[0];
 
   const handleSubmit = async () => {
+    if(sending.current)return;
     setFormError("");
     if (!petId) return setFormError("Vui lòng chọn thú cưng.");
     if (!date || !time) return setFormError("Vui lòng chọn ngày và khung giờ Spa.");
     if (date < todayIso()) return setFormError("Ngày Spa không thể nằm trong quá khứ.");
 
+    sending.current=true;
     try {
-      await createAppointment({ petId, type: serviceType, serviceName: selectedService.label, date, time, ownerNote: ownerNote.trim() || undefined });
+      const input={ petId, type: serviceType, serviceName: selectedService.label, date, time, ownerNote: ownerNote.trim() || undefined };
+      await createAppointment(input,intent.key(input));intent.complete();
       setOwnerNote("");
       setSuccess(true);
       window.setTimeout(() => setSuccess(false), 3500);
     } catch (reason) {
       setFormError(reason instanceof Error ? reason.message : "Không thể gửi yêu cầu Spa. Vui lòng thử lại.");
-    }
+    }finally{sending.current=false;}
   };
 
   return (
     <OwnerLayout title="Spa cho thú cưng">
-      {ownerPets.length === 0 ? (
+      {!petQuery.data ? <QueryStatus label="thú cưng" query={petQuery} /> : ownerPets.length === 0 ? (
         <EmptyState
           icon={<PawPrint size={42} />}
           title="Cần thêm thú cưng trước khi đặt Spa"
@@ -83,7 +83,7 @@ export function SpaBookingPage() {
           />
           <div className="space-y-6">
             <OwnerAppointmentCalendar category="spa" selectedDate={selectedCalendarDate} onSelectDate={setSelectedCalendarDate} onClearDate={() => setSelectedCalendarDate("")} />
-            <OwnerAppointmentList mode="spa" appointments={visibleAppointments} pets={pets} selectedDate={selectedCalendarDate || undefined} onClearDate={() => setSelectedCalendarDate("")} />
+            <OwnerAppointmentList mode="spa" selectedDate={selectedCalendarDate || undefined} onClearDate={() => setSelectedCalendarDate("")} />
           </div>
         </div>
       )}

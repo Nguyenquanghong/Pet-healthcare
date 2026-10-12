@@ -1,0 +1,1073 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Phase2 internal service contracts",
+    "version": "1.0.0",
+    "description": "Core directory and Notification send authorization implemented; billing endpoints remain reserved for P4. Service token and actor JWT are separate credentials."
+  },
+  "security": [
+    {
+      "ServiceCredential": []
+    }
+  ],
+  "paths": {
+    "/internal/billing-reservations/{operationId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OperationId"
+        }
+      ],
+      "put": {
+        "operationId": "prepareReservation",
+        "summary": "Idempotent prepare with verified actor context and revision",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Prepare"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Persisted immutable prepared source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparedSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or dependency unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServiceCredential": [],
+            "ActorBearer": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "readReservation",
+        "summary": "Read Clinic local reservation",
+        "security": [
+          {
+            "ServiceCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Local state and immutable snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reservation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or dependency unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/billing-reservations/{operationId}/commit": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OperationId"
+        }
+      ],
+      "post": {
+        "operationId": "finalizeReservation",
+        "summary": "Finalize only from authenticated durable COMMITTED evidence",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent terminal reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "operationId",
+                    "state"
+                  ],
+                  "properties": {
+                    "operationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "INVOICED"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or dependency unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServiceCredential": []
+          }
+        ],
+        "description": "Clinic fetches authenticated read-only Core terminal evidence before the SQL transaction. Caller-provided terminal state or invoiceId is not trusted. Timeout/404 retains HELD."
+      }
+    },
+    "/internal/billing-reservations/{operationId}/release": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OperationId"
+        }
+      ],
+      "post": {
+        "operationId": "releaseReservation",
+        "summary": "Release only after verified ABORTED; timeout/404 insufficient",
+        "responses": {
+          "200": {
+            "description": "Idempotent terminal reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "operationId",
+                    "state"
+                  ],
+                  "properties": {
+                    "operationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "RELEASED"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or dependency unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServiceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "description": "Clinic fetches authenticated read-only Core terminal evidence before the SQL transaction. Caller-provided terminal state or invoiceId is not trusted. Timeout/404 retains HELD."
+      }
+    },
+    "/internal/billing-operations/{operationId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OperationId"
+        }
+      ],
+      "get": {
+        "operationId": "readBillingOperation",
+        "summary": "Read Core state without a callback to Clinic",
+        "responses": {
+          "200": {
+            "description": "Read-only Core state without callback to Clinic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "operationId",
+                    "state",
+                    "appointmentId",
+                    "invoiceId"
+                  ],
+                  "properties": {
+                    "operationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "appointmentId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "PREPARING",
+                        "COMMITTED",
+                        "ABORTED"
+                      ]
+                    },
+                    "invoiceId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or dependency unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServiceCredential": []
+          }
+        ]
+      }
+    },
+    "/internal/directory/authorize": {
+      "post": {
+        "operationId": "directoryauthorize",
+        "summary": "Verify signed actor scope from Core source; projection cannot authorize",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "petIds": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "ownerIds": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "doctorId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current actor, authorized pets/owners; request-local snapshots only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "actor",
+                    "pets",
+                    "owners"
+                  ],
+                  "properties": {
+                    "actor": {
+                      "type": "object",
+                      "required": [
+                        "sub",
+                        "role",
+                        "fullName"
+                      ],
+                      "properties": {
+                        "sub": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "owner",
+                            "admin",
+                            "doctor",
+                            "staff"
+                          ]
+                        },
+                        "fullName": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "pets": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "ownerId",
+                          "name",
+                          "directoryVersion"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ownerId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "directoryVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "description": "Core public pet DTO; no authentication secrets"
+                      }
+                    },
+                    "owners": {
+                      "type": "array",
+                      "maxItems": 200,
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "fullName",
+                          "directoryVersion"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "fullName": {
+                            "type": "string"
+                          },
+                          "directoryVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "description": "Core public owner DTO; loginEnabled boolean, never password fields"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication, source lookup or availability failure"
+          },
+          "403": {
+            "description": "Scope/service permission denied"
+          },
+          "404": {
+            "description": "Authentication, source lookup or availability failure"
+          },
+          "422": {
+            "description": "Invalid or excessive batch"
+          },
+          "503": {
+            "description": "Authentication, source lookup or availability failure"
+          }
+        },
+        "security": [
+          {
+            "ServiceCredential": [],
+            "ActorBearer": []
+          }
+        ]
+      }
+    },
+    "/internal/directory/lookup": {
+      "post": {
+        "operationId": "directorylookup",
+        "summary": "Bounded lookup of authorized IDs; no credentials or internal notes",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "petIds": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "ownerIds": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "doctorId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current actor, authorized pets/owners; request-local snapshots only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "actor",
+                    "pets",
+                    "owners"
+                  ],
+                  "properties": {
+                    "actor": {
+                      "type": "object",
+                      "required": [
+                        "sub",
+                        "role",
+                        "fullName"
+                      ],
+                      "properties": {
+                        "sub": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "owner",
+                            "admin",
+                            "doctor",
+                            "staff"
+                          ]
+                        },
+                        "fullName": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "pets": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "ownerId",
+                          "name",
+                          "directoryVersion"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ownerId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "directoryVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "description": "Core public pet DTO; no authentication secrets"
+                      }
+                    },
+                    "owners": {
+                      "type": "array",
+                      "maxItems": 200,
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "fullName",
+                          "directoryVersion"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "fullName": {
+                            "type": "string"
+                          },
+                          "directoryVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "description": "Core public owner DTO; loginEnabled boolean, never password fields"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication, source lookup or availability failure"
+          },
+          "403": {
+            "description": "Scope/service permission denied"
+          },
+          "404": {
+            "description": "Authentication, source lookup or availability failure"
+          },
+          "422": {
+            "description": "Invalid or excessive batch"
+          },
+          "503": {
+            "description": "Authentication, source lookup or availability failure"
+          }
+        },
+        "security": [
+          {
+            "ServiceCredential": [],
+            "ActorBearer": []
+          }
+        ]
+      }
+    },
+    "/internal/directory/export": {
+      "get": {
+        "operationId": "exportDirectory",
+        "summary": "Migration/consumer permission only; cursor snapshot then versioned catch-up",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "owner",
+                "pet",
+                "staff"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Optional exact source ID for event hydration"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versioned directory page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "$ref": "#/components/schemas/DirectoryEntry"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "pet",
+                        "staff"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Service token missing or invalid"
+          },
+          "403": {
+            "description": "Export permission denied"
+          },
+          "503": {
+            "description": "Core source unavailable"
+          }
+        }
+      }
+    },
+    "/internal/notifications/authorize-send": {
+      "post": {
+        "operationId": "authorizeNotificationSend",
+        "summary": "Implemented Core endpoint; validate service credential, signed actor, current staff role and owner recipient",
+        "security": [
+          {
+            "notificationServiceToken": [],
+            "actorBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "recipientOwnerId"
+                ],
+                "properties": {
+                  "recipientOwnerId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bound minimal authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "actorId",
+                    "actorRole",
+                    "recipientOwnerId",
+                    "authorized"
+                  ],
+                  "properties": {
+                    "actorId": {
+                      "type": "string"
+                    },
+                    "actorRole": {
+                      "enum": [
+                        "doctor",
+                        "staff",
+                        "admin"
+                      ]
+                    },
+                    "recipientOwnerId": {
+                      "type": "string"
+                    },
+                    "authorized": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid service or actor credential"
+          },
+          "403": {
+            "description": "Current staff permission denied"
+          },
+          "404": {
+            "description": "Owner recipient missing"
+          },
+          "422": {
+            "description": "Invalid recipient request"
+          },
+          "503": {
+            "description": "Source authority unavailable"
+          }
+        }
+      }
+    },
+    "/internal/billing-sources/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      ],
+      "get": {
+        "operationId": "readBillingSource",
+        "summary": "Read eligible Clinic appointment revision and minimal immutable source",
+        "security": [
+          {
+            "ServiceCredential": [],
+            "ActorBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current completed source; prepare checks revision again under lock",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparedSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected or dependency unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ServiceCredential": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Service-Token",
+        "description": "Dedicated Core/Clinic credential; browser JWT alone grants no internal access."
+      },
+      "notificationServiceToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Service-Token"
+      },
+      "actorBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "ActorBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT RS256"
+      }
+    },
+    "parameters": {
+      "OperationId": {
+        "in": "path",
+        "name": "operationId",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "schemas": {
+      "Prepare": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "appointmentId",
+          "expectedRevision"
+        ],
+        "properties": {
+          "appointmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        }
+      },
+      "Reservation": {
+        "type": "object",
+        "required": [
+          "operationId",
+          "appointmentId",
+          "state",
+          "snapshot"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string"
+          },
+          "appointmentId": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "HELD",
+              "INVOICED",
+              "RELEASED"
+            ]
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/BillingSourceSnapshot"
+          },
+          "invoiceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "nullable": true
+          }
+        }
+      },
+      "DirectoryEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "sourceVersion",
+          "displayName"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "owner",
+              "pet",
+              "staff"
+            ]
+          },
+          "sourceVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "breed": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "microchipId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "BillingSourceSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "appointmentId",
+          "ownerId",
+          "petId",
+          "revision",
+          "type",
+          "serviceName",
+          "clinicName",
+          "date",
+          "time"
+        ],
+        "properties": {
+          "appointmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "ownerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "petId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "type": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "clinicName": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          }
+        }
+      },
+      "PreparedSource": {
+        "type": "object",
+        "required": [
+          "snapshot"
+        ],
+        "properties": {
+          "snapshot": {
+            "$ref": "#/components/schemas/BillingSourceSnapshot"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

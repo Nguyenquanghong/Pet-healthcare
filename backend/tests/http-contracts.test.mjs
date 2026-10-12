@@ -51,8 +51,8 @@ test("representative routes keep JSON, auth and method contracts", async () => {
     dailyCareNote: { findMany: async () => [] },
     notification: {
       findMany: async () => [],
-      create: async ({ data }) => { writes.push({ kind: "notification", data }); return { id: "n-1", status: "sent", ...data }; },
     },
+    outboxEvent: { create: async ({ data }) => { writes.push({ kind: 'outbox', data }); return data; } },
     invoice: { findMany: async () => [] },
     rescueReport: { create: async ({ data }) => { writes.push({ kind: "report", data }); return { id: "r-1", ...data }; } },
     $transaction: async (work) => work(client),
@@ -98,14 +98,19 @@ test("representative routes keep JSON, auth and method contracts", async () => {
     const denied = await request("/api/notifications/send", "POST", ownerToken, { recipientOwnerId: owner.id, title: "Hi", message: "Message" });
     assert.equal(denied.status, 403);
     const sent = await request("/api/notifications/send", "POST", staffToken, { recipientOwnerId: owner.id, title: "Hi", message: "Message" });
-    assert.equal(sent.status, 201);
-    assert.equal(sent.body.notification.recipientOwnerId, owner.id);
-    validateResponse("/api/notifications/send", "POST", 201, sent.body);
+    // This legacy app factory is intentionally not the split composition.
+    // Successful send/gateway/RSA/dedup contracts are exercised by the real
+    // phase2 runtime suite. It must never fall back to a local Notification insert.
+    assert.equal(sent.status, 503);
+    validateResponse("/api/notifications/send", "POST", 503, sent.body);
+    assert.equal(writes.length, 0);
 
     const rescue = await request("/api/public/pets/qr-1/rescue-reports", "POST", undefined, { finderPhone: "000", location: "Park" });
     assert.equal(rescue.status, 201);
     validateResponse("/api/public/pets/{token}/rescue-reports", "POST", 201, rescue.body);
-    assert.deepEqual(writes.slice(-2).map((item) => item.kind), ["report", "notification"]);
+    assert.deepEqual(writes.slice(-2).map((item) => item.kind), ["report", "outbox"]);
+    assert.equal(writes.at(-1).data.envelope.eventType, 'notification.requested.v1');
+    assert.equal(writes.at(-1).data.envelope.payload.recipientOwnerId, owner.id);
 
     const deleted = await request("/api/medical-records/images/img-1", "DELETE", staffToken);
     assert.equal(deleted.status, 204);

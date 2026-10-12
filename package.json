@@ -4,19 +4,45 @@
   "version": "1.0.0",
   "workspaces": [
     "frontend",
-    "backend"
+    "backend",
+    "services/clinic",
+    "services/notification",
+    "packages/contracts",
+    "packages/messaging",
+    "packages/runtime"
   ],
   "scripts": {
     "dev": "concurrently -n frontend,backend -c cyan,green \"npm run dev -w frontend\" \"npm run dev -w backend\"",
     "dev:frontend": "npm run dev -w frontend",
     "dev:backend": "npm run dev -w backend",
-    "build": "npm run build -w backend && npm run build -w frontend",
+    "build": "npm run build -w @nipopeto/runtime && npm run build -w @nipopeto/contracts && npm run build -w @nipopeto/messaging && npm run build -w backend && npm run build -w frontend",
     "db:generate": "npm run db:generate -w backend",
     "db:migrate": "npm run db:migrate -w backend",
     "db:seed": "npm run db:seed -w backend",
     "test:smoke": "npm run test:smoke -w backend",
-    "test": "npm run build && npm run test:unit -w backend && npm run test:architecture -w backend && npm run test:openapi -w backend",
-    "test:e2e": "playwright test"
+    "test": "npm run build && npm run test:unit -w backend && npm run test:architecture -w backend && npm run test:openapi -w backend && npm run phase2:test:runtime",
+    "test:e2e": "playwright test",
+    "phase2:build": "npm run build -w @nipopeto/runtime && npm run build -w @nipopeto/contracts && npm run build -w @nipopeto/messaging && npm run build -w backend && npm run build -w @nipopeto/clinic && npm run build -w @nipopeto/notification",
+    "phase2:test:contracts": "npm run build -w @nipopeto/contracts && npm test -w @nipopeto/contracts",
+    "phase2:test:architecture": "node tools/phase2/check-boundaries.mjs",
+    "phase2:test:integration": "node tools/phase2/run-proof.mjs",
+    "phase2:test:notification": "node tools/phase2/run-proof.mjs --notification",
+    "phase2:test:notification-runtime": "node tools/phase2/run-proof.mjs --notification-runtime",
+    "phase2:up": "docker compose -f deploy/phase2/compose.test.yml up -d --wait",
+    "phase2:verify": "npm run phase2:build && npm run phase2:test:contracts && npm run phase2:test:architecture && npm run phase2:test:notification-writers && npm run phase2:test:integration && npm run phase2:test:notification && npm run phase2:test:notification-runtime && npm run phase2:test:clinic && npm run phase2:test:billing && npm run phase2:test:runtime && npm run phase2:test:resilience && npm run phase2:test:migration && npm run phase2:test:e2e",
+    "phase2:test:notification-writers": "node tools/phase2/check-notification-writers.mjs",
+    "phase2:test:notification-ui": "playwright test --config tools/phase2/playwright.config.ts",
+    "phase2:test:clinic": "node tools/phase2/run-proof.mjs --clinic",
+    "phase2:test:billing": "node tools/phase2/run-proof.mjs --billing",
+    "phase2:test:e2e": "node --import tsx tools/phase2/run-e2e.mjs",
+    "phase2:test:resilience": "node tools/phase2/run-proof.mjs --resilience",
+    "phase2:test:runtime": "npm test -w @nipopeto/runtime && node --test tools/phase2/dependencies.test.mjs && npm run phase2:test:source",
+    "phase2:prepare:nginx": "powershell -NoProfile -File tools/phase2/prepare-nginx.ps1",
+    "phase2:test:migration": "node tools/phase2/run-proof.mjs --migration",
+    "phase2:verify:clean-local": "node tools/phase2/clean-local.mjs",
+    "phase2:handoff:package": "node tools/phase2/create-handoff.mjs",
+    "phase2:handoff:verify": "node tools/phase2/verify-handoff.mjs",
+    "phase2:test:source": "node --test tools/phase2/source-provenance.test.mjs"
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",
@@ -27,12 +53,19 @@
         "deepmerge-ts": "8.0.0"
       }
     },
-    "ip-address": "10.7.3"
+    "ip-address": "10.7.3",
+    "braces": "$braces",
+    "proxy-addr": "2.0.8",
+    "shell-quote": "1.12.0",
+    "source-map-js": "1.2.2",
+    "postcss-selector-parser": "7.1.6"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "concurrently": "^9.2.1",
     "deepmerge-ts": "8.0.0",
-    "prisma": "6.19.3"
+    "prisma": "6.19.3",
+    "braces": "file:tools/vendor/braces",
+    "tailwindcss": "3.4.19"
   }
 }

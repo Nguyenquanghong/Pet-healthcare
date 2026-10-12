@@ -1,0 +1,101 @@
+{
+  "replicaOutage": {
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  "samples": {
+    "clinic-0": {
+      "cpu_seconds_total": 1.53,
+      "rss_bytes": 89251840,
+      "event_loop_p99_seconds": 0.036569087
+    },
+    "clinic-1": {
+      "cpu_seconds_total": 1.405,
+      "rss_bytes": 90427392,
+      "event_loop_p99_seconds": 0.037912575
+    },
+    "core-0": {
+      "cpu_seconds_total": 5.405,
+      "rss_bytes": 97939456,
+      "event_loop_p99_seconds": 0.040108031,
+      "hash_rejected": 11,
+      "hash_peak_active": 2,
+      "hash_peak_queued": 2
+    },
+    "core-1": {
+      "cpu_seconds_total": 4.53,
+      "rss_bytes": 91103232,
+      "event_loop_p99_seconds": 0.036667391,
+      "hash_rejected": 11,
+      "hash_peak_active": 2,
+      "hash_peak_queued": 2
+    },
+    "notification": {
+      "cpu_seconds_total": 1.281,
+      "rss_bytes": 80506880,
+      "event_loop_p99_seconds": 0.036077567
+    }
+  },
+  "note": "Single correctness-proof snapshot; no capacity/peak claim.",
+  "resources": {
+    "connections": {
+      "core": 5,
+      "clinic": 5,
+      "notification": 3
+    },
+    "apiPoolLimit": 2,
+    "workerPoolLimit": 2,
+    "controlPoolLimit": 4,
+    "hashConcurrency": 2,
+    "hashPendingLimit": 2,
+    "nginxVersion": "1.30.5"
+  },
+  "validation": {
+    "source": "test-results/phase2/p6-verify-complete.log",
+    "resourceArtifact": "test-results/phase2/p6-16210286-74a9-40c6-af47-1f011f527c6e",
+    "localDate": "2026-10-12",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "tests": 18,
+    "passed": 18,
+    "skipped": 0,
+    "durationSeconds": 71.643,
+    "aggregateResult": "PASS, exit 0: 62 integration groups and 18 real E2E; contracts 8/8 and runtime/dependency 6/6",
+    "ownedE2EChildLifetimes": {
+      "total": 6,
+      "expectedExitZero": 6,
+      "unexpectedExits": 0
+    },
+    "nativeFailureHistory": "Earlier native Windows startup exit 3221226505 and later Core TCP loss have unestablished causes; final PASS does not establish a native-crash fix."
+  },
+  "css": {
+    "unchanged": true,
+    "sha256": "7a38d0adde8ec08c7c34fc454964a4a7e22e5eeb73774b6650aa8153a551d4a9"
+  },
+  "dependencyAudit": {
+    "findingsBefore": {
+      "moderate": 2,
+      "high": 6,
+      "critical": 3,
+      "total": 11
+    },
+    "findingsAfter": {
+      "total": 0
+    },
+    "localBuildGuard": "braces 3.0.3-pet-p6.1; not upstream release"
+  }
+}

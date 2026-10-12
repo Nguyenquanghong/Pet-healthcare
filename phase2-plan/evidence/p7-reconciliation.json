@@ -1,0 +1,1396 @@
+{
+  "version": 1,
+  "run": "5bbafb8f-2361-4e8a-a997-8a5731f241ab",
+  "snapshotHash": "89e132c89c6381c254d65fe15434fefb447227de15e7b85d5ae7f4db3c576715",
+  "source": {
+    "User": {
+      "owner": "core",
+      "count": 5,
+      "keysHash": "1c81ce4367304f3d59840527a2d0daa560a2c31bcff71d6dacbf4df8e9ab31da",
+      "contentHash": "18599fd1e06b142dfd9e485757f023427d7d4c1b3fc9a05ceb8db0f4c75a719a",
+      "fields": [
+        "directory_revision",
+        "id",
+        "username",
+        "phone",
+        "email",
+        "password_hash",
+        "password_salt",
+        "full_name",
+        "role",
+        "address",
+        "avatar_url",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "OwnerActivation": {
+      "owner": "core",
+      "count": 1,
+      "keysHash": "dcf23b907ce368ccb6bac9e08529b7f7b6ca49ffa51494db999cb28af8aa90c1",
+      "contentHash": "aedafaadad9f7681723165448f00cd7b78b4666747fdda8aa84a878bf568d4c3",
+      "fields": [
+        "id",
+        "owner_id",
+        "token_hash",
+        "email",
+        "expires_at",
+        "used_at",
+        "revoked_at",
+        "issued_by",
+        "issued_by_name",
+        "created_at"
+      ]
+    },
+    "Pet": {
+      "owner": "core",
+      "count": 3,
+      "keysHash": "a189ad7fb00ddc14d2a4cc4cad22f99ca024b3ef8ca85d98b9887c04babe9e4d",
+      "contentHash": "4096d862d3610fcd137850b1d9228f7045c4aa018426c6512901dbe46b15e54e",
+      "fields": [
+        "directory_revision",
+        "id",
+        "owner_id",
+        "name",
+        "species",
+        "breed",
+        "gender",
+        "age_label",
+        "weight_kg",
+        "microchip_id",
+        "health_status",
+        "allergies",
+        "notes",
+        "avatar_url",
+        "identifying_marks",
+        "last_seen_location",
+        "qr_token",
+        "qr_enabled",
+        "show_owner_phone",
+        "show_owner_email",
+        "show_owner_address",
+        "show_medical_alerts",
+        "rescue_note",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "Appointment": {
+      "owner": "clinic",
+      "count": 10,
+      "keysHash": "6c7058433b061d8257526d5f8f19441f4bb1fd9d929d781bf4c9742464c3915b",
+      "contentHash": "c947213a7b8a7920bea3f6d2bd31d22d549bef12da7f1317539d04813786b96b",
+      "fields": [
+        "id",
+        "pet_id",
+        "owner_id",
+        "doctor_id",
+        "type",
+        "service_name",
+        "clinic_name",
+        "appointment_date",
+        "appointment_time",
+        "status",
+        "status_revision",
+        "owner_note",
+        "internal_note",
+        "created_by",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "MedicalRecord": {
+      "owner": "clinic",
+      "count": 1,
+      "keysHash": "02d575994eb755af31effc31498a2edbd41c5fa9ab38e226a8934037df4ab8e5",
+      "contentHash": "c502a3f710cea25fc28735470e67042fb5afe03668df2b29440fbb3ac93b2df7",
+      "fields": [
+        "id",
+        "pet_id",
+        "owner_id",
+        "appointment_id",
+        "doctor_name",
+        "visit_date",
+        "title",
+        "symptoms",
+        "diagnosis",
+        "treatment",
+        "medications",
+        "vaccine_name",
+        "follow_up_date",
+        "weight_kg",
+        "temperature_c",
+        "heart_rate_bpm",
+        "internal_note",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "MedicalImage": {
+      "owner": "clinic",
+      "count": 1,
+      "keysHash": "b97955ccfb7856d76c353bfac2c2194c76ebbaf55a9f8480f4f8bfeffcaf8204",
+      "contentHash": "02798a0f0ce2a05f4ceed10ef55f7e986712fff333d6f478237a61e133e0ae2e",
+      "fields": [
+        "id",
+        "pet_id",
+        "title",
+        "image_url",
+        "mime_type",
+        "created_at"
+      ]
+    },
+    "HotelBooking": {
+      "owner": "core",
+      "count": 1,
+      "keysHash": "913ba32f258aed29c5684ae69f6a0e3f9bb22b7be59af6a3dc990985132d9cd6",
+      "contentHash": "c52daab1df7ffc5229e009436d573b53607cd43238346349d5d2d9d418f3bcb8",
+      "fields": [
+        "id",
+        "pet_id",
+        "owner_id",
+        "check_in",
+        "check_out",
+        "nights",
+        "room_type",
+        "service_keys",
+        "total_amount",
+        "status",
+        "status_revision",
+        "owner_note",
+        "internal_note",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "HotelBookingRequest": {
+      "owner": "core",
+      "count": 1,
+      "keysHash": "8e5977352356e766a1dd5651cf4a092e016f8f75af831e5bbb3e7eb90ef6dce0",
+      "contentHash": "c96353e9478b7f7cefac17d66c39faa3e5523ea07972da337b40fb2d0b342f1e",
+      "fields": [
+        "actor_id",
+        "request_key",
+        "fingerprint",
+        "booking_id",
+        "created_at"
+      ]
+    },
+    "BookingStatusEvent": {
+      "owner": "split(kind)",
+      "count": 12,
+      "keysHash": "59db1eda03043eb61abe1fa07ba3a616b60d556fdc93cfe9eeffbfb178cd8c80",
+      "contentHash": "90926ec27e1c69c0a41f61bdee4216469a3d2711ce9e2cdc9b29311eeeb56145",
+      "fields": [
+        "id",
+        "kind",
+        "booking_id",
+        "revision",
+        "action",
+        "from_status",
+        "to_status",
+        "actor_id",
+        "actor_name",
+        "actor_role",
+        "reason",
+        "reverses_id",
+        "created_at"
+      ]
+    },
+    "DailyCareNote": {
+      "owner": "core",
+      "count": 1,
+      "keysHash": "01252b09b0d8f798a09b207baefb3da853be48f6a19948f824edbac863f917d3",
+      "contentHash": "8f3683b852d06fe6197310e4c8380f283c69923b2091d1ee0acce4fe96b45a4e",
+      "fields": [
+        "id",
+        "booking_id",
+        "note_date",
+        "eating_status",
+        "mood",
+        "note",
+        "visible_to_owner",
+        "created_by_staff_id",
+        "created_at"
+      ]
+    },
+    "RescueReport": {
+      "owner": "core",
+      "count": 1,
+      "keysHash": "4ecf46450c698bfd808fb4fceaf168cb4075e01aebcd375bdbb0e72c5f264775",
+      "contentHash": "19f1541bcdeb186b8809b94ab8179fc37fac3ae4fc4e4376a3becfcc1019aa0e",
+      "fields": [
+        "id",
+        "pet_id",
+        "finder_name",
+        "finder_phone",
+        "location",
+        "note",
+        "created_at"
+      ]
+    },
+    "Invoice": {
+      "owner": "core",
+      "count": 3,
+      "keysHash": "f5b189da74bad1122129f406caf2b46fea069f6cbf75ce1fed9b4d4b2d0d25b4",
+      "contentHash": "a6c5cc6342f569b946fa8c8d37995045e905507a7cf744fb7ce3fc7645cbab28",
+      "fields": [
+        "id",
+        "invoice_code",
+        "transfer_code",
+        "type",
+        "owner_id",
+        "pet_id",
+        "appointment_id",
+        "hotel_booking_id",
+        "subtotal",
+        "tax_amount",
+        "discount_amount",
+        "total_amount",
+        "payment_status",
+        "payment_method",
+        "payment_channel",
+        "bank_transfer_details",
+        "transfer_review_status",
+        "transfer_reported_at",
+        "transfer_reference",
+        "transfer_review_note",
+        "issued_at",
+        "paid_at",
+        "notes",
+        "created_at",
+        "updated_at",
+        "source_snapshot"
+      ]
+    },
+    "InvoiceItem": {
+      "owner": "core",
+      "count": 3,
+      "keysHash": "c8c4e9cb5c46292632cdd90537e76a42039bae940d5560c60be31dd1a43b74d2",
+      "contentHash": "7e129a999fd8ea638dbc69f83833f03a6e57ba7a760975e0ff07603f164eb0b3",
+      "fields": [
+        "id",
+        "invoice_id",
+        "description",
+        "unit_price",
+        "quantity",
+        "amount"
+      ]
+    },
+    "PaymentAttempt": {
+      "owner": "core",
+      "count": 3,
+      "keysHash": "a00c71c4597bf1705fe015f95ab844d47e4c6aefb4cf564e4227ea1c07ddeb40",
+      "contentHash": "e10df88ac3969c306fb8cd5deb19db12c9325c6f0d37e06079f7c6e89bf386d2",
+      "fields": [
+        "id",
+        "invoice_id",
+        "amount",
+        "status",
+        "transaction_no",
+        "response_code",
+        "created_at",
+        "expires_at"
+      ]
+    },
+    "PaymentEvent": {
+      "owner": "core",
+      "count": 1,
+      "keysHash": "079f353956ef688b70e3db17a563e55dfd0c14d616744697220fda9cb95a9f17",
+      "contentHash": "9ee22d140cfcb35cab42d6bef9a714dc9dd85cbbb4530a5622bddbca839b7e97",
+      "fields": [
+        "id",
+        "invoice_id",
+        "action",
+        "from_status",
+        "to_status",
+        "actor_id",
+        "actor_name",
+        "actor_role",
+        "reason",
+        "reference",
+        "created_at"
+      ]
+    },
+    "OutboxEvent": {
+      "owner": "core",
+      "count": 14,
+      "keysHash": "63a2a5b96b23ee4bb073d345b6c87a702d442a2e2c62e1b65b3ce305348de6a7",
+      "contentHash": "ef5858106e2d2976ced69d231d5df882635ac5c89a41681a9c3de5b53778afdc",
+      "fields": [
+        "id",
+        "envelope",
+        "createdAt",
+        "publishedAt",
+        "attempts",
+        "nextAttemptAt",
+        "leaseOwner",
+        "leaseUntil",
+        "lastErrorCode"
+      ]
+    },
+    "AppointmentBillingOperation": {
+      "owner": "core",
+      "count": 0,
+      "keysHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "contentHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "fields": [
+        "id",
+        "actorId",
+        "actorRole",
+        "operationType",
+        "idempotencyKey",
+        "requestHash",
+        "appointmentId",
+        "expectedRevision",
+        "payload",
+        "state",
+        "invoiceId",
+        "snapshot",
+        "errorCode",
+        "errorStatus",
+        "createdAt",
+        "updatedAt",
+        "terminalAt",
+        "finalizedAt",
+        "attempts",
+        "nextAttemptAt",
+        "leaseOwner",
+        "leaseUntil"
+      ]
+    },
+    "Notification": {
+      "owner": "notification",
+      "count": 2,
+      "keysHash": "395e98c850d7738008614e8b6a38b9a665bd794e893e2a61171ceef009c15282",
+      "contentHash": "0450250f9a2204a627c4b6f8772a1da82b1f908aa914767b35300456c9947e11",
+      "fields": [
+        "id",
+        "recipient_owner_id",
+        "recipient_role",
+        "type",
+        "title",
+        "message",
+        "status",
+        "action_url",
+        "related_pet_id",
+        "related_appointment_id",
+        "related_booking_id",
+        "sent_by_staff_id",
+        "created_at",
+        "sent_at"
+      ]
+    }
+  },
+  "target": {
+    "core": {
+      "User": {
+        "count": 5,
+        "keysHash": "1c81ce4367304f3d59840527a2d0daa560a2c31bcff71d6dacbf4df8e9ab31da",
+        "contentHash": "18599fd1e06b142dfd9e485757f023427d7d4c1b3fc9a05ceb8db0f4c75a719a",
+        "fields": [
+          "directory_revision",
+          "id",
+          "username",
+          "phone",
+          "email",
+          "password_hash",
+          "password_salt",
+          "full_name",
+          "role",
+          "address",
+          "avatar_url",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "OwnerActivation": {
+        "count": 1,
+        "keysHash": "dcf23b907ce368ccb6bac9e08529b7f7b6ca49ffa51494db999cb28af8aa90c1",
+        "contentHash": "aedafaadad9f7681723165448f00cd7b78b4666747fdda8aa84a878bf568d4c3",
+        "fields": [
+          "id",
+          "owner_id",
+          "token_hash",
+          "email",
+          "expires_at",
+          "used_at",
+          "revoked_at",
+          "issued_by",
+          "issued_by_name",
+          "created_at"
+        ]
+      },
+      "Pet": {
+        "count": 3,
+        "keysHash": "a189ad7fb00ddc14d2a4cc4cad22f99ca024b3ef8ca85d98b9887c04babe9e4d",
+        "contentHash": "4096d862d3610fcd137850b1d9228f7045c4aa018426c6512901dbe46b15e54e",
+        "fields": [
+          "directory_revision",
+          "id",
+          "owner_id",
+          "name",
+          "species",
+          "breed",
+          "gender",
+          "age_label",
+          "weight_kg",
+          "microchip_id",
+          "health_status",
+          "allergies",
+          "notes",
+          "avatar_url",
+          "identifying_marks",
+          "last_seen_location",
+          "qr_token",
+          "qr_enabled",
+          "show_owner_phone",
+          "show_owner_email",
+          "show_owner_address",
+          "show_medical_alerts",
+          "rescue_note",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "HotelBooking": {
+        "count": 1,
+        "keysHash": "913ba32f258aed29c5684ae69f6a0e3f9bb22b7be59af6a3dc990985132d9cd6",
+        "contentHash": "c52daab1df7ffc5229e009436d573b53607cd43238346349d5d2d9d418f3bcb8",
+        "fields": [
+          "id",
+          "pet_id",
+          "owner_id",
+          "check_in",
+          "check_out",
+          "nights",
+          "room_type",
+          "service_keys",
+          "total_amount",
+          "status",
+          "status_revision",
+          "owner_note",
+          "internal_note",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "HotelBookingRequest": {
+        "count": 1,
+        "keysHash": "8e5977352356e766a1dd5651cf4a092e016f8f75af831e5bbb3e7eb90ef6dce0",
+        "contentHash": "c96353e9478b7f7cefac17d66c39faa3e5523ea07972da337b40fb2d0b342f1e",
+        "fields": [
+          "actor_id",
+          "request_key",
+          "fingerprint",
+          "booking_id",
+          "created_at"
+        ]
+      },
+      "BookingStatusEvent": {
+        "count": 1,
+        "keysHash": "75b28297971e5c494e7cfe497fef4ce261bc0081a840f45d0478d0a9ca3ae08c",
+        "contentHash": "2be6ae16f47b364990f1329d8e65d374a2d9d0c68594b05616eff101e0b6ff8e",
+        "fields": [
+          "id",
+          "kind",
+          "booking_id",
+          "revision",
+          "action",
+          "from_status",
+          "to_status",
+          "actor_id",
+          "actor_name",
+          "actor_role",
+          "reason",
+          "reverses_id",
+          "created_at"
+        ]
+      },
+      "DailyCareNote": {
+        "count": 1,
+        "keysHash": "01252b09b0d8f798a09b207baefb3da853be48f6a19948f824edbac863f917d3",
+        "contentHash": "8f3683b852d06fe6197310e4c8380f283c69923b2091d1ee0acce4fe96b45a4e",
+        "fields": [
+          "id",
+          "booking_id",
+          "note_date",
+          "eating_status",
+          "mood",
+          "note",
+          "visible_to_owner",
+          "created_by_staff_id",
+          "created_at"
+        ]
+      },
+      "RescueReport": {
+        "count": 1,
+        "keysHash": "4ecf46450c698bfd808fb4fceaf168cb4075e01aebcd375bdbb0e72c5f264775",
+        "contentHash": "19f1541bcdeb186b8809b94ab8179fc37fac3ae4fc4e4376a3becfcc1019aa0e",
+        "fields": [
+          "id",
+          "pet_id",
+          "finder_name",
+          "finder_phone",
+          "location",
+          "note",
+          "created_at"
+        ]
+      },
+      "Invoice": {
+        "count": 3,
+        "keysHash": "f5b189da74bad1122129f406caf2b46fea069f6cbf75ce1fed9b4d4b2d0d25b4",
+        "contentHash": "cbbafcfe6488990eb0632fba47cb8159804f46ac0e2504afe461a7fad851ba09",
+        "fields": [
+          "id",
+          "invoice_code",
+          "transfer_code",
+          "type",
+          "owner_id",
+          "pet_id",
+          "appointment_id",
+          "hotel_booking_id",
+          "subtotal",
+          "tax_amount",
+          "discount_amount",
+          "total_amount",
+          "payment_status",
+          "payment_method",
+          "payment_channel",
+          "bank_transfer_details",
+          "transfer_review_status",
+          "transfer_reported_at",
+          "transfer_reference",
+          "transfer_review_note",
+          "issued_at",
+          "paid_at",
+          "notes",
+          "created_at",
+          "updated_at",
+          "source_snapshot"
+        ]
+      },
+      "InvoiceItem": {
+        "count": 3,
+        "keysHash": "c8c4e9cb5c46292632cdd90537e76a42039bae940d5560c60be31dd1a43b74d2",
+        "contentHash": "7e129a999fd8ea638dbc69f83833f03a6e57ba7a760975e0ff07603f164eb0b3",
+        "fields": [
+          "id",
+          "invoice_id",
+          "description",
+          "unit_price",
+          "quantity",
+          "amount"
+        ]
+      },
+      "PaymentAttempt": {
+        "count": 3,
+        "keysHash": "a00c71c4597bf1705fe015f95ab844d47e4c6aefb4cf564e4227ea1c07ddeb40",
+        "contentHash": "e10df88ac3969c306fb8cd5deb19db12c9325c6f0d37e06079f7c6e89bf386d2",
+        "fields": [
+          "id",
+          "invoice_id",
+          "amount",
+          "status",
+          "transaction_no",
+          "response_code",
+          "created_at",
+          "expires_at"
+        ]
+      },
+      "PaymentEvent": {
+        "count": 1,
+        "keysHash": "079f353956ef688b70e3db17a563e55dfd0c14d616744697220fda9cb95a9f17",
+        "contentHash": "9ee22d140cfcb35cab42d6bef9a714dc9dd85cbbb4530a5622bddbca839b7e97",
+        "fields": [
+          "id",
+          "invoice_id",
+          "action",
+          "from_status",
+          "to_status",
+          "actor_id",
+          "actor_name",
+          "actor_role",
+          "reason",
+          "reference",
+          "created_at"
+        ]
+      },
+      "OutboxEvent": {
+        "count": 14,
+        "keysHash": "63a2a5b96b23ee4bb073d345b6c87a702d442a2e2c62e1b65b3ce305348de6a7",
+        "contentHash": "ef5858106e2d2976ced69d231d5df882635ac5c89a41681a9c3de5b53778afdc",
+        "fields": [
+          "id",
+          "envelope",
+          "createdAt",
+          "publishedAt",
+          "attempts",
+          "nextAttemptAt",
+          "leaseOwner",
+          "leaseUntil",
+          "lastErrorCode"
+        ]
+      },
+      "AppointmentBillingOperation": {
+        "count": 2,
+        "keysHash": "d7391e629bfaff83a3ec77fd330f4c87b55c97ffd39def6fac8d972551e5bb7d",
+        "contentHash": "8af3d465b64716286b80a59d0bc506c1aa261e94cc999045b6446520b2735d61",
+        "fields": [
+          "id",
+          "actorId",
+          "actorRole",
+          "operationType",
+          "idempotencyKey",
+          "requestHash",
+          "appointmentId",
+          "expectedRevision",
+          "payload",
+          "state",
+          "invoiceId",
+          "snapshot",
+          "errorCode",
+          "errorStatus",
+          "createdAt",
+          "updatedAt",
+          "terminalAt",
+          "finalizedAt",
+          "attempts",
+          "nextAttemptAt",
+          "leaseOwner",
+          "leaseUntil"
+        ]
+      }
+    },
+    "clinic": {
+      "Appointment": {
+        "count": 10,
+        "keysHash": "6c7058433b061d8257526d5f8f19441f4bb1fd9d929d781bf4c9742464c3915b",
+        "contentHash": "c947213a7b8a7920bea3f6d2bd31d22d549bef12da7f1317539d04813786b96b",
+        "fields": [
+          "id",
+          "pet_id",
+          "owner_id",
+          "doctor_id",
+          "type",
+          "service_name",
+          "clinic_name",
+          "appointment_date",
+          "appointment_time",
+          "status",
+          "status_revision",
+          "owner_note",
+          "internal_note",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "MedicalRecord": {
+        "count": 1,
+        "keysHash": "02d575994eb755af31effc31498a2edbd41c5fa9ab38e226a8934037df4ab8e5",
+        "contentHash": "c502a3f710cea25fc28735470e67042fb5afe03668df2b29440fbb3ac93b2df7",
+        "fields": [
+          "id",
+          "pet_id",
+          "owner_id",
+          "appointment_id",
+          "doctor_name",
+          "visit_date",
+          "title",
+          "symptoms",
+          "diagnosis",
+          "treatment",
+          "medications",
+          "vaccine_name",
+          "follow_up_date",
+          "weight_kg",
+          "temperature_c",
+          "heart_rate_bpm",
+          "internal_note",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "MedicalImage": {
+        "count": 1,
+        "keysHash": "b97955ccfb7856d76c353bfac2c2194c76ebbaf55a9f8480f4f8bfeffcaf8204",
+        "contentHash": "358fe43f23bb76e4c0a64016645135aa54dd310699e02c22faaa78af38d70cd7",
+        "fields": [
+          "id",
+          "owner_id",
+          "pet_id",
+          "title",
+          "image_url",
+          "mime_type",
+          "created_at"
+        ]
+      },
+      "BookingStatusEvent": {
+        "count": 11,
+        "keysHash": "a10fd710d013338ace20ed23e1f92a11bc2f70daa13388fae21cde1c6b2c0d39",
+        "contentHash": "7a42e7e7220e8b1bd576ef81a29968f09ea7efacadd7b0e2314f046ddc6f3374",
+        "fields": [
+          "id",
+          "kind",
+          "booking_id",
+          "revision",
+          "action",
+          "from_status",
+          "to_status",
+          "actor_id",
+          "actor_name",
+          "actor_role",
+          "reason",
+          "reverses_id",
+          "created_at"
+        ]
+      },
+      "AppointmentReservation": {
+        "count": 2,
+        "keysHash": "d7391e629bfaff83a3ec77fd330f4c87b55c97ffd39def6fac8d972551e5bb7d",
+        "contentHash": "b749a9437b5bf89bafdd0fee3188675a7db0cd8f8f456ea8c01293225e15491d",
+        "fields": [
+          "operationId",
+          "appointmentId",
+          "revisionAtPrepare",
+          "snapshot",
+          "state",
+          "invoiceId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AppointmentBillingTerminal": {
+        "count": 2,
+        "keysHash": "d7391e629bfaff83a3ec77fd330f4c87b55c97ffd39def6fac8d972551e5bb7d",
+        "contentHash": "1bf0068833728e2a42af267073493254b4c4d0e351aece0f5b2eb9293bab2dba",
+        "fields": [
+          "operationId",
+          "appointmentId",
+          "state",
+          "invoiceId",
+          "createdAt"
+        ]
+      },
+      "DirectoryProjection": {
+        "count": 8,
+        "keysHash": "3be3021702009ef0d347b22627f0aa38b3a1d3d2028af5e20843ef09b8e9bca0",
+        "contentHash": "b1c7802fe33ed33cc7e0f792189f80ee267c25312e414987bb3fa19fe2244b84",
+        "fields": [
+          "kind",
+          "id",
+          "sourceVersion",
+          "displayName",
+          "ownerId",
+          "species",
+          "phone",
+          "breed",
+          "email",
+          "microchipId",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "InboxEvent": {
+        "count": 0,
+        "keysHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "contentHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "fields": [
+          "consumerName",
+          "eventId",
+          "createdAt"
+        ]
+      }
+    },
+    "notification": {
+      "Notification": {
+        "count": 2,
+        "keysHash": "395e98c850d7738008614e8b6a38b9a665bd794e893e2a61171ceef009c15282",
+        "contentHash": "e0df51df98390845eeb5dd6aaafdb791a662868a1926e3a39836ad28e810cd0e",
+        "fields": [
+          "id",
+          "recipientOwnerId",
+          "recipientRole",
+          "type",
+          "title",
+          "message",
+          "status",
+          "actionUrl",
+          "relatedPetId",
+          "relatedAppointmentId",
+          "relatedBookingId",
+          "sentByStaffId",
+          "createdAt",
+          "sentAt"
+        ]
+      },
+      "InboxEvent": {
+        "count": 4,
+        "keysHash": "03e8ef3d0cd6a96332b65ce9b0794f69e772392d3a6de77952215b0a7b47361f",
+        "contentHash": "820a3d490897d89e18e08015300b8454e0f6daf3ec72cfcd960bb80d63a46c5d",
+        "fields": [
+          "consumerName",
+          "eventId",
+          "createdAt"
+        ]
+      }
+    }
+  },
+  "summaries": {
+    "appointmentStatus": {
+      "cancelled": 1,
+      "checked_in": 2,
+      "completed": 2,
+      "confirmed": 1,
+      "in_progress": 2,
+      "no_show": 1,
+      "pending": 1
+    },
+    "appointmentType": {
+      "dental": 1,
+      "dermatology": 1,
+      "general_checkup": 1,
+      "hotel_consultation": 1,
+      "other": 1,
+      "spa_bath": 1,
+      "spa_combo": 1,
+      "spa_grooming": 1,
+      "surgery": 1,
+      "vaccination": 1
+    },
+    "hotelStatus": {
+      "checked_out": 1
+    },
+    "historyKind": {
+      "appointment": 11,
+      "hotel": 1
+    },
+    "notificationReadState": {
+      "read": 1,
+      "sent": 1
+    },
+    "financial": {
+      "appointment:paid": {
+        "count": 1,
+        "totalVnd": "123450"
+      },
+      "appointment:unpaid": {
+        "count": 1,
+        "totalVnd": "30000"
+      },
+      "hotel_booking:unpaid": {
+        "count": 1,
+        "totalVnd": "400000"
+      }
+    }
+  },
+  "historicalSnapshotPolicy": "Preserve existing snapshots; reconstruct only when source timestamps/history show no later appointment change, otherwise require review.",
+  "notificationPolicy": "Materialized/deleted event IDs seeded in inbox; ambiguous absent notice requires explicit reviewed pending/deleted evidence; pending retained in outbox.",
+  "validation": {
+    "core": {
+      "empty": false,
+      "exact": true,
+      "tables": {
+        "User": {
+          "count": 5,
+          "keysHash": "1c81ce4367304f3d59840527a2d0daa560a2c31bcff71d6dacbf4df8e9ab31da",
+          "contentHash": "18599fd1e06b142dfd9e485757f023427d7d4c1b3fc9a05ceb8db0f4c75a719a",
+          "fields": [
+            "directory_revision",
+            "id",
+            "username",
+            "phone",
+            "email",
+            "password_hash",
+            "password_salt",
+            "full_name",
+            "role",
+            "address",
+            "avatar_url",
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "OwnerActivation": {
+          "count": 1,
+          "keysHash": "dcf23b907ce368ccb6bac9e08529b7f7b6ca49ffa51494db999cb28af8aa90c1",
+          "contentHash": "aedafaadad9f7681723165448f00cd7b78b4666747fdda8aa84a878bf568d4c3",
+          "fields": [
+            "id",
+            "owner_id",
+            "token_hash",
+            "email",
+            "expires_at",
+            "used_at",
+            "revoked_at",
+            "issued_by",
+            "issued_by_name",
+            "created_at"
+          ]
+        },
+        "Pet": {
+          "count": 3,
+          "keysHash": "a189ad7fb00ddc14d2a4cc4cad22f99ca024b3ef8ca85d98b9887c04babe9e4d",
+          "contentHash": "4096d862d3610fcd137850b1d9228f7045c4aa018426c6512901dbe46b15e54e",
+          "fields": [
+            "directory_revision",
+            "id",
+            "owner_id",
+            "name",
+            "species",
+            "breed",
+            "gender",
+            "age_label",
+            "weight_kg",
+            "microchip_id",
+            "health_status",
+            "allergies",
+            "notes",
+            "avatar_url",
+            "identifying_marks",
+            "last_seen_location",
+            "qr_token",
+            "qr_enabled",
+            "show_owner_phone",
+            "show_owner_email",
+            "show_owner_address",
+            "show_medical_alerts",
+            "rescue_note",
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "HotelBooking": {
+          "count": 1,
+          "keysHash": "913ba32f258aed29c5684ae69f6a0e3f9bb22b7be59af6a3dc990985132d9cd6",
+          "contentHash": "c52daab1df7ffc5229e009436d573b53607cd43238346349d5d2d9d418f3bcb8",
+          "fields": [
+            "id",
+            "pet_id",
+            "owner_id",
+            "check_in",
+            "check_out",
+            "nights",
+            "room_type",
+            "service_keys",
+            "total_amount",
+            "status",
+            "status_revision",
+            "owner_note",
+            "internal_note",
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "HotelBookingRequest": {
+          "count": 1,
+          "keysHash": "8e5977352356e766a1dd5651cf4a092e016f8f75af831e5bbb3e7eb90ef6dce0",
+          "contentHash": "c96353e9478b7f7cefac17d66c39faa3e5523ea07972da337b40fb2d0b342f1e",
+          "fields": [
+            "actor_id",
+            "request_key",
+            "fingerprint",
+            "booking_id",
+            "created_at"
+          ]
+        },
+        "BookingStatusEvent": {
+          "count": 1,
+          "keysHash": "75b28297971e5c494e7cfe497fef4ce261bc0081a840f45d0478d0a9ca3ae08c",
+          "contentHash": "2be6ae16f47b364990f1329d8e65d374a2d9d0c68594b05616eff101e0b6ff8e",
+          "fields": [
+            "id",
+            "kind",
+            "booking_id",
+            "revision",
+            "action",
+            "from_status",
+            "to_status",
+            "actor_id",
+            "actor_name",
+            "actor_role",
+            "reason",
+            "reverses_id",
+            "created_at"
+          ]
+        },
+        "DailyCareNote": {
+          "count": 1,
+          "keysHash": "01252b09b0d8f798a09b207baefb3da853be48f6a19948f824edbac863f917d3",
+          "contentHash": "8f3683b852d06fe6197310e4c8380f283c69923b2091d1ee0acce4fe96b45a4e",
+          "fields": [
+            "id",
+            "booking_id",
+            "note_date",
+            "eating_status",
+            "mood",
+            "note",
+            "visible_to_owner",
+            "created_by_staff_id",
+            "created_at"
+          ]
+        },
+        "RescueReport": {
+          "count": 1,
+          "keysHash": "4ecf46450c698bfd808fb4fceaf168cb4075e01aebcd375bdbb0e72c5f264775",
+          "contentHash": "19f1541bcdeb186b8809b94ab8179fc37fac3ae4fc4e4376a3becfcc1019aa0e",
+          "fields": [
+            "id",
+            "pet_id",
+            "finder_name",
+            "finder_phone",
+            "location",
+            "note",
+            "created_at"
+          ]
+        },
+        "Invoice": {
+          "count": 3,
+          "keysHash": "f5b189da74bad1122129f406caf2b46fea069f6cbf75ce1fed9b4d4b2d0d25b4",
+          "contentHash": "cbbafcfe6488990eb0632fba47cb8159804f46ac0e2504afe461a7fad851ba09",
+          "fields": [
+            "id",
+            "invoice_code",
+            "transfer_code",
+            "type",
+            "owner_id",
+            "pet_id",
+            "appointment_id",
+            "hotel_booking_id",
+            "subtotal",
+            "tax_amount",
+            "discount_amount",
+            "total_amount",
+            "payment_status",
+            "payment_method",
+            "payment_channel",
+            "bank_transfer_details",
+            "transfer_review_status",
+            "transfer_reported_at",
+            "transfer_reference",
+            "transfer_review_note",
+            "issued_at",
+            "paid_at",
+            "notes",
+            "created_at",
+            "updated_at",
+            "source_snapshot"
+          ]
+        },
+        "InvoiceItem": {
+          "count": 3,
+          "keysHash": "c8c4e9cb5c46292632cdd90537e76a42039bae940d5560c60be31dd1a43b74d2",
+          "contentHash": "7e129a999fd8ea638dbc69f83833f03a6e57ba7a760975e0ff07603f164eb0b3",
+          "fields": [
+            "id",
+            "invoice_id",
+            "description",
+            "unit_price",
+            "quantity",
+            "amount"
+          ]
+        },
+        "PaymentAttempt": {
+          "count": 3,
+          "keysHash": "a00c71c4597bf1705fe015f95ab844d47e4c6aefb4cf564e4227ea1c07ddeb40",
+          "contentHash": "e10df88ac3969c306fb8cd5deb19db12c9325c6f0d37e06079f7c6e89bf386d2",
+          "fields": [
+            "id",
+            "invoice_id",
+            "amount",
+            "status",
+            "transaction_no",
+            "response_code",
+            "created_at",
+            "expires_at"
+          ]
+        },
+        "PaymentEvent": {
+          "count": 1,
+          "keysHash": "079f353956ef688b70e3db17a563e55dfd0c14d616744697220fda9cb95a9f17",
+          "contentHash": "9ee22d140cfcb35cab42d6bef9a714dc9dd85cbbb4530a5622bddbca839b7e97",
+          "fields": [
+            "id",
+            "invoice_id",
+            "action",
+            "from_status",
+            "to_status",
+            "actor_id",
+            "actor_name",
+            "actor_role",
+            "reason",
+            "reference",
+            "created_at"
+          ]
+        },
+        "OutboxEvent": {
+          "count": 14,
+          "keysHash": "63a2a5b96b23ee4bb073d345b6c87a702d442a2e2c62e1b65b3ce305348de6a7",
+          "contentHash": "ef5858106e2d2976ced69d231d5df882635ac5c89a41681a9c3de5b53778afdc",
+          "fields": [
+            "id",
+            "envelope",
+            "createdAt",
+            "publishedAt",
+            "attempts",
+            "nextAttemptAt",
+            "leaseOwner",
+            "leaseUntil",
+            "lastErrorCode"
+          ]
+        },
+        "AppointmentBillingOperation": {
+          "count": 2,
+          "keysHash": "d7391e629bfaff83a3ec77fd330f4c87b55c97ffd39def6fac8d972551e5bb7d",
+          "contentHash": "8af3d465b64716286b80a59d0bc506c1aa261e94cc999045b6446520b2735d61",
+          "fields": [
+            "id",
+            "actorId",
+            "actorRole",
+            "operationType",
+            "idempotencyKey",
+            "requestHash",
+            "appointmentId",
+            "expectedRevision",
+            "payload",
+            "state",
+            "invoiceId",
+            "snapshot",
+            "errorCode",
+            "errorStatus",
+            "createdAt",
+            "updatedAt",
+            "terminalAt",
+            "finalizedAt",
+            "attempts",
+            "nextAttemptAt",
+            "leaseOwner",
+            "leaseUntil"
+          ]
+        }
+      },
+      "foreignKeys": 23
+    },
+    "clinic": {
+      "empty": false,
+      "exact": true,
+      "tables": {
+        "Appointment": {
+          "count": 10,
+          "keysHash": "6c7058433b061d8257526d5f8f19441f4bb1fd9d929d781bf4c9742464c3915b",
+          "contentHash": "c947213a7b8a7920bea3f6d2bd31d22d549bef12da7f1317539d04813786b96b",
+          "fields": [
+            "id",
+            "pet_id",
+            "owner_id",
+            "doctor_id",
+            "type",
+            "service_name",
+            "clinic_name",
+            "appointment_date",
+            "appointment_time",
+            "status",
+            "status_revision",
+            "owner_note",
+            "internal_note",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "MedicalRecord": {
+          "count": 1,
+          "keysHash": "02d575994eb755af31effc31498a2edbd41c5fa9ab38e226a8934037df4ab8e5",
+          "contentHash": "c502a3f710cea25fc28735470e67042fb5afe03668df2b29440fbb3ac93b2df7",
+          "fields": [
+            "id",
+            "pet_id",
+            "owner_id",
+            "appointment_id",
+            "doctor_name",
+            "visit_date",
+            "title",
+            "symptoms",
+            "diagnosis",
+            "treatment",
+            "medications",
+            "vaccine_name",
+            "follow_up_date",
+            "weight_kg",
+            "temperature_c",
+            "heart_rate_bpm",
+            "internal_note",
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "MedicalImage": {
+          "count": 1,
+          "keysHash": "b97955ccfb7856d76c353bfac2c2194c76ebbaf55a9f8480f4f8bfeffcaf8204",
+          "contentHash": "358fe43f23bb76e4c0a64016645135aa54dd310699e02c22faaa78af38d70cd7",
+          "fields": [
+            "id",
+            "owner_id",
+            "pet_id",
+            "title",
+            "image_url",
+            "mime_type",
+            "created_at"
+          ]
+        },
+        "BookingStatusEvent": {
+          "count": 11,
+          "keysHash": "a10fd710d013338ace20ed23e1f92a11bc2f70daa13388fae21cde1c6b2c0d39",
+          "contentHash": "7a42e7e7220e8b1bd576ef81a29968f09ea7efacadd7b0e2314f046ddc6f3374",
+          "fields": [
+            "id",
+            "kind",
+            "booking_id",
+            "revision",
+            "action",
+            "from_status",
+            "to_status",
+            "actor_id",
+            "actor_name",
+            "actor_role",
+            "reason",
+            "reverses_id",
+            "created_at"
+          ]
+        },
+        "AppointmentReservation": {
+          "count": 2,
+          "keysHash": "d7391e629bfaff83a3ec77fd330f4c87b55c97ffd39def6fac8d972551e5bb7d",
+          "contentHash": "b749a9437b5bf89bafdd0fee3188675a7db0cd8f8f456ea8c01293225e15491d",
+          "fields": [
+            "operationId",
+            "appointmentId",
+            "revisionAtPrepare",
+            "snapshot",
+            "state",
+            "invoiceId",
+            "createdAt",
+            "updatedAt"
+          ]
+        },
+        "AppointmentBillingTerminal": {
+          "count": 2,
+          "keysHash": "d7391e629bfaff83a3ec77fd330f4c87b55c97ffd39def6fac8d972551e5bb7d",
+          "contentHash": "1bf0068833728e2a42af267073493254b4c4d0e351aece0f5b2eb9293bab2dba",
+          "fields": [
+            "operationId",
+            "appointmentId",
+            "state",
+            "invoiceId",
+            "createdAt"
+          ]
+        },
+        "DirectoryProjection": {
+          "count": 8,
+          "keysHash": "3be3021702009ef0d347b22627f0aa38b3a1d3d2028af5e20843ef09b8e9bca0",
+          "contentHash": "b1c7802fe33ed33cc7e0f792189f80ee267c25312e414987bb3fa19fe2244b84",
+          "fields": [
+            "kind",
+            "id",
+            "sourceVersion",
+            "displayName",
+            "ownerId",
+            "species",
+            "phone",
+            "breed",
+            "email",
+            "microchipId",
+            "updatedAt",
+            "deletedAt"
+          ]
+        },
+        "InboxEvent": {
+          "count": 0,
+          "keysHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "contentHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "fields": [
+            "consumerName",
+            "eventId",
+            "createdAt"
+          ]
+        }
+      },
+      "foreignKeys": 5
+    },
+    "notification": {
+      "empty": false,
+      "exact": true,
+      "tables": {
+        "Notification": {
+          "count": 2,
+          "keysHash": "395e98c850d7738008614e8b6a38b9a665bd794e893e2a61171ceef009c15282",
+          "contentHash": "e0df51df98390845eeb5dd6aaafdb791a662868a1926e3a39836ad28e810cd0e",
+          "fields": [
+            "id",
+            "recipientOwnerId",
+            "recipientRole",
+            "type",
+            "title",
+            "message",
+            "status",
+            "actionUrl",
+            "relatedPetId",
+            "relatedAppointmentId",
+            "relatedBookingId",
+            "sentByStaffId",
+            "createdAt",
+            "sentAt"
+          ]
+        },
+        "InboxEvent": {
+          "count": 4,
+          "keysHash": "03e8ef3d0cd6a96332b65ce9b0794f69e772392d3a6de77952215b0a7b47361f",
+          "contentHash": "820a3d490897d89e18e08015300b8454e0f6daf3ec72cfcd960bb80d63a46c5d",
+          "fields": [
+            "consumerName",
+            "eventId",
+            "createdAt"
+          ]
+        }
+      },
+      "foreignKeys": 0
+    }
+  },
+  "comparisonPoint": "Exact comparisons at import, before opening target writes; cutover report then checks retained new writes.",
+  "cutover": {
+    "sourceWriterFenced": true,
+    "targetWriterOnly": true,
+    "beforeOpenRollback": true,
+    "afterOpenRollbackRejected": true,
+    "forwardFix": true,
+    "newInvoiceCount": 1,
+    "clinicalInvoiceReservations": 3,
+    "sourceModels": 18,
+    "restoreExact": true,
+    "historySplit": true,
+    "notificationReplay": true,
+    "gateway": "actual nginx reload",
+    "liveDatabaseTouched": false
+  },
+  "provenance": {
+    "gitHead": "add596e4488e3cac2584115874c2f65a97af7047",
+    "dirtyDiffHash": "82817bdf735fc59c95481c661f367d40fec7c3c020d06432dad73686049eb63d",
+    "untrackedHash": "b46f5a3b438178a887f6784098adf8cf2a9ff9ec49bea839e28ab8ca80735b30",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "exportedAt": "2026-10-11T18:31:01.088Z",
+    "sequence": {
+      "last_value": "1",
+      "is_called": false
+    },
+    "gatewayConfigHash": "6e3d4ffab383606bed4597ca0da54dcd746ff6fdc2394a271624cca9bc6a1801",
+    "eventSchemaVersion": 1
+  },
+  "artifacts": {
+    "context": "C:\\Users\\Admin\\Documents\\KTPM\\Pet-healthcare\\test-results\\phase2\\p7-bd557bd5-c1d4-4cc6-b3bd-658051344ea8-context.json",
+    "snapshot": "test-results\\phase2\\p7-5bbafb8f-2361-4e8a-a997-8a5731f241ab\\snapshot.json",
+    "report": "test-results\\phase2\\p7-5bbafb8f-2361-4e8a-a997-8a5731f241ab\\migration-report.json",
+    "cutover": "test-results\\phase2\\p7-5bbafb8f-2361-4e8a-a997-8a5731f241ab\\cutover-report.json"
+  },
+  "privacy": "Local ignored snapshot contains protected rows/credentials. This report contains only counts/hashes/schema/aggregate totals; do not publish the snapshot."
+}

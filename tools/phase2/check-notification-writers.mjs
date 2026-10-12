@@ -1,0 +1,12 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import assert from 'node:assert/strict';
+const files = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.name === 'generated' ? [] : e.isDirectory() ? files(resolve(dir,e.name)) : e.name.endsWith('.ts') ? [resolve(dir,e.name)] : []);
+const forbidden = source => /\bnotification\s*\.\s*(create|createMany|upsert)\s*\(/.test(source);
+assert.ok(forbidden('tx.notification.create({ data })')); assert.ok(forbidden('db.notification . createMany([])'));
+const core = files(resolve('backend/src')); const violations = core.filter(f => forbidden(readFileSync(f,'utf8')));
+assert.deepEqual(violations, [], 'Core runtime must publish transactional outbox, never create notification rows');
+const sites = files(resolve('services/notification/src')).filter(f => forbidden(readFileSync(f,'utf8'))).map(f => f.replaceAll('\\','/').split('/').at(-1)).sort();
+assert.deepEqual(sites, ['inbox.ts','manualSend.ts'], 'Only inbox/manual send own Notification creation');
+assert.ok(readFileSync('backend/src/infrastructure/persistence/notificationRepository.ts','utf8').includes('Manual notifications require the Notification service.'));
+console.log('Notification writers PASS: no Core inserts; Notification inbox/manual-send are sole runtime creators. Legacy fixture/export reads retained.');

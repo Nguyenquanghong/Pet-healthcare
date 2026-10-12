@@ -735,6 +735,15 @@
                     },
                     "related": {
                       "$ref": "#/components/schemas/RelatedPageData"
+                    },
+                    "directory": {
+                      "$ref": "#/components/schemas/DirectoryStatus"
+                    },
+                    "searchConsistency": {
+                      "type": "string",
+                      "enum": [
+                        "eventual"
+                      ]
                     }
                   }
                 }
@@ -835,6 +844,46 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "description": "Actor or owner scope denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Slot, revision or request key conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or missing key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable; result may be uncertain, retry same key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "default": {
             "$ref": "#/components/responses/ApiError"
           }
@@ -853,7 +902,21 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            },
+            "description": "Clinic create persists one result per actor/type/key after validation; retry an uncertain result with the same key and content. Reuse with different content returns 409."
+          }
+        ]
       }
     },
     "/appointments/{id}/status": {
@@ -1073,6 +1136,15 @@
                     },
                     "related": {
                       "$ref": "#/components/schemas/RelatedPageData"
+                    },
+                    "directory": {
+                      "$ref": "#/components/schemas/DirectoryStatus"
+                    },
+                    "searchConsistency": {
+                      "type": "string",
+                      "enum": [
+                        "eventual"
+                      ]
                     }
                   }
                 }
@@ -1130,6 +1202,46 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "description": "Actor or owner scope denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Slot, revision or request key conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or missing key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable; result may be uncertain, retry same key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "default": {
             "$ref": "#/components/responses/ApiError"
           }
@@ -1148,7 +1260,21 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            },
+            "description": "Clinic create persists one result per actor/type/key after validation; retry an uncertain result with the same key and content. Reuse with different content returns 409."
+          }
+        ]
       }
     },
     "/medical-records/{id}": {
@@ -1328,6 +1454,15 @@
                     },
                     "related": {
                       "$ref": "#/components/schemas/RelatedPageData"
+                    },
+                    "directory": {
+                      "$ref": "#/components/schemas/DirectoryStatus"
+                    },
+                    "searchConsistency": {
+                      "type": "string",
+                      "enum": [
+                        "eventual"
+                      ]
                     }
                   }
                 }
@@ -1874,6 +2009,56 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "description": "Staff access required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency-Key reused with different validated content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid recipient, title, message or request key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core authority or Notification unavailable; retry the same key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "default": {
             "$ref": "#/components/responses/ApiError"
           }
@@ -1893,7 +2078,18 @@
             }
           }
         },
-        "description": " Notification mutations use the same inbox scope as listing: owner recipient ID or the admin-role staff inbox."
+        "description": "Staff manual send checks current actor/recipient through Core before commit in Notification. Retry with the same Idempotency-Key after a timeout.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ]
       }
     },
     "/invoices": {
@@ -2002,11 +2198,33 @@
               }
             }
           },
+          "202": {
+            "description": "Durable operation pending; poll Location or retry the same request key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingPending"
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "Staff role required",
+            "description": "Permission, source, charges or temporary dependency failure.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2016,7 +2234,7 @@
             }
           },
           "404": {
-            "description": "Invoice or source service not found",
+            "description": "Permission, source, charges or temporary dependency failure.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2026,7 +2244,7 @@
             }
           },
           "409": {
-            "description": "Duplicate invoice, unfinished service, or payment state conflict",
+            "description": "Permission, source, charges or temporary dependency failure.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2036,7 +2254,17 @@
             }
           },
           "422": {
-            "description": "Invalid amount or payment method",
+            "description": "Permission, source, charges or temporary dependency failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Permission, source, charges or temporary dependency failure.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2064,7 +2292,20 @@
             }
           }
         },
-        "description": "Nhân viên chốt một hóa đơn cho mỗi nguồn. Hotel mới chốt khi đang lưu trú; đơn cũ đã checkout mà chưa có hóa đơn vẫn được xử lý. Tổng tiền lấy từ giá booking đã lưu và phí phát sinh."
+        "description": "Nhân viên chốt một hóa đơn cho mỗi nguồn. Hotel mới chốt khi đang lưu trú; đơn cũ đã checkout mà chưa có hóa đơn vẫn được xử lý. Tổng tiền lấy từ giá booking đã lưu và phí phát sinh. Split appointment billing uses a durable operation/reservation; a network timeout can return 202. Clinic owns current source; Core stores an immutable source snapshot. Browser must not create a new intent while pending.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Required for split appointment billing; hotel issuance keeps the baseline contract. Preserve this key and body after an unknown result."
+          }
+        ]
       }
     },
     "/invoices/{id}/pay": {
@@ -2260,6 +2501,78 @@
               }
             }
           },
+          "202": {
+            "description": "Durable operation pending; poll Location or retry the same request key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingPending"
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission, source, charges or temporary dependency failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Permission, source, charges or temporary dependency failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Permission, source, charges or temporary dependency failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Permission, source, charges or temporary dependency failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Permission, source, charges or temporary dependency failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "default": {
             "$ref": "#/components/responses/RequestFailed"
           }
@@ -2292,7 +2605,20 @@
             }
           }
         },
-        "description": "Chủ nuôi tự tạo yêu cầu thanh toán cho spa có giá cố định sau khi hoàn tất. Khách sạn cần nhân viên chốt phí, không hỗ trợ endpoint này."
+        "description": "Chủ nuôi tự tạo yêu cầu thanh toán cho spa có giá cố định sau khi hoàn tất. Khách sạn cần nhân viên chốt phí, không hỗ trợ endpoint này. Split appointment billing uses a durable operation/reservation; a network timeout can return 202. Clinic owns current source; Core stores an immutable source snapshot. Browser must not create a new intent while pending.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Required for split appointment billing; hotel issuance keeps the baseline contract. Preserve this key and body after an unknown result."
+          }
+        ]
       }
     },
     "/invoices/{id}/onsite": {
@@ -3703,6 +4029,251 @@
           }
         }
       }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "operationId": "getNotificationUnreadCount",
+        "summary": "Authoritative actor-scoped unread count from Notification",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unread snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "unread",
+                    "asOf"
+                  ],
+                  "properties": {
+                    "unread": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "503": {
+            "description": "Notification count unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/operations/{id}": {
+      "get": {
+        "operationId": "getBillingOperation",
+        "summary": "Read own durable invoice operation; no result inferred from timeout",
+        "tags": [
+          "Invoices"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current durable state and committed invoice, if any",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingOperation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current actor role required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Operation outside actor and role scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/core": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Independent Core region; failure returns an error instead of fake zero counts",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoreDashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current actor rejected"
+          },
+          "503": {
+            "description": "Region unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "JSON error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getCoreDashboard"
+      }
+    },
+    "/dashboard/clinic": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Independent Clinic region; failure returns an error instead of fake zero counts",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicDashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current actor rejected"
+          },
+          "503": {
+            "description": "Region unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "JSON error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getClinicDashboard"
+      }
     }
   },
   "components": {
@@ -3901,6 +4472,11 @@
           },
           "avatarUrl": {
             "type": "string"
+          },
+          "directoryVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Core source revision. Projection search may lag; related DTOs use current Core source."
           }
         },
         "required": [
@@ -3956,6 +4532,11 @@
           },
           "publicProfile": {
             "$ref": "#/components/schemas/PublicProfile"
+          },
+          "directoryVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Core source revision. Projection search may lag; related DTOs use current Core source."
           }
         },
         "required": [
@@ -4426,6 +5007,10 @@
             "type": "string",
             "readOnly": true,
             "description": "Stable transfer purpose; legacy invoices retain their original instruction."
+          },
+          "sourceSnapshot": {
+            "$ref": "#/components/schemas/BillingSourceSnapshot",
+            "nullable": true
           }
         },
         "required": [
@@ -4761,7 +5346,8 @@
                 "type": "object",
                 "additionalProperties": {
                   "type": "integer",
-                  "minimum": 0
+                  "minimum": 0,
+                  "nullable": true
                 }
               },
               "species": {
@@ -4775,7 +5361,8 @@
                 "type": "object",
                 "additionalProperties": {
                   "type": "integer",
-                  "minimum": 0
+                  "minimum": 0,
+                  "nullable": true
                 }
               },
               "hotelStatus": {
@@ -4789,14 +5376,94 @@
                 "type": "object",
                 "additionalProperties": {
                   "type": "integer",
-                  "minimum": 0
+                  "minimum": 0,
+                  "nullable": true
                 }
               },
               "unread": {
-                "type": "integer"
+                "type": "integer",
+                "nullable": true
               },
               "todayAppointments": {
-                "type": "integer"
+                "type": "integer",
+                "nullable": true
+              }
+            }
+          },
+          "regions": {
+            "type": "object",
+            "properties": {
+              "core": {
+                "type": "object",
+                "required": [
+                  "status",
+                  "asOf"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "available",
+                      "unavailable"
+                    ]
+                  },
+                  "asOf": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                }
+              },
+              "clinic": {
+                "type": "object",
+                "required": [
+                  "status",
+                  "asOf"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "available",
+                      "unavailable"
+                    ]
+                  },
+                  "asOf": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                }
+              },
+              "notifications": {
+                "type": "object",
+                "required": [
+                  "status",
+                  "asOf"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "available",
+                      "unavailable"
+                    ]
+                  },
+                  "asOf": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }
@@ -5403,13 +6070,19 @@
         "type": "object",
         "properties": {
           "recipientOwnerId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
           }
         },
         "required": [
@@ -5791,6 +6464,12 @@
                 }
               }
             }
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional optimistic revision for split appointment billing.",
+            "maximum": 2147483647
           }
         }
       },
@@ -6044,6 +6723,11 @@
             "type": "integer",
             "minimum": 0,
             "description": "Total pet count independent of pages. petIds is empty in bounded directory/profile responses; load pet pages with ownerId."
+          },
+          "directoryVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Core source revision. Projection search may lag; related DTOs use current Core source."
           }
         }
       },
@@ -6153,6 +6837,281 @@
             "items": {
               "$ref": "#/components/schemas/Invoice"
             }
+          }
+        }
+      },
+      "BillingSourceSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "appointmentId",
+          "ownerId",
+          "petId",
+          "revision",
+          "type",
+          "serviceName",
+          "clinicName",
+          "date",
+          "time"
+        ],
+        "properties": {
+          "appointmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "ownerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "petId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "type": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "clinicName": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          }
+        }
+      },
+      "BillingPending": {
+        "type": "object",
+        "required": [
+          "operationId",
+          "status"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending"
+            ]
+          }
+        }
+      },
+      "BillingOperation": {
+        "type": "object",
+        "required": [
+          "operationId",
+          "status"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "invoiceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "invoice": {
+            "$ref": "#/components/schemas/Invoice"
+          },
+          "error": {
+            "type": "string"
+          },
+          "errorStatus": {
+            "type": "integer"
+          }
+        }
+      },
+      "CoreDashboard": {
+        "type": "object",
+        "required": [
+          "asOf",
+          "owners",
+          "pets",
+          "hotelBookings",
+          "summary"
+        ],
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Owner"
+            }
+          },
+          "pets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Pet"
+            }
+          },
+          "hotelBookings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelBooking"
+            }
+          },
+          "summary": {
+            "type": "object",
+            "required": [
+              "totals",
+              "species",
+              "hotelStatus"
+            ],
+            "properties": {
+              "totals": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "species": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "hotelStatus": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "ClinicDashboard": {
+        "type": "object",
+        "required": [
+          "asOf",
+          "appointments",
+          "medicalRecords",
+          "medicalImages",
+          "summary",
+          "pets",
+          "owners"
+        ],
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "appointments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Appointment"
+            }
+          },
+          "medicalRecords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalRecord"
+            }
+          },
+          "medicalImages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalImage"
+            }
+          },
+          "summary": {
+            "type": "object",
+            "required": [
+              "totals",
+              "appointmentStatus",
+              "todayAppointments"
+            ],
+            "properties": {
+              "totals": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "appointmentStatus": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "todayAppointments": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "pets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Pet"
+            }
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Owner"
+            }
+          }
+        }
+      },
+      "DirectoryStatus": {
+        "type": "object",
+        "required": [
+          "petId",
+          "sourceVersion",
+          "projectionVersion",
+          "searchReady"
+        ],
+        "properties": {
+          "petId": {
+            "type": "string"
+          },
+          "sourceVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "projectionVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "searchReady": {
+            "type": "boolean"
           }
         }
       }

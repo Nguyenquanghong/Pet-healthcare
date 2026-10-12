@@ -22,12 +22,11 @@ const genderLabels = {
 };
 
 export function MedicalRecordsPage() {
-  const { ownerPets } = useAppStore();
+
   const [searchParams] = useSearchParams();
   const requestedPetId = searchParams.get("petId");
-  const [selectedPetId, setSelectedPetId] = useState(requestedPetId ?? ownerPets[0]?.id ?? "");
+  const [selectedPetId, setSelectedPetId] = useState(requestedPetId ?? "");
   useEffect(() => { if (requestedPetId) setSelectedPetId(requestedPetId); }, [requestedPetId]);
-  useEffect(() => { if (!selectedPetId && ownerPets[0]) setSelectedPetId(ownerPets[0].id); }, [ownerPets, selectedPetId]);
   const selectedPet = usePagedList<Pet>("/pets", { id: selectedPetId }, Boolean(selectedPetId));
   const list = usePagedList<MedicalRecord>("/medical-records", { petId: selectedPetId }, Boolean(selectedPetId));
   const latest = useApiQuery<ListPage<MedicalRecord>>(`/medical-records?petId=${encodeURIComponent(selectedPetId)}&page=1&pageSize=1`, {
@@ -35,7 +34,7 @@ export function MedicalRecordsPage() {
   });
   const medicalRecords = list.items;
 
-  const pet = selectedPet.items[0] ?? ownerPets.find((item) => item.id === selectedPetId);
+  const pet = selectedPet.items[0];
   const petRecords = useMemo(
     () => medicalRecords.filter((record) => record.petId === selectedPetId).sort((a, b) => b.visitDate.localeCompare(a.visitDate)),
     [medicalRecords, selectedPetId],
@@ -44,11 +43,11 @@ export function MedicalRecordsPage() {
   return (
     <OwnerLayout title="Hồ sơ y tế chi tiết">
       <div className="mb-6"><PetLookup label="Chọn thú cưng" value={selectedPetId} onChange={setSelectedPetId} /></div>
-      {ownerPets.length === 0 ? (
+      {!selectedPetId ? (
         <EmptyState
           icon={<PawPrint size={42} />}
-          title="Bạn chưa có hồ sơ thú cưng"
-          description="Hồ sơ y tế sẽ được lưu theo từng thú cưng. Hãy thêm thú cưng đầu tiên để bắt đầu theo dõi lịch sử khám."
+          title="Chọn thú cưng để xem hồ sơ"
+          description="Chọn hoặc tìm thú cưng ở danh sách phía trên. Bạn cũng có thể thêm hồ sơ thú cưng mới."
           action={<Link to="/owner/pets"><Button icon={<Plus size={16} />}>Thêm thú cưng</Button></Link>}
         />
       ) : pet ? (

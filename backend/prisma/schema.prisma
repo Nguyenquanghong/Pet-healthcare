@@ -88,6 +88,7 @@ enum PaymentMethod {
 }
 
 model User {
+  directoryRevision Int @default(1) @map("directory_revision")
   id             String   @id @default(uuid())
   username       String?  @unique
   phone          String?  @unique
@@ -131,6 +132,7 @@ model OwnerActivation {
 }
 
 model Pet {
+  directoryRevision Int @default(1) @map("directory_revision")
   id                String          @id @default(uuid())
   ownerId           String          @map("owner_id")
   name              String
@@ -190,7 +192,6 @@ model Appointment {
   owner           User              @relation("OwnerAppointments", fields: [ownerId], references: [id], onDelete: Cascade)
   doctor          User?             @relation("DoctorAppointments", fields: [doctorId], references: [id])
   medicalRecords  MedicalRecord[]
-  invoices        Invoice[]
 
   @@index([ownerId, appointmentDate])
   @@index([status, appointmentDate(sort: Desc), appointmentTime(sort: Desc), id(sort: Desc)], map: "appointments_page_idx")
@@ -387,7 +388,8 @@ model Invoice {
   updatedAt      DateTime       @updatedAt @map("updated_at")
   owner          User           @relation(fields: [ownerId], references: [id])
   pet            Pet            @relation(fields: [petId], references: [id])
-  appointment    Appointment?   @relation(fields: [appointmentId], references: [id])
+  sourceSnapshot Json?           @map("source_snapshot")
+  billingOperations AppointmentBillingOperation[]
   hotelBooking   HotelBooking?  @relation(fields: [hotelBookingId], references: [id])
   items          InvoiceItem[]
   paymentAttempts PaymentAttempt[]
@@ -441,4 +443,47 @@ model PaymentAttempt {
   invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   @@index([invoiceId, createdAt])
   @@map("payment_attempts")
+}
+
+// Service-local transactional events; legacy notifications remain export-only.
+model OutboxEvent {
+  id String @id
+  envelope Json
+  createdAt DateTime @default(now())
+  publishedAt DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseOwner String?
+  leaseUntil DateTime?
+  lastErrorCode String?
+  @@index([publishedAt, nextAttemptAt])
+}
+
+// Runtime appointment billing; P1 proof operation remains in its own client/schema.
+model AppointmentBillingOperation {
+  id String @id
+  actorId String
+  actorRole String
+  operationType String
+  idempotencyKey String
+  requestHash String
+  appointmentId String
+  expectedRevision Int?
+  payload Json
+  state String @default("PREPARING")
+  invoiceId String?
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  snapshot Json?
+  errorCode String?
+  errorStatus Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  terminalAt DateTime?
+  finalizedAt DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseOwner String?
+  leaseUntil DateTime?
+  @@unique([actorId,operationType,idempotencyKey])
+  @@index([state,nextAttemptAt,leaseUntil])
 }

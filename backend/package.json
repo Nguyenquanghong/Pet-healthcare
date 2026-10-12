@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/src/index.js",
-    "prebuild": "prisma generate",
-    "build": "tsc -p tsconfig.json",
+    "prebuild": "prisma generate && prisma generate --schema prisma/phase2/schema.prisma",
+    "build": "tsc -p tsconfig.json && node ../tools/phase2/copy-core-client.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -17,7 +17,10 @@
     "test:integration": "node tests/postgres.integration.mjs && node tests/fix-postgres.integration.mjs && node tests/invoices.integration.mjs && node tests/payments.integration.mjs && node tests/bank-transfer.integration.mjs && node tests/vietqr.integration.mjs && node tests/booking-lifecycle.integration.mjs && node tests/hotel-booking-idempotency.integration.mjs && node tests/admin-creation.integration.mjs && node tests/owner-activation.integration.mjs && node tests/phase1-security.integration.mjs && node tests/pagination.integration.mjs",
     "test:architecture": "node scripts/check-architecture.mjs",
     "test:openapi": "node scripts/check-openapi.mjs",
-    "check:vnpay": "node scripts/check-vnpay.mjs"
+    "check:vnpay": "node scripts/check-vnpay.mjs",
+    "worker:built": "node dist/src/phase2/worker.js",
+    "worker:notifications": "node dist/src/phase2/notificationWorker.js",
+    "worker:billing": "node dist/src/phase2/billingWorker.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -32,7 +35,11 @@
     "jsonwebtoken": "^9.0.2",
     "qrcode": "^1.5.4",
     "swagger-ui-express": "^5.0.1",
-    "vietnam-qr-pay": "1.5.1"
+    "vietnam-qr-pay": "1.5.1",
+    "@nipopeto/contracts": "1.0.0",
+    "amqplib": "0.10.9",
+    "@nipopeto/messaging": "1.0.0",
+    "@nipopeto/runtime": "1.0.0"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^13.1.0",
@@ -45,6 +52,7 @@
     "jsqr": "1.4.0",
     "pngjs": "7.0.0",
     "tsx": "^4.23.12",
-    "typescript": "latest"
+    "typescript": "latest",
+    "@types/amqplib": "^0.10.7"
   }
 }

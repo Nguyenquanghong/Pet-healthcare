@@ -28,15 +28,17 @@ import {
 } from "../../services/medicalRecordService";
 import { useAppStore } from "../../store/AppStoreProvider";
 import type { MedicalRecord } from "../../types/medicalRecord";
+import { useRequestIntent } from '../../services/useRequestIntent';
 
 export function AdminMedicalRecordsPage() {
+  const intent=useRequestIntent(),recordSending=useRef(false);
   const {
     createMedicalRecord: createMedicalRecordInStore,
     updateMedicalRecord: updateMedicalRecordInStore,
     deleteMedicalRecord: deleteMedicalRecordInStore,
     deleteMedicalImage,
     uploadMedicalImage,
-    pets: cachedPets,
+    petUpdates,
   } = useAppStore();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -51,7 +53,7 @@ export function AdminMedicalRecordsPage() {
   const [viewDetailRecord, setViewDetailRecord] = useState<MedicalRecord | null>(null);
 
   // Form inputs
-  const [petId, setPetId] = useState(cachedPets[0]?.id ?? "");
+  const [petId, setPetId] = useState("");
   const [appointmentId, setAppointmentId] = useState("");
   const [title, setTitle] = useState("");
   const [symptoms, setSymptoms] = useState("");
@@ -64,7 +66,7 @@ export function AdminMedicalRecordsPage() {
   const [temperatureC, setTemperatureC] = useState("");
   const [heartRateBpm, setHeartRateBpm] = useState("");
   const [doctorName, setDoctorName] = useState("Bs. Mai Nguyễn");
-  const [imagePetId, setImagePetId] = useState(cachedPets[0]?.id ?? "");
+  const [imagePetId, setImagePetId] = useState("");
   const [imageTitle, setImageTitle] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState("");
   const [imageMimeType, setImageMimeType] = useState("");
@@ -117,7 +119,8 @@ export function AdminMedicalRecordsPage() {
   };
 
   const handleCreateSubmit = async () => {
-    if (isSubmitting) return;
+    if (isSubmitting||recordSending.current) return;
+    recordSending.current=true;
     setFormError("");
     setIsSubmitting(true);
     try {
@@ -126,7 +129,7 @@ export function AdminMedicalRecordsPage() {
           petId,
           appointmentId: appointmentId || undefined,
           doctorName,
-          visitDate: new Date().toISOString().slice(0, 10),
+          visitDate: new Date(Date.now()+7*3600000).toISOString().slice(0, 10),
           title,
           symptoms,
           diagnosis,
@@ -138,13 +141,15 @@ export function AdminMedicalRecordsPage() {
           temperatureC: Number(temperatureC) || undefined,
           heartRateBpm: Number(heartRateBpm) || undefined,
         },
-        createMedicalRecordInStore,
+        input=>createMedicalRecordInStore(input,intent.key(input)),
       );
+      intent.complete();
       toast(refreshed ? "Đã tạo hồ sơ y tế thành công." : "Đã lưu bệnh án nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu.", !refreshed);
       resetForm();
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Không thể tạo hồ sơ y tế.");
     } finally {
+      recordSending.current=false;
       setIsSubmitting(false);
     }
   };
@@ -236,7 +241,7 @@ export function AdminMedicalRecordsPage() {
   };
 
   const list = usePagedList<MedicalRecord>("/medical-records", { q: searchQuery, petId: selectedPetFilter });
-  const pets = [...new Map([...list.related.pets, ...cachedPets].map(pet => [pet.id, pet])).values()], owners = list.related.owners, medicalRecords = list.items;
+  const pets = [...new Map([...list.related.pets, ...Object.values(petUpdates)].map(pet => [pet.id, pet])).values()], owners = list.related.owners, medicalRecords = list.items;
   const appointmentList = usePagedList<Appointment>("/appointments", { petId }, Boolean(petId && showCreateForm));
   const appointments = appointmentList.items;
   const imagePage = usePagedList<MedicalImage>("/medical-records/images", { petId: imagePetId }, showImageForm);
@@ -267,7 +272,7 @@ export function AdminMedicalRecordsPage() {
         </div>
       )}
       {formError && !editRecord && !deleteConfirmRecord && (
-        <div className="mb-4 flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-700">
+        <div role="alert" className="mb-4 flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-700">
           <AlertCircle size={18} /> {formError}
         </div>
       )}

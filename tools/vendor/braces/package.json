@@ -1,0 +1,7 @@
+{
+  "name": "braces", "version": "3.0.3-pet-p6.1", "private": true,
+  "description": "Build-only braces 3.0.3 with bounded pattern/AST traversal for GHSA-vfj7-8cjw-p6xm",
+  "main": "index.js", "license": "MIT", "engines": { "node": ">=18" },
+  "dependencies": { "fill-range": "^7.1.1" },
+  "files": ["index.js", "lib", "LICENSE", "PATCH-NOTES.md"]
+}

@@ -62,6 +62,7 @@ export function createApp(client: PrismaClient) {
   const activation = new OwnerActivationService(new PrismaOwnerActivationRepository(client), activationTokenAdapter, passwordAdapter);
   const origins = process.env.CORS_ORIGIN?.split(",").map((value) => value.trim()).filter(Boolean);
 
+  if (process.env.TRUST_PROXY_HOPS === "1") app.set("trust proxy", 1);
   app.disable("x-powered-by");
   app.use(helmet());
   app.use(cors({ origin: origins?.length ? origins : false, credentials: true }));

@@ -1,0 +1,93 @@
+{
+  "description": "Observed P5 built UI against real isolated Core/Clinic/Notification services. Same hard navigations, network idle and 12 seconds per flow as before; login/setup excluded. Only method/path/status are retained.",
+  "phases": [
+    {
+      "path": "/admin/dashboard",
+      "durationMs": 12000,
+      "initial": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/notifications/unread-count",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/dashboard/core",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/dashboard/clinic",
+          "status": 200
+        }
+      ],
+      "background": [],
+      "calls": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/notifications/unread-count",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/dashboard/core",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/dashboard/clinic",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "path": "/admin/appointments",
+      "durationMs": 12000,
+      "initial": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/notifications/unread-count",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/appointments",
+          "status": 200
+        }
+      ],
+      "background": [],
+      "calls": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/notifications/unread-count",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/appointments",
+          "status": 200
+        }
+      ]
+    }
+  ]
+}

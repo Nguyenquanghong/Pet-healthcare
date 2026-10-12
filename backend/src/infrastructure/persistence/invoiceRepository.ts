@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
+import { writeNotification } from './notificationOutbox.js';
 import type { InvoiceRepository, InvoiceIssuance, BankTransferDetails } from "../../application/ports/invoices.js";
 import { BusinessError } from "../../domain/error.js";
 import type { Actor } from "../../domain/auth.js";
@@ -41,8 +42,8 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       if (changed.count) {
         await recordPaymentEvent(tx, id, "payment_confirmed", before!.paymentStatus, "paid", actor,
           null, before?.paymentChannel === "bank_transfer" ? before.transferReference : null);
-        await tx.notification.create({ data: { recipientOwnerId: invoice.ownerId, recipientRole: "owner", type: "invoice_paid",
-          title: "Đã xác nhận thanh toán", message: `Hóa đơn ${invoice.invoiceCode} đã được xác nhận thu đủ tiền.`, actionUrl: "/owner/billing" } });
+        await writeNotification(tx, { recipientOwnerId: invoice.ownerId, recipientRole: "owner", type: "invoice_paid",
+          title: "Đã xác nhận thanh toán", message: `Hóa đơn ${invoice.invoiceCode} đã được xác nhận thu đủ tiền.`, actionUrl: "/owner/billing" });
       }
       return invoice;
     });
@@ -62,7 +63,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
             description: `Lưu trú ${item.roomType}, ${item.nights} đêm (gồm dịch vụ đã đặt)`, amount: Number(item.totalAmount) } : null;
         },
         findSource: (type, id) => tx.invoice.findFirst({ where: type === "appointment" ? { appointmentId: id } : { hotelBookingId: id }, include: { items: true } }),
-        notify: async data => { await tx.notification.create({ data }); },
+        notify: async data => { await writeNotification(tx, data); },
         create: ({ items, ...data }) => tx.invoice.create({ data: { ...data,
           invoiceCode: `INV-${randomUUID()}`, paymentStatus: "unpaid",
           items: { create: items },
@@ -111,9 +112,9 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       const updated = await tx.invoice.update({ where: { id }, data: { transferReviewStatus: "pending",
         transferReportedAt: new Date(), transferReference: reference, transferReviewNote: null }, include: { items: true } });
       await recordPaymentEvent(tx, id, "transfer_reported", invoice.transferReviewStatus ?? "none", "pending", actor, null, reference);
-      await tx.notification.create({ data: { recipientRole: "admin", type: "transfer_reported",
+      await writeNotification(tx, { recipientRole: "admin", type: "transfer_reported",
         title: "Khách báo đã chuyển khoản", message: `Kiểm tra tiền nhận cho hóa đơn ${invoice.invoiceCode} trước khi xác nhận.`,
-        actionUrl: "/admin/billing" } });
+        actionUrl: "/admin/billing" });
       return updated;
     });
   }
@@ -126,8 +127,8 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
         throw new BusinessError(409, "Báo chuyển khoản không còn chờ kiểm tra. Hãy tải lại.");
       const updated = await tx.invoice.update({ where: { id }, data: { transferReviewStatus: "rejected", transferReviewNote: reason }, include: { items: true } });
       await recordPaymentEvent(tx, id, "transfer_rejected", "pending", "rejected", actor, reason, invoice.transferReference);
-      await tx.notification.create({ data: { recipientOwnerId: invoice.ownerId, recipientRole: "owner", type: "transfer_rejected",
-        title: "Chuyển khoản cần kiểm tra lại", message: `Hóa đơn ${invoice.invoiceCode}: ${reason}`, actionUrl: "/owner/billing" } });
+      await writeNotification(tx, { recipientOwnerId: invoice.ownerId, recipientRole: "owner", type: "transfer_rejected",
+        title: "Chuyển khoản cần kiểm tra lại", message: `Hóa đơn ${invoice.invoiceCode}: ${reason}`, actionUrl: "/owner/billing" });
       return updated;
     });
   }

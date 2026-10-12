@@ -1,0 +1,8 @@
+ALTER TABLE "AppointmentReservation" ADD COLUMN "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "AppointmentReservation" ADD COLUMN "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+CREATE TABLE "AppointmentBillingTerminal" (
+ "operationId" TEXT PRIMARY KEY, "appointmentId" TEXT NOT NULL,
+ state TEXT NOT NULL CHECK (state IN ('COMMITTED','ABORTED')),
+ "invoiceId" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ CHECK ((state='COMMITTED' AND "invoiceId" IS NOT NULL) OR (state='ABORTED' AND "invoiceId" IS NULL))
+);

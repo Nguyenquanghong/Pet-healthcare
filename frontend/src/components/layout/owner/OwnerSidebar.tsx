@@ -3,11 +3,11 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { ownerNav } from "../../../constants/navigation";
 import { useAppStore } from "../../../store/AppStoreProvider";
 import { BrandLogo } from "../../shared/BrandLogo";
+import { NotificationBadge } from '../NotificationBadge';
 
 export function OwnerSidebar() {
   const navigate = useNavigate();
-  const { logout, summary } = useAppStore();
-  const unreadCount = summary.unread;
+  const { logout } = useAppStore();
 
   const handleLogout = () => {
     logout();
@@ -55,11 +55,7 @@ export function OwnerSidebar() {
                 <Icon size={18} />
                 {item.label}
               </span>
-              {isNotif && unreadCount > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
+              {isNotif && <NotificationBadge className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-xs font-bold text-white" />}
             </NavLink>
           );
         })}

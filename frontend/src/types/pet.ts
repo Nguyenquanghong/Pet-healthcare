@@ -13,6 +13,7 @@ export type PetPublicProfile = {
 export type Pet = {
   id: string;
   ownerId: string;
+  directoryVersion?: number;
   name: string;
   species: PetSpecies;
   breed: string;
