@@ -1,22 +1,40 @@
-FROM node:24-bookworm-slim AS build
+FROM node:24-bookworm-slim AS base
 WORKDIR /work
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY package.json package-lock.json ./
-COPY backend/package.json backend/package.json
-COPY frontend/package.json frontend/package.json
-RUN npm ci --workspace @nipopeto/backend --include-workspace-root
-COPY backend backend
-RUN npm run build --workspace @nipopeto/backend
 
-FROM node:24-bookworm-slim AS runtime
-WORKDIR /work
-ENV NODE_ENV=production
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+FROM base AS build
 COPY package.json package-lock.json ./
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
-RUN npm ci --omit=dev --workspace @nipopeto/backend --include-workspace-root
+COPY services/clinic/package.json services/clinic/package.json
+COPY services/notification/package.json services/notification/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/messaging/package.json packages/messaging/package.json
+COPY packages/runtime/package.json packages/runtime/package.json
+COPY tools/vendor/braces tools/vendor/braces
+RUN npm ci --workspace @nipopeto/backend --workspace @nipopeto/contracts --workspace @nipopeto/messaging --workspace @nipopeto/runtime --include-workspace-root
+COPY packages/contracts packages/contracts
+COPY packages/messaging packages/messaging
+COPY packages/runtime packages/runtime
+COPY backend backend
+COPY tools/phase2/copy-core-client.mjs tools/phase2/copy-core-client.mjs
+RUN npm run build --workspace @nipopeto/runtime && npm run build --workspace @nipopeto/contracts && npm run build --workspace @nipopeto/messaging && npm run build --workspace @nipopeto/backend
+
+FROM build AS production-deps
+RUN npm prune --omit=dev --workspace @nipopeto/backend --workspace @nipopeto/contracts --workspace @nipopeto/messaging --workspace @nipopeto/runtime --include-workspace-root
+
+FROM base AS runtime
+ENV NODE_ENV=production HOST=0.0.0.0
+COPY --from=build /work/package.json ./package.json
+COPY --from=build /work/backend/package.json ./backend/package.json
+COPY --from=production-deps /work/node_modules ./node_modules
 COPY --from=build /work/node_modules/.prisma /work/node_modules/.prisma
+COPY --from=build /work/packages/contracts/package.json ./packages/contracts/package.json
+COPY --from=build /work/packages/contracts/dist ./packages/contracts/dist
+COPY --from=build /work/packages/messaging/package.json ./packages/messaging/package.json
+COPY --from=build /work/packages/messaging/dist ./packages/messaging/dist
+COPY --from=build /work/packages/runtime/package.json ./packages/runtime/package.json
+COPY --from=build /work/packages/runtime/dist ./packages/runtime/dist
 COPY --from=build /work/backend/dist /work/backend/dist
 USER node
 EXPOSE 5000

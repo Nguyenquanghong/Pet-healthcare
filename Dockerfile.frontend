@@ -3,6 +3,12 @@ WORKDIR /work
 COPY package.json package-lock.json ./
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
+COPY services/clinic/package.json services/clinic/package.json
+COPY services/notification/package.json services/notification/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/messaging/package.json packages/messaging/package.json
+COPY packages/runtime/package.json packages/runtime/package.json
+COPY tools/vendor/braces tools/vendor/braces
 RUN npm ci --workspace @nipopeto/frontend --include-workspace-root=false
 COPY backend/src/domain/pricing.json backend/src/domain/pricing.json
 COPY frontend frontend

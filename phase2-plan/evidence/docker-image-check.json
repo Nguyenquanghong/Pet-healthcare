@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "at": "2026-10-13T01:16:41.965Z",
+  "baseCommit": "41d8a72ea69f342e278d357be27b10130e07c954",
+  "sourceFiles": [
+    {
+      "path": ".dockerignore",
+      "sha256": "6db4f8ea7cab84b27bcd31b5520eb4498d8787c801d1409e826f8a01899231ce"
+    },
+    {
+      "path": "Dockerfile.frontend",
+      "sha256": "5406dbc045cc06e198da0023f75703d85166386f68134c3e64822afb7942552f"
+    },
+    {
+      "path": "Dockerfile.backend",
+      "sha256": "07bff6c1f2d8aaab40d760aa3fd273c2c874f46028020d2ec4980f84da5fb671"
+    }
+  ],
+  "storage": {
+    "drive": "D",
+    "managedDisk": "DockerDesktop/DockerDesktopWSL/disk/docker_data.vhdx",
+    "fileBytes": 8616148992,
+    "oldCDataDiskExists": false,
+    "originalImagesContainersVolumesPreserved": true,
+    "originalVolumeCount": 3,
+    "currentVolumeCount": 3,
+    "runningContainers": 0
+  },
+  "images": [
+    {
+      "id": "sha256:ac47ae71fe036633705e2f2c43c03f33650caac1aed009c70c770da1c6df44d3",
+      "tags": [
+        "pet-healthcare-frontend:latest"
+      ],
+      "sizeBytes": 92257429,
+      "platform": "linux/amd64"
+    },
+    {
+      "id": "sha256:5b48402484d3dd55869812af8b37d0cbbc76e26606d75d97b4b77f5884f7fcf5",
+      "tags": [
+        "pet-healthcare-api:latest"
+      ],
+      "sizeBytes": 826283970,
+      "platform": "linux/amd64"
+    },
+    {
+      "id": "sha256:ac91e62a84a9676d05da43f7e5eff9154787e038b8c9b95318103035757df53d",
+      "tags": [
+        "pet-healthcare-migrate:latest"
+      ],
+      "sizeBytes": 1174823904,
+      "platform": "linux/amd64"
+    }
+  ],
+  "checks": {
+    "buildkitDefinition": "PASS",
+    "allThreeFinalImagesBuildExit": 0,
+    "apiOfflineImports": "PASS: 3 shared packages, 2 Prisma clients, Core app factory; Playwright absent",
+    "nginxSyntax": "PASS",
+    "migrationArtifacts": "PASS: Prisma CLI and migration lock exist; CLI not invoked",
+    "localBracesGuard": "2/2 PASS",
+    "hostFrontendBuildExit": 0,
+    "originalBaseline": "17 files unchanged; Dockerfile.frontend intentionally fixed, old bytes preserved in original H package"
+  },
+  "notRun": [
+    "compose up",
+    "database migration",
+    "seed",
+    "database integration suite",
+    "real E2E",
+    "remote CI"
+  ],
+  "rawLogs": [
+    "test-results/phase2/docker-final-build.log",
+    "test-results/phase2/docker-runtime-smoke-final.log"
+  ]
+}
