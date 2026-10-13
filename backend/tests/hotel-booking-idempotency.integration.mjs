@@ -1,3 +1,4 @@
+import { notificationOutbox } from "./notification-outbox-helper.mjs";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
@@ -46,7 +47,7 @@ try {
   const bookingId = concurrent[0].body.booking.id;
   assert.equal(concurrent[1].body.booking.id, bookingId);
   assert.equal(await db.hotelBooking.count({ where: { petId: pet.id } }), 1);
-  assert.equal(await db.notification.count({ where: { relatedBookingId: bookingId, type: "hotel_booking_created" } }), 1);
+  assert.equal(await notificationOutbox(db).count({ where: { relatedBookingId: bookingId, type: "hotel_booking_created" } }), 1);
   assert.equal(await db.invoice.count({ where: { hotelBookingId: bookingId } }), 0);
   await stop(); await start();
   assert.equal((await request(token, "POST", input, "", key)).body.booking.id, bookingId, "Replay survives restart");

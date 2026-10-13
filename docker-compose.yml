@@ -36,7 +36,13 @@ services:
       target: runtime
     environment:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in a private env file}
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in a private env file}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?Run node tools/docker/prepare-notifications.mjs}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?Run node tools/docker/prepare-notifications.mjs}
+      JWT_ISSUER: ${JWT_ISSUER:?Prepare Notification configuration}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:?Prepare Notification configuration}
+      JWT_KEY_ID: ${JWT_KEY_ID:?Prepare Notification configuration}
+      NOTIFICATION_SERVICE_URL: http://notification-api:5102
+      CORE_NOTIFICATION_SEND_TOKEN: ${CORE_NOTIFICATION_SEND_TOKEN:?Prepare Notification configuration}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
       TRUST_PROXY_HOPS: "1"
@@ -50,12 +56,118 @@ services:
       VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
       VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-http://localhost:5173/owner/billing}
       PORT: ${PORT:-5000}
+    command: ["node", "tools/docker/core-local-start.mjs"]
     ports:
       - "127.0.0.1:${PORT:-5000}:${PORT:-5000}"
     depends_on:
       migrate:
         condition: service_completed_successfully
       postgres:
+        condition: service_healthy
+      notification-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+process.env.PORT+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  notification-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nipopeto_notification
+      POSTGRES_USER: notification
+      POSTGRES_PASSWORD: ${NOTIFICATION_POSTGRES_PASSWORD:?Prepare Notification configuration}
+    volumes:
+      - notification_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification -d nipopeto_notification"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    hostname: local-notification-broker
+    environment:
+      RABBITMQ_DEFAULT_USER: notification
+      RABBITMQ_DEFAULT_PASS: ${BROKER_PASSWORD:?Prepare Notification configuration}
+    volumes:
+      - notification_broker:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  notification-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: notification-build
+    environment:
+      DATABASE_URL: postgresql://notification:${NOTIFICATION_POSTGRES_PASSWORD:?Prepare Notification configuration}@notification-postgres:5432/nipopeto_notification?schema=public
+    command: ["npm", "run", "db:deploy", "--workspace", "@nipopeto/notification"]
+    depends_on:
+      notification-postgres:
+        condition: service_healthy
+    restart: "no"
+
+  notification-api:
+    build: &notification-build
+      context: .
+      dockerfile: Dockerfile.backend
+      target: notification-runtime
+    environment:
+      DATABASE_URL: postgresql://notification:${NOTIFICATION_POSTGRES_PASSWORD:?Prepare Notification configuration}@notification-postgres:5432/nipopeto_notification?schema=public
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?Prepare Notification configuration}
+      JWT_ISSUER: ${JWT_ISSUER:?Prepare Notification configuration}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:?Prepare Notification configuration}
+      JWT_KEY_ID: ${JWT_KEY_ID:?Prepare Notification configuration}
+      CORE_SERVICE_URL: http://api:${PORT:-5000}
+      CORE_NOTIFICATION_SEND_TOKEN: ${CORE_NOTIFICATION_SEND_TOKEN:?Prepare Notification configuration}
+      PORT: "5102"
+    depends_on:
+      notification-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5102/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  notification-worker:
+    build: *notification-build
+    environment:
+      DATABASE_URL: postgresql://notification:${NOTIFICATION_POSTGRES_PASSWORD:?Prepare Notification configuration}@notification-postgres:5432/nipopeto_notification?schema=public
+      BROKER_URL: amqp://notification:${BROKER_PASSWORD:?Prepare Notification configuration}@rabbitmq:5672
+      BROKER_PREFIX: nipopeto.local.v1
+    command: ["node", "services/notification/dist/worker.js"]
+    depends_on:
+      notification-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  core-outbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: runtime
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in a private env file}
+      BROKER_URL: amqp://notification:${BROKER_PASSWORD:?Prepare Notification configuration}@rabbitmq:5672
+      BROKER_PREFIX: nipopeto.local.v1
+    command: ["node", "backend/dist/src/phase2/notificationWorker.js"]
+    depends_on:
+      api:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: unless-stopped
 
@@ -80,3 +192,5 @@ services:
 
 volumes:
   nipopeto_postgres:
+  notification_postgres:
+  notification_broker:

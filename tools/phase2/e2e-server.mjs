@@ -17,6 +17,7 @@ import { OutboxRelay as ClinicRelay } from '../../services/clinic/dist/relay.js'
 import { AppointmentInvoiceBilling, ClinicBillingRemote } from '../../backend/dist/src/phase2/appointmentBilling.js';
 import { topology, declareTopology } from '@nipopeto/messaging';
 import amqp from 'amqplib';
+import {drainHandles} from './drain-handles.mjs';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test');
 assertTestProject();
@@ -44,6 +45,11 @@ const pets=[];
 for(let n=0;n<21;n++)pets.push(await db.core.pet.create({data:{ownerId:users.owner.id,name:`P5 ${short} Pet ${String(n).padStart(2,'0')}`,species:n%2?'cat':'dog',breed:'Synthetic P5',allergies:[],qrToken:'p5_'+randomUUID().replaceAll('-',''),createdAt:new Date(startedAt.getTime()+n)}}));
 const counterPet=await db.core.pet.create({data:{ownerId:users.counter.id,name:`P5 ${short} Counter pet`,species:'dog',allergies:[]}});
 const otherPet=await db.core.pet.create({data:{ownerId:users.other.id,name:`P5 ${short} Other private pet`,species:'cat',allergies:[]}});
+let loadDataset;
+if(process.env.PHASE2_LOAD_RUN && process.env.PHASE2_LOAD_ACCOUNTS){
+  const {createDataset}=await import('../../benchmarks/phase2/dataset.mjs');
+  loadDataset=await createDataset(db,{run,hash,count:Number(process.env.PHASE2_LOAD_ACCOUNTS),anchor:startedAt});
+}
 const handles=[],ports={};
 process.stdout.write('P6 E2E UUID fixtures created\n');
 async function freePort(){const s=tcpServer().listen(0,'127.0.0.1');await once(s,'listening');const p=s.address().port;await new Promise(r=>s.close(r));return p;}
@@ -67,6 +73,7 @@ const workerEnv={JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:'',JWT_ISSUER:'',JWT_AUDIENCE
 await child('services/clinic/dist/worker.js',{...workerEnv,DATABASE_URL:urls.clinic,CORE_DIRECTORY_TOKEN:env.CORE_DIRECTORY_TOKEN,CORE_SERVICE_URL:origins.core,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run,OUTBOX_AGGREGATE_ID:run});
 await child('services/notification/dist/worker.js',{...workerEnv,DATABASE_URL:urls.notification,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run});
 const fixture={run,password,admin:{id:users.admin.id,username:users.admin.username,fullName:users.admin.fullName},owner:{id:users.owner.id,email:users.owner.email,fullName:users.owner.fullName},other:{id:users.other.id,email:users.other.email,fullName:users.other.fullName},counter:{id:users.counter.id,fullName:users.counter.fullName},pets:pets.map(p=>({id:p.id,name:p.name,qrToken:p.qrToken})),counterPetId:counterPet.id,otherPetId:otherPet.id,origins};
+if(loadDataset)Object.assign(fixture,{loadAccounts:loadDataset.accounts,dataset:loadDataset.description});
 writeFileSync(resolve(fixtureDir,'p5-e2e-fixture.json'),JSON.stringify(fixture,null,2));
 const controlPath=resolve(fixtureDir,'p5-e2e-controls.json');writeFileSync(controlPath,JSON.stringify({run}));
 function control(){try{const c=JSON.parse(readFileSync(controlPath,'utf8'));return c.run===run?c:{};}catch{return{};}}
@@ -127,11 +134,19 @@ export async function shutdown(){
     while(loopBusy)await new Promise(r=>setTimeout(r,100));
     await waitForQueueIdle([routes.clinic,routes.notification]);
   }catch(error){failure=error;process.stdout.write('P5 queues retained for failure diagnosis\n');}
-  await new Promise(r=>server.close(r));for(const h of handles.reverse())await h.stop();
-  assert.ok(handles.every(h=>!/postgresql:\/\/|amqp:\/\/|BEGIN PRIVATE KEY|p2_\w+_fixture_only/.test(h.logs())),'P5 worker credential log leak');
-  const conn=await amqp.connect(broker),channel=await conn.createChannel();
-  for(const name of [routes.clinic,routes.notification,routes.clinic+'.dlq',routes.notification+'.dlq']){const q=await channel.checkQueue(name);if(!failure&&q.messageCount===0&&q.consumerCount===0)await channel.deleteQueue(name);}
-  await channel.close();await conn.close();await Promise.all(Object.values(db).map(client=>client.$disconnect()));
+  await new Promise(r=>server.close(r));
+  try{await drainHandles(handles);}catch(error){failure??=error;}
+  try{assert.ok(handles.every(h=>!/postgresql:\/\/|amqp:\/\/|BEGIN PRIVATE KEY|p2_\w+_fixture_only/.test(h.logs())),'P5 worker credential log leak');}catch(error){failure??=error;}
+  let conn,channel;
+  try{
+    conn=await amqp.connect(broker);channel=await conn.createChannel();
+    for(const name of [routes.clinic,routes.notification,routes.clinic+'.dlq',routes.notification+'.dlq']){const q=await channel.checkQueue(name);if(!failure&&q.messageCount===0&&q.consumerCount===0)await channel.deleteQueue(name);}
+  }catch(error){failure??=error;}
+  finally{
+    await channel?.close().catch(error=>{failure??=error;});await conn?.close().catch(error=>{failure??=error;});
+    const disconnected=await Promise.allSettled(Object.values(db).map(client=>client.$disconnect()));
+    for(const result of disconnected)if(result.status==='rejected')failure??=result.reason;
+  }
   if(failure)throw failure;
 }
 for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>void shutdown().then(()=>process.exit(0)).catch(()=>process.exit(1)));

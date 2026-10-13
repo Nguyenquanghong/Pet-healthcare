@@ -19,6 +19,7 @@ import { PrismaUserRepository } from '../infrastructure/persistence/userReposito
 import { PrismaOwnerActivationRepository } from '../infrastructure/persistence/ownerActivationRepository.js';
 import { activationTokenAdapter } from '../infrastructure/security/activationToken.js';
 import { passwordAdapter, tokenAdapter } from '../infrastructure/security/authAdapters.js';
+import { currentAccount } from './currentAccount.js';
 
 // Keep the user's app.ts intact. This composition owns the split service route
 // and the private Core authorization endpoint before mounting existing domains.
@@ -42,6 +43,7 @@ export function createCoreApp(db: PrismaClient, config: {notificationUrl?:string
     if(!config.clinicUrl||!config.notificationUrl)throw new Error('SPLIT_SERVICE_URLS_REQUIRED');
   }
   const runtime=coreRuntime(db);runtime?.install(app);
+  app.use('/api',currentAccount(db));
   if(runtime)app.use('/api/auth',createAuthRouter(new AuthService({users:new PrismaUserRepository(db),passwords:passwordAdapter,tokens:tokenAdapter}),new OwnerActivationService(new PrismaOwnerActivationRepository(db),activationTokenAdapter,passwordAdapter)));
   mountDirectory(app,db,config.directoryToken??config.clinicToken);
   if(config.clinicUrl&&(!jwt?.privateKey||!config.clinicToken||config.clinicToken.length<32||config.clinicToken.length>512))throw new Error('SPLIT_CLINIC_CONFIGURATION_REQUIRED');
@@ -91,6 +93,10 @@ export function createCoreApp(db: PrismaClient, config: {notificationUrl?:string
       const response = await fetch(url, { method: req.method, headers, body, redirect: 'error', signal: AbortSignal.timeout(4000) });
       // Never expose the downstream URL, internal credentials or transport error.
       if(res.writableEnded)return;
+      for (const name of ['retry-after', 'x-service-degraded', 'x-service-instance']) {
+        const value = response.headers.get(name);
+        if (value) res.setHeader(name, name === 'x-service-instance' ? 'notification:' + value : value);
+      }
       if (response.status === 204) { res.status(204).end(); return; }
       res.status(response.status).json(await response.json());
     } catch { if(!res.headersSent)res.status(503).json({ error: 'Notification service unavailable. Retry the same request key.' }); }

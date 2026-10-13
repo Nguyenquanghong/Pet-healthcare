@@ -1,3 +1,4 @@
+import { notificationOutbox } from "./notification-outbox-helper.mjs";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
@@ -58,7 +59,7 @@ try {
   const reports = await Promise.all(Array.from({ length: 6 }, () => req(path + "/transfer-report", ownerToken, "POST", { reference: "DEMO-TXN" })));
   assert.ok(reports.every(r => r.status === 200 && r.body.invoice.paymentStatus === "unpaid"));
   assert.equal(new Set(reports.map(r => r.body.invoice.transferReportedAt)).size, 1);
-  assert.equal(await db.notification.count({ where: { type: "transfer_reported", message: { contains: invoice.invoiceCode } } }), 1);
+  assert.equal(await notificationOutbox(db).count({ where: { type: "transfer_reported", message: { contains: invoice.invoiceCode } } }), 1);
   assert.equal((await req(path + "/onsite", ownerToken, "PATCH")).status, 409);
   assert.equal((await req(path + "/pay", ownerToken, "PATCH", { paymentMethod: "bank_transfer" })).status, 403);
   assert.equal((await req(path + "/pay", staffToken, "PATCH", { paymentMethod: "cash" })).status, 409);
@@ -89,7 +90,7 @@ try {
   const paid = payments[0].body.invoice;
   assert.equal(paid.paymentChannel, "bank_transfer");
   assert.equal(paid.transferReviewStatus, "confirmed");
-  assert.equal(await db.notification.count({ where: { recipientOwnerId: owner.id, type: "invoice_paid" } }), 1);
+  assert.equal(await notificationOutbox(db).count({ where: { recipientOwnerId: owner.id, type: "invoice_paid" } }), 1);
   const audit = await req(path + "/payment-history", staffToken);
   assert.equal(audit.status, 200);
   assert.equal(audit.body.length, 4);

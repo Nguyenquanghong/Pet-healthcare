@@ -1,3 +1,4 @@
+import { notificationOutbox } from "./notification-outbox-helper.mjs";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
@@ -76,39 +77,39 @@ try {
     assert.ok(results.filter(result => result.status === 409).every(result => typeof result.body.error === "string"));
     const stored = await prisma.appointment.findMany({ where: { petId: pet.id, appointmentDate: new Date(`${date}T00:00:00.000Z`), appointmentTime: "10:00" } });
     assert.equal(stored.length, 1);
-    assert.equal(await prisma.notification.count({ where: { type: "appointment_created", relatedAppointmentId: stored[0].id } }), 1);
+    assert.equal(await notificationOutbox(prisma).count({ where: { type: "appointment_created", relatedAppointmentId: stored[0].id } }), 1);
     summary.race.push({ date, dispatched: 50, ...counts, stored: stored.length, notifications: 1, elapsedMs: Math.round(performance.now() - started) });
   }
 
   const first = await create(pet.id, "2099-01-13");
   const occupied = await create(pet.id, "2099-01-14");
-  const notificationsBeforeReschedule = await prisma.notification.count({ where: { relatedAppointmentId: first.id } });
+  const notificationsBeforeReschedule = await notificationOutbox(prisma).count({ where: { relatedAppointmentId: first.id } });
   const collision = await request(`/api/appointments/${first.id}/reschedule`, "PATCH", token, { date: "2099-01-14", time: "10:00" });
   assert.equal(collision.status, 409, JSON.stringify(collision.body));
   assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: first.id } })).appointmentDate.toISOString().slice(0, 10), "2099-01-13");
-  assert.equal(await prisma.notification.count({ where: { relatedAppointmentId: first.id } }), notificationsBeforeReschedule);
+  assert.equal(await notificationOutbox(prisma).count({ where: { relatedAppointmentId: first.id } }), notificationsBeforeReschedule);
   assert.equal((await request(`/api/appointments/${first.id}/reschedule`, "PATCH", token, { date: "2099-01-13", time: "10:00" })).status, 200, "self-reschedule");
   summary.scenarios.push("reschedule collision 409 atomic; self-reschedule 200");
 
   const contenderA = await create(pet.id, "2099-01-22", "09:00");
   const contenderB = await create(pet.id, "2099-01-23", "09:00");
-  const beforeMove = Object.fromEntries(await Promise.all([contenderA, contenderB].map(async item => [item.id, await prisma.notification.count({ where: { relatedAppointmentId: item.id } })])));
+  const beforeMove = Object.fromEntries(await Promise.all([contenderA, contenderB].map(async item => [item.id, await notificationOutbox(prisma).count({ where: { relatedAppointmentId: item.id } })])));
   const moves = await Promise.all([contenderA, contenderB].map(item => request(`/api/appointments/${item.id}/reschedule`, "PATCH", token, { date: "2099-01-24", time: "11:00" })));
   assert.deepEqual(moves.map(result => result.status).sort(), [200, 409]);
   assert.equal(await prisma.appointment.count({ where: { petId: pet.id, appointmentDate: new Date("2099-01-24T00:00:00.000Z"), appointmentTime: "11:00" } }), 1);
   const loser = moves[0].status === 409 ? contenderA : contenderB;
   const winner = moves[0].status === 200 ? contenderA : contenderB;
   assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: loser.id } })).appointmentDate.toISOString().slice(0, 10), loser.date);
-  assert.equal(await prisma.notification.count({ where: { relatedAppointmentId: loser.id } }), beforeMove[loser.id]);
-  assert.equal(await prisma.notification.count({ where: { relatedAppointmentId: winner.id } }), beforeMove[winner.id] + 1);
+  assert.equal(await notificationOutbox(prisma).count({ where: { relatedAppointmentId: loser.id } }), beforeMove[loser.id]);
+  assert.equal(await notificationOutbox(prisma).count({ where: { relatedAppointmentId: winner.id } }), beforeMove[winner.id] + 1);
   summary.scenarios.push("concurrent reschedule into empty slot: one 200, one 409, loser unchanged and no notification");
 
   assert.equal((await request(`/api/appointments/${occupied.id}/cancel`, "PATCH", token, {})).status, 200);
   const replacement = await create(pet.id, "2099-01-14");
-  const beforeStatus = await prisma.notification.count({ where: { relatedAppointmentId: occupied.id } });
+  const beforeStatus = await notificationOutbox(prisma).count({ where: { relatedAppointmentId: occupied.id } });
   assert.equal((await request(`/api/appointments/${occupied.id}/status`, "PATCH", staffToken, { status: "confirmed" })).status, 409);
   assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: occupied.id } })).status, "cancelled");
-  assert.equal(await prisma.notification.count({ where: { relatedAppointmentId: occupied.id } }), beforeStatus);
+  assert.equal(await notificationOutbox(prisma).count({ where: { relatedAppointmentId: occupied.id } }), beforeStatus);
   assert.equal((await request(`/api/appointments/${replacement.id}/status`, "PATCH", staffToken, { status: "confirmed" })).status, 200);
   assert.equal((await request(`/api/appointments/${replacement.id}/status`, "PATCH", staffToken, { status: "no_show" })).status, 200);
   await create(pet.id, "2099-01-14");
@@ -117,7 +118,7 @@ try {
   summary.scenarios.push("cancelled/no_show slot reuse; reactivation collision 409 atomic; another pet and another time allowed");
 
   const medicalInput = (petId, appointmentId) => ({ petId, appointmentId, doctorName: "Fix doctor", visitDate: "2099-01-14", title: "Fix record", diagnosis: "Checked", treatment: "Observe" });
-  const baseline = async () => ({ records: await prisma.medicalRecord.count(), notifications: await prisma.notification.count({ where: { type: "medical_record_updated" } }) });
+  const baseline = async () => ({ records: await prisma.medicalRecord.count(), notifications: await notificationOutbox(prisma).count({ where: { type: "medical_record_updated" } }) });
   const siblingAppointment = await create(sibling.id, "2099-01-19");
   const foreignAppointment = await prisma.appointment.create({ data: { petId: foreign.id, ownerId: otherOwner.id, type: "general_checkup", serviceName: "Foreign", clinicName: "Test", appointmentDate: new Date("2099-01-20T00:00:00.000Z"), appointmentTime: "10:00", createdBy: "owner" } });
   for (const [name, id, expected] of [["missing", "nonexistent-id", 404], ["same owner other pet", siblingAppointment.id, 422], ["other owner", foreignAppointment.id, 422]]) {

@@ -12,6 +12,10 @@
     "packages/runtime"
   ],
   "scripts": {
+    "test:docker:phase2": "node tools/docker/test-notifications.mjs --phase2",
+    "docker:prepare-phase2": "node tools/docker/prepare-phase2.mjs",
+    "test:docker:notifications": "node tools/docker/test-notifications.mjs",
+    "docker:prepare-notifications": "node tools/docker/prepare-notifications.mjs",
     "dev": "concurrently -n frontend,backend -c cyan,green \"npm run dev -w frontend\" \"npm run dev -w backend\"",
     "dev:frontend": "npm run dev -w frontend",
     "dev:backend": "npm run dev -w backend",
@@ -41,8 +45,9 @@
     "phase2:test:migration": "node tools/phase2/run-proof.mjs --migration",
     "phase2:verify:clean-local": "node tools/phase2/clean-local.mjs",
     "phase2:handoff:package": "node tools/phase2/create-handoff.mjs",
+    "phase2:handoff:integrity": "node tools/phase2/verify-handoff-integrity.mjs",
     "phase2:handoff:verify": "node tools/phase2/verify-handoff.mjs",
-    "phase2:test:source": "node --test tools/phase2/source-provenance.test.mjs"
+    "phase2:test:source": "node --test tools/phase2/source-provenance.test.mjs tools/phase2/drain-handles.test.mjs"
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",

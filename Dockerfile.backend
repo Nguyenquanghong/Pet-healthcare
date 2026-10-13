@@ -36,6 +36,31 @@ COPY --from=build /work/packages/messaging/dist ./packages/messaging/dist
 COPY --from=build /work/packages/runtime/package.json ./packages/runtime/package.json
 COPY --from=build /work/packages/runtime/dist ./packages/runtime/dist
 COPY --from=build /work/backend/dist /work/backend/dist
+COPY tools/docker/core-local-start.mjs tools/docker/core-local-start.mjs
 USER node
 EXPOSE 5000
 CMD ["node", "backend/dist/src/index.js"]
+
+# Notification uses the same dependency versions as Core. Reuse the build layer
+# rather than downloading a second node_modules tree for the local composition.
+FROM build AS notification-build
+COPY services/notification services/notification
+COPY tools/phase2/copy-client.mjs tools/phase2/copy-client.mjs
+RUN npm run build --workspace @nipopeto/notification
+
+FROM runtime AS notification-runtime
+COPY --from=notification-build /work/services/notification/package.json ./services/notification/package.json
+COPY --from=notification-build /work/services/notification/dist ./services/notification/dist
+EXPOSE 5102
+CMD ["node", "services/notification/dist/index.js"]
+
+FROM build AS clinic-build
+COPY services/clinic services/clinic
+COPY tools/phase2/copy-client.mjs tools/phase2/copy-client.mjs
+RUN npm run build --workspace @nipopeto/clinic
+
+FROM runtime AS clinic-runtime
+COPY --from=clinic-build /work/services/clinic/package.json ./services/clinic/package.json
+COPY --from=clinic-build /work/services/clinic/dist ./services/clinic/dist
+EXPOSE 5101
+CMD ["node", "services/clinic/dist/index.js"]

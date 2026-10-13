@@ -1,3 +1,4 @@
+import { notificationOutbox } from "./notification-outbox-helper.mjs";
 import assert from "node:assert/strict";
 import { randomUUID, randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
@@ -93,11 +94,11 @@ try {
   const paid = await db.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
   assert.equal(paid.paymentStatus, "paid"); assert.equal(paid.paymentMethod, "vnpay");
   assert.ok(paid.paidAt);
-  assert.equal(await db.notification.count({ where: { recipientOwnerId: owner.id, type: "invoice_paid" } }), 1);
+  assert.equal(await notificationOutbox(db).count({ where: { recipientOwnerId: owner.id, type: "invoice_paid" } }), 1);
   // A contradictory late success must be flagged, never silently discarded or charged again.
   assert.equal((await ipn(callback(reference, { vnp_TransactionNo: "123456790" }))).body.RspCode, "00");
   assert.equal((await db.paymentAttempt.findUniqueOrThrow({ where: { id: reference } })).status, "review");
-  const notice = await db.notification.findFirstOrThrow({ where: { type: "payment_review", message: { contains: reference } } });
+  const notice = await notificationOutbox(db).findFirstOrThrow({ where: { type: "payment_review", message: { contains: reference } } });
   notices.push(notice.id);
   assert.equal((await db.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).paidAt.toISOString(), paid.paidAt.toISOString());
   assert.equal((await req("/invoices", otherToken)).body.items.length, 0);
@@ -110,14 +111,14 @@ try {
   assert.equal((await ipn(callback(late, { vnp_Amount: "70000000", vnp_ResponseCode: "24", vnp_TransactionStatus: "02", vnp_TransactionNo: "0" }))).body.RspCode, "00");
   assert.equal((await req(`/invoices/${hotel.id}/onsite`, ownerToken, "PATCH")).status, 200);
   assert.equal((await ipn(callback(late, { vnp_Amount: "70000000", vnp_TransactionNo: "123456791" }))).body.RspCode, "00");
-  const lateNotice = await db.notification.findFirstOrThrow({ where: { type: "payment_review", message: { contains: late } } });
+  const lateNotice = await notificationOutbox(db).findFirstOrThrow({ where: { type: "payment_review", message: { contains: late } } });
   notices.push(lateNotice.id);
   assert.equal((await req(`/invoices/${hotel.id}/pay`, staffToken, "PATCH", { paymentMethod: "cash" })).status, 409);
   assert.equal((await req(`/payments/${hotel.id}/vnpay`, ownerToken, "POST")).status, 409);
   console.log("VNPay integration PASS: itemized charges, fixed checkout, ownership, onsite, concurrent attempts, signed callbacks, amount/merchant checks, browser return read-only, failed retry, pending expiry lock, concurrent IPN exactly once, late success review, stored hotel price.");
 } finally {
   if (server) await new Promise(resolve => server.close(resolve));
-  await db.notification.deleteMany({ where: { id: { in: notices } } });
+  await db.outboxEvent.deleteMany({ where: { id: { in: notices } } }); // only this test's captured event IDs
   await db.invoice.deleteMany({ where: { ownerId: { in: userIds } } });
   await db.user.deleteMany({ where: { id: { in: userIds } } });
   await db.$disconnect();

@@ -1,6 +1,29 @@
 # Pet Healthcare (NIPOPETO)
 
-Ứng dụng quản lý thú cưng, lịch khám và Spa, lưu trú khách sạn, hồ sơ y tế, hóa đơn và thông báo. `frontend/` dùng React, TypeScript và Vite; `backend/` là một ứng dụng Express chia module theo route → application service/port → infrastructure, dùng Prisma và PostgreSQL. Hai phần dùng chung npm workspace; đây chưa phải kiến trúc microservice.
+Ứng dụng quản lý thú cưng, lịch khám và Spa, lưu trú khách sạn, hồ sơ y tế, hóa đơn và thông báo. React/TypeScript/Express/Prisma/PostgreSQL được giữ nguyên. Pha 2 có Core, Clinic & Scheduling và Notification, mỗi service sở hữu database/client riêng; các mục Pha 1 bên dưới mô tả baseline lịch sử. Mã mới nằm trong checkpoint và working tree hiện tại; không giả định clone `main` sẽ có các thay đổi chưa push.
+
+## Chạy local đủ ba service pha 2
+
+`docker-compose.phase2.yml` bổ sung Clinic API/worker/DB/migration, worker hóa đơn Core và Redis vào Compose gốc; bật strict runtime và scoped credentials. Đây là chế độ local trên **storage mới**. Không dùng lệnh này để chuyển dữ liệu đang dùng: cần backup/restore, nhập dữ liệu và đối soát theo [runbook P7](deploy/phase2/migration-runtime.md). Entry point từ chối nếu Core còn notification, lịch, bệnh án, ảnh hoặc lịch sử appointment cũ; không xóa dữ liệu để vượt chốt.
+
+Sau khi có private env của môi trường mới với `POSTGRES_PASSWORD` và `DATABASE_URL` đúng:
+
+```powershell
+node tools/docker/prepare-phase2.mjs .env.docker
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.phase2.yml config --quiet
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.phase2.yml up --build -d
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.phase2.yml ps -a
+```
+
+Helper chỉ thêm nhóm khóa thiếu hoàn toàn; giữ nguyên khóa RSA/mật khẩu DB có sẵn, từ chối cấu hình dở dang và không đọc/ghi database. Nếu chưa có Node, chạy helper bằng image Node 24 như phần Docker bên dưới. API Core mở loopback; Clinic/Notification/Redis/broker không publish cổng. Frontend đi qua Core adapter; đây chưa phải gateway nhiều replica cho benchmark B2/B3. Strict mode không tin proxy headers khi chưa cấu hình CIDR, nên local dùng quota chung IP. Ba DB local có tài khoản bootstrap trên ba PostgreSQL riêng; cấu hình production phải dùng runtime role ít quyền theo P7.
+
+Kiểm toàn bộ wiring trên project UUID riêng, không đọc `.env.docker`:
+
+```powershell
+npm run test:docker:phase2
+```
+
+Test build image với cache, chạy migration trên volume mới, kiểm ownership, directory/outbox/inbox, hóa đơn/reservation, idempotency, quyền và guard cutover; tự stop project và giữ evidence/volume. Không chạy seed legacy trong chế độ này. Notebook tải: [hướng dẫn](benchmarks/phase2/README.md). Trạng thái và giới hạn nghiệm thu: [STATUS](phase2-plan/STATUS.md).
 
 ## Phạm vi và kiến trúc Pha 1
 
@@ -50,25 +73,26 @@ Thư mục sau khi clone cần có `Dockerfile.backend`, `Dockerfile.frontend`, 
 Trong `.env.docker`, điền `POSTGRES_PASSWORD`, `DATABASE_URL=postgresql://nipopeto:<cùng-mật-khẩu>@postgres:5432/nipopeto?schema=public` và `JWT_SECRET` ngẫu nhiên ít nhất 32 ký tự. Nếu mật khẩu chứa ký tự đặc biệt, phải URL encode trong `DATABASE_URL`. `postgres` là tên dịch vụ trong mạng Compose; không đổi thành `localhost`. Giữ file môi trường riêng ngoài Git; không gửi bí mật lên repository. Các cổng mặc định `5432`, `5000` và `5173` cần chưa bị ứng dụng khác sử dụng.
 
 ```powershell
+docker run --rm --mount "type=bind,source=$((Get-Location).Path),target=/work" --workdir /work node:24-bookworm-slim node tools/docker/prepare-notifications.mjs
 docker compose --env-file .env.docker config --quiet
 docker compose --env-file .env.docker up --build -d
 docker compose --env-file .env.docker ps -a
 Invoke-RestMethod http://localhost:5000/api/health
 ```
 
-Mở `http://localhost:5173`. Compose khởi động PostgreSQL, chạy `migrate` rồi khởi động API và frontend. `migrate` thoát mã 0 là bình thường. Frontend được build trong Docker và phục vụ bằng Nginx; `/api/` được chuyển tiếp tới API qua mạng Compose. Có thể đổi cổng giao diện bằng `FRONTEND_PORT` trong `.env.docker`; bản frontend Docker luôn gọi `/api` cùng địa chỉ web. Đặc tả API ở `http://localhost:5000/api/docs/` khi dùng cổng mặc định.
+Mở `http://localhost:5173`. Compose khởi động PostgreSQL Core, PostgreSQL Notification riêng, RabbitMQ, hai migration job, Core API/outbox relay, Notification API/worker và frontend. Migration job thoát mã 0 là bình thường. Frontend được build trong Docker và phục vụ bằng Nginx; `/api/` được chuyển tiếp tới API qua mạng Compose. Có thể đổi cổng giao diện bằng `FRONTEND_PORT` trong `.env.docker`; bản frontend Docker luôn gọi `/api` cùng địa chỉ web. Đặc tả API ở `http://localhost:5000/api/docs/` khi dùng cổng mặc định.
+
+`prepare-notifications.mjs` thêm khóa RSA và credential Notification/broker vào file riêng tư, giữ nguyên cấu hình DB đã có; chạy lại không đổi khóa. Các phiên HS256 cũ cần đăng nhập lại. Notification chỉ nhận public key, không nhận signing key. DB Notification và broker không publish cổng ra host. Root Compose này là cấu hình local chuyển tiếp: Clinic vẫn chạy trong Core; bộ ba service pha 2 đầy đủ được kiểm trong `phase2:verify`.
+
+Nếu máy đã có Node 24, có thể dùng `node tools/docker/prepare-notifications.mjs` thay cho lệnh `docker run` trên; công cụ chuẩn bị không cần `npm install`.
+
+Với DB đang dùng, **không chạy `up` để tự cutover**: kiểm backup và dữ liệu thông báo trước. Entry point local chặn khởi động nếu bảng Notification cũ còn bản ghi (`LOCAL_NOTIFICATION_MIGRATION_REQUIRED`); không xóa bảng/seed để vượt chặn. Cần quy trình chuyển dữ liệu đã đối soát trong `deploy/phase2/migration-runtime.md`. Với DB mới hoặc bảng thông báo cũ trống, các notification outbox pending được relay giao sang DB riêng sau khi API healthy. Không đổi lại writer cũ sau khi Notification đã nhận dữ liệu mới.
+
+Kiểm bản sửa bằng `node tools/docker/test-notifications.mjs`: tự tạo project UUID/volume thử riêng, build lại với cache, kiểm gửi/đọc/outbox/inbox và dừng đúng project đó; không đọc `.env.docker`, không seed/reset/xóa volumes. Artifacts ở `test-results/phase2/a01-*`. Kiểm này chưa khởi động frontend.
 
 Compose bật `TRUST_PROXY_HOPS=1` cho API để giới hạn đăng nhập theo địa chỉ người dùng qua Nginx. Nginx ghi lại các header proxy; cổng API trên host chỉ mở ở `127.0.0.1` để truy cập trực tiếp từ cùng máy. Khi truy cập từ máy khác, dùng cổng frontend và `/api/` qua Nginx. Backend chạy trực tiếp mặc định không tin header proxy.
 
-**Chỉ với database demo mới, trống và có thể bỏ**, tạo dữ liệu minh họa sau khi Compose khởi động thành công:
-
-```powershell
-docker compose --env-file .env.docker run --rm --no-deps migrate npm run db:seed --workspace @nipopeto/backend
-```
-
-Sau seed, đăng nhập chủ nuôi tại `/login` bằng `owner@example.com` / `owner123`; đăng nhập admin tại `/admin/login` bằng `admin` / `admin123`. Seed có hai thú cưng Mochi/Yuki, lịch khám/Spa, một bệnh án độc lập và một booking khách sạn; chưa có hóa đơn mẫu. Ngày dữ liệu mẫu cố định trong tháng 10–11/2026, nên dashboard hôm nay có thể trống.
-
-Không chạy seed trên dữ liệu thật hoặc để “sửa” dữ liệu demo cũ: seed cập nhật mật khẩu các tài khoản mẫu, còn các bản ghi thú cưng/lịch/bệnh án/booking dùng `update: {}` nên giữ nội dung đã tồn tại. Dừng ứng dụng bằng `docker compose --env-file .env.docker down`; lệnh này giữ volume database. Không dùng `down -v` nếu cần giữ dữ liệu.
+Seed `backend/prisma/seed.ts` là fixture Pha 1, không dùng để khởi tạo stack đã tách Notification hoặc Clinic: nó ghi bảng legacy và sẽ làm guard cutover từ chối lần khởi động tiếp theo. Test pha 2 tự tạo tài khoản/dữ liệu tổng hợp trong môi trường được đánh dấu; không sinh tài khoản admin mặc định trên database đang dùng. Dừng ứng dụng bằng `docker compose --env-file .env.docker stop` (thêm hai `-f` nếu dùng chế độ pha 2); giữ volume database. Không dùng `down -v` nếu cần giữ dữ liệu.
 
 ## Phân trang và tải theo màn hình (02/10/2026)
 

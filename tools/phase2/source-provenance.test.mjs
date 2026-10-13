@@ -4,7 +4,8 @@ import {createHash,randomUUID} from 'node:crypto';
 import {mkdirSync,writeFileSync,readFileSync,symlinkSync,unlinkSync,rmSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {resolve} from 'node:path';
-import {verifyBundle,readProvenance,manifestFile,hashValue,selectedSourceFiles} from './source-provenance.mjs';
+import {verifyBundle,readProvenance,manifestFile,hashValue,selectedSourceFiles,inScope,forbidden,sha256} from './source-provenance.mjs';
+import {baselineRevisions} from './baseline-revisions.mjs';
 
 const artifacts=resolve('test-results/phase2/source-guards-'+randomUUID());mkdirSync(artifacts,{recursive:true});
 const bytes=Buffer.from('{"private":true}\n'),hash=createHash('sha256').update(bytes).digest('hex');
@@ -12,6 +13,23 @@ function fixture(name,modify=()=>{}){const root=resolve(artifacts,name);mkdirSyn
 
 test('sealed source works without .git, Prisma clients or built dependencies and refuses a different published hash',()=>{
   const root=fixture('valid'),m=verifyBundle(root);assert.equal(readProvenance(root).provenanceKind,'verified-handoff-manifest');assert.equal(readProvenance(root).sourceBundleHash,m.sourceHash);assert.throws(()=>verifyBundle(root,'0'.repeat(64)),/SOURCE_HASH/);
+});
+
+test('Docker and load tools are in handoff scope but private env/data and old Kaggle notebooks remain excluded',()=>{
+  for(const path of ['Dockerfile.backend','docker-compose.yml','docker-compose.phase2.yml','.dockerignore','.env.docker.example','tools/docker/prepare-phase2.mjs','benchmarks/phase2/dataset.mjs'])assert.ok(inScope(path)&&!forbidden(path),path);
+  for(const path of ['.env.docker','backend/.env.docker.example','benchmarks/phase2/private.key'])assert.ok(forbidden(path),path);
+  assert.equal(inScope('benchmarks/kaggle/notebook.ipynb'),false);
+});
+
+test('reviewed baseline revisions pin old and new bytes without accepting future drift',()=>{
+  const root=resolve(artifacts,'baseline-revisions'),path='README.md',before=sha256('old'),after=sha256('reviewed');
+  mkdirSync(resolve(root,'phase2-plan/evidence'),{recursive:true});writeFileSync(resolve(root,path),'reviewed');
+  const baseline=[{path,sha256:before,included:true}];
+  assert.throws(()=>baselineRevisions(root,baseline),/ORIGINAL_LOCAL_CHANGED/);
+  const revisions=resolve(root,'phase2-plan/evidence/baseline-revisions.json');
+  writeFileSync(revisions,JSON.stringify([{path,originalSha256:before,currentSha256:after,reason:'Explicitly reviewed later documentation fix.'}]));
+  const result=baselineRevisions(root,baseline);assert.equal(result[0].sha256,before);assert.equal(result[0].currentSha256,after);
+  writeFileSync(resolve(root,path),'unexpected future edit');assert.throws(()=>baselineRevisions(root,baseline),/ORIGINAL_LOCAL_CHANGED/);
 });
 test('changed or missing source bytes are rejected before a migration receives provenance',()=>{
   const changed=fixture('changed');writeFileSync(resolve(changed,'package.json'),'{"private":false}\n');assert.throws(()=>readProvenance(changed),/FILE_DRIFT/);

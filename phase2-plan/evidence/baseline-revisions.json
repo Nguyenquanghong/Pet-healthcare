@@ -1,0 +1,20 @@
+[
+  {
+    "path": "Dockerfile.frontend",
+    "originalSha256": "eed2d790b82b820776c21d66dba15af6dd4bddcde8e6fff9005d15cbff7b1669",
+    "currentSha256": "5406dbc045cc06e198da0023f75703d85166386f68134c3e64822afb7942552f",
+    "reason": "Authorized Docker build fix committed in 18c1788320504df10256c9bf02cecddd36515ef4; original bytes retained in checkpoint 41d8a72."
+  },
+  {
+    "path": "README.md",
+    "originalSha256": "18a61fb2b4ff02858a0f9ed2aa4b159d5a23bf661d3884acc412337447cfa118",
+    "currentSha256": "c045ea844ed32b9ebd0484f8b16943e545e2c307630308fc07c66aa065e9fb6f",
+    "reason": "Authorized Docker/phase2 instructions updated to match verified service wiring and avoid legacy seed in split mode."
+  },
+  {
+    "path": "docker-compose.yml",
+    "originalSha256": "1fe2228101da01edfa5729695904866f083871d4ef0c5c2bc584686d876b2dba",
+    "currentSha256": "cf69d225da30c7e6b07417498b6467eaed7b4112125e9855f0acc818415bc2c3",
+    "reason": "Authorized A01 Notification split wiring, isolated Docker regression passed; original baseline retained in local-changes.md."
+  }
+]

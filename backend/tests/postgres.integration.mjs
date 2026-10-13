@@ -1,3 +1,4 @@
+import { notificationOutbox } from "./notification-outbox-helper.mjs";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
@@ -153,7 +154,12 @@ try {
   const report = await request(`/api/public/pets/${marker}/rescue-reports`, "POST", undefined, { finderPhone: "000", location: "Test park" });
   assert.equal(report.status, 201);
   assert.equal(await prisma.rescueReport.count({ where: { petId: pet.id } }), 1);
-  assert.equal(await prisma.notification.count({ where: { recipientOwnerId: owner.id, type: "pet_rescue_report" } }), 1);
+  assert.equal(await notificationOutbox(prisma).count({ where: { recipientOwnerId: owner.id, type: "pet_rescue_report" } }), 1);
+  // This legacy factory still exposes archived inbox CRUD. Seed its read fixture
+  // explicitly; production delivery is covered by phase2 notification-runtime
+  // and the root Compose regression, never by a test-only runtime writer.
+  const event = await notificationOutbox(prisma).findFirstOrThrow({where:{recipientOwnerId:owner.id,type:"pet_rescue_report"}});
+  await prisma.notification.create({data:{id:event.notificationId,recipientOwnerId:owner.id,type:event.type,title:event.title,message:event.message}});
   const inbox = await request("/api/notifications", "GET", login.body.token);
   assert.equal(inbox.status, 200);
   assert.ok(Array.isArray(inbox.body.items));
@@ -161,7 +167,7 @@ try {
   assert.ok(rescueNotification, "rescue notification must appear in owner inbox");
   assert.equal((await request(`/api/notifications/${rescueNotification.id}`, "DELETE", login.body.token)).status, 204);
   assert.equal(await prisma.notification.count({ where: { id: rescueNotification.id } }), 0);
-  console.log("PostgreSQL integration PASS: four real rollback adapters; owner/staff login; appointments create/reschedule/status; medical record + completed appointment + delete; hotel pricing/status/care/cancel; bootstrap/invoices; rescue + inbox DELETE; auth 401/403.");
+  console.log("PostgreSQL integration PASS: four real rollback adapters; owner/staff login; appointments create/reschedule/status; medical record + completed appointment + delete; hotel pricing/status/care/cancel; bootstrap/invoices; rescue outbox + archived inbox fixture DELETE; auth 401/403.");
 } finally {
   if (server) await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   if (owner) {
