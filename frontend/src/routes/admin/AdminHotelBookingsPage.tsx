@@ -101,7 +101,7 @@ export function AdminHotelBookingsPage() {
     });
   };
 
-  const list = usePagedList<HotelBooking>("/hotel-bookings", { q: searchQuery, status: tab, roomType: roomTypeFilter });
+  const list = usePagedList<HotelBooking>("/hotel-bookings", { q: searchQuery, status: tab, roomType: roomTypeFilter }, true, { pollMs: 5000 });
   const hotelBookings = list.items, filteredBookings = hotelBookings, pets = list.related.pets, owners = list.related.owners;
   const invoices = list.related.invoices, invoiceLoadError = list.error;
   const careList = usePagedList<DailyCareNote>("/hotel-care-notes", { bookingId: careHistoryModal?.id }, Boolean(careHistoryModal));

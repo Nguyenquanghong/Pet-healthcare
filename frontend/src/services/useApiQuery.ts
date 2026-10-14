@@ -27,7 +27,8 @@ export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, re
     const active = new AbortController(); controller.current = active;
     const request = ++sequence.current;
     const isCurrent = () => mounted.current && request === sequence.current && key === currentKey.current && token === authToken.get();
-    setState(previous => ({ key, data: previous.key === key ? previous.data : undefined, asOf: previous.key === key ? previous.asOf : undefined, loading: true, error: "" }));
+    setState(previous => ({ key, data: previous.key === key ? previous.data : undefined, asOf: previous.key === key ? previous.asOf : undefined,
+      loading: previous.key !== key || previous.data === undefined, error: "" }));
     const promise = (async () => {
       try {
         const result = await apiClient.get<T>(url, { signal: AbortSignal.any([active.signal, AbortSignal.timeout(15_000)]) });
@@ -85,8 +86,8 @@ export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, re
       running = false; schedule();
     };
     const resume = () => { if (document.visibilityState === 'visible' && navigator.onLine) { window.clearTimeout(next); void tick(); } };
-    schedule(); window.addEventListener('online', resume); document.addEventListener('visibilitychange', resume);
-    return () => { stopped = true; window.clearTimeout(next); window.removeEventListener('online', resume); document.removeEventListener('visibilitychange', resume); };
+    schedule(); window.addEventListener('online', resume); window.addEventListener('focus', resume); document.addEventListener('visibilitychange', resume);
+    return () => { stopped = true; window.clearTimeout(next); window.removeEventListener('online', resume); window.removeEventListener('focus', resume); document.removeEventListener('visibilitychange', resume); };
   }, [enabled, pollMs, key, load]);
 
   const setData = useCallback((change: T | ((previous: T | undefined) => T | undefined)) => {

@@ -6,9 +6,9 @@ import type { Appointment } from '../types/appointment';
 import type { MedicalRecord } from '../types/medicalRecord';
 type CoreRegion = { asOf: string; pets: Pet[]; owners: Owner[]; hotelBookings: HotelBooking[]; summary: { totals: Record<string,number>; species: Record<string,number>; hotelStatus: Record<string,number> } };
 type ClinicRegion = { asOf: string; pets: Pet[]; owners: Owner[]; appointments: Appointment[]; medicalRecords: MedicalRecord[]; summary: { totals: Record<string,number>; appointmentStatus: Record<string,number>; todayAppointments: number } };
-export function useDashboard() {
-  const core = useApiQuery<CoreRegion>('/dashboard/core', { refreshOnTick: true });
-  const clinic = useApiQuery<ClinicRegion>('/dashboard/clinic', { refreshOnTick: true });
+export function useDashboard(pollMs?: number) {
+  const core = useApiQuery<CoreRegion>('/dashboard/core', { refreshOnTick: true, pollMs });
+  const clinic = useApiQuery<ClinicRegion>('/dashboard/clinic', { refreshOnTick: true, pollMs });
   const pets = [...new Map([...(core.data?.pets??[]),...(clinic.data?.pets??[])].map(pet=>[pet.id,pet])).values()];
   const owners = [...new Map([...(core.data?.owners??[]),...(clinic.data?.owners??[])].map(owner=>[owner.id,owner])).values()];
   return { core, clinic, pets, owners, ownerPets: core.data?.pets??[], appointments: clinic.data?.appointments??[], hotelBookings:core.data?.hotelBookings??[],medicalRecords:clinic.data?.medicalRecords??[],

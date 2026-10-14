@@ -68,7 +68,10 @@ try{
     assert.equal(connected,false,'Cross-service CONNECT must fail');
   }
   const password=randomBytes(24).toString('hex'),hash=await hashPasswordAsync(password);
-  const dataset=await createDataset(db,{run:context.run,hash,count:context.accounts,anchor:new Date()});
+  const profile=context.datasetProfile??'deep';
+  assert.ok(['deep','pcn'].includes(profile));
+  const makeDataset=profile==='pcn'?(await import('./pcn_dataset.mjs')).createPcnDataset:createDataset;
+  const dataset=await makeDataset(db,{run:context.run,hash,count:context.accounts,anchor:new Date()});
   const admin=await db.core.user.create({data:{id:randomUUID(),username:'p8_'+context.run,fullName:'Synthetic benchmark admin',role:'admin',...hash}});
   const keys=generateKeyPairSync('rsa',{modulusLength:2048});
   const privateKey=keys.privateKey.export({type:'pkcs8',format:'pem'}).toString();

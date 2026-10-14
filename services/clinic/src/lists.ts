@@ -31,7 +31,7 @@ export async function list(db:PrismaClient,resource:Resource,actor:Actor,directo
       const where:Prisma.AppointmentWhereInput={AND:[base,...(q.statusGroup?[{status:{in:groups[q.statusGroup as string]}}]:[]),...(q.status?[{status:q.status as AppointmentStatus}]:[])]};
       counts=Object.fromEntries((await tx.appointment.groupBy({by:['status'],where:base,_count:true})).map(g=>[g.status,g._count]));
       counts.billingHeld=await tx.appointment.count({where:{...base,reservations:{some:{state:'HELD'}}}});
-      total=await tx.appointment.count({where});appointments=await tx.appointment.findMany({where,...bounds,orderBy:[{status:'asc'},{appointmentDate:'desc'},{appointmentTime:'desc'},{id:'desc'}]});
+      total=await tx.appointment.count({where});appointments=await tx.appointment.findMany({where,...bounds,orderBy:actor.role==='owner'?[{status:'asc'},{appointmentDate:'desc'},{appointmentTime:'desc'},{id:'desc'}]:[{status:'asc'},{createdAt:'desc'},{id:'desc'}]});
     }else if(resource==='medicalRecords'){
       const where:Prisma.MedicalRecordWhereInput={...scope,...identity,...(q.q?{OR:[...joined,text('title'),text('doctorName'),text('diagnosis')]}:{})};
       total=await tx.medicalRecord.count({where});records=await tx.medicalRecord.findMany({where,...bounds,orderBy:[{visitDate:'desc'},{id:'desc'}]});appointments=await tx.appointment.findMany({where:{id:{in:records.flatMap(r=>r.appointmentId?[r.appointmentId]:[])},...(ownerId?{ownerId}:{})}});

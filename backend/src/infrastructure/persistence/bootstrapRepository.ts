@@ -36,7 +36,7 @@ export class PrismaBootstrapRepository implements BootstrapRepository {
         if (isAdmin) {
           const [todayRows, pendingRows] = this.skipClinic?[[],[]]:await Promise.all([
             tx.appointment.findMany({ where: { appointmentDate: today }, take: 5, orderBy: [{ appointmentTime: "asc" }, { id: "asc" }] }),
-            tx.appointment.findMany({ where: { status: "pending" }, take: 3, orderBy: [{ appointmentDate: "asc" }, { id: "asc" }] }),
+            tx.appointment.findMany({ where: { status: "pending" }, take: 3, orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),
           ]);
           data.appointments = [...new Map([...todayRows, ...pendingRows].map(row => [row.id, row])).values()];
           const [pending, active] = await Promise.all([

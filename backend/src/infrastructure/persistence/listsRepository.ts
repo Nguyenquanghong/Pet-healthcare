@@ -42,7 +42,8 @@ export class PrismaListsRepository implements ListsRepository {
         const where: Prisma.AppointmentWhereInput = { AND: [base, ...(query.statusGroup ? [{ status: { in: groupStatuses[query.statusGroup] } }] : []), ...(query.status ? [{ status: query.status as AppointmentStatus }] : [])] };
         const groups = await tx.appointment.groupBy({ by: ["status"], where: base, _count: true });
         counts = Object.fromEntries(groups.map(group => [group.status, group._count]));
-        [total, data.appointments] = await Promise.all([tx.appointment.count({ where }), tx.appointment.findMany({ where, ...bounds, orderBy: [{ status: "asc" }, { appointmentDate: "desc" }, { appointmentTime: "desc" }, { id: "desc" }] })]);
+        [total, data.appointments] = await Promise.all([tx.appointment.count({ where }), tx.appointment.findMany({ where, ...bounds,
+          orderBy: scope.ownerId ? [{ status: "asc" }, { appointmentDate: "desc" }, { appointmentTime: "desc" }, { id: "desc" }] : [{ status: "asc" }, { createdAt: "desc" }, { id: "desc" }] })]);
       } else if (resource === "hotelBookings") {
         const base: Prisma.HotelBookingWhereInput = { ...owner, ...identity,
           ...(query.roomType ? { roomType: query.roomType as RoomType } : {}),

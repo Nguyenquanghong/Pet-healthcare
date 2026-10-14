@@ -81,7 +81,7 @@ export function AdminNotificationsPage() {
   const sending = useRef(false);
   const sendRequest = useRef<{ fingerprint: string; key: string } | null>(null);
 
-  const list = usePagedList<Notification>("/notifications", {}, activeTab === "inbox");
+  const list = usePagedList<Notification>("/notifications", {}, activeTab === "inbox", { pollMs: 5000 });
   const adminNotifications = list.items;
   const unread = useNotificationCount();
   const unreadAdminCount = unread.error ? null : unread.data?.unread ?? null;

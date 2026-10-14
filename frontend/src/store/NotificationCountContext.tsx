@@ -6,7 +6,7 @@ type Value = ReturnType<typeof useApiQuery<Count>>;
 const Context = createContext<Value | null>(null);
 export function NotificationCountProvider({ children }: { children: ReactNode }) {
   const { authRole } = useSession();
-  const count = useApiQuery<Count>('/notifications/unread-count', { enabled: Boolean(authRole), refreshOnTick: true, pollMs: 20000 });
+  const count = useApiQuery<Count>('/notifications/unread-count', { enabled: Boolean(authRole), refreshOnTick: true, pollMs: authRole === 'admin' ? 5000 : 20000 });
   return <Context.Provider value={count}>{children}</Context.Provider>;
 }
 export function useNotificationCount() { const count = useContext(Context); if (!count) throw new Error('Missing NotificationCountProvider'); return count; }

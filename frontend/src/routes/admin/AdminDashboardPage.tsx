@@ -24,12 +24,12 @@ function StatCard({ label, value, icon: Icon, subtitle }: { label: string; value
 
 export function AdminDashboardPage() {
   const navigate = useNavigate();
-  const { core, clinic, appointments, hotelBookings, pets, owners, medicalRecords, summary } = useDashboard();
+  const { core, clinic, appointments, hotelBookings, pets, owners, medicalRecords, summary } = useDashboard(5000);
   const unread = useNotificationCount();
 
   const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
   const todayAppointments = appointments.filter(a => a.date === today);
-  const pendingAppointments = appointments.filter(a => a.status === "pending");
+  const pendingAppointments = appointments.filter(a => a.status === "pending").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const pendingBookings = hotelBookings.filter(b => b.status === "pending");
   const checkedInBookings = hotelBookings.filter(b => b.status === "in_stay");
   const unreadNotifications = unread.data?.unread ?? '—';

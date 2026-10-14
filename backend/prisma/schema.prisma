@@ -195,6 +195,7 @@ model Appointment {
 
   @@index([ownerId, appointmentDate])
   @@index([status, appointmentDate(sort: Desc), appointmentTime(sort: Desc), id(sort: Desc)], map: "appointments_page_idx")
+  @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "appointments_admin_recent_idx")
   @@index([ownerId, status, appointmentDate(sort: Desc), appointmentTime(sort: Desc), id(sort: Desc)], map: "appointments_owner_page_idx")
   @@map("appointments")
 }

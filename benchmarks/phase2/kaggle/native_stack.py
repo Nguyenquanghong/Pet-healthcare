@@ -36,11 +36,13 @@ def wait_port(port, process, seconds=90):
 
 
 class NativeStack:
-    def __init__(self, repo, accounts=40, replicas=1):
+    def __init__(self, repo, accounts=40, replicas=1, dataset_profile='deep'):
         if platform.system() != 'Linux':
             raise RuntimeError('Native stack requires Linux (Kaggle CPU notebook)')
-        if not isinstance(accounts, int) or not 2 <= accounts <= 40 or replicas not in (1, 2):
-            raise ValueError('accounts 2..40; Clinic replicas 1 or 2')
+        maximum = 100 if dataset_profile == 'pcn' else 40
+        if dataset_profile not in ('deep', 'pcn') or not isinstance(accounts, int) or not 2 <= accounts <= maximum or replicas not in (1, 2):
+            raise ValueError('deep accounts 2..40 / pcn accounts 2..100; Clinic replicas 1 or 2')
+        self.dataset_profile = dataset_profile
         self.repo = Path(repo).resolve(strict=True)
         self.run = str(uuid.uuid4())
         self.private = Path('/tmp') / ('pet-phase2-kaggle-' + self.run)
@@ -124,6 +126,7 @@ class NativeStack:
         wait_port(rabbit, self.rabbit)
         context = {'kind': 'phase2-kaggle-native-v1', 'run': self.run, 'directory': str(self.private),
             'urls': urls, 'pgData': str(data), 'pgPort': pg, 'accounts': self.accounts, 'replicas': self.replicas,
+            'datasetProfile': self.dataset_profile,
             'broker': f'amqp://p8:{rabbit_password}@127.0.0.1:{rabbit}', 'redis': f'redis://127.0.0.1:{redis}'}
         path = self.private / 'context.json'
         path.write_text(json.dumps(context)); path.chmod(0o600)
