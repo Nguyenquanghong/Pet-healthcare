@@ -1,0 +1,25 @@
+{
+  "version": "phase2-nfr-20261014-v1",
+  "warmup_seconds": 120,
+  "steady_seconds": 300,
+  "repeats": 3,
+  "minimum_samples_per_operation": 1000,
+  "minimum_success_ratio": 0.99,
+  "maximum_unexpected_error_ratio_exclusive": 0.01,
+  "maximum_generator_drop_ratio": 0.001,
+  "maximum_scheduler_lag_p95_ms": 50,
+  "latency_ms": {
+    "read": {"p95": 750, "p99": 1500},
+    "clinic_write": {"p95": 1500, "p99": 3000},
+    "auth": {"p95": 2000, "p99": 4000}
+  },
+  "notification_p95_ms": 5000,
+  "billing_terminal_p95_ms": 10000,
+  "billing_terminal_deadline_seconds": 30,
+  "consumer_outage_seconds": 60,
+  "recovery_deadline_seconds": 120,
+  "recovery_max_events": 300,
+  "hotel_p95_ratio_max": 1.2,
+  "b3_throughput_ratio_target": 1.3,
+  "correctness_violations_allowed": 0
+}
