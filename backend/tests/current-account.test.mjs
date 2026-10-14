@@ -4,7 +4,10 @@ import express from 'express';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { currentAccount } from '../dist/src/phase2/currentAccount.js';
-import { signToken } from '../dist/src/lib/token.js';
+import { signToken, verifyToken } from '../dist/src/lib/token.js';
+import { requireAuth } from '../dist/src/middleware/auth.js';
+import { requestActor } from '@nipopeto/runtime';
+import jwt from 'jsonwebtoken';
 
 test('Core rejects deleted/changed actors, fails closed on DB outage, leaves public auth available', async () => {
   for(const key of ['JWT_PRIVATE_KEY','JWT_PUBLIC_KEY','JWT_ISSUER','JWT_AUDIENCE','JWT_KEY_ID'])delete process.env[key];
@@ -26,4 +29,22 @@ test('Core rejects deleted/changed actors, fails closed on DB outage, leaves pub
     assert.equal(calls,before);
     assert.equal((await get('/payments/vnpay/reconcile')).status,503); // protected lookalike must not bypass
   } finally {await new Promise(ok=>server.close(ok));}
+});
+
+test('Core shares signature verification within a request but checks current account on every request',async()=>{
+  for(const key of ['JWT_PRIVATE_KEY','JWT_PUBLIC_KEY','JWT_ISSUER','JWT_AUDIENCE','JWT_KEY_ID'])delete process.env[key];
+  process.env.JWT_SECRET=randomBytes(32).toString('hex');
+  const token=signToken('fixture','owner'),original=jwt.verify;let signatures=0,queries=0,account={id:'fixture',role:'owner'};
+  jwt.verify=(...args)=>{signatures++;return original(...args);};
+  const db={user:{findUnique:async()=>{queries++;return account;}}};
+  const app=express();
+  app.use((req,_res,next)=>{requestActor(req,verifyToken);next();});
+  app.use('/api',currentAccount(db));app.use('/api',requireAuth);app.get('/api/pets',(_req,res)=>res.json({ok:true}));
+  const server=app.listen(0,'127.0.0.1');await once(server,'listening');
+  const get=()=>fetch(`http://127.0.0.1:${server.address().port}/api/pets`,{headers:{Authorization:'Bearer '+token}});
+  try{
+    assert.equal((await get()).status,200);assert.equal(signatures,1);assert.equal(queries,1);
+    account={id:'fixture',role:'admin'};assert.equal((await get()).status,403);assert.equal(signatures,2);assert.equal(queries,2);
+    account=null;assert.equal((await get()).status,401);assert.equal(signatures,3);assert.equal(queries,3);
+  }finally{jwt.verify=original;server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 });

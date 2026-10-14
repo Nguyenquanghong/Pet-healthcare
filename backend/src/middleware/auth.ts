@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import type { Role } from "../domain/auth.js";
 import { verifyToken, type AuthPayload } from "../lib/token.js";
+import { requestActor } from '@nipopeto/runtime';
 
 declare global {
   namespace Express {
@@ -14,7 +15,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "Authentication is required." });
   try {
-    req.auth = verifyToken(header.slice(7));
+    req.auth = requestActor(req,verifyToken);
     next();
   } catch {
     return res.status(401).json({ error: "Your session is invalid or has expired." });

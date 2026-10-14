@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express';
 import type { PrismaClient } from '@prisma/client';
 import { verifyToken } from '../lib/token.js';
+import { requestActor } from '@nipopeto/runtime';
 
 // Core is the account authority. Validate current existence/role on authenticated
 // API requests; a valid signature alone must not keep a deleted account active.
@@ -13,7 +14,7 @@ export function currentAccount(db: Pick<PrismaClient,'user'>): RequestHandler {
     const header=req.headers.authorization;
     if (!header?.startsWith('Bearer ')) { next(); return; }
     let actor;
-    try { actor=verifyToken(header.slice(7)); }
+    try { actor=requestActor(req,verifyToken); }
     catch { res.status(401).json({error:'Your session is invalid or has expired.'}); return; }
     try {
       const account=await db.user.findUnique({where:{id:actor.sub},select:{id:true,role:true}});

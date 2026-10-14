@@ -8,6 +8,7 @@ import amqp from 'amqplib';
 import { SharedLimiter, type Bucket } from './limiter.js';
 import { acceptsCredential, credential, integer, runtimeEnabled } from './config.js';
 import type { Actor } from './jwt.js';
+import { requestActor } from './jwt.js';
 
 const context=new AsyncLocalStorage<{requestId:string}>();
 export const currentRequestId=()=>context.getStore()?.requestId;
@@ -35,6 +36,7 @@ export class ServiceRuntime {
   private own:OwnSnapshot|undefined;
   private ownAt=0;
   private checking:Promise<void>|undefined;
+  private refreshTimer:ReturnType<typeof setInterval>|undefined;
   private database=false;
   private redis=false;
   private broker=false;
@@ -90,7 +92,12 @@ export class ServiceRuntime {
         }
         res.setHeader('RateLimit-Limit',decision.limit);res.setHeader('RateLimit-Remaining',decision.remaining);
         if(!decision.allowed){res.setHeader('Retry-After',Math.max(1,Math.ceil(decision.retryMs/1000)));res.status(429).json({error:'Too many requests. Retry after the indicated delay.'});return;}
-        if(!policy.read){await this.refresh();if((this.own?.pending??0)>=this.hardLimit){res.setHeader('Retry-After','5');res.status(503).json({error:'Event backlog capacity reached. Retry the same request key later.'});return;}}
+        if(!policy.read){
+          // Health I/O runs in the background. Never admit writes using missing,
+          // failed or stale DB/backlog evidence, and never wait on AMQP here.
+          if(!this.database||!this.own||Date.now()-this.ownAt>=6000){res.setHeader('Retry-After','2');res.status(503).json({error:'Event backlog authority unavailable. Retry the same request key later.'});return;}
+          if(this.own.pending>=this.hardLimit){res.setHeader('Retry-After','5');res.status(503).json({error:'Event backlog capacity reached. Retry the same request key later.'});return;}
+        }
         if(!res.writableEnded)next();
       }catch{if(!res.headersSent)res.status(503).json({error:'Request admission unavailable.'});}
     });
@@ -105,8 +112,8 @@ export class ServiceRuntime {
     }
     if(req.method==='POST'&&req.path==='/auth/owner/register')return{group:'auth-register',read:false,buckets:[b(ip,limit('AUTH_REGISTER_IP_LIMIT',300))]};
     if(req.method==='POST'&&req.path.startsWith('/auth/owner/activation'))return{group:'auth-activation',read:false,buckets:[b(ip,limit('AUTH_ACTIVATION_IP_LIMIT',300))]};
-    let actor:Actor|undefined;const h=req.headers.authorization;
-    try{if(h?.startsWith('Bearer '))actor=this.options.verify(h.slice(7));}catch{}
+    let actor:Actor|undefined;
+    try{actor=requestActor(req,this.options.verify);}catch{}
     const identity=actor?'actor:'+actor.sub:ip,read=['GET','HEAD'].includes(req.method);
     if(req.method==='POST'&&req.path==='/auth/me/password')return{group:'auth-password',read:false,buckets:[b(identity,limit('AUTH_PASSWORD_ACTOR_LIMIT',10)),b(ip,200)]};
     const group=this.options.service+(read?'-read':'-write');
@@ -128,14 +135,26 @@ export class ServiceRuntime {
     }catch{return false;}finally{await connection?.close().catch(()=>{});}
   }
   async refresh(force=false){
+    if(this.stopping)return;
     if(!force&&Date.now()-this.ownAt<3000)return;
     if(!this.checking)this.checking=(async()=>{
-      const [db,redis,broker]=await Promise.allSettled([this.options.probe(),this.limiter.ping(),this.brokerProbe()]);
-      this.database=db.status==='fulfilled';this.own=db.status==='fulfilled'?db.value:undefined;
-      this.redis=redis.status==='fulfilled'&&redis.value;this.broker=broker.status==='fulfilled'&&broker.value;this.ownAt=Date.now();
+      // Timestamp the actual backlog read, not the later AMQP completion. A
+      // stuck broker probe must never make old DB evidence look fresh again.
+      const database=Promise.resolve().then(()=>this.options.probe()).then(value=>{
+        this.database=true;this.own=value;this.ownAt=Date.now();
+      },()=>{this.database=false;this.own=undefined;this.ownAt=0;});
+      const [,redis,broker]=await Promise.allSettled([database,this.limiter.ping(),this.brokerProbe()]);
+      this.redis=redis.status==='fulfilled'&&redis.value;this.broker=broker.status==='fulfilled'&&broker.value;
     })().finally(()=>{this.checking=undefined;});await this.checking;
   }
-  async start(){await this.refresh();if(!this.database){this.close();throw new Error('SERVICE_DATABASE_OR_MIGRATION_UNAVAILABLE');}}
+  async start(){
+    await this.refresh(true);
+    if(!this.database){this.close();throw new Error('SERVICE_DATABASE_OR_MIGRATION_UNAVAILABLE');}
+    if(!this.stopping&&!this.refreshTimer){
+      this.refreshTimer=setInterval(()=>{void this.refresh(true).catch(()=>{this.database=false;this.own=undefined;});},3000);
+      this.refreshTimer.unref();
+    }
+  }
   metrics(){
     const s=this.options.service,label=`service="${s}"`,lines:string[]=[];
     const gauge=(name:string,value:number)=>lines.push(`pet_${name}{${label}} ${Number.isFinite(value)?value:0}`);
@@ -148,12 +167,12 @@ export class ServiceRuntime {
     for(const [k,v]of Object.entries(this.options.extras?.()??{})){if(/^[a-z_]{1,60}$/.test(k))gauge(k,v);}
     return lines.join('\n')+'\n';
   }
-  close(){this.stopping=true;this.limiter.close();this.lag.disable();}
+  close(){this.stopping=true;if(this.refreshTimer){clearInterval(this.refreshTimer);this.refreshTimer=undefined;}this.limiter.close();this.lag.disable();}
   async drain(server:Server,disconnect:()=>Promise<void>){
     this.stopping=true;
     const deadline=integer('SHUTDOWN_TIMEOUT_MS',10000,100,30000);
     await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>server.closeAllConnections(),deadline);timer.unref();server.close(e=>{clearTimeout(timer);e?reject(e):resolve();});server.closeIdleConnections();});
-    this.close();await disconnect();
+    this.close();await this.checking;await disconnect();
   }
 }
 export function createRuntime(options:RuntimeOptions){return runtimeEnabled()?new ServiceRuntime(options):undefined;}

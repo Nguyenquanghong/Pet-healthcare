@@ -30,8 +30,12 @@ export async function list(db:PrismaClient,resource:Resource,actor:Actor,directo
       const base:Prisma.AppointmentWhereInput={...scope,...identity,...(q.date?{appointmentDate:new Date(`${q.date}T00:00:00Z`)}:{}),...(q.category?{type:q.category==='spa'?{in:[...spa]}:{notIn:[...spa]}}:{}),...(q.mode==='unbilled'?{status:'completed',reservations:{none:{state:{in:['HELD','INVOICED']}}}}:{}),...(q.q?{OR:[...joined,text('serviceName'),text('id')]}:{})};
       const where:Prisma.AppointmentWhereInput={AND:[base,...(q.statusGroup?[{status:{in:groups[q.statusGroup as string]}}]:[]),...(q.status?[{status:q.status as AppointmentStatus}]:[])]};
       counts=Object.fromEntries((await tx.appointment.groupBy({by:['status'],where:base,_count:true})).map(g=>[g.status,g._count]));
+      // These groups already cover the exact base predicate in this snapshot.
+      // Apply the remaining status filters to obtain total without another COUNT.
+      total=Object.entries(counts).reduce((sum,[status,count])=>sum+(
+        (!q.status||q.status===status)&&(!q.statusGroup||groups[q.statusGroup as string]!.includes(status as AppointmentStatus))?count:0),0);
       counts.billingHeld=await tx.appointment.count({where:{...base,reservations:{some:{state:'HELD'}}}});
-      total=await tx.appointment.count({where});appointments=await tx.appointment.findMany({where,...bounds,orderBy:actor.role==='owner'?[{status:'asc'},{appointmentDate:'desc'},{appointmentTime:'desc'},{id:'desc'}]:[{status:'asc'},{createdAt:'desc'},{id:'desc'}]});
+      appointments=await tx.appointment.findMany({where,...bounds,orderBy:actor.role==='owner'?[{status:'asc'},{appointmentDate:'desc'},{appointmentTime:'desc'},{id:'desc'}]:[{status:'asc'},{createdAt:'desc'},{id:'desc'}]});
     }else if(resource==='medicalRecords'){
       const where:Prisma.MedicalRecordWhereInput={...scope,...identity,...(q.q?{OR:[...joined,text('title'),text('doctorName'),text('diagnosis')]}:{})};
       total=await tx.medicalRecord.count({where});records=await tx.medicalRecord.findMany({where,...bounds,orderBy:[{visitDate:'desc'},{id:'desc'}]});appointments=await tx.appointment.findMany({where:{id:{in:records.flatMap(r=>r.appointmentId?[r.appointmentId]:[])},...(ownerId?{ownerId}:{})}});

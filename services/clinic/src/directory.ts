@@ -29,7 +29,24 @@ export class CoreDirectory {
 }
 // Request-local authorized snapshots only; no global user cache or projection auth.
 export class RequestDirectory {
-  constructor(private readonly source:CoreDirectory,readonly actor:Actor,readonly token:string,readonly snapshot:DirectorySnapshot){}
+  private readonly pets=new Map<string,PetSnapshot>();
+  private readonly owners=new Map<string,OwnerSnapshot>();
+  constructor(private readonly source:CoreDirectory,readonly actor:Actor,readonly token:string,readonly snapshot:DirectorySnapshot){
+    for(const pet of snapshot.pets)this.pets.set(pet.id,pet);
+    for(const owner of snapshot.owners)this.owners.set(owner.id,owner);
+  }
   async pet(id:string){const p=this.snapshot.pets.find(p=>p.id===id);if(!p)throw new BusinessError(404,'Authorized pet not found.');return p;}
-  lookup(petIds:string[],ownerIds:string[]){return this.source.request(this.actor,this.token,{petIds:[...new Set(petIds)],ownerIds:[...new Set(ownerIds)]},true);}
+  async lookup(petIds:string[],ownerIds:string[]):Promise<DirectorySnapshot>{
+    const wantedPets=[...new Set(petIds)],wantedOwners=[...new Set(ownerIds)];
+    if(wantedPets.length>100||wantedOwners.length>100)throw new BusinessError(422,'Invalid directory IDs.');
+    const missingPets=wantedPets.filter(id=>!this.pets.has(id)),missingOwners=wantedOwners.filter(id=>!this.owners.has(id));
+    if(missingPets.length||missingOwners.length){
+      const value=await this.source.request(this.actor,this.token,{petIds:missingPets,ownerIds:missingOwners},true);
+      for(const pet of value.pets)this.pets.set(pet.id,pet);
+      for(const owner of value.owners)this.owners.set(owner.id,owner);
+    }
+    const pets=wantedPets.map(id=>this.pets.get(id)!);
+    const owners=[...new Set([...wantedOwners,...pets.map(p=>p.ownerId)])].map(id=>this.owners.get(id)!);
+    return{actor:this.snapshot.actor,pets,owners};
+  }
 }
