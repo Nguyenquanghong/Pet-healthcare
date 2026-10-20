@@ -1,0 +1,12 @@
+{
+    "python.analysis.exclude": [
+        "**/.git",
+        "**/dist",
+        "**/build",
+        "**/coverage",
+        "**/.pytest_cache",
+        "**/data",
+        "**/outputs"
+    ],
+    "python.analysis.useDefaultExcludes": true
+}

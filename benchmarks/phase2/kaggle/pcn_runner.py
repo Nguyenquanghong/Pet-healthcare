@@ -13,6 +13,8 @@ from collections import Counter
 
 from native_stack import NativeStack
 from benchmark import Client, reconcile
+from cqrs_probe import preflight as cqrs_preflight
+from cqrs_diagnostics import collect as collect_read_diagnostics
 
 LEGACY = Path(__file__).resolve().parents[2] / 'kaggle'
 sys.path.insert(0, str(LEGACY))
@@ -93,7 +95,8 @@ def stop_load(child):
             child.kill(); child.wait(timeout=10)
 
 
-def run_pcn(repo, output, *, mode='full', replicas=1, progress=print):
+def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_configuration=None):
+    if cqrs_configuration not in (None, 'O', 'A', 'B'): raise ValueError('Unknown CQRS configuration')
     settings = configuration(mode)
     repo, output = Path(repo).resolve(), Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -101,6 +104,7 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print):
     if mode == 'full' and not kaggle:
         raise RuntimeError('Full PCN acceptance requires a Kaggle session; use smoke for local validation')
     manifest = {'protocol': PROTOCOL, 'mode': mode, **settings, 'clinic_replicas': replicas,
+                'configuration': cqrs_configuration or 'O',
                 'kaggle': kaggle, 'python': sys.version, 'platform': platform.platform(),
                 'cpu_count': os.cpu_count(), 'hashes': {}, 'status': 'STARTING',
                 'differences_from_phase1': [
@@ -122,13 +126,21 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print):
     summary.update({'load_status': 'NOT_RUN', 'scope': 'PCN01/PCN02 load only', 'capacity_accepted': False})
     child = None
     stage = 'startup'
+    stack = None
     try:
         progress(f"PCN {mode}: {settings['users']} users, {settings['seconds']}s measured, Clinic={replicas}")
-        with NativeStack(repo, accounts=settings['users'], replicas=replicas, dataset_profile='pcn') as stack:
+        options = {} if cqrs_configuration is None else {'cqrs_configuration': cqrs_configuration}
+        stack = NativeStack(repo, accounts=settings['users'], replicas=replicas, dataset_profile='pcn', **options)
+        with stack:
+            manifest['run'] = stack.run
             manifest['dataset'] = stack.fixture['dataset']
             manifest['db_cross_connect_denied'] = stack.fixture['dbCrossConnectDenied']
             stage = 'authentication'
             client = Client(stack)
+            if cqrs_configuration is not None:
+                stage = 'cqrs-read-path-preflight'
+                manifest['cqrs'] = stack.fixture['cqrs']
+                manifest['cqrs_preflight'] = cqrs_preflight(client, cqrs_configuration, manifest['cqrs']['generation'])
             fixture = {'users': [{'token': actor['token'], 'petId': actor['pets'][0]['id'],
                                   'qrToken': actor['pets'][0]['qrToken']} for actor in client.actors]}
             fixture_path = stack.private / 'pcn-fixture.json'
@@ -154,6 +166,8 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print):
                 tracked += [('postgres', int((stack.private / 'pgdata/postmaster.pid').read_text().splitlines()[0]), True),
                             ('nginx', int((stack.private / 'nginx.pid').read_text().strip()), True),
                             ('generator', child.pid, False)]
+                if cqrs_configuration is not None:
+                    tracked += [('stack-supervisor', stack.application.pid, False), ('controller', os.getpid(), False)]
                 started, samplers, process_errors = time.monotonic(), {}, 0
                 deadline = started + settings['seconds'] + settings['warmup'] + settings['users'] / 10 + 90
                 next_progress = started
@@ -163,6 +177,9 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print):
                             now = time.monotonic()
                             if now > deadline: raise TimeoutError('Bounded PCN load deadline exceeded')
                             samples = resource_sample(tracked, samplers, now)
+                            if cqrs_configuration is not None:
+                                with (output / 'cqrs.jsonl').open('a', encoding='utf-8') as handle:
+                                    handle.write(json.dumps({'monotonic_s': now, **stack.control('cqrs-observe')}) + '\n')
                             process_errors += sum('error' in row and row['component'] != 'generator' for row in samples)
                             for row in samples: resource_file.write(json.dumps(row) + '\n')
                             resource_file.flush()
@@ -198,6 +215,8 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print):
         progress(f'PCN stopped at {stage}: {type(error).__name__}; private logs remain in /tmp')
     finally:
         stop_load(child)
+        if cqrs_configuration in ('A','B') and stack is not None:
+            manifest['read_diagnostics'] = collect_read_diagnostics(stack.private, replicas, output)
         (output / 'manifest.json').write_text(json.dumps(manifest, indent=2))
         (output / 'pcn-report.json').write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding='utf-8')
     return summary

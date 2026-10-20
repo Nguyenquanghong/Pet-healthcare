@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import unittest
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
 
@@ -103,7 +104,12 @@ class PcnComparisonTests(unittest.TestCase):
         self.assertIn('wait_time = between(0.5, 1.5)', ast.unparse(cls))
 
     def test_notebook_compiles_and_embeds_exact_helpers_without_secret_output(self):
-        target = build()
+        historical = REPO/'benchmarks/phase2/phase2-pcn-kaggle.ipynb'
+        original_hash = hashlib.sha256(historical.read_bytes()).hexdigest()
+        output = REPO/'test-results/phase2/pcn-unit-tests'/str(uuid.uuid4())
+        output.mkdir(parents=True, exist_ok=False)
+        target = build(target=output/'notebook.ipynb')
+        self.assertEqual(hashlib.sha256(historical.read_bytes()).hexdigest(), original_hash)
         notebook = json.loads(target.read_text(encoding='utf-8'))
         payload = None
         for cell in notebook['cells']:

@@ -24,7 +24,7 @@ USER_ERRORS = 0
 def open_details(environment, **kwargs):
     global DETAILS, WRITER, WRITES
     DETAILS = open(os.environ['PCN_HTTP'], 'w', newline='', encoding='utf-8')
-    WRITER = csv.DictWriter(DETAILS, fieldnames=['started_seconds', 'operation', 'status', 'latency_ms', 'failed'])
+    WRITER = csv.DictWriter(DETAILS, fieldnames=['started_seconds', 'operation', 'status', 'latency_ms', 'failed', 'read_source', 'degraded'])
     WRITER.writeheader()
     WRITES = open(os.environ['PCN_WRITES'], 'w', encoding='utf-8')
 
@@ -65,9 +65,13 @@ def capture_user_error(user_instance, exception, tb, **kwargs):
 def capture_status(name, response_time, response, exception, context, **kwargs):
     if not context or not context.get('pcn_measured'):
         return
+    headers = getattr(response, 'headers', {}) or {}
+    source = headers.get('X-Clinic-Read-Source')
     WRITER.writerow({'started_seconds': context['pcn_start'] - legacy.STATE['start'],
                      'operation': name, 'status': getattr(response, 'status_code', 0),
-                     'latency_ms': response_time, 'failed': exception is not None})
+                     'latency_ms': response_time, 'failed': exception is not None,
+                     'read_source': source if source in ('authoritative', 'projection') else 'absent' if source is None else 'invalid',
+                     'degraded': headers.get('X-Service-Degraded') == 'clinic-read'})
 
 
 @events.quitting.add_listener

@@ -268,7 +268,7 @@ export function AdminAppointmentsPage() {
               >
                 {s.label}
                 <span className="ml-1.5 rounded-full bg-black/10 px-1.5 py-0.5 text-[10px]">
-                  {count}
+                  {list.loading||list.error?'—':count}
                 </span>
               </button>
             );
@@ -446,7 +446,7 @@ export function AdminAppointmentsPage() {
                 );
               })}
 
-              {filteredAppointments.length === 0 && (
+              {!list.loading&&!list.error&&filteredAppointments.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
                     Không tìm thấy lịch hẹn phù hợp.

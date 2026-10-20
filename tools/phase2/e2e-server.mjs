@@ -21,14 +21,23 @@ import {drainHandles} from './drain-handles.mjs';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test');
 assertTestProject();
+const q4E2e=process.env.CQRS_Q4_E2E==='1',q4Run=randomUUID(),q4Schema='cqrs_q4_e2e_'+q4Run.replaceAll('-','');
 const urls={core:'postgresql://p2_core:p2_core_fixture_only@127.0.0.1:55432/p2_core_test?schema=core_runtime_test&connection_limit=4',clinic:'postgresql://p2_clinic:p2_clinic_fixture_only@127.0.0.1:55432/p2_clinic_test?schema=p1_proof&connection_limit=4',notification:'postgresql://p2_notification:p2_notification_fixture_only@127.0.0.1:55432/p2_notification_test?schema=p1_proof&connection_limit=4'};
+if(q4E2e){const u=new URL(urls.clinic);u.searchParams.set('schema',q4Schema);urls.clinic=u.href;}
 const db={core:new Core({datasourceUrl:urls.core}),clinic:new Clinic({datasourceUrl:urls.clinic}),notification:new Notification({datasourceUrl:urls.notification})};
 for(const [name,client] of Object.entries(db)){
   const [identity]=await client.$queryRaw`SELECT current_database() AS db,current_user AS role`;
   assert.equal(identity.db,`p2_${name}_test`);assert.equal(identity.role,`p2_${name}`);
   const [marker]=await client.$queryRaw`SELECT marker FROM public.p2_test_marker`;
   assert.equal(marker.marker,`pet-phase2-p1-test:${name}:v1`);
+  if(q4E2e&&name==='clinic'){await client.$executeRawUnsafe(`CREATE SCHEMA "${q4Schema}"`);await client.$executeRawUnsafe(`COMMENT ON SCHEMA "${q4Schema}" IS 'cqrs-q4-e2e:${q4Run}'`);}
   execFileSync(process.execPath,['node_modules/prisma/build/index.js','migrate','deploy','--schema',name==='core'?'backend/prisma/schema.prisma':`services/${name}/prisma/schema.prisma`],{env:{...process.env,DATABASE_URL:urls[name]},stdio:'pipe'});
+}
+if(q4E2e){
+  const {AppointmentRebuild}=await import('../../services/clinic/dist/readRebuild.js');
+  const u=new URL(urls.clinic);u.searchParams.set('connection_limit','1');const operator=new Clinic({datasourceUrl:u.href}),rebuild=new AppointmentRebuild(operator),id=randomUUID();
+  try{await rebuild.claim(id,randomUUID());while(!(await rebuild.batch(id)).done){}await rebuild.verify(id);await rebuild.activate(id);await operator.readProjectionControl.update({where:{projectionName:'appointments'},data:{servingMode:'projection'}});}
+  finally{await rebuild.close();await operator.$disconnect();}
 }
 process.stdout.write('P6 E2E database identity and migrations checked\n');
 const [{stamp:startedAt}]=await db.core.$queryRaw`SELECT transaction_timestamp() AS stamp`;
@@ -62,7 +71,8 @@ async function child(file,extra,ready){
   const handle={stop:async()=>{if(!ended){stopping=true;c.send({type:'shutdown'});await until(()=>ended,'graceful child drain',15000);}assert.equal(c.exitCode,0,'Owned API/worker must drain successfully: '+file);},logs:()=>logs};handles.push(handle);
   await until(async()=>{if(ended)throw new Error('P5 owned process exited before readiness: '+file);return ready?ready():logs.includes('worker-ready');},file);return handle;
 }
-const apiEnv=name=>({DATABASE_URL:urls[name],PORT:String(ports[name]),CORE_SERVICE_URL:origins.core,CLINIC_SERVICE_URL:origins.clinic,NOTIFICATION_SERVICE_URL:origins.notification,...(name==='core'?{}:name==='clinic'?{JWT_PRIVATE_KEY:'',CORE_NOTIFICATION_SEND_TOKEN:''}:{JWT_PRIVATE_KEY:'',CORE_DIRECTORY_TOKEN:'',CORE_BILLING_EVIDENCE_TOKEN:'',CLINIC_BILLING_TOKEN:'',CLINIC_BOOTSTRAP_TOKEN:''}),CORS_ORIGIN:'http://127.0.0.1:5189',PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',VNPAY_TMN_CODE:'',VNPAY_HASH_SECRET:'',BANK_TRANSFER_ENABLED:'false'});
+const readTokenSecret=q4E2e?'q4-e2e-'+randomUUID():undefined;
+const apiEnv=name=>({CLINIC_READ_MODE:q4E2e&&name==='clinic'?'projection':'authoritative',CLINIC_READ_TOKEN_SECRET:name==='clinic'?readTokenSecret:'',DATABASE_URL:urls[name],PORT:String(ports[name]),CORE_SERVICE_URL:origins.core,CLINIC_SERVICE_URL:origins.clinic,NOTIFICATION_SERVICE_URL:origins.notification,...(name==='core'?{}:name==='clinic'?{JWT_PRIVATE_KEY:'',CORE_NOTIFICATION_SEND_TOKEN:''}:{JWT_PRIVATE_KEY:'',CORE_DIRECTORY_TOKEN:'',CORE_BILLING_EVIDENCE_TOKEN:'',CLINIC_BILLING_TOKEN:'',CLINIC_BOOTSTRAP_TOKEN:''}),CORS_ORIGIN:'http://127.0.0.1:5189',PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',VNPAY_TMN_CODE:'',VNPAY_HASH_SECRET:'',BANK_TRANSFER_ENABLED:'false'});
 const startApi=name=>child(name==='core'?'backend/dist/src/index.js':`services/${name}/dist/index.js`,apiEnv(name),async()=>{try{return(await fetch(origins[name]+'/health/ready')).status===200;}catch{return false;}});
 let coreApi=await startApi('core'),clinicApi=await startApi('clinic'),notificationApi=await startApi('notification');
 process.stdout.write('P6 E2E strict APIs ready\n');
@@ -72,7 +82,8 @@ await declareTopology(broker,routes);
 const workerEnv={JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:'',JWT_ISSUER:'',JWT_AUDIENCE:'',JWT_KEY_ID:'',JWT_SECRET:'',CORE_DIRECTORY_TOKEN:'',CORE_BILLING_EVIDENCE_TOKEN:'',CLINIC_BILLING_TOKEN:'',CLINIC_BOOTSTRAP_TOKEN:'',CORE_NOTIFICATION_SEND_TOKEN:'',REDIS_URL:'',RATE_LIMIT_KEY_SECRET:'',OBSERVABILITY_TOKEN:''};
 await child('services/clinic/dist/worker.js',{...workerEnv,DATABASE_URL:urls.clinic,CORE_DIRECTORY_TOKEN:env.CORE_DIRECTORY_TOKEN,CORE_SERVICE_URL:origins.core,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run,OUTBOX_AGGREGATE_ID:run});
 await child('services/notification/dist/worker.js',{...workerEnv,DATABASE_URL:urls.notification,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run});
-const fixture={run,password,admin:{id:users.admin.id,username:users.admin.username,fullName:users.admin.fullName},owner:{id:users.owner.id,email:users.owner.email,fullName:users.owner.fullName},other:{id:users.other.id,email:users.other.email,fullName:users.other.fullName},counter:{id:users.counter.id,fullName:users.counter.fullName},pets:pets.map(p=>({id:p.id,name:p.name,qrToken:p.qrToken})),counterPetId:counterPet.id,otherPetId:otherPet.id,origins};
+let readWorker=q4E2e?await child('services/clinic/dist/readWorker.js',{...workerEnv,DATABASE_URL:urls.clinic,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run}):undefined;
+const fixture={run,q4E2e,q4Schema:q4E2e?q4Schema:undefined,password,admin:{id:users.admin.id,username:users.admin.username,fullName:users.admin.fullName},owner:{id:users.owner.id,email:users.owner.email,fullName:users.owner.fullName},other:{id:users.other.id,email:users.other.email,fullName:users.other.fullName},counter:{id:users.counter.id,fullName:users.counter.fullName},pets:pets.map(p=>({id:p.id,name:p.name,qrToken:p.qrToken})),counterPetId:counterPet.id,otherPetId:otherPet.id,origins};
 if(loadDataset)Object.assign(fixture,{loadAccounts:loadDataset.accounts,dataset:loadDataset.description});
 writeFileSync(resolve(fixtureDir,'p5-e2e-fixture.json'),JSON.stringify(fixture,null,2));
 const controlPath=resolve(fixtureDir,'p5-e2e-controls.json');writeFileSync(controlPath,JSON.stringify({run}));
@@ -89,6 +100,8 @@ async function pump(){
     // Explicit restart fault only. P6 retains Redis counters across process
     // lifetimes; normal browser cases run against one Core without quota reset.
     if(controls.restartCore&&controls.restartCore!==coreRestart){await coreApi.stop();coreApi=await startApi('core');coreRestart=controls.restartCore;}
+    if(q4E2e&&controls.pauseRead&&readWorker){await readWorker.stop();readWorker=undefined;}
+    if(q4E2e&&!controls.pauseRead&&!readWorker)readWorker=await child('services/clinic/dist/readWorker.js',{...workerEnv,DATABASE_URL:urls.clinic,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run});
     for(const [name,client]of [['core',db.core],['clinic',db.clinic]]){
       const rows=await client.outboxEvent.findMany({where:{publishedAt:null,createdAt:{gte:startedAt}},select:{envelope:true},take:100});
       for(const id of new Set(rows.map(r=>r.envelope.aggregateId))){
@@ -101,7 +114,7 @@ async function pump(){
     for(const op of ops)await billing.reconcileOnce(run,1,op.id);
     if(controls.stopNotification&&notificationApi){await notificationApi.stop();notificationApi=null;}
     if(!controls.stopNotification&&!notificationApi)notificationApi=await startApi('notification');
-    writeFileSync(resolve(fixtureDir,'p5-e2e-observed.json'),JSON.stringify({run,coreRestart,pauseDirectory:Boolean(controls.pauseDirectory),notificationStopped:notificationApi===null}));
+    writeFileSync(resolve(fixtureDir,'p5-e2e-observed.json'),JSON.stringify({run,coreRestart,pauseDirectory:Boolean(controls.pauseDirectory),notificationStopped:notificationApi===null,readPaused:q4E2e&&!readWorker}));
   }catch{if(!ending)process.stdout.write('P5 fixture relay pending; retrying\n');}
   finally{loopBusy=false;}
 }
@@ -114,9 +127,9 @@ const server=createServer(async(req,res)=>{
     if(path.startsWith('/internal')||path.startsWith('/metrics')){res.writeHead(404);res.end();return;}
     if(path.startsWith('/api/')){
       const chunks=[];for await(const b of req)chunks.push(b);
-      const headers={};for(const name of ['authorization','content-type','idempotency-key'])if(typeof req.headers[name]==='string')headers[name]=req.headers[name];
+      const headers={};for(const name of ['authorization','content-type','idempotency-key','x-clinic-min-version','x-clinic-read-consistency'])if(typeof req.headers[name]==='string')headers[name]=req.headers[name];
       const r=await fetch(origins.core+req.url,{method:req.method,headers,body:['GET','HEAD'].includes(req.method)?undefined:Buffer.concat(chunks),redirect:'error',signal:AbortSignal.timeout(15000)});
-      const body=Buffer.from(await r.arrayBuffer());for(const name of ['content-type','location','retry-after','cache-control'])if(r.headers.has(name))res.setHeader(name,r.headers.get(name));res.writeHead(r.status);res.end(body);return;
+      const body=Buffer.from(await r.arrayBuffer());for(const name of ['content-type','location','retry-after','cache-control','x-clinic-read-token','x-clinic-read-source','x-clinic-projection-generation','x-service-degraded'])if(r.headers.has(name))res.setHeader(name,r.headers.get(name));res.writeHead(r.status);res.end(body);return;
     }
     let file=resolve(root,'.'+decodeURIComponent(path));if(relative(root,file).startsWith('..')){res.writeHead(404);res.end();return;}
     try{if(!statSync(file).isFile())file=resolve(root,'index.html');}catch{file=resolve(root,'index.html');}
@@ -132,7 +145,7 @@ export async function shutdown(){
   let failure;
   try{
     while(loopBusy)await new Promise(r=>setTimeout(r,100));
-    await waitForQueueIdle([routes.clinic,routes.notification]);
+    await waitForQueueIdle([routes.clinic,routes.notification,...(q4E2e?[routes.clinicRead]:[])]);
   }catch(error){failure=error;process.stdout.write('P5 queues retained for failure diagnosis\n');}
   await new Promise(r=>server.close(r));
   try{await drainHandles(handles);}catch(error){failure??=error;}
@@ -140,7 +153,7 @@ export async function shutdown(){
   let conn,channel;
   try{
     conn=await amqp.connect(broker);channel=await conn.createChannel();
-    for(const name of [routes.clinic,routes.notification,routes.clinic+'.dlq',routes.notification+'.dlq']){const q=await channel.checkQueue(name);if(!failure&&q.messageCount===0&&q.consumerCount===0)await channel.deleteQueue(name);}
+    for(const name of [routes.clinic,routes.notification,routes.clinic+'.dlq',routes.notification+'.dlq']){const q=await channel.checkQueue(name);if(!q4E2e&&!failure&&q.messageCount===0&&q.consumerCount===0)await channel.deleteQueue(name);}
   }catch(error){failure??=error;}
   finally{
     await channel?.close().catch(error=>{failure??=error;});await conn?.close().catch(error=>{failure??=error;});

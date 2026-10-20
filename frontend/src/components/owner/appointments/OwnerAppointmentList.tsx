@@ -137,7 +137,7 @@ export function OwnerAppointmentList({ mode = "medical", selectedDate, onClearDa
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className={`text-sm font-black ${isActive ? "text-primary" : "text-slate-900"}`}>{tab.label}</span>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-black ${tab.countClass}`}>{tabCounts[tab.key]}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-black ${tab.countClass}`}>{list.loading||list.error?'—':tabCounts[tab.key]}</span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">{tab.description}</p>
               </button>
@@ -210,7 +210,7 @@ export function OwnerAppointmentList({ mode = "medical", selectedDate, onClearDa
           );
         })}
 
-        {visibleAppointments.length === 0 && (
+        {!list.loading&&!list.error&&visibleAppointments.length === 0 && (
           <p className="px-6 py-12 text-center text-slate-400">
             {selectedDate ? "Không có lịch hẹn phù hợp trong ngày đã chọn." : "Không có lịch hẹn phù hợp."}
           </p>

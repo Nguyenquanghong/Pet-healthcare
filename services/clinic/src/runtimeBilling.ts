@@ -2,6 +2,7 @@ import type { PrismaClient, Prisma } from './generated/client/index.js';
 import type { Actor } from './domain/auth.js';
 import { BusinessError } from './domain/error.js';
 import type { BillingSourceSnapshot, CoreState } from '@nipopeto/contracts';
+import {recordAppointmentChange} from './readRevision.js';
 
 function permitted(actor: Actor, ownerId: string) {
   if (actor.role === 'owner' && actor.sub !== ownerId) throw new BusinessError(404, 'Billing source not found.');
@@ -35,6 +36,7 @@ export class AppointmentBilling {
       if(await tx.appointmentReservation.findFirst({where:{appointmentId,state:{in:['HELD','INVOICED']}}}))throw new BusinessError(409,'Appointment is already reserved or invoiced.');
       const snapshot:BillingSourceSnapshot={appointmentId:a.id,ownerId:a.ownerId,petId:a.petId,revision:a.statusRevision,type:a.type,serviceName:a.serviceName,clinicName:a.clinicName,date:a.appointmentDate.toISOString().slice(0,10),time:a.appointmentTime};
       await tx.appointmentReservation.create({data:{operationId,appointmentId,revisionAtPrepare:revision,snapshot:snapshot as unknown as Prisma.InputJsonValue}});
+      await recordAppointmentChange(tx,appointmentId);
       return snapshot;
     });
   }
@@ -56,6 +58,9 @@ export async function applyBillingTerminal(tx:Prisma.TransactionClient,operation
   if(evidence.state==='COMMITTED'&&(!r||!evidence.invoiceId))throw new Error('BILLING_RESERVATION_REQUIRED');
   if(r&&(r.appointmentId!==evidence.appointmentId||r.state!=='HELD'&&(r.state!==state||r.invoiceId!==(evidence.invoiceId??null))))throw new Error('BILLING_TERMINAL_CONFLICT');
   if(!old)await tx.appointmentBillingTerminal.create({data:{operationId,appointmentId:evidence.appointmentId,state:evidence.state,invoiceId:evidence.invoiceId??null}});
-  if(r?.state==='HELD')return tx.appointmentReservation.update({where:{operationId},data:{state,invoiceId:evidence.invoiceId??null}});
+  if(r?.state==='HELD'){
+    const saved=await tx.appointmentReservation.update({where:{operationId},data:{state,invoiceId:evidence.invoiceId??null}});
+    await recordAppointmentChange(tx,evidence.appointmentId);return saved;
+  }
   return r;
 }

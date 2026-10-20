@@ -3,15 +3,23 @@ import {catalogs,targets,sourceNames} from './p7-manifest.mjs';
 import {validateMigration,assertFrozenSource} from './p7-migration.mjs';
 
 const targetKinds=['core','clinic','notification'];
-function runtimeTables(kind){const names=[...targets[kind],...(kind==='clinic'?['OutboxEvent','RequestDedup']:kind==='notification'?['RequestDedup']:[])];return [...new Set(names.map(n=>catalogs[kind][n].table))];}
+function runtimeTables(kind){const names=[...targets[kind],...(kind==='clinic'?['OutboxEvent','RequestDedup','ClinicReadRevision','AppointmentReadRow','ReadProjectionGeneration','ReadProjectionControl','ReadRebuildRun']:kind==='notification'?['RequestDedup']:[])];return [...new Set(names.map(n=>catalogs[kind][n].table))];}
 export async function targetPermissions(ctx,write){
   for(const kind of targetKinds)await withDatabase(ctx,kind,db=>db.$transaction(async tx=>{
     const role=ident(ctx.components[kind].role);
     await tx.$executeRawUnsafe(`REVOKE ALL ON ALL TABLES IN SCHEMA runtime FROM ${role}`);
+      // Table-level REVOKE does not revoke column-level grants from a prior open.
+      if(kind==='clinic')await tx.$executeRawUnsafe(`REVOKE UPDATE ("lockAnchor") ON runtime."ReadProjectionControl" FROM ${role}`);
     await tx.$executeRawUnsafe(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA runtime FROM ${role}`);
     const tables=runtimeTables(kind).map(t=>'runtime.'+ident(t)).concat('runtime."_prisma_migrations"');
     await tx.$executeRawUnsafe(`GRANT SELECT ON ${tables.join(',')} TO ${role}`);
-    if(write){await tx.$executeRawUnsafe(`GRANT INSERT,UPDATE,DELETE ON ${runtimeTables(kind).map(t=>'runtime.'+ident(t)).join(',')} TO ${role}`);if(kind==='core')await tx.$executeRawUnsafe(`GRANT USAGE,SELECT ON SEQUENCE runtime.invoice_transfer_code_seq TO ${role}`);}
+    if(write){
+      const writable=runtimeTables(kind).filter(t=>kind!=='clinic'||!['ClinicReadRevision','ReadProjectionGeneration','ReadProjectionControl','ReadRebuildRun'].includes(t));
+      await tx.$executeRawUnsafe(`GRANT INSERT,UPDATE,DELETE ON ${writable.map(t=>'runtime.'+ident(t)).join(',')} TO ${role}`);
+      if(kind==='clinic')await tx.$executeRawUnsafe(`GRANT INSERT,UPDATE ON runtime."ClinicReadRevision" TO ${role}`);
+      if(kind==='clinic')await tx.$executeRawUnsafe(`GRANT UPDATE ("lockAnchor") ON runtime."ReadProjectionControl" TO ${role}`);
+      if(kind==='core')await tx.$executeRawUnsafe(`GRANT USAGE,SELECT ON SEQUENCE runtime.invoice_transfer_code_seq TO ${role}`);
+    }
   }),{admin:true});
 }
 export async function cutoverState(ctx){return withDatabase(ctx,'legacy',async db=>(await db.$queryRaw`SELECT state,snapshot_hash,opened_at FROM public.p7_cutover WHERE id=1`)[0]);}

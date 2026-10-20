@@ -7,6 +7,7 @@ import type { BookingLifecycleStore,LifecycleTransaction,BookingKind } from '../
 import { appointmentSlotWrite } from './appointmentSlotConflict.js';
 import { writeNotification } from '../../notificationOutbox.js';
 import type { RequestDirectory } from '../../directory.js';
+import {recordAppointmentChange} from '../../readRevision.js';
 
 type Client=PrismaClient|Prisma.TransactionClient;
 const transaction=<T>(db:PrismaClient,bound:Prisma.TransactionClient|undefined,work:(tx:Prisma.TransactionClient)=>Promise<T>)=>bound?work(bound):db.$transaction(work);
@@ -23,7 +24,7 @@ class Appointments implements AppointmentRepository {
   find(id:string){return this.db.appointment.findUnique({where:{id}});}
   async findWithPet(id:string){const appointment=await this.find(id);return appointment?{appointment,pet:await this.directory.pet(appointment.petId)}:null;}
   async hasSlot(petId:string,date:Date,time:string,exceptId?:string){return !!await this.db.appointment.findFirst({where:{petId,appointmentDate:date,appointmentTime:time,...(exceptId?{id:{not:exceptId}}:{}),status:{notIn:['cancelled','no_show']}}});}
-  create(data:Parameters<AppointmentRepository['create']>[0]){return appointmentSlotWrite(this.db.appointment.create({data}));}
+  async create(data:Parameters<AppointmentRepository['create']>[0]){const row=await appointmentSlotWrite(this.db.appointment.create({data}));await recordAppointmentChange(this.db,row.id,{created:true});return row;}
 }
 const writer=(db:Client)=>({create:async(draft:{recipientOwnerId?:string;recipientRole:string;title:string;message:string;type:string;actionUrl:string;relatedPetId:string;relatedAppointmentId:string|null})=>{await writeNotification(db,{...draft,recipientOwnerId:draft.recipientOwnerId??null,recipientRole:draft.recipientRole as 'owner'|'admin'});}});
 export function appointmentDependencies(db:PrismaClient,directory:RequestDirectory,bound?:Prisma.TransactionClient):AppointmentDependencies{
@@ -47,6 +48,7 @@ class Records implements MedicalRecordRepository {
     if(before.status==='completed')return;
     const saved=await appointmentSlotWrite(this.db.appointment.update({where:{id},data:{status:'completed',statusRevision:{increment:1}}}));
     await appendStatusEvent(this.db,this.directory,id,actor,'medical_completed',before.status,'completed',saved.statusRevision);
+    await recordAppointmentChange(this.db,id);
   }
 }
 export function medicalDependencies(db:PrismaClient,directory:RequestDirectory,bound?:Prisma.TransactionClient):MedicalDependencies{
@@ -64,7 +66,7 @@ export class Lifecycle implements BookingLifecycleStore {
       await unlocked(tx,id);
       return work({booking,dependencies:async()=>({medical:await tx.medicalRecord.count({where:{appointmentId:id}}),invoices:await tx.appointmentReservation.count({where:{appointmentId:id,state:{in:['HELD','INVOICED']}}})}),
         latestTransition:()=>tx.bookingStatusEvent.findFirst({where:{bookingId:id,action:{not:'note_updated'}},orderBy:{revision:'desc'}}),
-        save:(status,patch={})=>appointmentSlotWrite(tx.appointment.update({where:{id},data:{...patch,status:status as Prisma.AppointmentUpdateInput['status'],statusRevision:{increment:1}}})),
+        save:async(status,patch={})=>{const saved=await appointmentSlotWrite(tx.appointment.update({where:{id},data:{...patch,status:status as Prisma.AppointmentUpdateInput['status'],statusRevision:{increment:1}}}));await recordAppointmentChange(tx,id);return saved;},
         event:(actor,action,from,to,rev,reason,original)=>appendStatusEvent(tx,this.directory,id,actor,action,from,to,rev,reason,original),
         notify:async(message,role='owner')=>{await writeNotification(tx,{recipientOwnerId:role==='owner'?booking.ownerId:null,recipientRole:role,type:'booking_status_updated',title:'Appointment updated',message,relatedPetId:booking.petId,relatedAppointmentId:id,actionUrl:role==='admin'?'/admin/appointments':booking.type.startsWith('spa_')?'/owner/spa-booking':'/owner/appointments'});},
       });

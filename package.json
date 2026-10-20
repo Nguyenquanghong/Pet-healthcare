@@ -12,6 +12,14 @@
     "packages/runtime"
   ],
   "scripts": {
+    "cqrs:test:integration": "node tools/phase2/cqrs/postgres-parity.mjs",
+    "cqrs:profile": "node tools/phase2/cqrs/profile-reader.mjs",
+    "cqrs:test:projector": "node tools/phase2/cqrs/run-projector.mjs",
+    "cqrs:test:rebuild": "node tools/phase2/cqrs/run-rebuild.mjs",
+    "cqrs:test:read-path": "node tools/phase2/cqrs/run-read-path.mjs",
+    "cqrs:test:fault": "node tools/phase2/cqrs/run-fault.mjs",
+    "cqrs:rebuild": "node tools/phase2/cqrs/rebuild.mjs",
+    "cqrs:test:unit": "tsc -p packages/contracts/tsconfig.json && tsc -p packages/messaging/tsconfig.json && tsc -p services/clinic/tsconfig.json && node --test --test-isolation=none tools/phase2/cqrs/*.test.mjs",
     "test:docker:phase2": "node tools/docker/test-notifications.mjs --phase2",
     "docker:prepare-phase2": "node tools/docker/prepare-phase2.mjs",
     "test:docker:notifications": "node tools/docker/test-notifications.mjs",

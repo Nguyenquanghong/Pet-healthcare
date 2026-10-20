@@ -123,6 +123,17 @@ async function compareComponent(db,kind,expected,{emptyAllowed=false}={}){
   let empty=true,exact=true;const tables={};for(const name of targets[kind]){const actual=await readRows(db,catalogs[kind][name]);empty&&=actual.length===0;exact&&=digest(actual)===digest(expected[name]);tables[name]=reportTable(catalogs[kind][name],actual);}
   fail(exact||emptyAllowed&&empty,'TARGET_COLLISION_OR_DRIFT');return {empty,exact,tables};
 }
+// This importer only runs under its existing source-freeze/marker/journal guard.
+// Initial registry adoption is metadata, not an event per historical source row.
+// Refuse a live generation: import must never bypass CQRS writers after adoption.
+async function registerFrozenClinicReadRevisions(tx){
+  await tx.$executeRawUnsafe('LOCK TABLE runtime.appointments IN SHARE ROW EXCLUSIVE MODE');
+  const [control]=await tx.$queryRaw`SELECT count(*)::int AS n FROM runtime."ReadProjectionControl"`;
+  fail(control.n===0,'STOP_PROJECTOR_AND_USE_EXPLICIT_REBUILD_BEFORE_IMPORT');
+  const [conflict]=await tx.$queryRaw`SELECT count(*)::int AS n FROM runtime."ClinicReadRevision" WHERE kind='appointment' AND (deleted OR version<>1)`;
+  fail(conflict.n===0,'READ_REGISTRY_ALREADY_MUTATED');
+  await tx.$executeRaw`INSERT INTO runtime."ClinicReadRevision" (kind,"aggregateId",version,deleted,"changedAt") SELECT 'appointment',id,1,false,now() FROM runtime.appointments ON CONFLICT DO NOTHING`;
+}
 export async function inspectMigration(ctx,snapshot){const expected=buildMigration(snapshot,ctx),report=migrationReport(snapshot,ctx);await assertFrozenSource(ctx,snapshot);report.inspection={};
   for(const kind of ['core','clinic','notification'])report.inspection[kind]=await withDatabase(ctx,kind,db=>compareComponent(db,kind,expected[kind],{emptyAllowed:true}),{admin:true});return report;
 }
@@ -132,10 +143,11 @@ async function importMigrationLocked(ctx,snapshot,fault){
   for(const kind of ['core','clinic','notification'])await withDatabase(ctx,kind,db=>db.$transaction(async tx=>{
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(710007)::text`;
     const journals=await tx.$queryRaw`SELECT snapshot_hash FROM public.p7_import_journal`;fail(journals.every(j=>j.snapshot_hash===snapshot.sha256),'IMPORT_SNAPSHOT_REUSE');
-    if(journals.length){await compareComponent(tx,kind,expected[kind]);return;}
+    if(journals.length){await compareComponent(tx,kind,expected[kind]);if(kind==='clinic')await registerFrozenClinicReadRevisions(tx);return;}
     const before=await compareComponent(tx,kind,expected[kind],{emptyAllowed:true});fail(before.empty,'TARGET_NOT_EMPTY');
     if(kind==='core')for(const [table,prefix]of [['users','users'],['pets','pets']])for(const suffix of ['directory_revision','directory_event'])await tx.$executeRawUnsafe(`ALTER TABLE runtime.${ident(table)} DISABLE TRIGGER ${ident(prefix+'_'+suffix)}`);
     for(const name of targets[kind]){await insertRows(tx,catalogs[kind][name],expected[kind][name]);await fault?.(kind,name);}
+    if(kind==='clinic')await registerFrozenClinicReadRevisions(tx);
     if(kind==='core'){
       for(const [table,prefix]of [['users','users'],['pets','pets']])for(const suffix of ['directory_revision','directory_event'])await tx.$executeRawUnsafe(`ALTER TABLE runtime.${ident(table)} ENABLE TRIGGER ${ident(prefix+'_'+suffix)}`);
       const [codes]=await tx.$queryRaw`SELECT COALESCE(max(substring(transfer_code from '^NIPO([0-9]+)$')::bigint),0)::text AS maximum FROM runtime.invoices`;

@@ -1,0 +1,67 @@
+{
+  "version": "cqrs-acceptance-20261014-v1",
+  "status": "FROZEN_BEFORE_MEASUREMENT",
+  "primaryEndpoint": "GET /api/appointments",
+  "defaultReadMode": "authoritative",
+  "correctness": {
+    "allowedPrivacyLeaks": 0,
+    "allowedLostCommittedEvents": 0,
+    "allowedVersionRegressions": 0,
+    "allowedDuplicateEffects": 0,
+    "racePairsPerScenario": 100,
+    "replayDeliveriesPerEvent": 10
+  },
+  "freshness": {
+    "runs": 3,
+    "mutationsPerRun": 1000,
+    "p95MsMax": 2000,
+    "p99MsMax": 5000,
+    "adminWindowCases": 100,
+    "adminWindowMsMax": 10000,
+    "lagFallbackMs": 5000,
+    "evidenceExpiryMs": 6000,
+    "boundedWaitMsMax": 500,
+    "fallbackConcurrencyPerReplicaMax": 2
+  },
+  "recovery": {
+    "runs": 3,
+    "projectorOutageSeconds": 60,
+    "inputEventsPerSecondMax": 5,
+    "inputEventsMax": 300,
+    "catchUpSecondsMax": 120,
+    "rebuildAppointmentsMax": 100000,
+    "rebuildSecondsMax": 600
+  },
+  "benchmark": {
+    "abPairsMin": 3,
+    "order": ["AB", "BA", "AB"],
+    "equalTotalResourceBudgetRequired": true,
+    "projectorEnabledInAAndB": true,
+    "shadowEnabled": false,
+    "queryHeavy": {
+      "appointments": 100000,
+      "samplesPerOperationPerRunMin": 1000,
+      "warmupSecondsMin": 120,
+      "steadySecondsMin": 300
+    },
+    "pcn": {
+      "users": 100,
+      "spawnPerSecond": 10,
+      "warmupSeconds": 30,
+      "steadySeconds": 1800,
+      "waitSecondsMin": 0.5,
+      "waitSecondsMax": 1.5,
+      "weightsUnchangedRequired": true,
+      "acceptedScope": ["PCN01", "PCN02"]
+    },
+    "medianListP95ImprovementPercentMin": 20,
+    "pairedListP95RegressionPercentMax": 10,
+    "pcnListAndCalendarRegressionPercentMax": 10,
+    "writeP95RegressionVsOPercentMax": 10,
+    "successfulThroughputRegressionVsOPercentMax": 10,
+    "totalCpuSecondsPerSuccessIncreaseVsOPercentMax": 10,
+    "errors429And503Included": true
+  },
+  "results": ["PASS", "FAIL", "NOT_RUN", "INSUFFICIENT_SAMPLES", "INVALID_ENVIRONMENT", "INCONCLUSIVE"],
+  "projectionServingRequires": ["Q2", "Q3", "Q4", "Q5", "Q6"]
+}

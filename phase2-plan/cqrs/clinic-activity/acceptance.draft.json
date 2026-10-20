@@ -1,0 +1,109 @@
+{
+  "workstream": "clinic-activity",
+  "version": 1,
+  "status": "DRAFT_NOT_FROZEN",
+  "createdDate": "2026-10-20",
+  "notApplicationRuntimeConfig": true,
+  "historicalQ6PolicyUnchanged": true,
+  "environmentProfile": null,
+  "sourceManifest": null,
+  "primaryMetric": "http_primary_p95_latency",
+  "semantics": {
+    "role": "admin",
+    "dateField": "appointmentDate",
+    "statusMeaning": "current",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "maxPeriodDaysInclusive": 366,
+    "previousPeriod": "adjacent_equal_calendar_day_count",
+    "rateOnZeroDenominator": null
+  },
+  "primary": {
+    "endpoint": "/api/dashboard/clinic/activity",
+    "periodDays": 30,
+    "category": "all",
+    "groupBy": "day",
+    "fixtureBusinessDate": null,
+    "fixtureRows": 100000,
+    "minimumSuccessfulSamplesPerRun": 1000,
+    "maximumP95Ms": 300,
+    "minimumRelativeP95Improvement": 0.30,
+    "minimumAbsoluteP95ImprovementMs": 50,
+    "compareAgainst": ["S", "C"],
+    "maximumPairedRunRegression": 0.10
+  },
+  "matrix": {
+    "labels": ["S", "C", "P", "L"],
+    "pathBlocks": [["S", "C", "P"], ["P", "S", "C"], ["C", "P", "S"]],
+    "cacheTtlMs": 5000,
+    "cacheMaxEntries": 128,
+    "totalCostBaselineRequired": true,
+    "totalCostBaselineLabel": "L",
+    "identicalBusinessContractRequired": true
+  },
+  "productLoad": {
+    "screenCount": 10,
+    "pollIntervalMs": 15000,
+    "staggeredPolling": true,
+    "warmupSeconds": 120,
+    "minimumMeasuredSeconds": 1800,
+    "writeCommandsPerSecond": 0.1,
+    "writeMix": {"create": 0.2, "reschedule": 0.2, "status": 0.6},
+    "maxUnexpectedErrors": 0,
+    "maxGeneratorDrops": 0,
+    "maxHealthySummaryFallbacks": 0,
+    "responseSourceAndGenerationRequired": true
+  },
+  "regression": {
+    "maximumWriteP95Increase": 0.10,
+    "minimumMeasuredWriteSamplesPerConfiguration": 1000,
+    "maximumApplicationCpuPerSuccessIncrease": 0.10,
+    "maximumSuccessfulThroughputDecrease": 0.10,
+    "backgroundComponentsIncluded": true,
+    "generatorCpuReportedSeparately": true,
+    "measuredWindowMarkersRequired": true
+  },
+  "freshness": {
+    "runs": 3,
+    "minimumSamplesPerRun": 1000,
+    "backendP95Ms": 5000,
+    "backendP99Ms": 10000,
+    "visibleUiP95Ms": 20000,
+    "timeoutSamplesMustBeRetained": true,
+    "evidenceIsNotAnAbsoluteStalenessGuarantee": true
+  },
+  "recovery": {
+    "runs": 3,
+    "outageSeconds": 60,
+    "maximumBacklogEvents": 300,
+    "maximumCatchUpSeconds": 120,
+    "requiredFinalMismatchCount": 0
+  },
+  "correctness": {
+    "sourceToReadRowMismatch": 0,
+    "readRowToSummaryMismatch": 0,
+    "negativeCounters": 0,
+    "unauthorizedResponses": 0,
+    "mandatoryTestsMayBeSkipped": false
+  },
+  "fallback": {
+    "maximumConcurrentPerReplica": 2,
+    "unboundedQueueAllowed": false,
+    "wholeResponseSourceRequired": true
+  },
+  "diagnosticIterationLimitPerBottleneck": 2,
+  "decisions": [
+    "RECOMMEND_SUMMARY",
+    "RECOMMEND_SIMPLE",
+    "INCONCLUSIVE",
+    "FAIL_CORRECTNESS",
+    "INVALID_ENVIRONMENT"
+  ],
+  "freezeRequirements": [
+    "verify_working_tree_and_source_manifest",
+    "set_fixture_business_date",
+    "set_environment_profile_and_resource_budget",
+    "document_S_C_P_L_configurations",
+    "record_any_threshold_changes_before_measurements",
+    "write_acceptance_frozen_json_and_sha256"
+  ]
+}

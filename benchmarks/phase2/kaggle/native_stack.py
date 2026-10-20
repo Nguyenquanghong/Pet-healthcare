@@ -36,12 +36,18 @@ def wait_port(port, process, seconds=90):
 
 
 class NativeStack:
-    def __init__(self, repo, accounts=40, replicas=1, dataset_profile='deep'):
+    def __init__(self, repo, accounts=40, replicas=1, dataset_profile='deep', *, cqrs_configuration=None):
         if platform.system() != 'Linux':
             raise RuntimeError('Native stack requires Linux (Kaggle CPU notebook)')
-        maximum = 100 if dataset_profile == 'pcn' else 40
-        if dataset_profile not in ('deep', 'pcn') or not isinstance(accounts, int) or not 2 <= accounts <= maximum or replicas not in (1, 2):
-            raise ValueError('deep accounts 2..40 / pcn accounts 2..100; Clinic replicas 1 or 2')
+        maximum = 100 if dataset_profile in ('pcn', 'query-heavy') else 40
+        if dataset_profile not in ('deep', 'pcn', 'query-heavy') or not isinstance(accounts, int) or not 2 <= accounts <= maximum or replicas not in (1, 2):
+            raise ValueError('deep accounts 2..40 / pcn or query-heavy accounts 2..100; Clinic replicas 1 or 2')
+        if dataset_profile == 'query-heavy' and (accounts != 100 or replicas != 1):
+            raise ValueError('query-heavy requires 100 accounts and exactly one Clinic')
+        if cqrs_configuration is not None and (cqrs_configuration not in ('O', 'A', 'B')
+                or dataset_profile not in ('query-heavy', 'pcn') or replicas != 1):
+            raise ValueError('Q6 requires O/A/B, a benchmark fixture and one Clinic')
+        self.cqrs_configuration = cqrs_configuration
         self.dataset_profile = dataset_profile
         self.repo = Path(repo).resolve(strict=True)
         self.run = str(uuid.uuid4())
@@ -127,12 +133,13 @@ class NativeStack:
         context = {'kind': 'phase2-kaggle-native-v1', 'run': self.run, 'directory': str(self.private),
             'urls': urls, 'pgData': str(data), 'pgPort': pg, 'accounts': self.accounts, 'replicas': self.replicas,
             'datasetProfile': self.dataset_profile,
+            'cqrsConfiguration': self.cqrs_configuration,
             'broker': f'amqp://p8:{rabbit_password}@127.0.0.1:{rabbit}', 'redis': f'redis://127.0.0.1:{redis}'}
         path = self.private / 'context.json'
         path.write_text(json.dumps(context)); path.chmod(0o600)
         env = {key: value for key, value in os.environ.items() if key in ('PATH', 'HOME', 'LANG', 'TMPDIR', 'SystemRoot')}
         self.application = self.start_process('application', ['node', str(self.repo / 'benchmarks/phase2/kaggle/stack.mjs'), str(path)], cwd=self.repo, env=env, stdin=subprocess.PIPE, text=True)
-        end = time.monotonic() + 240
+        end = time.monotonic() + (900 if self.cqrs_configuration in ('A', 'B') else 240)
         while time.monotonic() < end:
             if self.application.poll() is not None:
                 raise RuntimeError('Three-service startup failed; private application.log retained')

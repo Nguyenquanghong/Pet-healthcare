@@ -6,8 +6,8 @@ export function logEvent(service:string,event:Envelope,status:string,started=per
   const id=(v:string)=>/^[0-9a-f-]{36}$/i.test(v)?v:'unknown';
   try{process.stdout.write(JSON.stringify({service,eventId:id(event.eventId),correlationId:id(event.correlationId),eventType:event.eventType,status,latencyMs:Math.round(performance.now()-started)})+'\n');}catch{}
 }
-export type ConsumerName = 'notification' | 'clinic';
-export const topology = (prefix = 'nipopeto.v1') => ({ exchange: `${prefix}.events`, notification: `${prefix}.notification`, clinic: `${prefix}.clinic` });
+export type ConsumerName = 'notification' | 'clinic' | 'clinic-read-v1';
+export const topology = (prefix = 'nipopeto.v1') => ({ exchange: `${prefix}.events`, notification: `${prefix}.notification`, clinic: `${prefix}.clinic`, clinicRead: `${prefix}.clinic-read-v1` });
 export type Topology = ReturnType<typeof topology>;
 export async function declareTopology(brokerUrl: string, t: Topology) {
   const connection = await amqp.connect(brokerUrl, { timeout: 5000 });
@@ -15,13 +15,14 @@ export async function declareTopology(brokerUrl: string, t: Topology) {
   try {
     const channel = await connection.createChannel();
     await channel.assertExchange(t.exchange, 'topic', { durable: true });
-    for (const consumer of ['notification', 'clinic'] as const) {
+    for (const consumer of ['notification', 'clinic', 'clinicRead'] as const) {
       await channel.assertQueue(t[consumer], { durable: true });
       await channel.assertQueue(`${t[consumer]}.dlq`, { durable: true });
     }
     await channel.bindQueue(t.notification, t.exchange, 'notification.requested.v1');
     await channel.bindQueue(t.clinic, t.exchange, 'directory.#');
     await channel.bindQueue(t.clinic, t.exchange, 'billing.#');
+    await channel.bindQueue(t.clinicRead, t.exchange, 'clinic.appointment-read-changed.v1');
   } finally { await connection.close(); }
 }
 // Confirm and mandatory-return detection are both required.
@@ -73,7 +74,7 @@ export async function consumeEvents(brokerUrl: string, queue: string, consumerNa
     try {
       const event = parseEnvelope(message.content.toString('utf8'));
       observed=event;
-      valid = consumerName === 'notification' ? event.eventType === 'notification.requested.v1' : event.eventType.startsWith('billing.') || event.eventType.startsWith('directory.');
+      valid = consumerName === 'notification' ? event.eventType === 'notification.requested.v1' : consumerName === 'clinic-read-v1' ? event.eventType === 'clinic.appointment-read-changed.v1' : event.eventType.startsWith('billing.') || event.eventType.startsWith('directory.');
       if (!valid) reason = 'UNSUPPORTED_EVENT';
     } catch {}
     if (valid) {

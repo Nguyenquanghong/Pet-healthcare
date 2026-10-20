@@ -82,6 +82,8 @@ enum AppointmentType {
 }
 
 model Appointment {
+  // SQL migration 20261019000100 adds a non-unique INCLUDE index for read ACL
+  // ranges; Prisma schema cannot express its covering columns.
   id              String            @id @default(uuid())
   petId           String            @map("pet_id")
   ownerId         String            @map("owner_id")
@@ -203,6 +205,93 @@ model RequestDedup {
  requestHash String
  resourceId String
  responsePayload Json
+ readVersions Json @default("{}")
  createdAt DateTime @default(now())
  @@unique([actorId,operationType,key])
+}
+
+// Independent read version: reservation/note changes are not statusRevision.
+// No source FK: tombstones must survive a future supported source deletion.
+model ClinicReadRevision {
+ kind String
+ aggregateId String
+ version Int
+ deleted Boolean @default(false)
+ changedAt DateTime @default(now())
+ @@id([kind,aggregateId])
+}
+
+enum ReadGenerationState {
+ BUILDING
+ READY
+ ACTIVE
+ RETIRED
+}
+model ReadProjectionGeneration {
+ id String @id
+ projectionName String @default("appointments")
+ schemaVersion Int @default(1)
+ state ReadGenerationState @default(BUILDING)
+ startedAt DateTime @default(now())
+ verifiedAt DateTime?
+ rows AppointmentReadRow[]
+ activeIn ReadProjectionControl[]
+}
+model ReadProjectionControl {
+ projectionName String @id
+ activeGenerationId String?
+ servingMode String @default("authoritative")
+ // Column-level UPDATE permits FOR SHARE without granting pointer/mode changes.
+ lockAnchor Boolean @default(true)
+ activeGeneration ReadProjectionGeneration? @relation(fields:[activeGenerationId],references:[id],onDelete:Restrict)
+}
+model AppointmentQueryEpoch {
+ scope String @id
+ revision BigInt @default(1)
+}
+
+model AppointmentReadRow {
+  // SQL migration 20261019000100 adds the partial INCLUDE aggregate range
+  // index. Keep its deletedAt predicate/covering columns in migration SQL.
+ generation String
+ appointmentId String
+ sourceVersion Int
+ petId String
+ ownerId String
+ doctorId String?
+ type AppointmentType
+ serviceName String
+ clinicName String
+ appointmentDate DateTime @db.Date
+ appointmentTime String
+ status AppointmentStatus
+ statusRevision Int
+ ownerNote String?
+ internalNote String?
+ createdBy String
+ createdAt DateTime
+ updatedAt DateTime
+ billingHeld Boolean
+ billingInvoiced Boolean
+ deletedAt DateTime?
+ projectedAt DateTime @default(now())
+ generationRecord ReadProjectionGeneration @relation(fields:[generation],references:[id],onDelete:Restrict)
+ @@id([generation,appointmentId])
+ @@index([generation,deletedAt,status,createdAt(sort: Desc),appointmentId(sort: Desc)], map: "appointment_read_admin_page_idx")
+ @@index([generation,deletedAt,ownerId,status,appointmentDate(sort: Desc),appointmentTime(sort: Desc),appointmentId(sort: Desc)], map: "appointment_read_owner_page_idx")
+}
+
+// Durable trial rebuild fence/checkpoint. Only an operator may mutate this table.
+model ReadRebuildRun {
+ id String @id
+ generation String @unique
+ expectedGeneration String?
+ ownerPid Int
+ frozen Boolean @default(true)
+ checkpoint String?
+ sourceHash String?
+ state String @default("BUILDING")
+ copied Int @default(0)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
 }

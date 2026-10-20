@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.json && node ../../tools/phase2/copy-client.mjs",
     "start": "tsx src/index.ts",
     "start:built": "node dist/index.js",
-    "worker:built": "node dist/worker.js"
+    "worker:built": "node dist/worker.js",
+    "read-worker:built": "node dist/readWorker.js"
   },
   "dependencies": {
     "@nipopeto/contracts": "1.0.0",

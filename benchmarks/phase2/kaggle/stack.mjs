@@ -69,14 +69,22 @@ try{
   }
   const password=randomBytes(24).toString('hex'),hash=await hashPasswordAsync(password);
   const profile=context.datasetProfile??'deep';
-  assert.ok(['deep','pcn'].includes(profile));
-  const makeDataset=profile==='pcn'?(await import('./pcn_dataset.mjs')).createPcnDataset:createDataset;
+  assert.ok(['deep','pcn','query-heavy'].includes(profile));
+  const makeDataset=profile==='query-heavy'?(await import('./query_dataset.mjs')).createQueryDataset:profile==='pcn'?(await import('./pcn_dataset.mjs')).createPcnDataset:createDataset;
   const dataset=await makeDataset(db,{run:context.run,hash,count:context.accounts,anchor:new Date()});
+  const cqrsMode=context.cqrsConfiguration;
+  let cqrs,cqrsTools;
+  if(cqrsMode!==undefined&&cqrsMode!==null){
+    assert.equal(context.replicas,1);assert.ok(['pcn','query-heavy'].includes(profile));
+    cqrsTools=await import('./cqrs_runtime.mjs');
+    cqrs=await cqrsTools.prepareReadModel(cqrsMode,context.urls.clinic,context);
+  }
   const admin=await db.core.user.create({data:{id:randomUUID(),username:'p8_'+context.run,fullName:'Synthetic benchmark admin',role:'admin',...hash}});
   const keys=generateKeyPairSync('rsa',{modulusLength:2048});
   const privateKey=keys.privateKey.export({type:'pkcs8',format:'pem'}).toString();
   const secret=()=>randomBytes(32).toString('hex');
   const credentials=Object.fromEntries(['CORE_DIRECTORY_TOKEN','CORE_BILLING_EVIDENCE_TOKEN','CLINIC_BILLING_TOKEN','CLINIC_BOOTSTRAP_TOKEN','CORE_NOTIFICATION_SEND_TOKEN'].map(k=>[k,secret()]));
+  const cqrsEnv=cqrsTools?{...cqrsTools.apiEnvironment(cqrsMode,secret()),CLINIC_READ_DIAGNOSTICS:cqrsMode==='O'?'0':'1'}:{CLINIC_READ_DIAGNOSTICS:'0'};
   const common={HOST:'127.0.0.1',PHASE2_RUNTIME_REQUIRED:'1',JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:keys.publicKey.export({type:'spki',format:'pem'}).toString(),JWT_KEY_ID:'p8-kaggle',JWT_ISSUER:'p8-core',JWT_AUDIENCE:'pet-healthcare',JWT_SECRET:'',REDIS_URL:context.redis,RATE_LIMIT_NAMESPACE:'p8-'+context.run,RATE_LIMIT_KEY_SECRET:secret(),OBSERVABILITY_TOKEN:secret(),DB_POOL_LIMIT:'4',HASH_CONCURRENCY:'2',HASH_PENDING_LIMIT:'16',TRUST_PROXY_CIDRS:'',BROKER_URL:context.broker,BROKER_PREFIX:'p8.'+context.run,PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',BANK_TRANSFER_ENABLED:'false',CORS_ORIGIN:''};
   const ports={core:await port(),notification:await port(),clinic:await port(),gateway:await port()};
   const clinicPorts=[];for(let n=0;n<context.replicas;n++)clinicPorts.push(await port());
@@ -97,8 +105,11 @@ try{
     if(readyPort)metrics.push({name,origin:'http://127.0.0.1:'+readyPort,pid:c.pid});
     return handle;
   }
+  if(cqrs?.projectorEnabled)await child('clinic-read-worker','services/clinic/dist/readWorker.js',{
+    JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:'',JWT_KEY_ID:'',JWT_ISSUER:'',JWT_AUDIENCE:'',REDIS_URL:'',RATE_LIMIT_KEY_SECRET:'',OBSERVABILITY_TOKEN:'',
+    DATABASE_URL:context.urls.clinic,CLINIC_READ_PROJECTOR_POOL_LIMIT:'1'});
   await child('core','backend/dist/src/index.js',{...credentials,JWT_PRIVATE_KEY:privateKey,DATABASE_URL:context.urls.core,PORT:String(ports.core),SERVICE_INSTANCE_ID:'p8-core'},ports.core);
-  for(let i=0;i<clinicPorts.length;i++)await child('clinic-'+i,'services/clinic/dist/index.js',{...credentials,CORE_NOTIFICATION_SEND_TOKEN:'',DATABASE_URL:context.urls.clinic,PORT:String(clinicPorts[i]),SERVICE_INSTANCE_ID:'p8-clinic-'+i},clinicPorts[i]);
+  for(let i=0;i<clinicPorts.length;i++)await child('clinic-'+i,'services/clinic/dist/index.js',{...credentials,...cqrsEnv,CORE_NOTIFICATION_SEND_TOKEN:'',DATABASE_URL:context.urls.clinic,PORT:String(clinicPorts[i]),SERVICE_INSTANCE_ID:'p8-clinic-'+i},clinicPorts[i]);
   await child('notification','services/notification/dist/index.js',{CORE_NOTIFICATION_SEND_TOKEN:credentials.CORE_NOTIFICATION_SEND_TOKEN,DATABASE_URL:context.urls.notification,PORT:String(ports.notification)},ports.notification);
   mkdirSync(resolve(dir,'nginx-temp'));
   const headers='proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Request-ID $request_id; proxy_connect_timeout 1s; proxy_read_timeout 15s; proxy_next_upstream error timeout http_502 http_503 http_504;';
@@ -113,7 +124,7 @@ try{
   const notificationWorker=()=>child('notification-worker','services/notification/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.notification});
   let consumer=await notificationWorker();
   await child('billing-worker','backend/dist/src/phase2/billingWorker.js',{...credentials,JWT_PRIVATE_KEY:privateKey,DATABASE_URL:context.urls.core});
-  dump('ready.json',{run:context.run,password,accounts:dataset.accounts,admin:{id:admin.id,username:admin.username},dataset:dataset.description,baseUrl:origins.gateway,metrics,metricsToken:common.OBSERVABILITY_TOKEN,processes:handles.map(h=>({name:h.name,pid:h.child.pid})),clinicReplicas:context.replicas,dbCrossConnectDenied:6});
+  dump('ready.json',{run:context.run,cqrs,password,accounts:dataset.accounts,admin:{id:admin.id,username:admin.username},dataset:dataset.description,baseUrl:origins.gateway,metrics,metricsToken:common.OBSERVABILITY_TOKEN,processes:handles.map(h=>({name:h.name,pid:h.child.pid})),clinicReplicas:context.replicas,dbCrossConnectDenied:6});
   const lines=createInterface({input:process.stdin});
   for await(const line of lines){
     const command=JSON.parse(line);
@@ -121,8 +132,20 @@ try{
     assert.match(command.id,/^[0-9a-f-]{36}$/);
     let response;
     try{
-      if(command.action==='pause-notification'){await stop(consumer);response={paused:true};}
+      if(command.action==='cqrs-observe'){assert.ok(cqrsTools);response={...await cqrsTools.observeReadModel(db.clinic,cqrsMode),unexpectedExit:failed};}
+      else if(command.action==='cqrs-query-plans'){
+        assert.equal(profile,'query-heavy');assert.equal(cqrsMode,'B');
+        const {collectQueryPlans}=await import('./cqrs_query_plans.mjs');
+        response=await collectQueryPlans(db.clinic,context.urls.clinic,context);
+      }
+      else if(command.action==='pause-notification'){await stop(consumer);response={paused:true};}
       else if(command.action==='resume-notification'){consumer=await notificationWorker();response={resumed:true};}
+      else if(command.action==='query-snapshot'||command.action==='query-observe'){
+        assert.equal(profile,'query-heavy');
+        const {querySnapshot,queryObserve}=await import('./query_dataset.mjs');
+        response=command.action==='query-snapshot'?await querySnapshot(db.clinic):await queryObserve(db.clinic);
+        response.unexpectedExit=failed;
+      }
       else if(command.action==='inspect'){
         const ids=command.appointmentIds;
         if(ids!==undefined)assert.ok(Array.isArray(ids)&&ids.length>0&&ids.length<=300&&ids.every(id=>typeof id==='string'&&/^[0-9a-f-]{36}$/.test(id)));

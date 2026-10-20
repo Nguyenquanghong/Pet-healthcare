@@ -5,6 +5,7 @@ overlay contains benchmark tools only, so no push of local changes is needed.
 """
 import hashlib
 import json
+import re
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -13,17 +14,27 @@ BASE_COMMIT = '58811549225692ec7e765031151ca5f47aed4b56'
 FILES = [
     *['benchmarks/phase2/kaggle/' + name for name in (
         'native_stack.py', 'stack.mjs', 'pcn_dataset.mjs', 'pcn_adapter.py',
-        'pcn_locust.py', 'pcn_runner.py', 'benchmark.py', 'acceptance.json')],
+        'pcn_locust.py', 'pcn_runner.py', 'benchmark.py', 'acceptance.json', 'cqrs_probe.py', 'cqrs_diagnostics.py')],
     *['benchmarks/kaggle/' + name for name in ('pcn_locustfile.py', 'pcn_contract.py', 'metrics.py')],
 ]
 
 
-def build():
+def build(*, base_commit=BASE_COMMIT, target=None, extra_files=()):
+    if not re.fullmatch(r'[0-9a-f]{40}', base_commit):
+        raise ValueError('A full application commit is required')
+    for name in extra_files:
+        relative = Path(name)
+        if (relative.is_absolute() or '..' in relative.parts
+                or not name.startswith(('benchmarks/phase2/kaggle/', 'benchmarks/kaggle/'))
+                or relative.suffix not in ('.py', '.mjs', '.json')
+                or (REPO / relative).is_symlink()
+                or not (REPO / relative).resolve().is_relative_to(REPO.resolve())):
+            raise ValueError('Overlay must contain benchmark helper source only')
     base = json.loads((HERE.parent / 'phase2-kaggle.ipynb').read_text(encoding='utf-8'))
     code_cells = [''.join(c['source']) for c in base['cells'] if c['cell_type'] == 'code']
     clone = code_cells[0].split("else:\n    matches = list(Path('/kaggle/input')")[0]
-    clone = clone.replace("GIT_REF = 'phase2/service-split-checkpoint-20261012'", f"GIT_REF = '{BASE_COMMIT}'")
-    clone = clone.replace('EXPECTED_COMMIT = None', f"EXPECTED_COMMIT = '{BASE_COMMIT}'")
+    clone = clone.replace("GIT_REF = 'phase2/service-split-checkpoint-20261012'", f"GIT_REF = '{base_commit}'")
+    clone = clone.replace('EXPECTED_COMMIT = None', f"EXPECTED_COMMIT = '{base_commit}'")
     clone = clone.replace("RECEIPT_PATH = None  # chỉ cần cho SOURCE_MODE='archive' nếu có nhiều input\n", '')
     clone = clone.replace("assert SOURCE_MODE in ('git','archive')", "assert SOURCE_MODE == 'git'")
     clone += "\nassert (ROOT/'benchmarks/phase2/kaggle/native_stack.py').is_file()\nprint({'git_commit':commit,'base_source_hash':source_hash})\n"
@@ -77,7 +88,7 @@ giống hệt. Muốn kết luận tăng tốc cần kết quả pha 1 cùng mô
     add('code', clone)
     add('markdown', '## Cài stack thử trong Kaggle\nNative PostgreSQL/3 DB, RabbitMQ, Redis, Nginx; Node 24.16.0, `npm ci` theo lockfile. Log và dữ liệu riêng trong `/tmp`, không xuất credentials.')
     add('code', setup)
-    payload = {name: {'text': (REPO/name).read_text(encoding='utf-8')} for name in FILES}
+    payload = {name: {'text': (REPO/name).read_text(encoding='utf-8')} for name in [*FILES, *extra_files]}
     for value in payload.values(): value['sha256'] = hashlib.sha256(value['text'].encode()).hexdigest()
     add('markdown', '## Công cụ đo kèm notebook\nCell này chứa source helper để notebook dùng được ngay cả khi chưa push. Hash base application và hash overlay được ghi tách biệt.')
     add('code', 'BENCHMARK_OVERLAY = ' + repr(payload) + '''
@@ -149,7 +160,7 @@ display(FileLink(str(archive_out)))
 print({'download':str(archive_out),'load_status':result['load_status'],'overall':result['overall']})
 ''')
     notebook = {'cells': cells, 'metadata': base['metadata'], 'nbformat': 4, 'nbformat_minor': 5}
-    target = HERE.parent / 'phase2-pcn-kaggle.ipynb'
+    target = Path(target) if target is not None else HERE.parent / 'phase2-pcn-kaggle.ipynb'
     target.write_text(json.dumps(notebook, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
     return target
 

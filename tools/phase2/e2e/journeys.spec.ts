@@ -77,12 +77,30 @@ test('P5 request evidence for the same real dashboard and appointments flows',as
   await page.addInitScript(()=>{(window as any).__e2eReactModes=[];(window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__={supportsFiber:true,inject:(renderer:any)=>{(window as any).__e2eReactModes.push(renderer.bundleType);return 1;},onCommitFiberRoot:()=>{},onCommitFiberUnmount:()=>{}};});
   const f=fixture();await browserOnlyLocal(page);const sign=await page.request.post('/api/auth/admin/login',{data:{username:f.admin.username,password:f.password}});expect(sign.status()).toBe(200);const {token}=await sign.json();await page.addInitScript(token=>sessionStorage.setItem('nipopeto_access_token',token),token);const calls=network(page),phases=[];
   for(const path of ['/admin/dashboard','/admin/appointments']){const start=calls.length;await page.goto(path);await expect(page.getByRole('heading',{name:path.endsWith('dashboard')?'Dashboard':'Quản lý lịch hẹn',exact:true})).toBeVisible();expect(await page.evaluate(()=>(window as any).__e2eReactModes)).toEqual([0]);await page.waitForLoadState('networkidle');const idleStart=calls.length;await page.waitForTimeout(12000);phases.push({path,durationMs:12000,initial:calls.slice(start,idleStart),background:calls.slice(idleStart),calls:calls.slice(start)});}
-  const before=JSON.parse(readFileSync(existsSync('test-results/phase2/p5-network-baseline.json')?'test-results/phase2/p5-network-baseline.json':'phase2-plan/evidence/p5-network-before.json','utf8'));writeFileSync('test-results/phase2/p5-network-after.json',JSON.stringify({run:f.run,phases},null,2));expect(calls.some(r=>r.path==='/api/bootstrap')).toBe(false);
+  const before=JSON.parse(readFileSync(existsSync('test-results/phase2/p5-network-baseline.json')?'test-results/phase2/p5-network-baseline.json':'phase2-plan/evidence/p5-network-before.json','utf8'));
+  writeFileSync('test-results/phase2/p5-network-after.json',JSON.stringify({run:f.run,phases,historicalComparison:{
+    beforeRequests:before.phases.reduce((n:number,p:any)=>n+p.calls.length,0),afterRequests:calls.length,
+    comparable:false,reason:'Current Admin pages intentionally poll scoped resources every 5s; the old bootstrap workload differs.'}},null,2));
+  expect(calls.some(r=>r.path==='/api/bootstrap')).toBe(false);
   // Session fencing may cancel its superseded initial /me request. Record its
   // actual terminal failure; never accept an unknown/pending or failed business
   // request. The replacement /me must finish with 200 on each navigation.
   const canceledSession=(r:typeof calls[number])=>r.outcome==='failed'&&r.failure==='net::ERR_ABORTED'&&r.method==='GET'&&r.path==='/api/auth/me';
   expect(calls.every(r=>r.outcome==='finished'&&r.status===200||canceledSession(r))).toBe(true);
   for(const phase of phases){expect(phase.initial.some(r=>r.path==='/api/auth/me'&&r.outcome==='finished'&&r.status===200)).toBe(true);expect(phase.initial.filter(canceledSession).length).toBeLessThanOrEqual(1);}
-  expect(phases.every(p=>p.background.length===0)).toBe(true);expect(before.phases.reduce((n:number,p:any)=>n+p.background.length,0)).toBeGreaterThan(0);expect(phases.reduce((n,p)=>n+p.calls.length,0)).toBeLessThan(before.phases.reduce((n:number,p:any)=>n+p.calls.length,0));
+  // Admin refresh across windows is intentional. Assert the current bounded,
+  // scoped polling contract instead of the obsolete zero-background contract.
+  for(const phase of phases){
+    const expected=phase.path==='/admin/dashboard'
+      ? ['/api/dashboard/core','/api/dashboard/clinic','/api/notifications/unread-count']
+      : ['/api/appointments','/api/notifications/unread-count'];
+    expect(phase.background.every(r=>r.method==='GET'&&expected.includes(r.path))).toBe(true);
+    for(const path of expected){
+      const count=phase.background.filter(r=>r.path===path).length;
+      expect(count,`${phase.path}: ${path} must refresh`).toBeGreaterThanOrEqual(1);
+      // 5s polling with 15% jitter in a 12s observation window; no request storm.
+      expect(count,`${phase.path}: ${path} polling is bounded`).toBeLessThanOrEqual(3);
+      expect(phase.initial.filter(r=>r.path===path)).toHaveLength(1);
+    }
+  }
 });
