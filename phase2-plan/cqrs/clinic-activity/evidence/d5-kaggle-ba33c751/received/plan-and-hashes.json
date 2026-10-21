@@ -1,0 +1,111 @@
+{
+  "hashes": {
+    "sourceArchiveSha256": "7f9c98e8410a7709428cb0673ffe4155c87bbe293119a0463e29b72e0ea626a0",
+    "sourceTreeSha256": "40f430d03e9d6e6b2b4d9dde1fa5c070db698a157a2bdd6ce01189db24b6ca50",
+    "buildSha256": "30e613637f937285fdf2a0ab80e6a140bc329e87043fac9ce5c07fba89b6b9fa",
+    "fixtureSha256": "dd29ca40cc98758ab7245d8ae908b86427eabaedb8edc18a144027134d9fbe24",
+    "traceSha256": "41e18025aa9eb92b03c2e85e8536534a4614eb8c9623c7d6578ab2b615be20ce",
+    "harnessSha256": "c595c6cbedb051ce58ecf94527a0021e9746785b7ad4218102b94b0f70fa4760",
+    "policySha256": "d8fbedbceacc82a79897be25315b4e16fa16823a3226f20493e882762784434e",
+    "migrationSha256": "07d13d323242156628af20fa75f0990ee2feac7c5f2d7f57854bade0dd0766e5"
+  },
+  "profileKey": {
+    "resourceClass": "kaggle_shared_envelope",
+    "cpuModel": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+    "architecture": "x86_64",
+    "cpuQuotaAndAffinity": {
+      "quota": "400000 100000",
+      "affinity": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "memoryMax": "32212254720",
+    "liveSoftwareVersions": {
+      "node": "v24.16.0",
+      "npm": "11.13.0",
+      "prisma": "6.19.3",
+      "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+      "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92",
+      "nginx": "nginx version: nginx/1.24.0 (Ubuntu)",
+      "rabbitmq": "3.12.1-1ubuntu1.7",
+      "erlang": "1:25.3.2.8+dfsg-1ubuntu4.8",
+      "kernel": "6.18.48+"
+    },
+    "replicas": {
+      "clinic": 1,
+      "core": 1,
+      "notification": 1
+    },
+    "poolLimits": {
+      "coreApi": 4,
+      "clinicApi": 4,
+      "clinicAudit": 1,
+      "readWorker": 1,
+      "notificationApi": 4,
+      "operator": "per client",
+      "source": "DB_POOL_LIMIT/connection_limit as configured"
+    },
+    "sourceBuildManifests": {
+      "source": "40f430d03e9d6e6b2b4d9dde1fa5c070db698a157a2bdd6ce01189db24b6ca50",
+      "build": "30e613637f937285fdf2a0ab80e6a140bc329e87043fac9ce5c07fba89b6b9fa"
+    },
+    "logicalFixtureDigest": "dd29ca40cc98758ab7245d8ae908b86427eabaedb8edc18a144027134d9fbe24",
+    "traceDigest": "41e18025aa9eb92b03c2e85e8536534a4614eb8c9623c7d6578ab2b615be20ce",
+    "harnessDigest": "c595c6cbedb051ce58ecf94527a0021e9746785b7ad4218102b94b0f70fa4760",
+    "policyDigest": "d8fbedbceacc82a79897be25315b4e16fa16823a3226f20493e882762784434e"
+  },
+  "profileKeySha256": "5ee445219381ea12876b5e7e1d303b20002cc2fe61fba8fb3ca610add3c8656c",
+  "traces": [
+    {
+      "label": "calibration",
+      "kind": "calibration",
+      "plan": {
+        "screens": 20,
+        "pollMs": 15000,
+        "warmupMs": 0,
+        "measuredMs": 120000,
+        "writesPerSecond": 0.2,
+        "seed": 20261020
+      }
+    },
+    {
+      "label": "smoke-S",
+      "kind": "smoke",
+      "plan": {
+        "screens": 10,
+        "pollMs": 3000,
+        "warmupMs": 15000,
+        "measuredMs": 75000,
+        "writesPerSecond": 0.5,
+        "seed": 20261020
+      }
+    },
+    {
+      "label": "smoke-C",
+      "kind": "smoke",
+      "plan": {
+        "screens": 10,
+        "pollMs": 3000,
+        "warmupMs": 15000,
+        "measuredMs": 75000,
+        "writesPerSecond": 0.5,
+        "seed": 20261020
+      }
+    },
+    {
+      "label": "smoke-P",
+      "kind": "smoke",
+      "plan": {
+        "screens": 10,
+        "pollMs": 3000,
+        "warmupMs": 15000,
+        "measuredMs": 75000,
+        "writesPerSecond": 0.5,
+        "seed": 20261020
+      }
+    }
+  ]
+}

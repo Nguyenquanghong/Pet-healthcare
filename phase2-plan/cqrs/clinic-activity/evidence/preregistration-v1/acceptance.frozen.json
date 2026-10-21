@@ -1,0 +1,466 @@
+{
+  "workstream": "clinic-activity",
+  "version": 1,
+  "status": "THRESHOLDS_FROZEN_ENVIRONMENT_PENDING",
+  "createdDate": "2026-10-20",
+  "notApplicationRuntimeConfig": true,
+  "historicalQ6PolicyUnchanged": true,
+  "environmentProfile": {
+    "status": "PROPOSED_NOT_OBSERVED_OR_RESOURCE_FROZEN",
+    "d0HostObserved": {
+      "os": "Windows 11 build 26200",
+      "architecture": "AMD64",
+      "logicalCpuCount": 12,
+      "node": "24.15.0",
+      "npm": "11.12.1",
+      "python": "3.13.13",
+      "quotasEnforced": false
+    },
+    "lockfileResolved": {
+      "prisma": "6.19.3",
+      "prismaClient": "6.19.3",
+      "typescript": "7.0.2",
+      "amqplib": "0.10.9",
+      "express": "5.2.1"
+    },
+    "actualTrial": null,
+    "enforcedStackBudget": {
+      "cpuQuota": null,
+      "memoryBytes": null,
+      "ioLimit": null,
+      "enforcementAndCoverageEvidence": null
+    },
+    "generatorBudgetAndIsolation": null,
+    "processReplicaPoolAllocation": null,
+    "liveRolePrivileges": null,
+    "identityGuardEvidence": null,
+    "unknowns": [
+      "native/remote host identity and OS, sanitized endpoints and dedicated trial database identity",
+      "exact live Node/PostgreSQL/RabbitMQ/Prisma versions and binary or image digests",
+      "total enforced CPU/RAM/IO allocation covering APIs, all workers, DB, broker, audit and common background services",
+      "separate generator resource allocation and co-tenant isolation",
+      "replica/process counts, API and worker pools and connections",
+      "live DB/schema/marker/migration inventory and least-privilege grants",
+      "activity-specific guard implementation and isolated queue namespace",
+      "fixture implementation/seeded data hash, valid command trace and trial build/harness manifest"
+    ],
+    "noDockerDbBrokerCommandsRunDuringD0": true,
+    "chosenTrial": "native_remote",
+    "choiceSource": "User reply during D0, 2026-10-20: Trial native/remote; configuration and quotas still to be supplied.",
+    "localReferenceNotSelected": {
+      "project": "pet-phase2-p1-test",
+      "composeFile": "deploy/phase2/compose.test.yml",
+      "postgresEndpoint": "127.0.0.1:55432",
+      "database": "p2_clinic_test",
+      "schemaPattern": "activity_<run UUID hex>",
+      "schemaMarkerPattern": "clinic-activity:<run UUID>",
+      "publicMarker": "pet-phase2-p1-test:clinic:v1",
+      "brokerEndpoint": "127.0.0.1:5679",
+      "brokerPrefixPattern": "p2.activity.<run UUID>",
+      "declaredImages": {
+        "postgres": "postgres:16-alpine",
+        "rabbitmq": "rabbitmq:4.1-management-alpine",
+        "redis": "redis:7.4-alpine"
+      },
+      "declaredImagesAreLiveVersionEvidence": false
+    },
+    "selectedTrial": {
+      "kind": "native_remote",
+      "hostAndOs": null,
+      "sanitizedServiceEndpoints": null,
+      "dedicatedDatabaseIdentity": null,
+      "schemaPattern": "activity_<run UUID hex>",
+      "schemaMarkerPattern": "clinic-activity:<run UUID>",
+      "brokerPrefixPattern": "p2.activity.<run UUID>",
+      "guard": "TO_IMPLEMENT native/remote identity, dedicated database/marker, real roles, isolated queues and resource enforcement; do not assert local Compose identity remotely",
+      "runtimeImageOrBinaryDigests": null
+    }
+  },
+  "sourceManifest": {
+    "path": "evidence/d0-source-manifest.json",
+    "sha256": "77adce137deffe86310ad9765ff06270d0209a10d416405b1ee7a8bc3b1405a9",
+    "head": "c4102b55a652dc8e4faa93eeada4d76cbe0753ef",
+    "sourceTreeSha256": "62de5c8f6474728b7f6f8b67d31f9b35b76cf33078e05b2164c5bb70abb55dec",
+    "buildOverlayPaths": [],
+    "trialBuildFixtureHarnessManifest": "PENDING_D1_IMPLEMENTATION; required and hashed before any application performance measurement"
+  },
+  "primaryMetric": "http_primary_p95_latency",
+  "semantics": {
+    "role": "admin",
+    "dateField": "appointmentDate",
+    "statusMeaning": "current",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "maxPeriodDaysInclusive": 366,
+    "previousPeriod": "adjacent_equal_calendar_day_count",
+    "rateOnZeroDenominator": null
+  },
+  "primary": {
+    "endpoint": "/api/dashboard/clinic/activity",
+    "periodDays": 30,
+    "category": "all",
+    "groupBy": "day",
+    "fixtureBusinessDate": "2030-10-20",
+    "fixtureRows": 100000,
+    "minimumSuccessfulSamplesPerRun": 1000,
+    "maximumP95Ms": 300,
+    "minimumRelativeP95Improvement": 0.3,
+    "minimumAbsoluteP95ImprovementMs": 50,
+    "compareAgainst": [
+      "S",
+      "C"
+    ],
+    "maximumPairedRunRegression": 0.1,
+    "from": "2030-09-21",
+    "to": "2030-10-20",
+    "previousFrom": "2030-08-22",
+    "previousTo": "2030-09-20"
+  },
+  "matrix": {
+    "labels": [
+      "S",
+      "C",
+      "P",
+      "L"
+    ],
+    "pathBlocks": [
+      [
+        "S",
+        "C",
+        "P"
+      ],
+      [
+        "P",
+        "S",
+        "C"
+      ],
+      [
+        "C",
+        "P",
+        "S"
+      ]
+    ],
+    "cacheTtlMs": 5000,
+    "cacheMaxEntries": 128,
+    "totalCostBaselineRequired": true,
+    "totalCostBaselineLabel": "L",
+    "identicalBusinessContractRequired": true,
+    "configurations": {
+      "S": {
+        "activityReader": "source",
+        "listMode": "authoritative",
+        "generationVersion": 2,
+        "maintenance": "V2 producer/projector/relay and row/summary freshness audits on",
+        "activityResultCache": false
+      },
+      "C": {
+        "activityReader": "cached",
+        "listMode": "authoritative",
+        "generationVersion": 2,
+        "maintenance": "identical to S",
+        "cacheTtlOrigin": "snapshot_start_absolute_non_sliding",
+        "coalesce": true
+      },
+      "P": {
+        "activityReader": "summary",
+        "listMode": "authoritative",
+        "generationVersion": 2,
+        "maintenance": "identical to S",
+        "activityResultCache": false,
+        "actualSourceAndGenerationEveryResponse": true
+      },
+      "L": {
+        "activityReader": "preselected_source_or_cached",
+        "listMode": "authoritative",
+        "generationVersion": 1,
+        "maintenance": "existing V1 row-only infrastructure retained; V2 summary updates and summary audits disabled; list freshness remains off as in authoritative composition",
+        "binary": "same candidate build with explicit V1-only target capability TO_IMPLEMENT; separate trial schema/process/queue; no old binary on V2",
+        "safeConfigurationVerified": false
+      }
+    },
+    "simpleReaderSelection": {
+      "when": "after the three matched S/C/P path blocks, before L runs",
+      "cacheEligibleOnlyIf": [
+        "business correctness and cache freshness pass",
+        "median of per-block C_p95/S_p95 <= 0.95",
+        "no paired C/S p95 regression above 0.10"
+      ],
+      "eligibleSelection": "C",
+      "otherwise": "S",
+      "reason": "choose cache only for a preregistered repeatable benefit; never choose the slower simple baseline to help P",
+      "selectionMeasurementsMustBeRetained": true
+    },
+    "totalCostBlocksAfterPathBlocks": [
+      [
+        "P",
+        "L"
+      ],
+      [
+        "L",
+        "P"
+      ],
+      [
+        "P",
+        "L"
+      ]
+    ],
+    "totalCostPRepeatsSeparateFromPathP": true,
+    "totalCostUnavailableResult": "TOTAL_COST_INCONCLUSIVE; RECOMMEND_SUMMARY forbidden"
+  },
+  "productLoad": {
+    "screenCount": 10,
+    "pollIntervalMs": 15000,
+    "staggeredPolling": true,
+    "warmupSeconds": 120,
+    "minimumMeasuredSeconds": 1800,
+    "writeCommandsPerSecond": 0.1,
+    "writeMix": {
+      "create": 0.2,
+      "reschedule": 0.2,
+      "status": 0.6
+    },
+    "maxUnexpectedErrors": 0,
+    "maxGeneratorDrops": 0,
+    "maxHealthySummaryFallbacks": 0,
+    "responseSourceAndGenerationRequired": true,
+    "plannedPrimaryRequestsPerRun": 1200,
+    "plannedMeasuredWritesPerRun": 180,
+    "fullProductRuns": 15,
+    "resetIdenticalSeedBetweenRuns": true
+  },
+  "regression": {
+    "maximumWriteP95Increase": 0.1,
+    "minimumMeasuredWriteSamplesPerConfiguration": 1000,
+    "maximumApplicationCpuPerSuccessIncrease": 0.1,
+    "maximumSuccessfulThroughputDecrease": 0.1,
+    "backgroundComponentsIncluded": true,
+    "generatorCpuReportedSeparately": true,
+    "measuredWindowMarkersRequired": true,
+    "writeSupplement": {
+      "labels": [
+        "S",
+        "C",
+        "P",
+        "L"
+      ],
+      "warmupSeconds": 120,
+      "measuredSeconds": 5000,
+      "commandsPerSecond": 0.1,
+      "mix": "same 20/20/60 as product",
+      "plannedAdditionalWritesPerConfiguration": 500,
+      "plannedProductPlusSupplementWritesPerConfiguration": 1040,
+      "compareProductAndSupplementRegressionsSeparately": true,
+      "pooledSampleCountDoesNotImplyPerOperation1000": true,
+      "minimumEachOperationSamples": 200,
+      "extendIfActualSamplesInsufficient": true,
+      "pProductSamplesForTotalCost": "only the three matched P/L cost-block P runs; do not pool path-P runs to hide cost-block regression"
+    }
+  },
+  "freshness": {
+    "runs": 3,
+    "minimumSamplesPerRun": 1000,
+    "backendP95Ms": 5000,
+    "backendP99Ms": 10000,
+    "visibleUiP95Ms": 20000,
+    "timeoutSamplesMustBeRetained": true,
+    "evidenceIsNotAnAbsoluteStalenessGuarantee": true,
+    "protocol": {
+      "separateFromProduct": true,
+      "logicalMutationPerSecond": 1,
+      "backendProbeRequestsPerSecond": 2,
+      "probeSharing": "one observer polls the whole isolated report scope; never two polls per pending mutation",
+      "visibleUiPollMs": 15000,
+      "minimumMeasuredSecondsPerRun": 1000,
+      "timeoutMs": 30000,
+      "scoping": "distinct observable day/status contribution scopes; no conflicting mutation until observed by both backend and visible UI or timed out; expected old/new contribution and source revision trace required",
+      "samplingResolutionMs": 500,
+      "timeoutHandling": "retain in denominator and nearest-rank latency population as right-censored/infinite; any timeout prevents healthy freshness acceptance",
+      "realEventHistoryAssumed": false
+    }
+  },
+  "recovery": {
+    "runs": 3,
+    "outageSeconds": 60,
+    "maximumBacklogEvents": 300,
+    "maximumCatchUpSeconds": 120,
+    "requiredFinalMismatchCount": 0,
+    "protocol": {
+      "countActualReadChangeEvents": true,
+      "commandEventOneToOneAssumed": false,
+      "catchUpOrigin": "projector resumes after 60 second outage",
+      "afterCatchUp": "quiesce and reconcile source-to-read-rows and read-rows-to-summary by bucket, all mismatches zero"
+    }
+  },
+  "correctness": {
+    "sourceToReadRowMismatch": 0,
+    "readRowToSummaryMismatch": 0,
+    "negativeCounters": 0,
+    "unauthorizedResponses": 0,
+    "mandatoryTestsMayBeSkipped": false
+  },
+  "fallback": {
+    "maximumConcurrentPerReplica": 2,
+    "unboundedQueueAllowed": false,
+    "wholeResponseSourceRequired": true,
+    "statementTimeoutMs": 1500,
+    "transactionTimeoutMs": 2500,
+    "maxWaitMs": 50,
+    "retryAfterSeconds": 1,
+    "neverFallbackOn": [
+      401,
+      403,
+      422
+    ]
+  },
+  "diagnosticIterationLimitPerBottleneck": 2,
+  "decisions": [
+    "RECOMMEND_SUMMARY",
+    "RECOMMEND_SIMPLE",
+    "INCONCLUSIVE",
+    "FAIL_CORRECTNESS",
+    "INVALID_ENVIRONMENT"
+  ],
+  "freezeRequirements": [
+    "verify_working_tree_and_source_manifest",
+    "set_fixture_business_date",
+    "set_environment_profile_and_resource_budget",
+    "document_S_C_P_L_configurations",
+    "record_any_threshold_changes_before_measurements",
+    "write_acceptance_frozen_json_and_sha256"
+  ],
+  "d0Status": "PARTIAL",
+  "thresholdsFrozenDate": "2026-10-20",
+  "fullyFrozen": false,
+  "performanceMeasurementsAllowed": false,
+  "cache": {
+    "absoluteTtlMs": 5000,
+    "ttlOrigin": "snapshot_start",
+    "publishWhenComputationAlreadyExpired": false,
+    "maxEntries": 128,
+    "maxActiveComputationsPerReplica": 1,
+    "maximumBoundedWaitersPerReplica": 4,
+    "authEveryRequestIncludingHit": true,
+    "keyComponents": [
+      "database context",
+      "contract version",
+      "admin scope",
+      "normalized from/to/groupBy/category"
+    ],
+    "reuseListSlidingEpochCacheUnmodified": false
+  },
+  "summaryEvidence": {
+    "independentOfListServingMode": true,
+    "registryRowSampleIntervalMs": 2000,
+    "registryRowEvidenceMaxAgeMs": 6000,
+    "registryRowStatementTimeoutMs": 750,
+    "registryRowTransactionTimeoutMs": 1500,
+    "registryRowMaxWaitMs": 50,
+    "summaryReconcileIntervalMs": 30000,
+    "summaryReconcileEvidenceMaxAgeMs": 60000,
+    "summaryReconcileStatementTimeoutMs": 1500,
+    "summaryReconcileTransactionTimeoutMs": 2500,
+    "summaryReconcileMaxWaitMs": 50,
+    "auditPoolConnections": 1,
+    "maximumConcurrentSummaryAudits": 1,
+    "maxParallelWorkersPerGather": 0,
+    "unknownOrDriftAction": "source whole-response fallback or 503; never claim healthy",
+    "observedFeasibility": "NOT_RUN"
+  },
+  "fixture": {
+    "rows": 100000,
+    "seed": 20261020,
+    "businessDate": "2030-10-20",
+    "historyCalendarYears": 4,
+    "requiredSkews": [
+      "busy and empty days/months",
+      "all enum types/statuses",
+      "rare service",
+      "hot counter",
+      "boundary and tombstone fixtures separate"
+    ],
+    "seedBeforeRebuildOnly": true,
+    "measuredCommandsUseDomainApi": true,
+    "createRescheduleDateMustBeAtLeastVietnamToday": true,
+    "ifAnchorExpired": "amend and rehash before any measurement; never disable validation",
+    "fixtureHash": null,
+    "traceHash": null
+  },
+  "measurementProtocol": {
+    "percentile": "nearest_rank",
+    "primaryBenefit": "for each baseline S and C: median of three per-block P_p95 / baseline_p95 <= 0.70 AND median of three paired absolute savings >= 50 ms; every pair ratio <= 1.10; P p95 <= 300 ms every primary run",
+    "regressions": "P/L matched cost-block ratios and supplemental write trace separately, each max 1.10 latency/CPU and min 0.90 successful throughput; inadequate samples or resource parity => inconclusive/invalid",
+    "resourceSampleIntervalMs": 1000,
+    "includeAllApplicationBackgroundComponents": true,
+    "generatorCpuSeparate": true,
+    "includeCommonDashboardPollingIfBrowserLoad": true,
+    "httpPrimaryUsesFrontEndConfiguredPublicGateway": true,
+    "secondaryIsSeparateAndCannotRescuePrimary": true,
+    "rawOutcomesMustInclude": [
+      "scheduled",
+      "success",
+      "unexpected401or403",
+      "422",
+      "429",
+      "503",
+      "timeout",
+      "generatorDrop",
+      "fallback",
+      "wrongSource",
+      "wrongGeneration"
+    ],
+    "resourceWindow": "measured_start <= interval fully inside measured_end; partial intervals explicit, never warmup CPU / measured successes",
+    "coldWarmSeparate": true,
+    "capacityOptionalNotRequired": true
+  },
+  "timeEstimate": {
+    "productRunsIncludingPLCostPairs": 15,
+    "productSecondsIncludingWarmup": 28800,
+    "writeSupplementSecondsIncludingWarmup": 20480,
+    "freshnessMinimumMeasuredSeconds": 3000,
+    "recoveryOutagePlusCatchUpCeilingSeconds": 540,
+    "rawFloorApproxHours": 15,
+    "plannedWallClockHoursRange": [
+      17,
+      24
+    ],
+    "excludesEngineeringDays": true,
+    "assumption": "sequential trial runs, plus reset/seed/rebuild/smoke/secondary/setup; not a measured runtime guarantee"
+  },
+  "preMeasurementRationale": {
+    "numericThresholdChangesFromDraft": [],
+    "retained": {
+      "primary300ms": "visible dashboard budget at modest product load; not evidence source is slow",
+      "relative30percentAndAbsolute50ms": "avoid adding summary cost for a few milliseconds; must beat both reasonable baselines",
+      "paired10percentAndThreeBlocks": "reject median hiding a regression and expose order noise",
+      "zeroCorrectnessAuthErrorsDropsHealthyFallback": "success responses cannot mask wrong data, rights or actual serving source",
+      "writeCpuThroughput10percent": "summary benefit must not regress command responsiveness or total application cost materially",
+      "freshness5sP95_10sP99_20sUI": "bounded async target; 15 second visible polling is not 5 second UI",
+      "recovery60s_300events_120s_threeRuns": "bounded fault contract and exact final reconciliation",
+      "samples1000And1800s": "keep full percentile evidence; add supplemental writes instead of lowering required count"
+    },
+    "clarificationsBeforeMeasurements": [
+      "fixture business date fixed to future 2030-10-20 without runtime clock overrides",
+      "source/date/rate/admin contract in ADR accepted for design",
+      "L selection rule and extra rotated P/L cost blocks registered before timing",
+      "5000 second matched write supplement supplies 1040 pooled writes/config, at least 200 each operation",
+      "absolute source-cache TTL differs from current epoch-protected sliding list cache",
+      "summary reconciliation cadence/budgets explicit and unmeasured",
+      "environment unknowns are not an approval to run or claim fully frozen"
+    ],
+    "historicalQ6ObservationsUsedAsNewActivityPerformanceEvidence": false
+  },
+  "freezeGate": {
+    "thresholdsAndSemantics": "FROZEN_BEFORE_NEW_ACTIVITY_PERFORMANCE_MEASUREMENT",
+    "environment": "PENDING_NATIVE_REMOTE_CONFIGURATION_AND_ENFORCED_BUDGET",
+    "sourceAudit": "RECORDED_D0_NOT_A_TRIAL_BUILD",
+    "d1ImplementationManifest": "PENDING_FUTURE_CODE",
+    "beforeApplicationPerformanceMeasurement": [
+      "complete and verify trial identity/profile/resource enforcement and hash it",
+      "record exact process/role/pool and generator allocation",
+      "complete D0 gate and set fullyFrozen true in a new version preserving preregistration",
+      "record actual D1+ build/fixture/trace/harness/migration/policy hashes",
+      "pass appropriate correctness/smoke gates for the stage"
+    ],
+    "revisionRule": "append a new policy version/hash with reason and time before measurements; preserve this preregistration; do not tune thresholds from newly observed results",
+    "hashConvention": "acceptance.frozen.sha256 is SHA256 of exact UTF-8 LF bytes of acceptance.frozen.json, excluding sidecar, no self-reference"
+  }
+}

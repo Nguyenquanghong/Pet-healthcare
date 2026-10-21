@@ -4,7 +4,9 @@ import { BookingStatusDialog, type StatusDialogSelection } from "./BookingStatus
 import { useBookingAction } from "./useBookingAction";
 import { apiClient } from "../../services/apiClient";
 import { useRequestIntent } from '../../services/useRequestIntent';
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {useLocation} from 'react-router-dom';
+import {readActivityDrilldown} from '../../services/clinicActivity';
 import {
   Bell,
   CheckCircle2,
@@ -50,16 +52,19 @@ const ALL_STATUSES: { key: string; label: string }[] = [
 ];
 
 export function AdminAppointmentsPage() {
+  const {search: locationSearch}=useLocation();
+  const drilldown=useMemo(()=>readActivityDrilldown(locationSearch),[locationSearch]);
   const {
     userRole,
     sendReminder,
   } = useAppStore();
 
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [serviceFilter, setServiceFilter] = useState<"all" | "medical" | "spa">("all");
+  const [filterStatus, setFilterStatus] = useState<string>(drilldown.status);
+  const [serviceFilter, setServiceFilter] = useState<"all" | "medical" | "spa">(drilldown.category);
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState<string>("all"); // 'all' | 'today' | custom date
-  const [customDate, setCustomDate] = useState("");
+  const [dateFilter, setDateFilter] = useState<string>(drilldown.active ? 'custom' : 'all');
+  const [customDate, setCustomDate] = useState(drilldown.date);
+  useEffect(()=>{if(drilldown.active){setFilterStatus(drilldown.status);setServiceFilter(drilldown.category);setDateFilter('custom');setCustomDate(drilldown.date);}},[drilldown]);
 
   const [cancelModal, setCancelModal] = useState<Appointment | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -90,7 +95,7 @@ export function AdminAppointmentsPage() {
     setTimeout(() => setToastMsg(""), 3500);
   };
 
-  const list = usePagedList<Appointment>("/appointments", { q: searchQuery, status: filterStatus, category: serviceFilter, date: dateFilter === "today" ? todayStr : dateFilter === "custom" ? customDate : undefined }, true, { pollMs: 5000 });
+  const list = usePagedList<Appointment>("/appointments", { q: searchQuery, status: filterStatus, category: serviceFilter, date: dateFilter === "today" ? todayStr : dateFilter === "custom" ? customDate : undefined }, !drilldown.error, { pollMs: 5000, consistency:drilldown.active?'authoritative':undefined });
   const appointments = list.items, filteredAppointments = appointments, pets = list.related.pets, owners = list.related.owners;
 
   const handleStatusUpdate = (id: string, status: AppointmentStatus) => {
@@ -155,6 +160,7 @@ export function AdminAppointmentsPage() {
 
   return (
     <AdminLayout title="Quản lý lịch hẹn">
+      {drilldown.error && <p role="alert" className="my-3 rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{drilldown.error}</p>}
       <Pagination {...list} />
       <div className="mb-4 flex justify-end">
         <AdminCreateButton kind="appointment" onCreated={() => { setFilterStatus("all"); setServiceFilter("all"); setSearchQuery(""); setDateFilter("all"); }} />

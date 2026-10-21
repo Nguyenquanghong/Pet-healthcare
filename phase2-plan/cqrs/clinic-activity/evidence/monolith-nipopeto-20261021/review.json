@@ -1,0 +1,1292 @@
+{
+  "format": "clinic-activity-monolith-evidence-review-v1",
+  "reviewedAtUtc": "2026-10-21T06:30:50.529375+00:00",
+  "status": "ARTIFACT_CONSISTENCY_AND_REPORTED_PRE_SPLIT_SOURCE_IDENTIFIED",
+  "archive": {
+    "path": "nipopeto-evidence.zip",
+    "bytes": 294548,
+    "sha256": "9a5d881d8a70a9da4993667cc9663a768ff102ddaac12d5035a76b3d34f39950",
+    "entries": 193,
+    "files": 176,
+    "uncompressedBytes": 1406295,
+    "crcAllFilesVerified": true
+  },
+  "reportedHistoricalSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+  "sourceProvenance": {
+    "localGitCommitPresent": true,
+    "ancestorOfP0PreSplitCheckpoint": true,
+    "clinicServiceEntrypointAbsent": true,
+    "allSixteenManifestsAgree": true,
+    "dirtyWorktreeReported": false,
+    "binaryOrRunningSourceIndependentlyAttested": false,
+    "sourceGitTree": "9fda543aa0af3ef46583b4ba6b2aaf5445d8998a",
+    "inspectedGitBlobs": [
+      {
+        "path": "benchmarks/kaggle/runner.py",
+        "bytes": 13011,
+        "sha256": "80ee5d2f0378c3e964962716f38ec9d0a58bb3509ef5406d5141486c52eba029"
+      },
+      {
+        "path": "benchmarks/kaggle/locustfile.py",
+        "bytes": 2457,
+        "sha256": "b958f1e84c0873fe52f49ae6b3980878bb465a084550259c1d92a2ec711d9971"
+      },
+      {
+        "path": "benchmarks/kaggle/metrics.py",
+        "bytes": 1216,
+        "sha256": "1c914536d9997890a8efc656dfcc0edb0d902d5aade9760c63bc478e147917b5"
+      },
+      {
+        "path": "benchmarks/kaggle/prepare_fixture.mjs",
+        "bytes": 1249,
+        "sha256": "b5953687666eb0bc70f70573bf80567ad38934d35ae4fae9ca74af13ba4ad9b4"
+      },
+      {
+        "path": "benchmarks/kaggle/fixtureData.mjs",
+        "bytes": 733,
+        "sha256": "80ec34dce0c6981d630873597b49c9768be574ce6946845b5323f1f8c7cd9e0b"
+      },
+      {
+        "path": "backend/openapi.json",
+        "bytes": 77449,
+        "sha256": "1b9bd57d699f248f5ac740152536f375b27b63cf879a40a39850e5dcf1c87528"
+      }
+    ]
+  },
+  "matrix": {
+    "profiles": {
+      "ReadHeavyUser": {
+        "GET bootstrap": 40,
+        "GET pets": 25,
+        "GET appointments": 20,
+        "GET notifications": 15
+      },
+      "MixedUser": {
+        "GET bootstrap": 30,
+        "GET pets": 20,
+        "GET appointments": 15,
+        "GET notifications": 5,
+        "POST rescue report": 20,
+        "POST appointment": 10
+      }
+    },
+    "userLevels": [
+      1,
+      10,
+      50,
+      100
+    ],
+    "repeats": 2,
+    "warmupSeconds": 15,
+    "locustWindowSecondsIncludingRamp": 60,
+    "spawnPerSecond": 5.0,
+    "waitSecondsUniform": [
+      0.5,
+      1.5
+    ],
+    "closedLoop": true,
+    "independentOfferedRps": null,
+    "fixtureSeed": "phase1",
+    "fixtureOwnerPetPairs": 100,
+    "fixtureCreatesOneHundredThousandAppointments": false
+  },
+  "environmentReported": {
+    "platform": "Linux-6.12.90+-x86_64-with-glibc2.35",
+    "logicalCpuCount": 4,
+    "hostMemoryTotalBytes": 33659367424,
+    "node": "v24.15.0",
+    "npm": "11.12.1",
+    "postgres": "postgres (PostgreSQL) 14.24 (Ubuntu 14.24-0ubuntu0.22.04.1)",
+    "locust": "locust 2.44.4 from /usr/local/lib/python3.12/dist-packages/locust (Python 3.12.13)",
+    "generatorSharesCpu": true,
+    "separateQuotasOrCgroupEnvelopeProven": false
+  },
+  "totals": {
+    "requests": 33468,
+    "locustFailures": 0,
+    "completedRuns": 16,
+    "configuredHistoricalStopThresholdsExceeded": false,
+    "businessCorrectnessOrFullAcceptanceProven": false
+  },
+  "limits": [
+    "No per-request raw response/status/contract/reconciliation ledger; zero Locust failures is not business correctness proof",
+    "Percentiles are rounded Locust CSV/histogram figures, not independently recomputed nearest-rank request samples",
+    "Sixty-second windows include ramp; history stops before final CSV totals, so no exact steady-only reconstruction",
+    "ReadHeavy appointment average content size is two bytes; fixture source creates users/pets, not the Q0 100k appointment history",
+    "PG14/Linux and bootstrap-heavy task mix differ from later PCN/query-heavy/activity runs",
+    "Resource samples lack verifiable PID coverage/monotonic exact measured boundaries and may miss short-lived children/shared pages",
+    "No original member-digest manifest/source bundle/build digests; hashes generated now establish review-copy integrity only"
+  ],
+  "historicalComparison": "BASELINE_IDENTIFIED_COMPARABILITY_PENDING",
+  "newPerformanceMeasurements": "NOT_RUN",
+  "runs": [
+    {
+      "run": "B1_MixedUser_100_1",
+      "profile": "MixedUser",
+      "users": 100,
+      "repeat": 1,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:30:08.848886+00:00",
+      "endedAtUtc": "2026-09-29T14:32:16.702860+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 4961,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 83.83480338292745,
+        "p50_ms": 8.0,
+        "p95_ms": 21.0,
+        "p99_ms": 240.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 710,
+          "failures": 0,
+          "p95MsRoundedHistogram": 16.0,
+          "p99MsRoundedHistogram": 95.0,
+          "averageContentBytes": 1417.9647887323943
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 1530,
+          "failures": 0,
+          "p95MsRoundedHistogram": 25.0,
+          "p99MsRoundedHistogram": 230.0,
+          "averageContentBytes": 5229.067973856209
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 242,
+          "failures": 0,
+          "p95MsRoundedHistogram": 10.0,
+          "p99MsRoundedHistogram": 290.0,
+          "averageContentBytes": 3126.0123966942147
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 1043,
+          "failures": 0,
+          "p95MsRoundedHistogram": 12.0,
+          "p99MsRoundedHistogram": 170.0,
+          "averageContentBytes": 378.75263662511986
+        },
+        {
+          "operation": "POST /api/appointments",
+          "requests": 474,
+          "failures": 0,
+          "p95MsRoundedHistogram": 32.0,
+          "p99MsRoundedHistogram": 290.0,
+          "averageContentBytes": 452.0
+        },
+        {
+          "operation": "POST /api/public/pets/{token}/rescue-reports",
+          "requests": 962,
+          "failures": 0,
+          "p95MsRoundedHistogram": 24.0,
+          "p99MsRoundedHistogram": 300.0,
+          "averageContentBytes": 42.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 20.0,
+        "lastCumulativeRequests": 4567,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.394209,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_MixedUser_100_2",
+      "profile": "MixedUser",
+      "users": 100,
+      "repeat": 2,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:32:17.643268+00:00",
+      "endedAtUtc": "2026-09-29T14:34:25.977445+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 4974,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 84.1360849466475,
+        "p50_ms": 7.0,
+        "p95_ms": 15.0,
+        "p99_ms": 22.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 738,
+          "failures": 0,
+          "p95MsRoundedHistogram": 8.0,
+          "p99MsRoundedHistogram": 16.0,
+          "averageContentBytes": 1275.449864498645
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 1526,
+          "failures": 0,
+          "p95MsRoundedHistogram": 12.0,
+          "p99MsRoundedHistogram": 19.0,
+          "averageContentBytes": 5169.517693315858
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 230,
+          "failures": 0,
+          "p95MsRoundedHistogram": 8.0,
+          "p99MsRoundedHistogram": 28.0,
+          "averageContentBytes": 3101.1434782608694
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 1028,
+          "failures": 0,
+          "p95MsRoundedHistogram": 9.0,
+          "p99MsRoundedHistogram": 17.0,
+          "averageContentBytes": 378.76459143968873
+        },
+        {
+          "operation": "POST /api/appointments",
+          "requests": 481,
+          "failures": 0,
+          "p95MsRoundedHistogram": 19.0,
+          "p99MsRoundedHistogram": 26.0,
+          "averageContentBytes": 452.0
+        },
+        {
+          "operation": "POST /api/public/pets/{token}/rescue-reports",
+          "requests": 971,
+          "failures": 0,
+          "p95MsRoundedHistogram": 18.0,
+          "p99MsRoundedHistogram": 26.0,
+          "averageContentBytes": 42.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 20.0,
+        "lastCumulativeRequests": 4568,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.30621,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_MixedUser_10_1",
+      "profile": "MixedUser",
+      "users": 10,
+      "repeat": 1,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:21:25.199366+00:00",
+      "endedAtUtc": "2026-09-29T14:23:42.751596+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 589,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 9.978549442412874,
+        "p50_ms": 8.0,
+        "p95_ms": 14.0,
+        "p99_ms": 16.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 81,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 7.0,
+          "averageContentBytes": 1959.4444444444443
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 187,
+          "failures": 0,
+          "p95MsRoundedHistogram": 9.0,
+          "p99MsRoundedHistogram": 16.0,
+          "averageContentBytes": 7064.941176470588
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 27,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 7.0,
+          "averageContentBytes": 3929.8888888888887
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 106,
+          "failures": 0,
+          "p95MsRoundedHistogram": 11.0,
+          "p99MsRoundedHistogram": 15.0,
+          "averageContentBytes": 377.0
+        },
+        {
+          "operation": "POST /api/appointments",
+          "requests": 62,
+          "failures": 0,
+          "p95MsRoundedHistogram": 15.0,
+          "p99MsRoundedHistogram": 16.0,
+          "averageContentBytes": 452.0
+        },
+        {
+          "operation": "POST /api/public/pets/{token}/rescue-reports",
+          "requests": 126,
+          "failures": 0,
+          "p95MsRoundedHistogram": 16.0,
+          "p99MsRoundedHistogram": 18.0,
+          "averageContentBytes": 42.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 2.0,
+        "lastCumulativeRequests": 550,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.266622,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_MixedUser_10_2",
+      "profile": "MixedUser",
+      "users": 10,
+      "repeat": 2,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:23:43.176703+00:00",
+      "endedAtUtc": "2026-09-29T14:25:52.944337+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 588,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 9.949116299488347,
+        "p50_ms": 7.0,
+        "p95_ms": 14.0,
+        "p99_ms": 17.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 81,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 8.0,
+          "averageContentBytes": 1986.4074074074074
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 189,
+          "failures": 0,
+          "p95MsRoundedHistogram": 10.0,
+          "p99MsRoundedHistogram": 13.0,
+          "averageContentBytes": 7386.148148148148
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 28,
+          "failures": 0,
+          "p95MsRoundedHistogram": 5.0,
+          "p99MsRoundedHistogram": 6.0,
+          "averageContentBytes": 3548.1785714285716
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 104,
+          "failures": 0,
+          "p95MsRoundedHistogram": 11.0,
+          "p99MsRoundedHistogram": 14.0,
+          "averageContentBytes": 377.0
+        },
+        {
+          "operation": "POST /api/appointments",
+          "requests": 60,
+          "failures": 0,
+          "p95MsRoundedHistogram": 18.0,
+          "p99MsRoundedHistogram": 21.0,
+          "averageContentBytes": 452.0
+        },
+        {
+          "operation": "POST /api/public/pets/{token}/rescue-reports",
+          "requests": 126,
+          "failures": 0,
+          "p95MsRoundedHistogram": 15.0,
+          "p99MsRoundedHistogram": 17.0,
+          "averageContentBytes": 42.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 2.0,
+        "lastCumulativeRequests": 549,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.281342,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_MixedUser_1_1",
+      "profile": "MixedUser",
+      "users": 1,
+      "repeat": 1,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:17:10.803574+00:00",
+      "endedAtUtc": "2026-09-29T14:19:17.569434+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 60,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 1.0204024833540968,
+        "p50_ms": 9.0,
+        "p95_ms": 16.0,
+        "p99_ms": 16.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 7,
+          "failures": 0,
+          "p95MsRoundedHistogram": 5.0,
+          "p99MsRoundedHistogram": 5.0,
+          "averageContentBytes": 2560.5714285714284
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 15,
+          "failures": 0,
+          "p95MsRoundedHistogram": 10.0,
+          "p99MsRoundedHistogram": 10.0,
+          "averageContentBytes": 9319.666666666666
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 3,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 6.0,
+          "averageContentBytes": 6587.666666666667
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 14,
+          "failures": 0,
+          "p95MsRoundedHistogram": 11.0,
+          "p99MsRoundedHistogram": 11.0,
+          "averageContentBytes": 377.0
+        },
+        {
+          "operation": "POST /api/appointments",
+          "requests": 8,
+          "failures": 0,
+          "p95MsRoundedHistogram": 16.0,
+          "p99MsRoundedHistogram": 16.0,
+          "averageContentBytes": 452.0
+        },
+        {
+          "operation": "POST /api/public/pets/{token}/rescue-reports",
+          "requests": 13,
+          "failures": 0,
+          "p95MsRoundedHistogram": 14.0,
+          "p99MsRoundedHistogram": 14.0,
+          "averageContentBytes": 42.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 1.0,
+        "lastCumulativeRequests": 55,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.260444,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_MixedUser_1_2",
+      "profile": "MixedUser",
+      "users": 1,
+      "repeat": 2,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:19:17.906389+00:00",
+      "endedAtUtc": "2026-09-29T14:21:24.856752+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 60,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 1.0200965120359624,
+        "p50_ms": 9.0,
+        "p95_ms": 16.0,
+        "p99_ms": 20.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 7,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 6.0,
+          "averageContentBytes": 2560.5714285714284
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 15,
+          "failures": 0,
+          "p95MsRoundedHistogram": 10.0,
+          "p99MsRoundedHistogram": 10.0,
+          "averageContentBytes": 9319.666666666666
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 3,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 6.0,
+          "averageContentBytes": 6587.666666666667
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 14,
+          "failures": 0,
+          "p95MsRoundedHistogram": 12.0,
+          "p99MsRoundedHistogram": 12.0,
+          "averageContentBytes": 377.0
+        },
+        {
+          "operation": "POST /api/appointments",
+          "requests": 8,
+          "failures": 0,
+          "p95MsRoundedHistogram": 18.0,
+          "p99MsRoundedHistogram": 18.0,
+          "averageContentBytes": 452.0
+        },
+        {
+          "operation": "POST /api/public/pets/{token}/rescue-reports",
+          "requests": 13,
+          "failures": 0,
+          "p95MsRoundedHistogram": 20.0,
+          "p99MsRoundedHistogram": 20.0,
+          "averageContentBytes": 42.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 1.0,
+        "lastCumulativeRequests": 55,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.264642,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_MixedUser_50_1",
+      "profile": "MixedUser",
+      "users": 50,
+      "repeat": 1,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:25:53.290020+00:00",
+      "endedAtUtc": "2026-09-29T14:28:01.193277+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 2729,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 46.208103862969345,
+        "p50_ms": 7.0,
+        "p95_ms": 14.0,
+        "p99_ms": 21.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 392,
+          "failures": 0,
+          "p95MsRoundedHistogram": 7.0,
+          "p99MsRoundedHistogram": 9.0,
+          "averageContentBytes": 1630.8775510204082
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 806,
+          "failures": 0,
+          "p95MsRoundedHistogram": 11.0,
+          "p99MsRoundedHistogram": 16.0,
+          "averageContentBytes": 6341.924317617866
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 135,
+          "failures": 0,
+          "p95MsRoundedHistogram": 7.0,
+          "p99MsRoundedHistogram": 14.0,
+          "averageContentBytes": 3723.177777777778
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 593,
+          "failures": 0,
+          "p95MsRoundedHistogram": 7.0,
+          "p99MsRoundedHistogram": 12.0,
+          "averageContentBytes": 378.52782462057337
+        },
+        {
+          "operation": "POST /api/appointments",
+          "requests": 277,
+          "failures": 0,
+          "p95MsRoundedHistogram": 18.0,
+          "p99MsRoundedHistogram": 27.0,
+          "averageContentBytes": 452.0
+        },
+        {
+          "operation": "POST /api/public/pets/{token}/rescue-reports",
+          "requests": 526,
+          "failures": 0,
+          "p95MsRoundedHistogram": 19.0,
+          "p99MsRoundedHistogram": 27.0,
+          "averageContentBytes": 42.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 10.0,
+        "lastCumulativeRequests": 2540,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.281772,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_MixedUser_50_2",
+      "profile": "MixedUser",
+      "users": 50,
+      "repeat": 2,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:28:01.527333+00:00",
+      "endedAtUtc": "2026-09-29T14:30:08.504086+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 2744,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 46.456701502918875,
+        "p50_ms": 7.0,
+        "p95_ms": 14.0,
+        "p99_ms": 19.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 402,
+          "failures": 0,
+          "p95MsRoundedHistogram": 7.0,
+          "p99MsRoundedHistogram": 9.0,
+          "averageContentBytes": 1674.0572139303483
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 838,
+          "failures": 0,
+          "p95MsRoundedHistogram": 11.0,
+          "p99MsRoundedHistogram": 15.0,
+          "averageContentBytes": 6340.397374701671
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 131,
+          "failures": 0,
+          "p95MsRoundedHistogram": 8.0,
+          "p99MsRoundedHistogram": 10.0,
+          "averageContentBytes": 4135.801526717557
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 568,
+          "failures": 0,
+          "p95MsRoundedHistogram": 8.0,
+          "p99MsRoundedHistogram": 15.0,
+          "averageContentBytes": 378.5211267605634
+        },
+        {
+          "operation": "POST /api/appointments",
+          "requests": 278,
+          "failures": 0,
+          "p95MsRoundedHistogram": 18.0,
+          "p99MsRoundedHistogram": 22.0,
+          "averageContentBytes": 452.0
+        },
+        {
+          "operation": "POST /api/public/pets/{token}/rescue-reports",
+          "requests": 527,
+          "failures": 0,
+          "p95MsRoundedHistogram": 16.0,
+          "p99MsRoundedHistogram": 21.0,
+          "averageContentBytes": 42.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 10.0,
+        "lastCumulativeRequests": 2557,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.302517,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_ReadHeavyUser_100_1",
+      "profile": "ReadHeavyUser",
+      "users": 100,
+      "repeat": 1,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:12:56.361702+00:00",
+      "endedAtUtc": "2026-09-29T14:15:03.231113+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 4984,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 84.32274390815856,
+        "p50_ms": 5.0,
+        "p95_ms": 10.0,
+        "p99_ms": 15.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 956,
+          "failures": 0,
+          "p95MsRoundedHistogram": 8.0,
+          "p99MsRoundedHistogram": 13.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 1998,
+          "failures": 0,
+          "p95MsRoundedHistogram": 11.0,
+          "p99MsRoundedHistogram": 16.0,
+          "averageContentBytes": 761.5255255255255
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 745,
+          "failures": 0,
+          "p95MsRoundedHistogram": 8.0,
+          "p99MsRoundedHistogram": 14.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 1285,
+          "failures": 0,
+          "p95MsRoundedHistogram": 8.0,
+          "p99MsRoundedHistogram": 15.0,
+          "averageContentBytes": 378.75719844357974
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 20.0,
+        "lastCumulativeRequests": 4583,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.291366,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_ReadHeavyUser_100_2",
+      "profile": "ReadHeavyUser",
+      "users": 100,
+      "repeat": 2,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:15:03.573097+00:00",
+      "endedAtUtc": "2026-09-29T14:17:10.455744+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 4987,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 84.35835552548475,
+        "p50_ms": 5.0,
+        "p95_ms": 11.0,
+        "p99_ms": 16.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 974,
+          "failures": 0,
+          "p95MsRoundedHistogram": 7.0,
+          "p99MsRoundedHistogram": 13.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 2027,
+          "failures": 0,
+          "p95MsRoundedHistogram": 12.0,
+          "p99MsRoundedHistogram": 18.0,
+          "averageContentBytes": 761.5125801677356
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 713,
+          "failures": 0,
+          "p95MsRoundedHistogram": 9.0,
+          "p99MsRoundedHistogram": 16.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 1273,
+          "failures": 0,
+          "p95MsRoundedHistogram": 8.0,
+          "p99MsRoundedHistogram": 14.0,
+          "averageContentBytes": 378.7690494893951
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 20.0,
+        "lastCumulativeRequests": 4595,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.29551,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_ReadHeavyUser_10_1",
+      "profile": "ReadHeavyUser",
+      "users": 10,
+      "repeat": 1,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:04:35.248588+00:00",
+      "endedAtUtc": "2026-09-29T14:06:35.462171+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 595,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 10.092582418602339,
+        "p50_ms": 5.0,
+        "p95_ms": 8.0,
+        "p99_ms": 15.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 122,
+          "failures": 0,
+          "p95MsRoundedHistogram": 5.0,
+          "p99MsRoundedHistogram": 7.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 237,
+          "failures": 0,
+          "p95MsRoundedHistogram": 9.0,
+          "p99MsRoundedHistogram": 15.0,
+          "averageContentBytes": 758.0
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 99,
+          "failures": 0,
+          "p95MsRoundedHistogram": 5.0,
+          "p99MsRoundedHistogram": 7.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 137,
+          "failures": 0,
+          "p95MsRoundedHistogram": 7.0,
+          "p99MsRoundedHistogram": 17.0,
+          "averageContentBytes": 377.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 2.0,
+        "lastCumulativeRequests": 555,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.25221,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_ReadHeavyUser_10_2",
+      "profile": "ReadHeavyUser",
+      "users": 10,
+      "repeat": 2,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:06:35.792663+00:00",
+      "endedAtUtc": "2026-09-29T14:08:42.318485+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 592,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 10.05277301446032,
+        "p50_ms": 5.0,
+        "p95_ms": 8.0,
+        "p99_ms": 14.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 117,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 9.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 235,
+          "failures": 0,
+          "p95MsRoundedHistogram": 8.0,
+          "p99MsRoundedHistogram": 16.0,
+          "averageContentBytes": 758.0
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 103,
+          "failures": 0,
+          "p95MsRoundedHistogram": 5.0,
+          "p99MsRoundedHistogram": 5.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 137,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 17.0,
+          "averageContentBytes": 377.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 2.0,
+        "lastCumulativeRequests": 550,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.256948,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_ReadHeavyUser_1_1",
+      "profile": "ReadHeavyUser",
+      "users": 1,
+      "repeat": 1,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:00:19.873060+00:00",
+      "endedAtUtc": "2026-09-29T14:02:29.247091+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 60,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 1.0233929850446373,
+        "p50_ms": 5.0,
+        "p95_ms": 9.0,
+        "p99_ms": 11.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 12,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 6.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 22,
+          "failures": 0,
+          "p95MsRoundedHistogram": 9.0,
+          "p99MsRoundedHistogram": 10.0,
+          "averageContentBytes": 758.0
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 12,
+          "failures": 0,
+          "p95MsRoundedHistogram": 5.0,
+          "p99MsRoundedHistogram": 5.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 14,
+          "failures": 0,
+          "p95MsRoundedHistogram": 11.0,
+          "p99MsRoundedHistogram": 11.0,
+          "averageContentBytes": 377.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 1.0,
+        "lastCumulativeRequests": 55,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.23721,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_ReadHeavyUser_1_2",
+      "profile": "ReadHeavyUser",
+      "users": 1,
+      "repeat": 2,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:02:29.576831+00:00",
+      "endedAtUtc": "2026-09-29T14:04:34.913717+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 60,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 1.023359912859192,
+        "p50_ms": 5.0,
+        "p95_ms": 9.0,
+        "p99_ms": 14.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 12,
+          "failures": 0,
+          "p95MsRoundedHistogram": 5.0,
+          "p99MsRoundedHistogram": 5.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 22,
+          "failures": 0,
+          "p95MsRoundedHistogram": 9.0,
+          "p99MsRoundedHistogram": 9.0,
+          "averageContentBytes": 758.0
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 12,
+          "failures": 0,
+          "p95MsRoundedHistogram": 5.0,
+          "p99MsRoundedHistogram": 5.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 14,
+          "failures": 0,
+          "p95MsRoundedHistogram": 14.0,
+          "p99MsRoundedHistogram": 14.0,
+          "averageContentBytes": 377.0
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 1.0,
+        "lastCumulativeRequests": 55,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.244264,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_ReadHeavyUser_50_1",
+      "profile": "ReadHeavyUser",
+      "users": 50,
+      "repeat": 1,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:08:42.663695+00:00",
+      "endedAtUtc": "2026-09-29T14:10:49.183880+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 2745,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 46.446928429497646,
+        "p50_ms": 5.0,
+        "p95_ms": 9.0,
+        "p99_ms": 13.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 533,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 12.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 1085,
+          "failures": 0,
+          "p95MsRoundedHistogram": 10.0,
+          "p99MsRoundedHistogram": 14.0,
+          "averageContentBytes": 761.052534562212
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 420,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 13.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 707,
+          "failures": 0,
+          "p95MsRoundedHistogram": 7.0,
+          "p99MsRoundedHistogram": 10.0,
+          "averageContentBytes": 378.6124469589816
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 10.0,
+        "lastCumulativeRequests": 2552,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.283773,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    },
+    {
+      "run": "B1_ReadHeavyUser_50_2",
+      "profile": "ReadHeavyUser",
+      "users": 50,
+      "repeat": 2,
+      "reportedSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+      "startedAtUtc": "2026-09-29T14:10:49.530856+00:00",
+      "endedAtUtc": "2026-09-29T14:12:56.026980+00:00",
+      "resultsFromCsvAndManifest": {
+        "requests": 2740,
+        "failures": 0,
+        "error_rate": 0.0,
+        "achieved_rps": 46.36647779226553,
+        "p50_ms": 5.0,
+        "p95_ms": 9.0,
+        "p99_ms": 13.0
+      },
+      "operations": [
+        {
+          "operation": "GET /api/appointments",
+          "requests": 555,
+          "failures": 0,
+          "p95MsRoundedHistogram": 7.0,
+          "p99MsRoundedHistogram": 12.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/bootstrap",
+          "requests": 1095,
+          "failures": 0,
+          "p95MsRoundedHistogram": 10.0,
+          "p99MsRoundedHistogram": 15.0,
+          "averageContentBytes": 761.0575342465753
+        },
+        {
+          "operation": "GET /api/notifications",
+          "requests": 401,
+          "failures": 0,
+          "p95MsRoundedHistogram": 6.0,
+          "p99MsRoundedHistogram": 12.0,
+          "averageContentBytes": 2.0
+        },
+        {
+          "operation": "GET /api/pets",
+          "requests": 689,
+          "failures": 0,
+          "p95MsRoundedHistogram": 7.0,
+          "p99MsRoundedHistogram": 13.0,
+          "averageContentBytes": 378.5732946298984
+        }
+      ],
+      "history": {
+        "samples": 56,
+        "firstTargetUsersSeconds": 10.0,
+        "lastCumulativeRequests": 2542,
+        "doesNotCoverFinalTail": true,
+        "rampIncludedInSixtySecondWindow": true
+      },
+      "resources": {
+        "samples": 62,
+        "firstCpuSampleUnknown": true,
+        "observedSpanSeconds": 61.280814,
+        "pidRoleCoverageAndExactMeasuredBoundaries": "NOT_PROVEN_BY_EXPORT"
+      }
+    }
+  ]
+}

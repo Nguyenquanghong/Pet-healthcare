@@ -1,0 +1,16 @@
+{
+  "kind": "CQRS_LIST_MATCHED_KAGGLE_V1",
+  "study": "cqrs-list-matched-kaggle-v1",
+  "run": "c403addf-ec74-4cac-915e-35f32f65899c",
+  "mode": "smoke",
+  "workloads": [
+    "query-heavy",
+    "pcn"
+  ],
+  "blocks": null,
+  "status": "READY_FOR_FULL_BLOCKS",
+  "resourceClass": "kaggle_shared_envelope",
+  "isolationClaimed": false,
+  "readiness": "READY_FOR_FULL_BLOCKS",
+  "evaluation": "NOT_RUN"
+}

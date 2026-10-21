@@ -1,0 +1,80 @@
+{
+  "format": "clinic-activity-d0-enforcement-probe-v1",
+  "run": "34de33f5-b259-4a28-b364-97e4733bab4f",
+  "capturedAtUtc": "2026-10-21T02:57:57.588347+00:00",
+  "status": "CAPABILITY_UNAVAILABLE",
+  "d0": "PARTIAL_ENVIRONMENT",
+  "performance": "NOT_RUN",
+  "budgetProposal": {
+    "status": "PROPOSED_NOT_FROZEN",
+    "stack": {
+      "cpuMax": "200000 100000",
+      "memoryBytes": 8589934592
+    },
+    "generator": {
+      "cpuMax": "100000 100000",
+      "memoryBytes": 2147483648
+    },
+    "swapMaxBytes": 0,
+    "ioLimit": null
+  },
+  "applicationStarted": false,
+  "databaseConnections": 0,
+  "existingParentControlsModified": false,
+  "resourceEnforcement": "NOT_PROVEN",
+  "fullStackPidRolePoolCoverage": "NOT_RUN",
+  "ownedCgroupsRetained": [],
+  "probes": [],
+  "platform": "Linux-6.18.48+-x86_64-with-glibc2.39",
+  "python": "3.13.15",
+  "uid": 0,
+  "affinity": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "cgroupLocation": {
+    "mount": "/sys/fs/cgroup",
+    "mountRoot": "/",
+    "current": "/sys/fs/cgroup",
+    "flags": [
+      "memory_recursiveprot",
+      "nodev",
+      "noexec",
+      "nosuid",
+      "nsdelegate",
+      "relatime",
+      "ro",
+      "rw"
+    ]
+  },
+  "ancestors": [
+    {
+      "path": "/sys/fs/cgroup",
+      "controls": {
+        "cpu.max": "400000 100000",
+        "cpu.stat": "usage_usec 19032377\nuser_usec 16541697\nsystem_usec 2490679\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 372\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+        "memory.max": "32212254720",
+        "memory.current": "1150992384",
+        "memory.swap.max": "0",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+        "cpuset.cpus.effective": "0-3",
+        "io.max": "",
+        "cgroup.controllers": "cpuset cpu io memory hugetlb pids rdma",
+        "cgroup.subtree_control": ""
+      }
+    }
+  ],
+  "observedEnvelope": {
+    "effectiveCpuUpperBound": 4,
+    "memoryUpperBoundBytes": 32212254720,
+    "isReservationOrCoTenantIsolationProof": false
+  },
+  "ownedChildCreationErrno": 30,
+  "reason": "CGROUP_READ_ONLY",
+  "nextAction": "DO_NOT_BOOTSTRAP_OR_BENCHMARK; PROVIDE_A_TRIAL_WITH_REQUIRED_DELEGATION",
+  "ownedHelperProcessesStopped": true,
+  "finishedAtUtc": "2026-10-21T02:57:57.590661+00:00",
+  "probeSourceSha256": "d0c63bd069c8a9b83833b1b2b9f0d3e09260e007b8878fd84c435b783405000f"
+}

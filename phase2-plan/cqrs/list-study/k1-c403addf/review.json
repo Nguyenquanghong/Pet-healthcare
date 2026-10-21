@@ -1,0 +1,38 @@
+{
+  "format": "cqrs-list-kaggle-review-v1",
+  "session": "K1 readiness smoke",
+  "run": "c403addf-ec74-4cac-915e-35f32f65899c",
+  "received": {
+    "form": "EXTRACTED_DIRECTORY_NO_ORIGINAL_ZIP",
+    "location": "benchmarks/phase2/Results/cqrs-list-c403addf-ec74-4cac-915e-35f32f65899c (left untouched)",
+    "copy": "received/ (byte-identical, SHA256SUMS.received, 47 files incl. result-manifest.json)",
+    "integrity": "46/46 result-manifest entries match bytes+sha256; no unlisted or missing files; manifest itself has no external anchor (no ZIP)",
+    "secretScan": "clean"
+  },
+  "provenance": {
+    "notebookSha256": "c6674cdc1cfd2a8bf287c77a1a0d9b662d45e69e3a199fe5ce4d75688e183cdf",
+    "policySha256": "1ee0ff4474c9517ca732a7172ed17760ea084af7b17398421631afc56f4b72fd",
+    "q6BundleSha256": "2b3d7c9c3e94980386dec3e5900198f9e6e6fd7c35d80cac9146709b47bb9037",
+    "overlayFilesEqualRepo": true,
+    "buildNormalizedEqualLocalDryRun4": {"O": true, "AB": true},
+    "buildRawEqualLocalDryRun4": {"O": false, "AB": false},
+    "profileKeySha256": "3d972289cd33b5f5ed00830bf9e090ab94237db30a861747c3539f9f57e6d0c8",
+    "profileKeyDiffersFromDryRunOnlyIn": ["cpuModel", "cpuQuotaAndAffinity", "memoryMax", "liveSoftwareVersions"]
+  },
+  "environment": {"cpuModel": "Intel(R) Xeon(R) CPU @ 2.20GHz", "logicalCpus": 4, "cpuMax": "400000 100000", "memoryMax": "32212254720", "kernel": "6.18.48+",
+                  "node": "v24.16.0", "postgres": "16.15", "redis": "7.0.15", "nginx": "1.24.0", "rabbitmq": "3.12.1", "python": "3.13.15", "locust": "2.44.4"},
+  "result": {
+    "status": "READY_FOR_FULL_BLOCKS",
+    "stages": "4/4 PASS",
+    "calibration": {"planned": 2880, "recorded": 2880, "drops": 0, "latenessP99Ms": 0.47, "latenessMaxMs": 1.36, "insideFraction": 1, "cpuComplete": true},
+    "queryHeavySmoke": "O/A/B COMPLETE, 720/720 success each, 0 errors, generator valid, CPU complete, pools PASS",
+    "pcnSmoke": "O/A/B COMPLETE, 0 errors, 0 path errors, 0 fallbacks, reconciliation PASS_IN_SCOPE, population 10/10, probe p99 ~1.3 ms, CPU complete, pools PASS",
+    "observationsOnly": "smoke latency/CPU are functional observations, not measurements"
+  },
+  "findings": [],
+  "decision": {
+    "readiness": "PASS",
+    "next": "K2 MODE='full' WORKLOADS=['query-heavy'] BLOCKS=[0,1,2]; then K3 MODE='full' WORKLOADS=['pcn']",
+    "measurements": "NOT_RUN"
+  }
+}

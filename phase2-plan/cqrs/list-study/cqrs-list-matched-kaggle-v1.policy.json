@@ -1,0 +1,260 @@
+{
+  "version": "cqrs-list-matched-kaggle-v1-policy-1",
+  "status": "FROZEN_BEFORE_MEASUREMENT",
+  "study": "cqrs-list-matched-kaggle-v1",
+  "derivedFrom": {
+    "path": "phase2-plan/cqrs/clinic-activity/evidence/benchmark-plan-20261021.json",
+    "sha256": "6b058747e66734c40e302a1da7aa712fa516608ad531c8b780fe65665d27474c"
+  },
+  "resourceClass": "kaggle_shared_envelope",
+  "isolationClaimed": false,
+  "sources": {
+    "O": {
+      "gitSha": "3e88d7e57fbf4f74da363d320f286244237a4389"
+    },
+    "AB_list": {
+      "sourceBundle": "test-results/phase2/cqrs/q6-cold-parts-20261019/cqrs-q6-source-v9.zip",
+      "sourceBundleSha256": "2b3d7c9c3e94980386dec3e5900198f9e6e6fd7c35d80cac9146709b47bb9037",
+      "sourceManifestSha256": "bce9a424f9e00c215a9251b856fbe6d9505c99de364758bbc5d29d8f4876a6ec",
+      "abSourceTreeSha256": "cd52a5bd4c5c75eaf820ac1971b2b3776a28fdd615b53048254ac6bb8f7432ec",
+      "projectionVersion": 1,
+      "sameBuildOnlyReaderChanges": true,
+      "newHarnessOverlayMustBeManifested": true,
+      "oldNotebookFullMustNotBeLaunched": true,
+      "declaredManifestDigest": "5623be60c061e24730cf98d42395609155bc09096b103470247cbf9fe67dde69"
+    }
+  },
+  "configurations": {
+    "O": "Pinned pre-CQRS source with its original schema and required components",
+    "A": "Pinned AB_list V1, authoritative reader; producer/projector enabled, shadow disabled",
+    "B": "Identical AB_list V1 build and maintenance; projected reader, unbilled authoritative control"
+  },
+  "blocksForEachWorkload": [
+    [
+      "O",
+      "A",
+      "B"
+    ],
+    [
+      "B",
+      "O",
+      "A"
+    ],
+    [
+      "A",
+      "B",
+      "O"
+    ]
+  ],
+  "queryHeavy": {
+    "basedOnProtocol": "cqrs-q0-query-heavy-v2",
+    "fixtureAppointments": 100000,
+    "owners": 100,
+    "pets": 100,
+    "reservations": 5900,
+    "medicalRecords": 100,
+    "fixtureMonth": "2028-02",
+    "warmupSeconds": 120,
+    "measuredSeconds": 800,
+    "arrivalsPerSecond": 12,
+    "concurrency": 16,
+    "operationWeights": "eight operations equal round-robin",
+    "operations": [
+      "owner-list",
+      "admin-list",
+      "admin-search",
+      "admin-unbilled",
+      "owner-calendar",
+      "admin-calendar",
+      "admin-filter",
+      "admin-page"
+    ],
+    "plannedSamplesPerOperationPerRun": 1200,
+    "minimumSuccessfulSamplesPerOperationPerRun": 1000,
+    "primaryOperation": "admin-list",
+    "primaryRequest": "GET /api/appointments?pageSize=100",
+    "adminActorLimitPerMinute": 600,
+    "ipLimitPerMinute": 3000,
+    "adminActors": 1,
+    "queryMeasuredWrites": 0
+  },
+  "pcn": {
+    "basedOnProtocol": "pet-healthcare-pcn-v1",
+    "users": 100,
+    "spawnPerSecond": 10,
+    "warmupAfterRampSeconds": 30,
+    "measuredSeconds": 1800,
+    "thinkTimeSeconds": [
+      0.5,
+      1.5
+    ],
+    "closedLoopNotFixedRps": true,
+    "operationWeights": {
+      "pets": 4,
+      "appointments": 2,
+      "medical": 2,
+      "hotel": 1,
+      "invoices": 1,
+      "notifications": 1,
+      "appointment-write": 2,
+      "rescue-write": 1
+    },
+    "fixture": "phase1-pcn-shape-v1: 100 owners/pets and one appointment, medical, hotel, invoice and notification per owner",
+    "minimumSuccessfulWriteSamplesPerConfiguration": 1000,
+    "calendarMeasured": false,
+    "requestPathAndGenerationEvidenceRequired": true,
+    "minimumSuccessfulAppointmentWriteSamplesPerConfiguration": 1000
+  },
+  "acceptance": {
+    "readPathImprovement": {
+      "medianPairedBtoAP95RatioMax": 0.8,
+      "everyPairRatioMax": 1.1
+    },
+    "improvementAgainstPreCqrs": {
+      "medianPairedBtoOP95RatioMax": 0.8,
+      "everyPairRatioMax": 1.1
+    },
+    "wholeFeatureNonRegressionAgainstO": {
+      "writeP95RatioMax": 1.1,
+      "applicationCpuPerSuccessRatioMax": 1.1,
+      "successfulThroughputRatioMin": 0.9
+    },
+    "pcnAppointmentListP95RatioMax": 1.1,
+    "healthyUnexpectedErrorsAndDrops": 0,
+    "noOwnerLeakOrContractMismatch": true,
+    "freshnessAndRecoveryReference": "phase2-plan/cqrs/acceptance.json: V1 freshness p95 2000ms/p99 5000ms, 3x1000 mutations; recovery 3x60s, catch-up <=120s; other correctness/fallback/rebuild gates unchanged",
+    "allPairsReportedWithWorstAndMedian": true,
+    "allMandatoryGatesRequiredForRecommendation": true,
+    "wholeFeatureRegressionGrading": "Every valid matched pair and workload separately; insufficient appointment write samples are inconclusive, not rescued by rescue-write counts.",
+    "queryHeavyOwnerAndAdminCalendarP95RatioToOMax": 1.1
+  },
+  "generatorValidity": {
+    "status": "RULE_LOCKED_COLLECTOR_IMPLEMENTATION_PENDING",
+    "openLoopCalibrationSeconds": 120,
+    "openLoopCalibrationRateMultiplier": 2,
+    "calibrationTarget": "Local no-op/loopback outside application, with the planned concurrency, observer and resource collector running; never lower application arrival rate from calibration",
+    "plannedCountAndAllOutcomesRetained": true,
+    "maximumGeneratorDropsForHealthyAcceptance": 0,
+    "dispatchLatenessP99MaxMs": 100,
+    "dispatchLatenessMaxMs": 1000,
+    "minimumPlannedDispatchFractionInsideMeasuredWindow": 0.99,
+    "percentile": "nearest_rank",
+    "openLoopLatency": "Both completion minus dispatch and completion minus scheduled; use scheduled end-to-end latency for acceptance, retain all failures/drops in outcome counts",
+    "closedLoop": "100 active users throughout measured window, no ramp/warmup samples, raw per-user task/wait/start/completion, event-loop delay probe at 10Hz with the same 100ms p99/1000ms maximum; actual RPS is an outcome",
+    "invalidRule": "Do not grade latency/throughput from invalid scheduling, missing timestamps or population; preserve raw and report INVALID_ENVIRONMENT or INCONCLUSIVE"
+  },
+  "sessions": {
+    "unit": "One complete matched block in one notebook kernel; multiple blocks allowed if profile remains identical",
+    "profileKey": [
+      "resourceClass",
+      "cpuModel",
+      "architecture",
+      "cpuQuotaAndAffinity",
+      "memoryMax",
+      "liveSoftwareVersions",
+      "replicas",
+      "poolLimits",
+      "sourceBuildManifests",
+      "logicalFixtureDigest",
+      "traceDigest",
+      "harnessDigest",
+      "policyDigest"
+    ],
+    "plannedBlockMembershipFixedBeforeTiming": true,
+    "maximumEnvironmentalReplacementBlocksPerPlannedBlock": 1,
+    "replacementRule": "Only objectively incomplete/invalid-environment blocks, never a valid slow/losing block; retain original and replacement, first valid complete block wins. A second environmental invalidity stops the study as incomplete. Correctness/application failures halt for diagnosis, not replacement.",
+    "profileMismatchRule": "Keep separate strata; complete all three blocks under one comparable key for an acceptance. Never combine unmatched halves or choose a winning session.",
+    "accounting": "All API/worker/PG-child/broker/Redis/gateway/audit CPU in measured window; generator/controller separately, root cgroup total separately; uncovered/unreadable process CPU means TOTAL_COST_INCONCLUSIVE",
+    "protectedData": "Disposable owned trial DB/schema/marker/roles/queues only, correct schema per source. Never use main DB, mix V1/V2 consumers or run V1 binary on V2."
+  },
+  "scope": "Demonstrates the pinned V1 CQRS revision only; no V2 or future integrated-product recommendation",
+  "excludes": [
+    "engineering",
+    "new freshness/recovery/rebuild drills if existing evidence does not match the build/profile",
+    "historical business bridge",
+    "activity study"
+  ],
+  "profile": {
+    "keyFields": [
+      "resourceClass",
+      "cpuModel",
+      "architecture",
+      "cpuQuotaAndAffinity",
+      "memoryMax",
+      "liveSoftwareVersions",
+      "replicas",
+      "poolLimits",
+      "sourceBuildManifests",
+      "logicalFixtureDigest",
+      "traceDigest",
+      "harnessDigest",
+      "policyDigest"
+    ],
+    "buildDigest": "path-normalized (tools/phase2/cqrs/activity/bench/profile.mjs); raw digest reported, not keyed",
+    "poolCeilingsPerProcess": {
+      "O": {
+        "core-api": 4,
+        "core-outbox": 4,
+        "billing-worker": 4,
+        "clinic-api": 4,
+        "clinic-worker": 4,
+        "notification-api": 4,
+        "notification-worker": 4
+      },
+      "A": {
+        "core-api": 4,
+        "core-outbox": 4,
+        "billing-worker": 4,
+        "clinic-api": 4,
+        "clinic-worker": 4,
+        "notification-api": 4,
+        "notification-worker": 4,
+        "clinic-read-worker": 1
+      },
+      "B": {
+        "core-api": 4,
+        "core-outbox": 4,
+        "billing-worker": 4,
+        "clinic-api": 4,
+        "clinic-audit": 1,
+        "clinic-worker": 4,
+        "notification-api": 4,
+        "notification-worker": 4,
+        "clinic-read-worker": 1
+      },
+      "harness": {
+        "stack-supervisor-per-database": 4
+      }
+    },
+    "poolCheck": "observed pg_stat_activity peak per database role <= sum of ceilings of the processes sharing that role"
+  },
+  "accounting": {
+    "collector": "tools/phase2/cqrs/activity/bench/collector.mjs via collector-cli.mjs, 1s, CLOCK_MONOTONIC windows",
+    "applicationRoles": [
+      "api",
+      "worker",
+      "relay",
+      "postgres",
+      "broker",
+      "redis",
+      "gateway"
+    ],
+    "separateRoles": [
+      "generator",
+      "controller"
+    ],
+    "missingCoverage": "TOTAL_COST_INCONCLUSIVE",
+    "measuredWindowObservation": "no stack observe/inspect actions inside measured windows; only the pool sampler (one pg_stat_activity catalog query/s over the private socket) runs, identically for O/A/B"
+  },
+  "readPath": {
+    "queryHeavy": "Q6 correct_path unchanged: O absent, A authoritative, B projection with matching generation (admin-unbilled authoritative); anything else is a contract error",
+    "pcn": "GET appointments: O absent, A authoritative, B projection with matching generation OR authoritative with X-Service-Degraded: clinic-read (V1 bounded fallback, counted and reported as listFallbackRate, no threshold); anything else is a path error"
+  },
+  "latencyForGrading": {
+    "openLoop": "scheduled -> completion (total_ms)",
+    "closedLoop": "request start -> completion"
+  },
+  "percentile": "nearest_rank",
+  "freshnessRecovery": "Reference only (listStudy.acceptance.freshnessAndRecoveryReference); NOT_RUN in this study unless matching evidence is supplied",
+  "performanceMeasurementsAllowed": "only after a readiness smoke in the same session records the profileKey and passes"
+}

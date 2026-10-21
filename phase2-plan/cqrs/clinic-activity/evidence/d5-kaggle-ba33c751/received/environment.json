@@ -1,0 +1,21 @@
+{
+  "kind": "kaggle_shared_envelope_fresh_profile",
+  "capturedAtUtc": "2026-10-21T13:58:05.304847+00:00",
+  "cpuModel": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+  "architecture": "x86_64",
+  "logicalCpus": 4,
+  "affinity": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "cpuMax": "400000 100000",
+  "memoryMax": "32212254720",
+  "memTotalBytes": 33658318848,
+  "kernel": "6.18.48+",
+  "cgroupVersion": 2,
+  "loadAverage": "0.42 0.23 0.16 2/324 112",
+  "python": "3.13.15",
+  "isolation": "NONE_CLAIMED: stack, generator and controller share the kernel envelope"
+}

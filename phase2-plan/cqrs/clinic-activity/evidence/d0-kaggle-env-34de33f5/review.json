@@ -1,0 +1,39 @@
+{
+  "format": "clinic-activity-d0-environment-review-v1",
+  "reviewedAtUtc": "2026-10-21T03:07:53.793910+00:00",
+  "run": "34de33f5-b259-4a28-b364-97e4733bab4f",
+  "status": "PASS_ARTIFACT_VALIDATION_CAPABILITY_UNAVAILABLE",
+  "source": "user supplied ZIP; local integrity/consistency review, not independent remote attestation",
+  "archive": {
+    "path": "clinic-activity-d0-env-34de33f5-b259-4a28-b364-97e4733bab4f.zip",
+    "bytes": 1614,
+    "sha256": "34b9a3e34fc9c7028cfa874be716d473c135534f260f70690c3040a8ac19458b"
+  },
+  "probeSourceSha256": "d0c63bd069c8a9b83833b1b2b9f0d3e09260e007b8878fd84c435b783405000f",
+  "artifactManifestSha256": "914f1fb71ffdb9984f3695ec0a356a8e3d80bf5ca5f90df7e31ce813919f8804",
+  "notebookSha256": "d7e3193fac90150aead1280131259ee3dd619509c9059bf2b35e4df34e20fb19",
+  "policyVersion": 5,
+  "policySha256": "96f51be71168fb8b4f8ab78eaf09035bd12b48a2c6fbe5bc02ea9badce65d181",
+  "observedStatus": "CAPABILITY_UNAVAILABLE",
+  "reason": "CGROUP_READ_ONLY",
+  "ownedChildCreationErrno": 30,
+  "hostEnvelopeIsSeparateBudgetProof": false,
+  "resourceEnforcement": "NOT_PROVEN",
+  "helpersApplicationAndDatabaseStarted": false,
+  "ownedHelpersStoppedReported": true,
+  "D1SourceFilesUnchanged": 608,
+  "d0": "PARTIAL_ENVIRONMENT",
+  "d1": "PASS_IN_FUNCTIONAL_SCOPE_10K_SOURCE_CACHED_API_UI",
+  "d2": "NOT_STARTED",
+  "performance": "NOT_RUN_BLOCKED",
+  "policyAmendedOrFrozen": false,
+  "decision": "Current exposed cgroup is read-only. Stop bootstrap and repeated notebooks on this kernel; require a trial with administrator-provided CPU/memory delegation or equivalent verified separate enforcement, then full stack identity/grants/versions/PID/pool coverage before policy freeze.",
+  "notRunByReviewer": [
+    "remote probe",
+    "helpers",
+    "application suites",
+    "DB/broker/service access",
+    "bootstrap/migrations/seed/reset",
+    "performance"
+  ]
+}

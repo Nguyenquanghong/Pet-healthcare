@@ -1,0 +1,662 @@
+{
+  "kind": "D1_READ_ONLY_EXPLAIN_NOT_ANALYZE",
+  "run": "4d002a50-8696-4eae-aeb9-a057c44749d2",
+  "status": "PASS_IN_SCOPE",
+  "fixture": {
+    "format": "clinic-activity-fixture-v1",
+    "rows": 10000,
+    "seed": 20261020,
+    "businessDate": "2030-10-20",
+    "syntheticOnly": true,
+    "distribution": {
+      "historyDays": 1461,
+      "busyAnchorProbability": 0.002,
+      "excludedHistoryMonth": 2,
+      "excludedWeekday": 0,
+      "typeWeights": [
+        40,
+        15,
+        3,
+        8,
+        1,
+        3,
+        12,
+        10,
+        6,
+        2
+      ],
+      "statusWeights": [
+        6,
+        8,
+        2,
+        2,
+        65,
+        12,
+        5
+      ],
+      "first70CoverAllEnumPairs": true
+    },
+    "contentSha256": "dbe3b90fdef6cd96627c638ba8018d0669ae06613c6ffef4feaa101dcb63327a"
+  },
+  "analyze": false,
+  "executesSelect": false,
+  "performance": "NOT_RUN",
+  "plans": [
+    {
+      "range": "day",
+      "category": "all",
+      "from": "2030-10-20",
+      "to": "2030-10-20",
+      "previousFrom": "2030-10-19",
+      "statement": "EXPLAIN (FORMAT JSON) SELECT a.appointment_date::text AS date, a.type, a.status, count(*)::bigint AS n\n    FROM appointments a\n    WHERE a.appointment_date >= $1::date\n      AND a.appointment_date <= $2::date \n    GROUP BY a.appointment_date, a.type, a.status",
+      "parameters": [
+        "2030-10-19",
+        "2030-10-20"
+      ],
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Aggregate",
+            "Strategy": "Sorted",
+            "Partial Mode": "Simple",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 464.4,
+            "Total Cost": 465.26,
+            "Plan Rows": 31,
+            "Plan Width": 52,
+            "Group Key": [
+              "appointment_date",
+              "type",
+              "status"
+            ],
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 464.4,
+                "Total Cost": 464.48,
+                "Plan Rows": 32,
+                "Plan Width": 12,
+                "Sort Key": [
+                  "appointment_date",
+                  "type",
+                  "status"
+                ],
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "appointments",
+                    "Alias": "a",
+                    "Startup Cost": 0,
+                    "Total Cost": 463.6,
+                    "Plan Rows": 32,
+                    "Plan Width": 12,
+                    "Filter": "((appointment_date >= ('2030-10-19'::cstring)::date) AND (appointment_date <= ('2030-10-20'::cstring)::date))"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "range": "day",
+      "category": "clinic",
+      "from": "2030-10-20",
+      "to": "2030-10-20",
+      "previousFrom": "2030-10-19",
+      "statement": "EXPLAIN (FORMAT JSON) SELECT a.appointment_date::text AS date, a.type, a.status, count(*)::bigint AS n\n    FROM appointments a\n    WHERE a.appointment_date >= $1::date\n      AND a.appointment_date <= $2::date AND a.type::text NOT IN ($3,$4,$5)\n    GROUP BY a.appointment_date, a.type, a.status",
+      "parameters": [
+        "2030-10-19",
+        "2030-10-20",
+        "spa_bath",
+        "spa_grooming",
+        "spa_combo"
+      ],
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Aggregate",
+            "Strategy": "Sorted",
+            "Partial Mode": "Simple",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 520.23,
+            "Total Cost": 521.07,
+            "Plan Rows": 30,
+            "Plan Width": 52,
+            "Group Key": [
+              "appointment_date",
+              "type",
+              "status"
+            ],
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 520.23,
+                "Total Cost": 520.31,
+                "Plan Rows": 31,
+                "Plan Width": 12,
+                "Sort Key": [
+                  "appointment_date",
+                  "type",
+                  "status"
+                ],
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "appointments",
+                    "Alias": "a",
+                    "Startup Cost": 0,
+                    "Total Cost": 519.46,
+                    "Plan Rows": 31,
+                    "Plan Width": 12,
+                    "Filter": "((appointment_date >= ('2030-10-19'::cstring)::date) AND (appointment_date <= ('2030-10-20'::cstring)::date) AND ((type)::text <> ALL ('{spa_bath,spa_grooming,spa_combo}'::text[])))"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "range": "day",
+      "category": "spa",
+      "from": "2030-10-20",
+      "to": "2030-10-20",
+      "previousFrom": "2030-10-19",
+      "statement": "EXPLAIN (FORMAT JSON) SELECT a.appointment_date::text AS date, a.type, a.status, count(*)::bigint AS n\n    FROM appointments a\n    WHERE a.appointment_date >= $1::date\n      AND a.appointment_date <= $2::date AND a.type::text IN ($3,$4,$5)\n    GROUP BY a.appointment_date, a.type, a.status",
+      "parameters": [
+        "2030-10-19",
+        "2030-10-20",
+        "spa_bath",
+        "spa_grooming",
+        "spa_combo"
+      ],
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Aggregate",
+            "Strategy": "Sorted",
+            "Partial Mode": "Simple",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 519.47,
+            "Total Cost": 519.5,
+            "Plan Rows": 1,
+            "Plan Width": 52,
+            "Group Key": [
+              "appointment_date",
+              "type",
+              "status"
+            ],
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 519.47,
+                "Total Cost": 519.48,
+                "Plan Rows": 1,
+                "Plan Width": 12,
+                "Sort Key": [
+                  "appointment_date",
+                  "type",
+                  "status"
+                ],
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "appointments",
+                    "Alias": "a",
+                    "Startup Cost": 0,
+                    "Total Cost": 519.46,
+                    "Plan Rows": 1,
+                    "Plan Width": 12,
+                    "Filter": "((appointment_date >= ('2030-10-19'::cstring)::date) AND (appointment_date <= ('2030-10-20'::cstring)::date) AND ((type)::text = ANY ('{spa_bath,spa_grooming,spa_combo}'::text[])))"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "range": "30days",
+      "category": "all",
+      "from": "2030-09-21",
+      "to": "2030-10-20",
+      "previousFrom": "2030-08-22",
+      "statement": "EXPLAIN (FORMAT JSON) SELECT a.appointment_date::text AS date, a.type, a.status, count(*)::bigint AS n\n    FROM appointments a\n    WHERE a.appointment_date >= $1::date\n      AND a.appointment_date <= $2::date \n    GROUP BY a.appointment_date, a.type, a.status",
+      "parameters": [
+        "2030-08-22",
+        "2030-10-20"
+      ],
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Aggregate",
+            "Strategy": "Sorted",
+            "Partial Mode": "Simple",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 464.4,
+            "Total Cost": 465.26,
+            "Plan Rows": 31,
+            "Plan Width": 52,
+            "Group Key": [
+              "appointment_date",
+              "type",
+              "status"
+            ],
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 464.4,
+                "Total Cost": 464.48,
+                "Plan Rows": 32,
+                "Plan Width": 12,
+                "Sort Key": [
+                  "appointment_date",
+                  "type",
+                  "status"
+                ],
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "appointments",
+                    "Alias": "a",
+                    "Startup Cost": 0,
+                    "Total Cost": 463.6,
+                    "Plan Rows": 32,
+                    "Plan Width": 12,
+                    "Filter": "((appointment_date >= ('2030-08-22'::cstring)::date) AND (appointment_date <= ('2030-10-20'::cstring)::date))"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "range": "30days",
+      "category": "clinic",
+      "from": "2030-09-21",
+      "to": "2030-10-20",
+      "previousFrom": "2030-08-22",
+      "statement": "EXPLAIN (FORMAT JSON) SELECT a.appointment_date::text AS date, a.type, a.status, count(*)::bigint AS n\n    FROM appointments a\n    WHERE a.appointment_date >= $1::date\n      AND a.appointment_date <= $2::date AND a.type::text NOT IN ($3,$4,$5)\n    GROUP BY a.appointment_date, a.type, a.status",
+      "parameters": [
+        "2030-08-22",
+        "2030-10-20",
+        "spa_bath",
+        "spa_grooming",
+        "spa_combo"
+      ],
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Aggregate",
+            "Strategy": "Sorted",
+            "Partial Mode": "Simple",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 520.23,
+            "Total Cost": 521.07,
+            "Plan Rows": 30,
+            "Plan Width": 52,
+            "Group Key": [
+              "appointment_date",
+              "type",
+              "status"
+            ],
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 520.23,
+                "Total Cost": 520.31,
+                "Plan Rows": 31,
+                "Plan Width": 12,
+                "Sort Key": [
+                  "appointment_date",
+                  "type",
+                  "status"
+                ],
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "appointments",
+                    "Alias": "a",
+                    "Startup Cost": 0,
+                    "Total Cost": 519.46,
+                    "Plan Rows": 31,
+                    "Plan Width": 12,
+                    "Filter": "((appointment_date >= ('2030-08-22'::cstring)::date) AND (appointment_date <= ('2030-10-20'::cstring)::date) AND ((type)::text <> ALL ('{spa_bath,spa_grooming,spa_combo}'::text[])))"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "range": "30days",
+      "category": "spa",
+      "from": "2030-09-21",
+      "to": "2030-10-20",
+      "previousFrom": "2030-08-22",
+      "statement": "EXPLAIN (FORMAT JSON) SELECT a.appointment_date::text AS date, a.type, a.status, count(*)::bigint AS n\n    FROM appointments a\n    WHERE a.appointment_date >= $1::date\n      AND a.appointment_date <= $2::date AND a.type::text IN ($3,$4,$5)\n    GROUP BY a.appointment_date, a.type, a.status",
+      "parameters": [
+        "2030-08-22",
+        "2030-10-20",
+        "spa_bath",
+        "spa_grooming",
+        "spa_combo"
+      ],
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Aggregate",
+            "Strategy": "Sorted",
+            "Partial Mode": "Simple",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 519.47,
+            "Total Cost": 519.5,
+            "Plan Rows": 1,
+            "Plan Width": 52,
+            "Group Key": [
+              "appointment_date",
+              "type",
+              "status"
+            ],
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 519.47,
+                "Total Cost": 519.48,
+                "Plan Rows": 1,
+                "Plan Width": 12,
+                "Sort Key": [
+                  "appointment_date",
+                  "type",
+                  "status"
+                ],
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "appointments",
+                    "Alias": "a",
+                    "Startup Cost": 0,
+                    "Total Cost": 519.46,
+                    "Plan Rows": 1,
+                    "Plan Width": 12,
+                    "Filter": "((appointment_date >= ('2030-08-22'::cstring)::date) AND (appointment_date <= ('2030-10-20'::cstring)::date) AND ((type)::text = ANY ('{spa_bath,spa_grooming,spa_combo}'::text[])))"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "range": "366days",
+      "category": "all",
+      "from": "2029-10-20",
+      "to": "2030-10-20",
+      "previousFrom": "2028-10-19",
+      "statement": "EXPLAIN (FORMAT JSON) SELECT a.appointment_date::text AS date, a.type, a.status, count(*)::bigint AS n\n    FROM appointments a\n    WHERE a.appointment_date >= $1::date\n      AND a.appointment_date <= $2::date \n    GROUP BY a.appointment_date, a.type, a.status",
+      "parameters": [
+        "2028-10-19",
+        "2030-10-20"
+      ],
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Aggregate",
+            "Strategy": "Sorted",
+            "Partial Mode": "Simple",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 464.4,
+            "Total Cost": 465.26,
+            "Plan Rows": 31,
+            "Plan Width": 52,
+            "Group Key": [
+              "appointment_date",
+              "type",
+              "status"
+            ],
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 464.4,
+                "Total Cost": 464.48,
+                "Plan Rows": 32,
+                "Plan Width": 12,
+                "Sort Key": [
+                  "appointment_date",
+                  "type",
+                  "status"
+                ],
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "appointments",
+                    "Alias": "a",
+                    "Startup Cost": 0,
+                    "Total Cost": 463.6,
+                    "Plan Rows": 32,
+                    "Plan Width": 12,
+                    "Filter": "((appointment_date >= ('2028-10-19'::cstring)::date) AND (appointment_date <= ('2030-10-20'::cstring)::date))"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "range": "366days",
+      "category": "clinic",
+      "from": "2029-10-20",
+      "to": "2030-10-20",
+      "previousFrom": "2028-10-19",
+      "statement": "EXPLAIN (FORMAT JSON) SELECT a.appointment_date::text AS date, a.type, a.status, count(*)::bigint AS n\n    FROM appointments a\n    WHERE a.appointment_date >= $1::date\n      AND a.appointment_date <= $2::date AND a.type::text NOT IN ($3,$4,$5)\n    GROUP BY a.appointment_date, a.type, a.status",
+      "parameters": [
+        "2028-10-19",
+        "2030-10-20",
+        "spa_bath",
+        "spa_grooming",
+        "spa_combo"
+      ],
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Aggregate",
+            "Strategy": "Sorted",
+            "Partial Mode": "Simple",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 520.23,
+            "Total Cost": 521.07,
+            "Plan Rows": 30,
+            "Plan Width": 52,
+            "Group Key": [
+              "appointment_date",
+              "type",
+              "status"
+            ],
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 520.23,
+                "Total Cost": 520.31,
+                "Plan Rows": 31,
+                "Plan Width": 12,
+                "Sort Key": [
+                  "appointment_date",
+                  "type",
+                  "status"
+                ],
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "appointments",
+                    "Alias": "a",
+                    "Startup Cost": 0,
+                    "Total Cost": 519.46,
+                    "Plan Rows": 31,
+                    "Plan Width": 12,
+                    "Filter": "((appointment_date >= ('2028-10-19'::cstring)::date) AND (appointment_date <= ('2030-10-20'::cstring)::date) AND ((type)::text <> ALL ('{spa_bath,spa_grooming,spa_combo}'::text[])))"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "range": "366days",
+      "category": "spa",
+      "from": "2029-10-20",
+      "to": "2030-10-20",
+      "previousFrom": "2028-10-19",
+      "statement": "EXPLAIN (FORMAT JSON) SELECT a.appointment_date::text AS date, a.type, a.status, count(*)::bigint AS n\n    FROM appointments a\n    WHERE a.appointment_date >= $1::date\n      AND a.appointment_date <= $2::date AND a.type::text IN ($3,$4,$5)\n    GROUP BY a.appointment_date, a.type, a.status",
+      "parameters": [
+        "2028-10-19",
+        "2030-10-20",
+        "spa_bath",
+        "spa_grooming",
+        "spa_combo"
+      ],
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Aggregate",
+            "Strategy": "Sorted",
+            "Partial Mode": "Simple",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 519.47,
+            "Total Cost": 519.5,
+            "Plan Rows": 1,
+            "Plan Width": 52,
+            "Group Key": [
+              "appointment_date",
+              "type",
+              "status"
+            ],
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 519.47,
+                "Total Cost": 519.48,
+                "Plan Rows": 1,
+                "Plan Width": 12,
+                "Sort Key": [
+                  "appointment_date",
+                  "type",
+                  "status"
+                ],
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "appointments",
+                    "Alias": "a",
+                    "Startup Cost": 0,
+                    "Total Cost": 519.46,
+                    "Plan Rows": 1,
+                    "Plan Width": 12,
+                    "Filter": "((appointment_date >= ('2028-10-19'::cstring)::date) AND (appointment_date <= ('2030-10-20'::cstring)::date) AND ((type)::text = ANY ('{spa_bath,spa_grooming,spa_combo}'::text[])))"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "status": "PASS"
+    }
+  ],
+  "identity": {
+    "database": "activity_4d002a5086964eaeaeb9a057c44749d2_clinic",
+    "role": "activity_4d002a5086964eaeaeb9a057c44749d2_reader",
+    "schema": "activity_4d002a5086964eaeaeb9a057c44749d2",
+    "port": 43605,
+    "serverVersionNumber": "160015",
+    "markerVerified": true,
+    "nonSuperuser": true
+  },
+  "snapshot": {
+    "isolation": "repeatable read",
+    "readonly": "on"
+  }
+}

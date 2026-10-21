@@ -2,8 +2,12 @@ import amqp from 'amqplib';
 import {requireBrokerConfig} from '@nipopeto/messaging';
 import type {PrismaClient} from './generated/client/index.js';
 import {ReadDiagnostics,readDiagnostics,type DiagnosticReason} from './readDiagnostics.js';
+import {isProjectionVersion} from './projectionVersions.js';
+import type {AuditLane} from './activitySummaryEvidence.js';
 
-export type FreshnessEvidence={generation:string;sampledAt:number;lagMs:number;healthy:boolean};
+// Row evidence only (registry<->rows). schemaVersion is recorded so V1 row health
+// is never read as V2 summary health; summary reconciliation evidence is separate.
+export type FreshnessEvidence={generation:string;schemaVersion:number;sampledAt:number;lagMs:number;healthy:boolean};
 export async function probeReadQueue(){
   const config=requireBrokerConfig();
   const connection=await amqp.connect(config.brokerUrl,{timeout:750});
@@ -34,7 +38,18 @@ export class ReadFreshness{
   private timer?:ReturnType<typeof setInterval>;
   private lagSince?:number;
   private generation?:string;
-  constructor(private readonly db:PrismaClient,private readonly brokerHealthy=probeReadQueue,private readonly now=()=>Date.now(),private readonly diagnostics:ReadDiagnostics=readDiagnostics){}
+  private pendingSince=new Map<string,{projected:number|null;since:number}>();
+  private overflowCarry?:number;
+  // requireListProjection=true keeps the list guard semantics (evidence only while
+  // list servingMode=projection). Activity summary evidence uses false: the same
+  // generation-bound registry<->rows audit without enabling projected lists.
+  // perAggregateLag (activity only): the list estimator carries the oldest pending
+  // time across samples even when each sample sees a DIFFERENT pending change, so
+  // steady writes make lag grow without bound. Per aggregate, a change still
+  // pending at the same projected version keeps its first-seen time; others start
+  // at their changedAt. Over 1000 pending, the global carry is kept until clean.
+  constructor(private readonly db:PrismaClient,private readonly brokerHealthy=probeReadQueue,private readonly now=()=>Date.now(),private readonly diagnostics:ReadDiagnostics=readDiagnostics,
+    private readonly options:{requireListProjection?:boolean;lane?:AuditLane;perAggregateLag?:boolean}={}){}
   sample(){
     if(this.pending)return this.pending;
     this.pending=this.diagnostics.run('freshness',async()=>{
@@ -44,7 +59,7 @@ export class ReadFreshness{
         this.diagnostics.mark('freshness-broker');
         if(!await this.brokerHealthy())throw new Error('BROKER_EVIDENCE_UNAVAILABLE');
         reason='sample_error';this.diagnostics.mark('freshness-acquire');
-        const result=await this.db.$transaction(async tx=>{
+        const audit=()=>this.db.$transaction(async tx=>{
           await tx.$executeRawUnsafe("SET LOCAL statement_timeout='750ms'");
           // Bound CPU fan-out of the full registry/read-row audit alongside
           // foreground cold queries. Still audit every row on every sample;
@@ -53,7 +68,7 @@ export class ReadFreshness{
           this.diagnostics.mark('freshness-control');
           const control=await tx.readProjectionControl.findUnique({where:{projectionName:'appointments'},include:{activeGeneration:true}});
           const g=control?.activeGeneration;
-          if(control?.servingMode!=='projection'||!g||g.state!=='ACTIVE'||g.schemaVersion!==1||!g.verifiedAt||g.projectionName!=='appointments'||await tx.readRebuildRun.count({where:{frozen:true}})){reason='projection_not_ready';throw new Error('PROJECTION_NOT_READY');}
+          if(((this.options.requireListProjection??true)&&control?.servingMode!=='projection')||!g||g.state!=='ACTIVE'||!isProjectionVersion(g.schemaVersion)||!g.verifiedAt||g.projectionName!=='appointments'||await tx.readRebuildRun.count({where:{frozen:true}})){reason='projection_not_ready';throw new Error('PROJECTION_NOT_READY');}
           this.diagnostics.mark('freshness-diff');
           const [diff]=await tx.$queryRaw<{pending:number;oldest:Date|null;bad:number}[]>`SELECT
             count(*) FILTER(WHERE (r.deleted AND p."appointmentId" IS NOT NULL AND p."deletedAt" IS NULL) OR (NOT r.deleted AND (p."appointmentId" IS NULL OR p."sourceVersion"<r.version OR p."deletedAt" IS NOT NULL)))::int AS pending,
@@ -61,12 +76,23 @@ export class ReadFreshness{
             count(*) FILTER(WHERE r."aggregateId" IS NULL OR p."sourceVersion">r.version)::int AS bad
             FROM (SELECT * FROM "ClinicReadRevision" WHERE kind='appointment') r FULL JOIN (SELECT * FROM "AppointmentReadRow" WHERE generation=${g.id}) p ON r."aggregateId"=p."appointmentId"`;
           if(diff!.bad){reason='projection_version_invalid';throw new Error('PROJECTION_VERSION_INVALID');}
-          this.diagnostics.mark('freshness-commit');return {generation:g.id,...diff!};
+          const items=this.options.perAggregateLag&&diff!.pending>0&&diff!.pending<=1000?await tx.$queryRaw<{id:string;changed:Date;projected:number|null}[]>`SELECT r."aggregateId" AS id,r."changedAt" AS changed,p."sourceVersion" AS projected
+            FROM (SELECT * FROM "ClinicReadRevision" WHERE kind='appointment') r LEFT JOIN (SELECT * FROM "AppointmentReadRow" WHERE generation=${g.id}) p ON r."aggregateId"=p."appointmentId"
+            WHERE (r.deleted AND p."appointmentId" IS NOT NULL AND p."deletedAt" IS NULL) OR (NOT r.deleted AND (p."appointmentId" IS NULL OR p."sourceVersion"<r.version OR p."deletedAt" IS NOT NULL))`:undefined;
+          this.diagnostics.mark('freshness-commit');return {generation:g.id,schemaVersion:g.schemaVersion,...diff!,items};
         },{isolationLevel:'RepeatableRead',maxWait:50,timeout:1500});
-        if(this.generation!==result.generation)this.lagSince=undefined;
+        const result=await (this.options.lane?this.options.lane.run(audit):audit());
+        if(this.generation!==result.generation){this.lagSince=undefined;this.pendingSince.clear();this.overflowCarry=undefined;}
         this.generation=result.generation;
-        this.lagSince=result.pending?Math.min(this.lagSince??started,result.oldest?.getTime()??started):undefined;
-        this.evidence={generation:result.generation,sampledAt:started,lagMs:this.lagSince===undefined?0:Math.max(0,this.now()-this.lagSince),healthy:true};
+        if(!this.options.perAggregateLag)this.lagSince=result.pending?Math.min(this.lagSince??started,result.oldest?.getTime()??started):undefined;
+        else if(!result.pending){this.lagSince=undefined;this.pendingSince.clear();this.overflowCarry=undefined;}
+        else if(!result.items){this.overflowCarry=Math.min(this.overflowCarry??this.lagSince??started,result.oldest?.getTime()??started);this.pendingSince.clear();this.lagSince=this.overflowCarry;}
+        else{
+          const next=new Map<string,{projected:number|null;since:number}>();let since=started;
+          for(const item of result.items){const old=this.pendingSince.get(item.id),s=old&&old.projected===item.projected?old.since:Math.min(item.changed.getTime(),started);next.set(item.id,{projected:item.projected,since:s});since=Math.min(since,s);}
+          this.pendingSince=next;this.lagSince=this.overflowCarry===undefined?since:Math.min(this.overflowCarry,since);
+        }
+        this.evidence={generation:result.generation,schemaVersion:result.schemaVersion,sampledAt:started,lagMs:this.lagSince===undefined?0:Math.max(0,this.now()-this.lagSince),healthy:true};
         this.diagnostics.emit('sample_ok');
       }catch(error){this.evidence=undefined;this.diagnostics.emit('sample_error',reason,error);}
     }).finally(()=>{this.pending=undefined;});return this.pending;

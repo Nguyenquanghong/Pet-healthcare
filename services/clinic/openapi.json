@@ -1597,6 +1597,212 @@
         },
         "operationId": "getClinicDashboard"
       }
+    },
+    "/api/dashboard/clinic/activity": {
+      "get": {
+        "operationId": "getClinicActivity",
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Current appointment activity for the currently authorized admin only",
+        "description": "Split Clinic only. Appointment DATE and current status; cancelled/no_show included in total. Inclusive period up to 366 days, adjacent equal-day previous period in the same read-only snapshot. Rates are ratios or null; totalDeltaPercent is percent or null when previous=0. Unknown/repeated/non-string parameters return 422. Clients cannot select a reader. Source/cached mode is server-configured; cache TTL is absolute 5s. Does not enable projected appointment lists.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$"
+            }
+          },
+          {
+            "name": "groupBy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "month"
+              ],
+              "default": "day"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "clinic",
+                "spa"
+              ],
+              "default": "all"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity from one source snapshot, an absolute-TTL cached snapshot or a verified V2 daily summary; ineligible summary falls back to the whole source response",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              },
+              "X-Clinic-Read-Source": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "source",
+                    "cached",
+                    "summary"
+                  ]
+                }
+              },
+              "X-Clinic-Projection-Generation": {
+                "description": "Set only when meta.source is summary",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Service-Degraded": {
+                "description": "clinic-activity when meta.degraded is true",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "clinic-activity"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicActivity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current admin access required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid or unsupported query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authorization or source unavailable, busy, deadline or unsafe counts; Retry-After: 1",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "JSON error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4372,6 +4578,449 @@
           },
           "searchReady": {
             "type": "boolean"
+          }
+        }
+      },
+      "ClinicActivity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "period",
+          "previousPeriod",
+          "current",
+          "previous",
+          "comparison",
+          "meta"
+        ],
+        "properties": {
+          "period": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from",
+              "to",
+              "groupBy",
+              "category",
+              "timezone"
+            ],
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$"
+              },
+              "to": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$"
+              },
+              "groupBy": {
+                "type": "string",
+                "enum": [
+                  "day",
+                  "month"
+                ]
+              },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "all",
+                  "clinic",
+                  "spa"
+                ]
+              },
+              "timezone": {
+                "type": "string",
+                "enum": [
+                  "Asia/Ho_Chi_Minh"
+                ]
+              }
+            }
+          },
+          "previousPeriod": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from",
+              "to"
+            ],
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$"
+              },
+              "to": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$"
+              }
+            }
+          },
+          "current": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "total",
+              "byStatus",
+              "cancellationRate",
+              "noShowRate",
+              "byType",
+              "buckets"
+            ],
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "byStatus": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "pending",
+                  "confirmed",
+                  "checked_in",
+                  "in_progress",
+                  "completed",
+                  "cancelled",
+                  "no_show"
+                ],
+                "properties": {
+                  "pending": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "confirmed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "checked_in": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "in_progress": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "completed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "cancelled": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "no_show": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "cancellationRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "nullable": true
+              },
+              "noShowRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "nullable": true
+              },
+              "byType": {
+                "type": "array",
+                "minItems": 10,
+                "maxItems": 10,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "total"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "general_checkup",
+                        "vaccination",
+                        "dental",
+                        "dermatology",
+                        "surgery",
+                        "hotel_consultation",
+                        "spa_bath",
+                        "spa_grooming",
+                        "spa_combo",
+                        "other"
+                      ]
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  }
+                }
+              },
+              "buckets": {
+                "type": "array",
+                "maxItems": 366,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "from",
+                    "to",
+                    "total",
+                    "byStatus"
+                  ],
+                  "properties": {
+                    "from": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$"
+                    },
+                    "to": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "byStatus": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "pending",
+                        "confirmed",
+                        "checked_in",
+                        "in_progress",
+                        "completed",
+                        "cancelled",
+                        "no_show"
+                      ],
+                      "properties": {
+                        "pending": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "confirmed": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "checked_in": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "in_progress": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "completed": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "cancelled": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "no_show": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "previous": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "total",
+              "byStatus",
+              "cancellationRate",
+              "noShowRate"
+            ],
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "byStatus": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "pending",
+                  "confirmed",
+                  "checked_in",
+                  "in_progress",
+                  "completed",
+                  "cancelled",
+                  "no_show"
+                ],
+                "properties": {
+                  "pending": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "confirmed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "checked_in": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "in_progress": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "completed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "cancelled": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "no_show": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "cancellationRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "nullable": true
+              },
+              "noShowRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "nullable": true
+              }
+            }
+          },
+          "comparison": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "totalDelta",
+              "totalDeltaPercent"
+            ],
+            "properties": {
+              "totalDelta": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "totalDeltaPercent": {
+                "type": "number",
+                "nullable": true
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source",
+              "generation",
+              "generatedAt",
+              "cacheComputedAt",
+              "freshness",
+              "degraded",
+              "reason"
+            ],
+            "properties": {
+              "source": {
+                "type": "string",
+                "enum": [
+                  "source",
+                  "cached",
+                  "summary"
+                ]
+              },
+              "generation": {
+                "type": "string",
+                "nullable": true
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "cacheComputedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "freshness": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "state",
+                  "checkedAt",
+                  "observedLagMs"
+                ],
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "current",
+                      "within-policy"
+                    ]
+                  },
+                  "checkedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "observedLagMs": {
+                    "type": "number",
+                    "minimum": 0,
+                    "nullable": true
+                  }
+                }
+              },
+              "degraded": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string",
+                "nullable": true
+              }
+            }
           }
         }
       }

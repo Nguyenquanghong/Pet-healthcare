@@ -1,0 +1,21 @@
+{
+  "status": "READY_FOR_FULL_BLOCKS",
+  "checks": {
+    "calibration": "PASS",
+    "query-heavy": {
+      "block": "COMPLETE",
+      "cpuComplete": true,
+      "pools": true,
+      "pathAndContract": true,
+      "generatorValid": true
+    },
+    "pcn": {
+      "block": "COMPLETE",
+      "cpuComplete": true,
+      "pools": true,
+      "pathAndContract": true,
+      "generatorValid": true
+    }
+  },
+  "profileKeySha256": "3d972289cd33b5f5ed00830bf9e090ab94237db30a861747c3539f9f57e6d0c8"
+}

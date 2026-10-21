@@ -61,5 +61,5 @@ for (const [path, methods] of Object.entries(spec.paths)) {
   }
 }
 assert.deepEqual([...documented].sort(), [...runtime].sort(), "OpenAPI routes differ from mounted runtime routes");
-assert.equal(runtime.size, 69, "P2 unread-count, P4 operations and P5 dashboard regions preserve the original 65 operations");
+assert.equal(runtime.size, 70, "P2 unread-count, P4 operations, P5 dashboard regions and D1 Clinic activity preserve the original 65 operations");
 process.stdout.write(`OpenAPI PASS: ${runtime.size} operations match source and schemas validate.\n`);

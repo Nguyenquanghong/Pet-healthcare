@@ -1,0 +1,10 @@
+{
+  "kind": "CLINIC_ACTIVITY_D5_READINESS_NOT_BENCHMARK",
+  "harnessRevision": 1,
+  "run": "ba33c751-97d7-4083-bb0f-1086f1b4ae69",
+  "status": "READY_FOR_POLICY_FREEZE_REVIEW",
+  "performance": "NOT_RUN",
+  "policy": "v9 partial (fullyFrozen=false)",
+  "resourceClass": "kaggle_shared_envelope",
+  "cleanup": "PASS"
+}

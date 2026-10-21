@@ -1,0 +1,129 @@
+{
+  "format": "clinic-activity-d0-environment-proposal-v1",
+  "recordedAtUtc": "2026-10-21T02:23:38.233902+00:00",
+  "status": "PROPOSED_NOT_FROZEN_NOT_EXECUTED",
+  "d0": "PARTIAL_ENVIRONMENT",
+  "performanceMeasurementsAllowed": false,
+  "policyChanged": false,
+  "budget": {
+    "stack": {
+      "cpuMax": "200000 100000",
+      "memoryMaxBytes": 8589934592
+    },
+    "generator": {
+      "cpuMax": "100000 100000",
+      "memoryMaxBytes": 2147483648
+    },
+    "memorySwapMaxBytes": 0,
+    "ioLimit": null,
+    "reason": "Before any new application performance measurement: aggregate stack2CPU/8GiB plus HTTP generator1CPU/2GiB fits previously observed 4CPU/30GiB envelope with headroom. Probe refuses a smaller/unknown envelope; no auto-adjustment or borrowed Q6 budget. Reconfirm actual run and co-tenant/IO controls before freeze."
+  },
+  "proposedProcessPools": [
+    {
+      "component": "core-api",
+      "entrypoint": "backend/dist/src/index.js",
+      "replicas": 1,
+      "DB_POOL_LIMIT": 2,
+      "DB_POOL_TIMEOUT_SECONDS": 1
+    },
+    {
+      "component": "clinic-api",
+      "entrypoint": "services/clinic/dist/index.js",
+      "replicas": 1,
+      "DB_POOL_LIMIT": 2,
+      "DB_POOL_TIMEOUT_SECONDS": 1
+    },
+    {
+      "component": "notification-api",
+      "entrypoint": "services/notification/dist/index.js",
+      "replicas": 1,
+      "DB_POOL_LIMIT": 2,
+      "DB_POOL_TIMEOUT_SECONDS": 1
+    },
+    {
+      "component": "core-runtime-relay",
+      "entrypoint": "backend/dist/src/phase2/notificationWorker.js",
+      "replicas": 1,
+      "DB_POOL_LIMIT": 1,
+      "DB_POOL_TIMEOUT_SECONDS": 1
+    },
+    {
+      "component": "core-billing-worker",
+      "entrypoint": "backend/dist/src/phase2/billingWorker.js",
+      "replicas": 1,
+      "DB_POOL_LIMIT": 1,
+      "DB_POOL_TIMEOUT_SECONDS": 1
+    },
+    {
+      "component": "clinic-consumer-and-relay",
+      "entrypoint": "services/clinic/dist/worker.js",
+      "replicas": 1,
+      "DB_POOL_LIMIT": 1,
+      "DB_POOL_TIMEOUT_SECONDS": 1
+    },
+    {
+      "component": "clinic-read-v1",
+      "entrypoint": "services/clinic/dist/readWorker.js",
+      "replicas": 1,
+      "DB_POOL_LIMIT": 1,
+      "DB_POOL_TIMEOUT_SECONDS": 1,
+      "CLINIC_READ_PROJECTOR_POOL_LIMIT": 1
+    },
+    {
+      "component": "notification-consumer",
+      "entrypoint": "services/notification/dist/worker.js",
+      "replicas": 1,
+      "DB_POOL_LIMIT": 1,
+      "DB_POOL_TIMEOUT_SECONDS": 1
+    },
+    {
+      "component": "audit",
+      "entrypoint": "TO_IMPLEMENT_BOUNDED_AUDIT_LAUNCHER",
+      "replicas": 1,
+      "DB_POOL_LIMIT": 1,
+      "DB_POOL_TIMEOUT_SECONDS": 1
+    }
+  ],
+  "proposedTotalApplicationPoolCap": 12,
+  "postgresMaxConnectionsProposal": 32,
+  "bootstrapAdminConnectionsOutsideMeasuredWindow": 2,
+  "generatorDatabaseConnections": 0,
+  "consumerPrefetch": 1,
+  "additionalStackProcesses": [
+    "PostgreSQL postmaster and every child",
+    "RabbitMQ/Erlang and helper children",
+    "Redis",
+    "Nginx master and one worker",
+    "all audit subprocesses; any extra process must be declared and remain inside aggregate cap"
+  ],
+  "sourceVerification": [
+    "runtime databaseUrl() overrides URL connection_limit with DB_POOL_LIMIT; set the env knob per process",
+    "core runtime relay uses main Core client in notificationWorker.js; proof worker.js is not the main runtime relay",
+    "Clinic worker is one process for consumer+relay; do not double count its Prisma pool",
+    "read worker currently requires schemaVersion1 target and CLINIC_READ_PROJECTOR_POOL_LIMIT1; no binary V1 on V2"
+  ],
+  "probeArtifact": {
+    "format": "clinic-activity-d0-environment-notebook-v1",
+    "notebook": "benchmarks/phase2/clinic-activity-d0-environment-v1.ipynb",
+    "notebookSha256": "d7e3193fac90150aead1280131259ee3dd619509c9059bf2b35e4df34e20fb19",
+    "probeSource": "benchmarks/phase2/kaggle/activity_environment.py",
+    "probeSourceSha256": "d0c63bd069c8a9b83833b1b2b9f0d3e09260e007b8878fd84c435b783405000f",
+    "execution": "NOT_RUN",
+    "d0": "PARTIAL_ENVIRONMENT",
+    "performance": "NOT_RUN",
+    "policySha256": "96f51be71168fb8b4f8ab78eaf09035bd12b48a2c6fbe5bc02ea9badce65d181"
+  },
+  "probeArtifactManifestSha256": "914f1fb71ffdb9984f3695ec0a356a8e3d80bf5ca5f90df7e31ce813919f8804",
+  "orderedGateSteps": [
+    "execute capability notebook in assigned kernel; current agent has no connected browser/remote kernel",
+    "if EROFS/EACCES/missing delegation: stop; obtain a trial where the administrator delegates required controllers, no remount/escape/sudo workaround",
+    "if capability passes: start full guarded trial under verified aggregate groups and collect live PID/role/pool/queue/versions/CPU-memory ancestor/IO evidence",
+    "reconcile source/build/fixture/trace/harness manifests and initial V1 worker compatibility",
+    "preserve policy v5, create new version/profile/hash with actual verified environment before application performance measurements"
+  ],
+  "capabilityPassIsNotD0Pass": true,
+  "fullTrialBootstrap": "NOT_IMPLEMENTED_PENDING_PLATFORM_CAPABILITY",
+  "activeRemoteProbe": "NOT_RUN",
+  "d1": "PASS_IN_FUNCTIONAL_SCOPE_10K_SOURCE_CACHED_API_UI",
+  "d2": "NOT_STARTED"
+}

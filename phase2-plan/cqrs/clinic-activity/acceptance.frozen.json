@@ -1,0 +1,862 @@
+{
+  "workstream": "clinic-activity",
+  "version": 9,
+  "status": "THRESHOLDS_FROZEN_DESIGN_PROTOCOL_ACCEPTED_PERFORMANCE_TRIAL_PENDING",
+  "createdDate": "2026-10-20",
+  "notApplicationRuntimeConfig": true,
+  "historicalQ6PolicyUnchanged": true,
+  "environmentProfile": {
+    "status": "KAGGLE_SHARED_ENVELOPE_SELECTED_FRESH_FULL_TRIAL_PENDING",
+    "d0HostObserved": {
+      "os": "Windows 11 build 26200",
+      "architecture": "AMD64",
+      "logicalCpuCount": 12,
+      "node": "24.15.0",
+      "npm": "11.12.1",
+      "python": "3.13.13",
+      "quotasEnforced": false
+    },
+    "lockfileResolved": {
+      "prisma": "6.19.3",
+      "prismaClient": "6.19.3",
+      "typescript": "7.0.2",
+      "amqplib": "0.10.9",
+      "express": "5.2.1"
+    },
+    "actualTrial": null,
+    "enforcedStackBudget": {
+      "cpuQuota": null,
+      "memoryBytes": null,
+      "ioLimit": null,
+      "enforcementAndCoverageEvidence": null,
+      "applicability": "Required only for controlled_separate_budgets. The selected shared-envelope class has no separately enforced stack budget; nulls are deliberate, not proof of enforcement."
+    },
+    "generatorBudgetAndIsolation": {
+      "resourceClass": "kaggle_shared_envelope",
+      "sharesKernelEnvelopeWithApplication": true,
+      "separateCpuQuota": null,
+      "separateMemoryLimit": null,
+      "isolatedOrReserved": false,
+      "separateCpuAccountingRequired": true,
+      "dispatchScheduleAndDropEvidenceRequired": true
+    },
+    "processReplicaPoolAllocation": null,
+    "liveRolePrivileges": null,
+    "identityGuardEvidence": null,
+    "unknowns": [
+      "Fresh per-session trial DB/schema/marker and broker/queue identity, current runtime role grants; historical D1 is not a live D2-D6 context",
+      "Full-stack live versions/binary hashes, actual process/child/replica/pool/prefetch coverage after the relevant stage is implemented",
+      "D5 shared-envelope collector and evaluator implementation, application/generator/controller CPU separation and coverage evidence",
+      "Per-session envelope/CPU model/architecture/software profile key, background/IO interference observations and preregistered complete-block session packing",
+      "Generator calibration/dispatch lateness validity rule and resource-accounting limitations fixed before performance measurements",
+      "Actual D2+ build/migration/source overlay, 100k fixture/trace/harness manifests and guarded smoke before D6"
+    ],
+    "noDockerDbBrokerCommandsRunDuringD0": true,
+    "chosenTrial": "kaggle_native",
+    "choiceSource": "User clarified continuation on Kaggle in conversation before this D0 follow-up, 2026-10-20. No platform change requested.",
+    "localReferenceNotSelected": {
+      "project": "pet-phase2-p1-test",
+      "composeFile": "deploy/phase2/compose.test.yml",
+      "postgresEndpoint": "127.0.0.1:55432",
+      "database": "p2_clinic_test",
+      "schemaPattern": "activity_<run UUID hex>",
+      "schemaMarkerPattern": "clinic-activity:<run UUID>",
+      "publicMarker": "pet-phase2-p1-test:clinic:v1",
+      "brokerEndpoint": "127.0.0.1:5679",
+      "brokerPrefixPattern": "p2.activity.<run UUID>",
+      "declaredImages": {
+        "postgres": "postgres:16-alpine",
+        "rabbitmq": "rabbitmq:4.1-management-alpine",
+        "redis": "redis:7.4-alpine"
+      },
+      "declaredImagesAreLiveVersionEvidence": false
+    },
+    "selectedTrial": {
+      "kind": "kaggle_native",
+      "hostAndOs": {
+        "platform": "Linux-6.18.48+-x86_64-with-glibc2.39",
+        "isKaggleLinux": true,
+        "profileId": "5ce8a9c6-e270-4a66-a151-7844abdddcde",
+        "source": "user_supplied_current_host_profile"
+      },
+      "sanitizedServiceEndpoints": null,
+      "dedicatedDatabaseIdentity": null,
+      "schemaPattern": "activity_<run UUID hex>",
+      "schemaMarkerPattern": "clinic-activity:<run UUID>",
+      "brokerPrefixPattern": "p2.activity.<run UUID>",
+      "guard": "Use UUID/DB/schema/marker/queue guards and current-role grants for each assigned trial. Child cgroup creation is not required for kaggle_shared_envelope. Fresh full-stack identity/PID/pool/version/build/fixture evidence remains required before performance; do not run old Q6 to fill it.",
+      "runtimeImageOrBinaryDigests": null,
+      "profileCollector": "TO_IMPLEMENT_D5_SHARED_ENVELOPE_FULL_TRIAL_COLLECTOR; existing D1 and D0 ZIPs are historical observations only"
+    },
+    "historicalKaggleReference": {
+      "evidenceFile": "evidence/d0-kaggle-environment-20261020.md",
+      "archive": "cqrs-q6-004d06f2-a3d4-4987-a72d-c33ebb142bed.zip",
+      "archiveSha256": "d2a8c401a2709013c1cd036acfd7ec96f8cfde0652447fad56d5085064d379ed",
+      "notCurrentActivityTrial": true,
+      "mayPopulateActualTrial": false,
+      "observedOldHost": {
+        "platform": "Linux-6.18.48+-x86_64-with-glibc2.39",
+        "cpuCount": 4,
+        "mountRootCpuMax": "400000 100000",
+        "mountRootMemoryMax": "32212254720"
+      },
+      "oldRunEqualTotalBudget": "UNVERIFIED",
+      "oldRunDecision": "INCONCLUSIVE",
+      "installedOldVersions": {
+        "node": "24.16.0",
+        "python": "3.13.15",
+        "postgresql": "16.15",
+        "rabbitmqPackage": "3.12.1",
+        "redis": "7.0.15",
+        "nginx": "1.24.0"
+      },
+      "limitations": [
+        "root cgroup readings lack per-owned-PID namespace/ancestor enforcement coverage",
+        "generator and stack resources not proven separately enforced",
+        "old DB ownership/markers/replica and pool settings do not verify the current activity trial"
+      ]
+    },
+    "hostProfileEvidence": {
+      "path": "evidence/kaggle-host-profile-5ce8a9c6.json",
+      "sha256": "4e6f88909f294b1a2971fed0cdc21ec7ddcdc54d9e1af69053b46e09190975bf",
+      "profileId": "5ce8a9c6-e270-4a66-a151-7844abdddcde",
+      "capturedAtUtc": "2026-10-20T16:21:52.631264+00:00",
+      "source": "user_supplied_stdout_from_current_Kaggle_notebook",
+      "agentIndependentRemoteProbe": false,
+      "doesNotEstablishActualTrial": true
+    },
+    "currentHostResourceEnvelope": {
+      "platform": "Linux-6.18.48+-x86_64-with-glibc2.39",
+      "python": "3.13.15",
+      "uid": 0,
+      "logicalCpuCount": 4,
+      "affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "collectorCgroup": "/sys/fs/cgroup",
+      "cpuMaxRaw": "400000 100000",
+      "cpuQuotaEquivalentCpus": 4,
+      "memoryMaxBytes": 32212254720,
+      "ioMaxRaw": "",
+      "onlyKernelEnvelopeNotSeparateStackGeneratorBudgets": true
+    },
+    "currentHostInstalledVersions": {
+      "node": "20.19.0",
+      "npm": "10.8.2",
+      "postgresClient": "NOT_INSTALLED",
+      "postgresqlPackage": "NOT_INSTALLED",
+      "rabbitmqPackage": "NOT_INSTALLED",
+      "redisPackage": "NOT_INSTALLED",
+      "nginxPackage": "NOT_INSTALLED",
+      "binaryDigests": {
+        "python": "bac00abc4dfc76da8fd1a09023b9454e4d34f591172af79bbfa7ee43091165d6",
+        "node": "34bc6627675906f8431892630b5e91fc4cc9f1e03ce15e9716025aa551e5c823"
+      },
+      "notLiveServerProof": true
+    },
+    "delegationObservation": {
+      "cgroupVersion2Resolved": true,
+      "collectorMembership": "0::/",
+      "ancestorWalkReachedMount": true,
+      "subtreeControl": "",
+      "writeAccessCgroupProcs": false,
+      "writeAccessSubtreeControl": false,
+      "actualEnforcementWriteProbe": "USER_RUN_34DE33F5_CGROUP_READ_ONLY_ERRNO30",
+      "separateBudgetFeasibility": "UNAVAILABLE_ON_OBSERVED_KERNEL; not a blocker for the selected shared-envelope protocol, still not evidence of separate enforcement",
+      "evidence": "evidence/d0-kaggle-env-34de33f5/environment.json",
+      "evidenceSha256": "395a65f94b52266036f7c53fd62f7be1fa39b75e6cd965390f7efaffcd1e5881"
+    }
+  },
+  "sourceManifest": {
+    "path": "evidence/d0-source-manifest.json",
+    "sha256": "77adce137deffe86310ad9765ff06270d0209a10d416405b1ee7a8bc3b1405a9",
+    "head": "c4102b55a652dc8e4faa93eeada4d76cbe0753ef",
+    "sourceTreeSha256": "62de5c8f6474728b7f6f8b67d31f9b35b76cf33078e05b2164c5bb70abb55dec",
+    "buildOverlayPaths": [],
+    "trialBuildFixtureHarnessManifest": "D0 source audit is historical; D1 v3 source608/fixture/build evidence is in evidence/d1-kaggle-result-4d002a50-20261021.md. Fresh D2+ trial build/fixture/trace/harness hashes matching v6 or its successor are required before performance."
+  },
+  "primaryMetric": "http_primary_p95_latency",
+  "semantics": {
+    "role": "admin",
+    "dateField": "appointmentDate",
+    "statusMeaning": "current",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "maxPeriodDaysInclusive": 366,
+    "previousPeriod": "adjacent_equal_calendar_day_count",
+    "rateOnZeroDenominator": null
+  },
+  "primary": {
+    "endpoint": "/api/dashboard/clinic/activity",
+    "periodDays": 30,
+    "category": "all",
+    "groupBy": "day",
+    "fixtureBusinessDate": "2030-10-20",
+    "fixtureRows": 100000,
+    "minimumSuccessfulSamplesPerRun": 1000,
+    "maximumP95Ms": 300,
+    "minimumRelativeP95Improvement": 0.3,
+    "minimumAbsoluteP95ImprovementMs": 50,
+    "compareAgainst": [
+      "S",
+      "C"
+    ],
+    "maximumPairedRunRegression": 0.1,
+    "from": "2030-09-21",
+    "to": "2030-10-20",
+    "previousFrom": "2030-08-22",
+    "previousTo": "2030-09-20"
+  },
+  "matrix": {
+    "labels": [
+      "S",
+      "C",
+      "P",
+      "L"
+    ],
+    "pathBlocks": [
+      [
+        "S",
+        "C",
+        "P"
+      ],
+      [
+        "P",
+        "S",
+        "C"
+      ],
+      [
+        "C",
+        "P",
+        "S"
+      ]
+    ],
+    "cacheTtlMs": 5000,
+    "cacheMaxEntries": 128,
+    "totalCostBaselineRequired": true,
+    "totalCostBaselineLabel": "L",
+    "identicalBusinessContractRequired": true,
+    "configurations": {
+      "S": {
+        "activityReader": "source",
+        "listMode": "authoritative",
+        "generationVersion": 2,
+        "maintenance": "V2 producer/projector/relay and row/summary freshness audits on",
+        "activityResultCache": false
+      },
+      "C": {
+        "activityReader": "cached",
+        "listMode": "authoritative",
+        "generationVersion": 2,
+        "maintenance": "identical to S",
+        "cacheTtlOrigin": "snapshot_start_absolute_non_sliding",
+        "coalesce": true
+      },
+      "P": {
+        "activityReader": "summary",
+        "listMode": "authoritative",
+        "generationVersion": 2,
+        "maintenance": "identical to S",
+        "activityResultCache": false,
+        "actualSourceAndGenerationEveryResponse": true
+      },
+      "L": {
+        "activityReader": "preselected_source_or_cached",
+        "listMode": "authoritative",
+        "generationVersion": 1,
+        "maintenance": "existing V1 row-only infrastructure retained; V2 summary updates and summary audits disabled; list freshness remains off as in authoritative composition",
+        "binary": "same candidate build with explicit V1-only target capability TO_IMPLEMENT; separate trial schema/process/queue; no old binary on V2",
+        "safeConfigurationVerified": false
+      }
+    },
+    "simpleReaderSelection": {
+      "when": "after the three matched S/C/P path blocks, before L runs",
+      "cacheEligibleOnlyIf": [
+        "business correctness and cache freshness pass",
+        "median of per-block C_p95/S_p95 <= 0.95",
+        "no paired C/S p95 regression above 0.10"
+      ],
+      "eligibleSelection": "C",
+      "otherwise": "S",
+      "reason": "choose cache only for a preregistered repeatable benefit; never choose the slower simple baseline to help P",
+      "selectionMeasurementsMustBeRetained": true
+    },
+    "totalCostBlocksAfterPathBlocks": [
+      [
+        "P",
+        "L"
+      ],
+      [
+        "L",
+        "P"
+      ],
+      [
+        "P",
+        "L"
+      ]
+    ],
+    "totalCostPRepeatsSeparateFromPathP": true,
+    "totalCostUnavailableResult": "TOTAL_COST_INCONCLUSIVE; RECOMMEND_SUMMARY forbidden"
+  },
+  "productLoad": {
+    "screenCount": 10,
+    "pollIntervalMs": 15000,
+    "staggeredPolling": true,
+    "warmupSeconds": 120,
+    "minimumMeasuredSeconds": 1800,
+    "writeCommandsPerSecond": 0.1,
+    "writeMix": {
+      "create": 0.2,
+      "reschedule": 0.2,
+      "status": 0.6
+    },
+    "maxUnexpectedErrors": 0,
+    "maxGeneratorDrops": 0,
+    "maxHealthySummaryFallbacks": 0,
+    "responseSourceAndGenerationRequired": true,
+    "plannedPrimaryRequestsPerRun": 1200,
+    "plannedMeasuredWritesPerRun": 180,
+    "fullProductRuns": 15,
+    "resetIdenticalSeedBetweenRuns": true
+  },
+  "regression": {
+    "maximumWriteP95Increase": 0.1,
+    "minimumMeasuredWriteSamplesPerConfiguration": 1000,
+    "maximumApplicationCpuPerSuccessIncrease": 0.1,
+    "maximumSuccessfulThroughputDecrease": 0.1,
+    "backgroundComponentsIncluded": true,
+    "generatorCpuReportedSeparately": true,
+    "measuredWindowMarkersRequired": true,
+    "writeSupplement": {
+      "labels": [
+        "S",
+        "C",
+        "P",
+        "L"
+      ],
+      "warmupSeconds": 120,
+      "measuredSeconds": 5000,
+      "commandsPerSecond": 0.1,
+      "mix": "same 20/20/60 as product",
+      "plannedAdditionalWritesPerConfiguration": 500,
+      "plannedProductPlusSupplementWritesPerConfiguration": 1040,
+      "compareProductAndSupplementRegressionsSeparately": true,
+      "pooledSampleCountDoesNotImplyPerOperation1000": true,
+      "minimumEachOperationSamples": 200,
+      "extendIfActualSamplesInsufficient": true,
+      "pProductSamplesForTotalCost": "only the three matched P/L cost-block P runs; do not pool path-P runs to hide cost-block regression"
+    }
+  },
+  "freshness": {
+    "runs": 3,
+    "minimumSamplesPerRun": 1000,
+    "backendP95Ms": 5000,
+    "backendP99Ms": 10000,
+    "visibleUiP95Ms": 20000,
+    "timeoutSamplesMustBeRetained": true,
+    "evidenceIsNotAnAbsoluteStalenessGuarantee": true,
+    "protocol": {
+      "separateFromProduct": true,
+      "logicalMutationPerSecond": 1,
+      "backendProbeRequestsPerSecond": 2,
+      "probeSharing": "one observer polls the whole isolated report scope; never two polls per pending mutation",
+      "visibleUiPollMs": 15000,
+      "minimumMeasuredSecondsPerRun": 1000,
+      "timeoutMs": 30000,
+      "scoping": "distinct observable day/status contribution scopes; no conflicting mutation until observed by both backend and visible UI or timed out; expected old/new contribution and source revision trace required",
+      "samplingResolutionMs": 500,
+      "timeoutHandling": "retain in denominator and nearest-rank latency population as right-censored/infinite; any timeout prevents healthy freshness acceptance",
+      "realEventHistoryAssumed": false
+    }
+  },
+  "recovery": {
+    "runs": 3,
+    "outageSeconds": 60,
+    "maximumBacklogEvents": 300,
+    "maximumCatchUpSeconds": 120,
+    "requiredFinalMismatchCount": 0,
+    "protocol": {
+      "countActualReadChangeEvents": true,
+      "commandEventOneToOneAssumed": false,
+      "catchUpOrigin": "projector resumes after 60 second outage",
+      "afterCatchUp": "quiesce and reconcile source-to-read-rows and read-rows-to-summary by bucket, all mismatches zero"
+    }
+  },
+  "correctness": {
+    "sourceToReadRowMismatch": 0,
+    "readRowToSummaryMismatch": 0,
+    "negativeCounters": 0,
+    "unauthorizedResponses": 0,
+    "mandatoryTestsMayBeSkipped": false
+  },
+  "fallback": {
+    "maximumConcurrentPerReplica": 2,
+    "unboundedQueueAllowed": false,
+    "wholeResponseSourceRequired": true,
+    "statementTimeoutMs": 1500,
+    "transactionTimeoutMs": 2500,
+    "maxWaitMs": 50,
+    "retryAfterSeconds": 1,
+    "neverFallbackOn": [
+      401,
+      403,
+      422
+    ]
+  },
+  "diagnosticIterationLimitPerBottleneck": 2,
+  "decisions": [
+    "RECOMMEND_SUMMARY",
+    "RECOMMEND_SIMPLE",
+    "INCONCLUSIVE",
+    "FAIL_CORRECTNESS",
+    "INVALID_ENVIRONMENT"
+  ],
+  "freezeRequirements": [
+    "verify_working_tree_and_source_manifest",
+    "set_fixture_business_date",
+    "select_resource_class_and_document_observed_envelope_accounting_limits_and_stage_readiness",
+    "document_S_C_P_L_configurations",
+    "record_any_threshold_changes_before_measurements",
+    "write_acceptance_frozen_json_and_sha256"
+  ],
+  "d0Status": "DESIGN_PROTOCOL_ACCEPTED",
+  "thresholdsFrozenDate": "2026-10-20",
+  "fullyFrozen": false,
+  "performanceMeasurementsAllowed": false,
+  "cache": {
+    "absoluteTtlMs": 5000,
+    "ttlOrigin": "snapshot_start",
+    "publishWhenComputationAlreadyExpired": false,
+    "maxEntries": 128,
+    "maxActiveComputationsPerReplica": 1,
+    "maximumBoundedWaitersPerReplica": 4,
+    "authEveryRequestIncludingHit": true,
+    "keyComponents": [
+      "database context",
+      "contract version",
+      "admin scope",
+      "normalized from/to/groupBy/category"
+    ],
+    "reuseListSlidingEpochCacheUnmodified": false
+  },
+  "summaryEvidence": {
+    "independentOfListServingMode": true,
+    "registryRowSampleIntervalMs": 2000,
+    "registryRowEvidenceMaxAgeMs": 6000,
+    "registryRowStatementTimeoutMs": 750,
+    "registryRowTransactionTimeoutMs": 1500,
+    "registryRowMaxWaitMs": 50,
+    "summaryReconcileIntervalMs": 30000,
+    "summaryReconcileEvidenceMaxAgeMs": 60000,
+    "summaryReconcileStatementTimeoutMs": 1500,
+    "summaryReconcileTransactionTimeoutMs": 2500,
+    "summaryReconcileMaxWaitMs": 50,
+    "auditPoolConnections": 1,
+    "maximumConcurrentSummaryAudits": 1,
+    "maxParallelWorkersPerGather": 0,
+    "unknownOrDriftAction": "source whole-response fallback or 503; never claim healthy",
+    "observedFeasibility": "NOT_RUN"
+  },
+  "fixture": {
+    "rows": 100000,
+    "seed": 20261020,
+    "businessDate": "2030-10-20",
+    "historyCalendarYears": 4,
+    "requiredSkews": [
+      "busy and empty days/months",
+      "all enum types/statuses",
+      "rare service",
+      "hot counter",
+      "boundary and tombstone fixtures separate"
+    ],
+    "seedBeforeRebuildOnly": true,
+    "measuredCommandsUseDomainApi": true,
+    "createRescheduleDateMustBeAtLeastVietnamToday": true,
+    "ifAnchorExpired": "amend and rehash before any measurement; never disable validation",
+    "fixtureHash": null,
+    "traceHash": null
+  },
+  "measurementProtocol": {
+    "percentile": "nearest_rank",
+    "primaryBenefit": "for each baseline S and C: median of three per-block P_p95 / baseline_p95 <= 0.70 AND median of three paired absolute savings >= 50 ms; every pair ratio <= 1.10; P p95 <= 300 ms every primary run",
+    "regressions": "P/L matched cost-block ratios and supplemental write trace separately, each max 1.10 latency/CPU and min 0.90 successful throughput; inadequate samples or resource parity => inconclusive/invalid",
+    "resourceSampleIntervalMs": 1000,
+    "includeAllApplicationBackgroundComponents": true,
+    "generatorCpuSeparate": true,
+    "includeCommonDashboardPollingIfBrowserLoad": true,
+    "httpPrimaryUsesFrontEndConfiguredPublicGateway": true,
+    "secondaryIsSeparateAndCannotRescuePrimary": true,
+    "rawOutcomesMustInclude": [
+      "scheduled",
+      "success",
+      "unexpected401or403",
+      "422",
+      "429",
+      "503",
+      "timeout",
+      "generatorDrop",
+      "fallback",
+      "wrongSource",
+      "wrongGeneration"
+    ],
+    "resourceWindow": "measured_start <= interval fully inside measured_end; partial intervals explicit, never warmup CPU / measured successes",
+    "coldWarmSeparate": true,
+    "capacityOptionalNotRequired": true,
+    "resourceComparability": "Use the selected resource class and its evidence. controlled_separate_budgets requires verified separate limits; kaggle_shared_envelope requires complete same-kernel matched blocks, fresh profiles and disclosed co-resident generator. Neither class proves physical isolation.",
+    "generatorCpuSeparateMeaning": "Separate accounting in all classes; enforced resource separation only in controlled_separate_budgets",
+    "missingCpuEvidence": "TOTAL_COST_INCONCLUSIVE; never claim the 10% application CPU gate passed or RECOMMEND_SUMMARY from latency alone"
+  },
+  "timeEstimate": {
+    "productRunsIncludingPLCostPairs": 15,
+    "productSecondsIncludingWarmup": 28800,
+    "writeSupplementSecondsIncludingWarmup": 20480,
+    "freshnessMinimumMeasuredSeconds": 3000,
+    "recoveryOutagePlusCatchUpCeilingSeconds": 540,
+    "rawFloorApproxHours": 15,
+    "plannedWallClockHoursRange": [
+      17,
+      24
+    ],
+    "excludesEngineeringDays": true,
+    "assumption": "sequential trial runs, plus reset/seed/rebuild/smoke/secondary/setup; not a measured runtime guarantee"
+  },
+  "preMeasurementRationale": {
+    "numericThresholdChangesFromDraft": [],
+    "retained": {
+      "primary300ms": "visible dashboard budget at modest product load; not evidence source is slow",
+      "relative30percentAndAbsolute50ms": "avoid adding summary cost for a few milliseconds; must beat both reasonable baselines",
+      "paired10percentAndThreeBlocks": "reject median hiding a regression and expose order noise",
+      "zeroCorrectnessAuthErrorsDropsHealthyFallback": "success responses cannot mask wrong data, rights or actual serving source",
+      "writeCpuThroughput10percent": "summary benefit must not regress command responsiveness or total application cost materially",
+      "freshness5sP95_10sP99_20sUI": "bounded async target; 15 second visible polling is not 5 second UI",
+      "recovery60s_300events_120s_threeRuns": "bounded fault contract and exact final reconciliation",
+      "samples1000And1800s": "keep full percentile evidence; add supplemental writes instead of lowering required count"
+    },
+    "clarificationsBeforeMeasurements": [
+      "fixture business date fixed to future 2030-10-20 without runtime clock overrides",
+      "source/date/rate/admin contract in ADR accepted for design",
+      "L selection rule and extra rotated P/L cost blocks registered before timing",
+      "5000 second matched write supplement supplies 1040 pooled writes/config, at least 200 each operation",
+      "absolute source-cache TTL differs from current epoch-protected sliding list cache",
+      "summary reconciliation cadence/budgets explicit and unmeasured",
+      "environment unknowns are not an approval to run or claim fully frozen",
+      "User approved v6: accept Kaggle shared-envelope comparisons with explicit limitations and separate accounting, decouple D0 design acceptance from full performance readiness; do not change numeric gates, workloads, samples, semantics or Q6 conclusions.",
+      "User requires comparison before CQRS and before module split. Add M/O/R legacy-endpoint comparison independently from new activity S/C/P/L; monolith historical artifact identity remains unknown. No numeric activity gates changed and no new measurements.",
+      "Historical monolith archive received and reviewed: identify reported M48d01c3 rather than candidate P0 add596e. Old sixty-second closed-loop bootstrap-heavy runs are historical screening, not a matched comparison with PCN/query-heavy/activity. No numeric activity gate changed and no new load run."
+    ],
+    "historicalQ6ObservationsUsedAsNewActivityPerformanceEvidence": false
+  },
+  "freezeGate": {
+    "thresholdsAndSemantics": "FROZEN_BEFORE_NEW_ACTIVITY_PERFORMANCE_MEASUREMENT",
+    "environment": "KAGGLE_SHARED_ENVELOPE_ACCEPTED_AS_PROTOCOL_FRESH_FULL_TRIAL_PENDING",
+    "sourceAudit": "RECORDED_D0_NOT_A_TRIAL_BUILD",
+    "d1ImplementationManifest": "D1_V3_FUNCTIONAL_TRIAL_SOURCE608_REVIEWED; NOT_FULL_STACK_OR_V6_PERFORMANCE_HARNESS_VALIDATION",
+    "beforeApplicationPerformanceMeasurement": [
+      "complete stage-appropriate correctness/integration/smoke and full trial identity/profile for the selected resource class",
+      "verify process/role/pool coverage and separate application/generator/controller accounting; enforce separate quotas only when that class is selected",
+      "preregister session packing, profile key, generator validity rule and actual D2+ build/fixture/trace/harness hashes",
+      "preserve this v6 partial preregistration and issue a new version/profile/hash with performanceReadiness READY and fullyFrozen true before timing",
+      "execute only explicitly assigned measurement scope and budget; no automatic performance authorization from D0 design acceptance"
+    ],
+    "revisionRule": "append a new policy version/hash with reason and time before measurements; preserve this preregistration; do not tune thresholds from newly observed results",
+    "hashConvention": "acceptance.frozen.sha256 is SHA256 of exact UTF-8 LF bytes of acceptance.frozen.json, excluding sidecar, no self-reference",
+    "d0DesignAndPerformanceReadinessAreSeparate": true
+  },
+  "revision": {
+    "previousVersion": 8,
+    "previousPolicySha256": "a55ce41925691098e9303e915d425c9629ba8550804b15a1464e84bd6d699fa7",
+    "preservedPreviousPolicy": "evidence/preregistration-v8/acceptance.frozen.json",
+    "recordedAtUtc": "2026-10-21T06:51:07.177731+00:00",
+    "reason": "User asks to settle a defensible CQRS benchmark against pre-CQRS and pre-split versions. Lock independent V1 O/A/B list study, common-business M/O/R bridge, generator validity and session/replacement rules before any new performance run. Preserve all activity gates and old Q6 policy/results.",
+    "authorizationSource": "Current user request to finalize CQRS benchmark and continue implementation; no automatic full-run authorization"
+  },
+  "developmentGateOverride": {
+    "authorizedBy": "user reply in this session: allow D1 before D0 environment PASS; keep benchmark blocked",
+    "scope": [
+      "D1 source and bounded cache API",
+      "admin activity UI and date drilldown",
+      "OpenAPI and fixture/harness implementation",
+      "local build/unit/HTTP/UI checks without unguarded DB writes"
+    ],
+    "d0EnvironmentStatus": "PARTIAL",
+    "d1DevelopmentAllowed": true,
+    "performanceMeasurementsAllowed": false,
+    "summaryMigrationCutoverAllowed": false,
+    "commitPushAllowed": false
+  },
+  "developmentArtifacts": {
+    "recordedAtUtc": "2026-10-20T17:11:46.729258+00:00",
+    "manifest": "evidence/d1-development-manifest.json",
+    "sha256": "2f02289c3d83dc9d009611e9c1245b2461915d99579d1678b18380f71710be32",
+    "sourceTreeSha256": "2cc8045e81e9a684b2875690e5600afcd5946e7384a6219ce0a7fa74852b436f",
+    "fixtureContentHashes": {
+      "10000": "dbe3b90fdef6cd96627c638ba8018d0669ae06613c6ffef4feaa101dcb63327a",
+      "100000": "dd29ca40cc98758ab7245d8ae908b86427eabaedb8edc18a144027134d9fbe24"
+    },
+    "scope": "Local D1 source/build/fixture/harness provenance only. PostgreSQL parity, public gateway trial smoke and performance NOT_RUN. Does not close D0 environment gate."
+  },
+  "trialSetupAuthorization": {
+    "source": "User approved: oke lam di, after confirming each run uses a new notebook, 2026-10-21 UTC+7",
+    "scope": "Disposable Kaggle functional D1 notebook: prerequisite install if missing, private PostgreSQL16/Core/Clinic/Nginx, new UUID-guarded DB/roles/schema, existing migrations, 10k synthetic fixture, bounded PG/direct/gateway checks. No reset/deletion/full benchmark/V2/commit/push.",
+    "authorized": true,
+    "actualTrialExecution": "NOT_RUN_BY_AGENT"
+  },
+  "notebookArtifact": {
+    "path": "benchmarks/phase2/clinic-activity-d1-kaggle-v2.ipynb",
+    "sha256": "46718ab8ecfea4415639b145c325cc0887fe897864adf71d26a3223ebb5ecc96",
+    "manifest": "benchmarks/phase2/clinic-activity-d1-kaggle-v2.manifest.json",
+    "manifestSha256": "1bee8dbf2df4542deb61595163a57ac5337e63665819af10fc7802c8e9e9984b",
+    "sourceArchiveSha256": "770fd6b8a135b66084ffb91d215abc914e0c02c1af55e0e3e073aa324f28e5d4",
+    "sourceTreeSha256": "10aa90d793f0c02cb7623b0b780008eefb11fdde9779259eaa62bed55e13ef24",
+    "sourceFiles": 605,
+    "policyAtBuildSha256": "ee875bb6c4bfe8b1b6918ff9558eb67a46dbd469e345c079b915c19dc53a8063",
+    "status": "LOCAL_PACKAGING_VALIDATED_KAGGLE_EXECUTION_PENDING",
+    "performanceMeasurementsAllowed": false
+  },
+  "currentFunctionalEvidence": {
+    "report": "evidence/d1-kaggle-result-4d002a50-20261021.md",
+    "review": "evidence/d1-kaggle-4d002a50/review.json",
+    "sourceFiles": 608,
+    "status": "PASS_IN_FUNCTIONAL_SCOPE_10K_SOURCE_CACHED_API_UI",
+    "notCurrentFullTrialOrV6HarnessProof": true,
+    "historicalDevelopmentArtifactsAndNotebookArtifactRetainedAsCaptured": true
+  },
+  "environmentProtocol": {
+    "adr": "evidence/adr-activity-02.md",
+    "selectedResourceClass": "kaggle_shared_envelope",
+    "selectedBeforeActivityPerformanceMeasurements": true,
+    "resourceClasses": {
+      "controlled_separate_budgets": {
+        "requires": [
+          "verified aggregate stack limits including all children",
+          "separately verified generator limits",
+          "live identity/version/grants/PID/pool evidence",
+          "observed interference and accounting limitations"
+        ],
+        "claimScope": "Measured workload under the recorded separate limits; no automatic physical-host isolation guarantee"
+      },
+      "kaggle_shared_envelope": {
+        "childCgroupCreationRequired": false,
+        "separateStackGeneratorEnforcementRequired": false,
+        "applicationAndGeneratorShareEnvelope": true,
+        "perSessionFreshProfileRequired": true,
+        "historicalEnvelopeOnly": {
+          "cpuQuotaEquivalentCpus": 4,
+          "memoryMaxBytes": 32212254720,
+          "evidence": "evidence/d0-kaggle-env-34de33f5/environment.json",
+          "notReservationOrFreshRunProof": true
+        },
+        "requires": [
+          "one configuration at a time",
+          "same source/fixture/trace/versions/settings within each matched block",
+          "same notebook kernel for every member of a matched path/cost block",
+          "fresh envelope/affinity/CPU-model/architecture/process profile per session and before/after each run",
+          "full application PID-role-child coverage plus separate generator and controller accounting",
+          "raw scheduled/dispatch/completion times, actual offered load, lateness and drops",
+          "recorded interference/throttling/memory-pressure/IO evidence and unknowns; no isolation claim"
+        ],
+        "claimScope": "Comparison within the observed Kaggle shared envelope and workload, with a co-resident generator; not proof of isolated stack quotas or production capacity"
+      }
+    },
+    "historicalSeparateBudgetProposal": {
+      "path": "evidence/d0-environment-proposal-20261021.json",
+      "status": "PRESERVED_NOT_APPLIED_NOT_THE_SELECTED_SHARED_BUDGET"
+    },
+    "completeBlockSessionRule": "Predeclare session packing before timing; preserve existing block order, repetitions, durations and sample gates. No matched block may straddle a kernel restart. Export completed blocks. Interrupted blocks are incomplete and retained, not silently merged or dropped. Cross-session profile mismatch must be disclosed and not pooled as one matched experiment; no cherry-picking.",
+    "comparisonBetweenResourceClassesAllowed": false,
+    "accountingRule": "Application CPU includes APIs, every worker, PostgreSQL children, broker, Redis, gateway and audits; generator and notebook/controller are reported separately, plus shared-cgroup totals. Whole-kernel CPU is never relabelled application CPU. Memory sums must disclose shared-page/double-counting limits.",
+    "missingCpuCoverageResult": "TOTAL_COST_INCONCLUSIVE; never claim the 10% application CPU gate passed or RECOMMEND_SUMMARY from latency alone",
+    "unreliableOfferedLoadResult": "Latency/throughput environment validity is INCONCLUSIVE or INVALID_ENVIRONMENT; do not accept a low-load/late/dropped schedule as the planned workload",
+    "latencyDecisionIndependentOfTotalCost": true,
+    "finalRecommendationRequiresAllExistingGates": true,
+    "freshnessCorrectnessAuthRecoveryGuardsRelaxed": false
+  },
+  "stageGates": {
+    "d0DesignProtocol": {
+      "status": "ACCEPTED_NOT_A_FULL_ENVIRONMENT_PASS",
+      "requires": [
+        "source/writer/version/fence/ACL/gateway map",
+        "metric/date/rate/admin/route contract",
+        "V2 compatibility and rebuild/freshness ADR",
+        "S/C/P/L protocol and unchanged thresholds/sample plan",
+        "selected resource class and known feasibility/limitations",
+        "versioned policy/hash and assigned-stage scope"
+      ],
+      "evidence": [
+        "evidence/d0-inventory.md",
+        "evidence/adr-activity-01.md",
+        "evidence/adr-activity-02.md",
+        "evidence/d1-kaggle-result-4d002a50-20261021.md",
+        "evidence/d0-kaggle-environment-result-34de33f5-20261021.md"
+      ],
+      "permits": "Proceed with independently assigned development stages; correctness gates and trial write guards still apply"
+    },
+    "performanceReadiness": {
+      "status": "NOT_READY",
+      "fullyFrozen": false,
+      "applicationPerformanceMeasurementsAllowed": false,
+      "requires": [
+        "stage-appropriate real functional integration/correctness/auth/source/fault checks before timing; timed freshness/recovery results remain required in their assigned stages before a final recommendation",
+        "fresh full trial identities/grants/live versions/PID/pool profiles for the selected resource class",
+        "implemented collector/evaluator enforcing the locked benchmarkPlan generator validity rule",
+        "matched resource/session plan plus actual build/fixture/trace/harness hashes",
+        "new preserved policy revision with full profile before timing",
+        "explicit assigned measurement scope and budget",
+        "Before historical-bridge timing: freeze its pinned M/O/R sources and contract/workload/fixture/profile/harness/criteria/session plan. Missing historical results are never silently called final whole-system acceptance."
+      ]
+    },
+    "legacyV5EnvironmentGate": "PARTIAL_NOT_SATISFIED; preserved in preregistration-v5, not retroactively passed",
+    "currentAuthorization": "Finalize benchmark specification/docs/policy. Next assigned development is D2; performance execution remains separately gated. No runtime, migrations applied, DB writes, service startup, cutover, commit/push or subagents in this finalization.",
+    "historicalComparison": {
+      "status": "BASELINE_IDENTIFIED_COMPARABILITY_PENDING",
+      "blocksAssignedSourceDevelopment": false,
+      "blocksWholeSystemPerformanceAcceptanceWhenMissing": true,
+      "requiredReport": "Separate M/O/R legacy-endpoint regressions, activity S/C/P, P/L total cost; preserve old Q6 conclusions"
+    }
+  },
+  "historicalComparison": {
+    "adr": "evidence/adr-activity-03.md",
+    "required": true,
+    "status": "BASELINE_IDENTIFIED_COMPARABILITY_PENDING",
+    "requiredBeforeWholeSystemPerformanceAcceptance": true,
+    "finalAcceptanceWithoutHistoricalBridgeAllowed": false,
+    "activityLatencyMayBeReportedSeparately": true,
+    "doesNotReplaceActivitySCPAndPLGates": true,
+    "baselines": {
+      "M": {
+        "meaning": "monolith before service/module split",
+        "candidateEvidence": "phase2-plan/evidence/baseline.md",
+        "selectedHistoricalRunSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+        "historicalArchive": "evidence/monolith-nipopeto-20261021/nipopeto-evidence.zip",
+        "historicalArchiveSha256": "9a5d881d8a70a9da4993667cc9663a768ff102ddaac12d5035a76b3d34f39950",
+        "historicalRunIdentityVerified": true,
+        "previousCandidateCheckpointSha": "add596e4488e3cac2584115874c2f65a97af7047",
+        "sourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+        "verificationScope": "Reported identity: sixteen matching supplied manifests, clean-worktree claim, locally available Git source predates split. This is not independent binary/running-source attestation.",
+        "binaryOrRunningSourceIndependentlyAttested": false,
+        "review": "evidence/monolith-nipopeto-20261021/review.json",
+        "report": "evidence/monolith-nipopeto-20261021.md",
+        "freshMatchedComparisonStatus": "NOT_RUN"
+      },
+      "O": {
+        "meaning": "split services, optimized requests, before CQRS",
+        "sourceSha": "3e88d7e57fbf4f74da363d320f286244237a4389",
+        "queryHeavyEvidence": "phase2-plan/cqrs/evidence/q0-query-v2-result-20261015.md",
+        "pcnEvidence": "phase2-plan/cqrs/evidence/q0-pcn-result-20261014.md",
+        "freshMatchedComparisonStatus": "NOT_RUN"
+      },
+      "R": {
+        "meaning": "current/future candidate with exact dirty source overlay and actual build",
+        "historicalD1Manifest": "benchmarks/phase2/clinic-activity-d1-kaggle-v3.manifest.json",
+        "actualBridgeBuildManifest": null,
+        "freshMatchedComparisonStatus": "NOT_RUN"
+      }
+    },
+    "pairs": [
+      [
+        "M",
+        "O"
+      ],
+      [
+        "O",
+        "R"
+      ],
+      [
+        "M",
+        "R"
+      ]
+    ],
+    "commonOperationsCandidate": [
+      "appointments",
+      "pets",
+      "medical-records",
+      "hotel-bookings",
+      "invoices",
+      "notifications"
+    ],
+    "openApiPresenceIsRuntimeParityProof": false,
+    "newActivityEndpointOnMAndO": "NOT_APPLICABLE_ENDPOINT_ABSENT; never compare its latency with a different old list/dashboard response",
+    "workloadCandidates": [
+      "pet-healthcare-pcn-v1",
+      "cqrs-q0-query-heavy-v2",
+      "legacy_48d01c3_bootstrap_readheavy_mixed_replay_screening_only"
+    ],
+    "workloadRule": "Use the locked common-business bridge in benchmark-plan-20261021.json; original PCN and legacy ReadHeavy/Mixed remain separate protocols. Freeze verified adapters/fixture/trace/build/harness/profile hashes before timing.",
+    "oldArtifactRule": "Retain original raw artifacts and policies as historical observations. Cross-session/history numbers alone are not a matched improvement/regression proof; rerun pinned sources under a verified common harness/profile/resource class for that claim.",
+    "runtimeSafety": "Old M/O binaries use only their matching isolated trial DB/schema/process/queue and source/migrations. No old binary on V2, no writes to main DB, no startup/migration/reset/seed in this D0 task.",
+    "interpretation": "M-to-O contains split and request optimizations; O-to-R may include indexes/cache/auth/admission as well as CQRS. Report whole-revision differences, not causal proof of one architectural pattern.",
+    "missingEvidenceResult": "HISTORICAL_COMPARISON_NOT_RUN_OR_INCONCLUSIVE; no whole-system performance acceptance or complete final recommendation from activity latency alone",
+    "measurementPlanFinalized": true,
+    "additionalWallClockBudget": {
+      "hours": [
+        6,
+        8
+      ],
+      "scope": "M/O/R common-business bridge only, excluding engineering and list/activity studies"
+    },
+    "unknownsBeforeBridgeTiming": [
+      "Implement and verify the locked common-business contracts/auth/collection pagination and terminal async-completion adapters on the three pinned sources.",
+      "Generate canonical fixture/trace and actual source overlay/Linux build/harness hashes, including future R_activity.",
+      "Capture live trial identities/grants/PID-role/pool/software and session profile; implement the frozen collector/evaluator/schedule rules. Protocol, criteria, order and budget are already selected."
+    ],
+    "legacyArchiveObservations": {
+      "source": "user supplied archive; offline CSV/manifest/Git consistency review only",
+      "runs": 16,
+      "requests": 33468,
+      "locustFailures": 0,
+      "profiles": [
+        "ReadHeavyUser",
+        "MixedUser"
+      ],
+      "users": [
+        1,
+        10,
+        50,
+        100
+      ],
+      "repeats": 2,
+      "warmupSeconds": 15,
+      "locustWindowSecondsIncludingRamp": 60,
+      "spawnUsersPerSecond": 5,
+      "thinkTimeSeconds": [
+        0.5,
+        1.5
+      ],
+      "fixtureOwnerPetPairs": 100,
+      "seed": "phase1",
+      "notThePcnThirtyMinuteOrQ0HundredThousandAppointmentWorkload": true,
+      "historicalStopConditionsNotNewAcceptanceTargets": {
+        "errorRateGreaterThan": 0.01,
+        "p95MsGreaterThan": 2000
+      },
+      "percentiles": "Rounded Locust histogram CSV figures; no per-request raw to recompute nearest-rank",
+      "resourceAndBuildLimitations": [
+        "No per-request raw response/status/contract/reconciliation ledger; zero Locust failures is not business correctness proof",
+        "Percentiles are rounded Locust CSV/histogram figures, not independently recomputed nearest-rank request samples",
+        "Sixty-second windows include ramp; history stops before final CSV totals, so no exact steady-only reconstruction",
+        "ReadHeavy appointment average content size is two bytes; fixture source creates users/pets, not the Q0 100k appointment history",
+        "PG14/Linux and bootstrap-heavy task mix differ from later PCN/query-heavy/activity runs",
+        "Resource samples lack verifiable PID coverage/monotonic exact measured boundaries and may miss short-lived children/shared pages",
+        "No original member-digest manifest/source bundle/build digests; hashes generated now establish review-copy integrity only"
+      ],
+      "doesNotProveWholeSystemComparisonOrCurrentAcceptance": true
+    },
+    "measurementPlanStatus": "SPECIFICATION_LOCKED_PARITY_AND_BUILD_PROFILE_PENDING",
+    "selectedWorkload": "pet-healthcare-common-business-bridge-v1",
+    "unresolvedBeforeMatchedRun": [
+      "new shared-envelope collector/evaluator/notebook",
+      "bridge adapters and parity fixtures",
+      "actual Linux build/software/DB role and pool profile",
+      "new trace/build/harness/profile digests",
+      "R_activity implementation and its real D2-D5 integration"
+    ]
+  },
+  "benchmarkPlan": {
+    "path": "evidence/benchmark-plan-20261021.json",
+    "sha256": "6b058747e66734c40e302a1da7aa712fa516608ad531c8b780fe65665d27474c",
+    "document": "BENCHMARK-FINAL.md",
+    "status": "SPECIFICATION_LOCKED_IMPLEMENTATION_AND_LIVE_PROFILE_PENDING"
+  }
+}

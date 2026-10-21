@@ -1,0 +1,51 @@
+{
+  "sourceArchiveSha256": "7f9c98e8410a7709428cb0673ffe4155c87bbe293119a0463e29b72e0ea626a0",
+  "files": [
+    {
+      "path": "summary.json",
+      "sha256": "73314e46d6a6c7dffb1d4e5b26738848abe1f33c06fd1133a38fc2df1d403c78",
+      "bytes": 318
+    },
+    {
+      "path": "stages.json",
+      "sha256": "f39a3a8be0c89ef7dcca40cbf0fc5f130082c75485d9696b9241a9d06eb9d0e2",
+      "bytes": 1274
+    },
+    {
+      "path": "environment.json",
+      "sha256": "74434c51e11c21f4d58993c55f52bc75a39bb78d7aee3b29e80f28ee0305c5f3",
+      "bytes": 547
+    },
+    {
+      "path": "readiness.json",
+      "sha256": "80b9c1b63feaa6616e775882ba2f66369287202992b7192a5001402d0e3802fb",
+      "bytes": 10636
+    },
+    {
+      "path": "smoke.json",
+      "sha256": "fac55309016fdae7c88a6ad2390e7ed0280bd44c25e747361143d1574a2de6b9",
+      "bytes": 2109
+    },
+    {
+      "path": "fresh-profile-and-pid-role-pool-ledger.json",
+      "sha256": "4ceaf84a063f3c68bc487d3e7df04d8ff8bc1dedd846be47874eb2c08961a066",
+      "bytes": 3745
+    },
+    {
+      "path": "plan-and-hashes.json",
+      "sha256": "2e631431cebb7de41150a066d6d4717cfbc052b3172697e4cc06500b3de35358",
+      "bytes": 3493
+    },
+    {
+      "path": "request-raw.jsonl",
+      "sha256": "8ffd9a567455dfdc216717ad16d9db684ab3b254371bdf369a6460b97289d8a4",
+      "bytes": 458605
+    },
+    {
+      "path": "resource-raw.jsonl",
+      "sha256": "b99ad6965cb2b63145d29c32300e6b2f320b994c1c954f30b5a284d1dbece792",
+      "bytes": 91165
+    }
+  ],
+  "performance": "NOT_RUN"
+}

@@ -1,0 +1,65 @@
+{
+  "kind": "D1_FUNCTIONAL_TRIAL_PROFILE_NOT_ENVIRONMENT_PASS",
+  "run": "4d002a50-8696-4eae-aeb9-a057c44749d2",
+  "identities": [
+    {
+      "database": "activity_4d002a5086964eaeaeb9a057c44749d2_core",
+      "role": "activity_4d002a5086964eaeaeb9a057c44749d2_operator",
+      "schema": "activity_4d002a5086964eaeaeb9a057c44749d2",
+      "port": 43605,
+      "serverVersionNumber": "160015",
+      "markerVerified": true,
+      "nonSuperuser": true
+    },
+    {
+      "database": "activity_4d002a5086964eaeaeb9a057c44749d2_clinic",
+      "role": "activity_4d002a5086964eaeaeb9a057c44749d2_operator",
+      "schema": "activity_4d002a5086964eaeaeb9a057c44749d2",
+      "port": 43605,
+      "serverVersionNumber": "160015",
+      "markerVerified": true,
+      "nonSuperuser": true
+    }
+  ],
+  "fixture": {
+    "format": "clinic-activity-fixture-v1",
+    "rows": 10000,
+    "seed": 20261020,
+    "businessDate": "2030-10-20",
+    "syntheticOnly": true,
+    "distribution": {
+      "historyDays": 1461,
+      "busyAnchorProbability": 0.002,
+      "excludedHistoryMonth": 2,
+      "excludedWeekday": 0,
+      "typeWeights": [
+        40,
+        15,
+        3,
+        8,
+        1,
+        3,
+        12,
+        10,
+        6,
+        2
+      ],
+      "statusWeights": [
+        6,
+        8,
+        2,
+        2,
+        65,
+        12,
+        5
+      ],
+      "first70CoverAllEnumPairs": true
+    },
+    "contentSha256": "dbe3b90fdef6cd96627c638ba8018d0669ae06613c6ffef4feaa101dcb63327a"
+  },
+  "benchmark": false,
+  "resourceEnforcement": "UNVERIFIED",
+  "backgroundWorkers": "NOT_STARTED_FUNCTIONAL_SOURCE_CACHE_ONLY",
+  "seededSourceFieldsReconciled": true,
+  "status": "PASS_IN_SCOPE"
+}

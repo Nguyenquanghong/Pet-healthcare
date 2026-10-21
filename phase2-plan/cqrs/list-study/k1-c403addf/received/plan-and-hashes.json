@@ -1,0 +1,157 @@
+{
+  "study": "cqrs-list-matched-kaggle-v1",
+  "run": "c403addf-ec74-4cac-915e-35f32f65899c",
+  "mode": "smoke",
+  "workloads": [
+    "query-heavy",
+    "pcn"
+  ],
+  "blocks": [],
+  "bundleSha256": "2b3d7c9c3e94980386dec3e5900198f9e6e6fd7c35d80cac9146709b47bb9037",
+  "bundleManifestSha256": "5623be60c061e24730cf98d42395609155bc09096b103470247cbf9fe67dde69",
+  "sources": {
+    "AB": {
+      "sha256": "cd52a5bd4c5c75eaf820ac1971b2b3776a28fdd615b53048254ac6bb8f7432ec",
+      "files": 422
+    },
+    "O": {
+      "sha256": "47bc79aaa64a6914ae5ec49e420bdb02d611bf59b132b05b20c6758a6394c958",
+      "files": 393
+    },
+    "harness": {
+      "sha256": "d3280e079239245ce985e623c8897f855ecb6b2028f9d836e67b56b6aa0716d8",
+      "files": 20
+    }
+  },
+  "builds": {
+    "O": {
+      "raw": "dfa1f0d0d18ac8f89f9bce08c460beeffb3908413217703289728f769df391f5",
+      "normalized": "5c3adfdf4c116de00eeb4cfdfd5913c5febc4b66bceaffdd17c4cc4c5e3c1e0b",
+      "files": 233,
+      "pathDependentFiles": [
+        "backend/dist/src/generated/phase2-core/edge.js",
+        "backend/dist/src/generated/phase2-core/index.js",
+        "backend/dist/src/generated/phase2-core/wasm.js",
+        "services/clinic/dist/generated/client/edge.js",
+        "services/clinic/dist/generated/client/index.js",
+        "services/clinic/dist/generated/client/wasm.js",
+        "services/notification/dist/generated/client/edge.js",
+        "services/notification/dist/generated/client/index.js",
+        "services/notification/dist/generated/client/wasm.js"
+      ],
+      "token": "<build-root>"
+    },
+    "AB": {
+      "raw": "cbba951f231c0c3d5dec52f43b0da1e6c96102a42361bc936ce6f06fcc5c208c",
+      "normalized": "fd83ed0deedd0748e9b11aa5f97ec25a9b5c13077f8bbe76000859e966c05064",
+      "files": 251,
+      "pathDependentFiles": [
+        "backend/dist/src/generated/phase2-core/edge.js",
+        "backend/dist/src/generated/phase2-core/index.js",
+        "backend/dist/src/generated/phase2-core/wasm.js",
+        "services/clinic/dist/generated/client/edge.js",
+        "services/clinic/dist/generated/client/index.js",
+        "services/clinic/dist/generated/client/wasm.js",
+        "services/notification/dist/generated/client/edge.js",
+        "services/notification/dist/generated/client/index.js",
+        "services/notification/dist/generated/client/wasm.js"
+      ],
+      "token": "<build-root>"
+    }
+  },
+  "overlay": {
+    "benchmarks/phase2/kaggle/list_trial.py": "3e8f0b730fde55d5cd6e19aacd16bd065ff5b2ae8ce0972148abc6777a9cf570",
+    "benchmarks/phase2/kaggle/list_pcn_locust.py": "f4695ddd625161d98be0f86a9173c4f8b0e5d845abc53d283ec1835e7c814cb7",
+    "tools/phase2/cqrs/activity/bench/collector.mjs": "33a5ac2632c0697083321178cd9f60586101d135d0f6c30537ece7629976cb4b",
+    "tools/phase2/cqrs/activity/bench/collector-cli.mjs": "fed5087725955654c25874d8b1430abb5088d55f153738b2f93dfaa46687c725",
+    "tools/phase2/cqrs/activity/bench/profile.mjs": "c6708efa17191585f5e83553aa14774650267b4e3e3ba2655c6300e6f894b78a",
+    "benchmarks/phase2/kaggle/list_study.py": "cd25485afda64551b84b20b933751de0418a2bb4a8577d9dc31d2de96b00422f",
+    "benchmarks/phase2/kaggle/list_evaluate.py": "306e31a80cf095296bb4a5d2e9401279d7fbd0c58fcb4edcd70f481f62be9129",
+    "benchmarks/phase2/kaggle/make_list_policy.py": "1a4a937f673603707a156404dd2e905e080f39a692e8c1ca7c9558b8ce0bbd88",
+    "benchmarks/phase2/kaggle/make_list_notebook.py": "b79cbc84451ac748448ded2627a216b87125b16d6c13b3d3bdcea8d986344041"
+  },
+  "policySha256": "1ee0ff4474c9517ca732a7172ed17760ea084af7b17398421631afc56f4b72fd",
+  "profileKey": {
+    "resourceClass": "kaggle_shared_envelope",
+    "cpuModel": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+    "architecture": "x86_64",
+    "cpuQuotaAndAffinity": {
+      "quota": "400000 100000",
+      "affinity": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "memoryMax": "32212254720",
+    "liveSoftwareVersions": {
+      "node": "v24.16.0",
+      "npm": "11.13.0",
+      "postgres": "postgres (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+      "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92",
+      "nginx": "nginx version: nginx/1.24.0 (Ubuntu)",
+      "rabbitmq": "3.12.1-1ubuntu1.7",
+      "erlang": "1:25.3.2.8+dfsg-1ubuntu4.8",
+      "python": "3.13.15",
+      "locust": "2.44.4",
+      "psutil": "7.0.0",
+      "kernel": "6.18.48+"
+    },
+    "replicas": {
+      "clinic": 1,
+      "core": 1,
+      "notification": 1
+    },
+    "poolLimits": {
+      "O": {
+        "core-api": 4,
+        "core-outbox": 4,
+        "billing-worker": 4,
+        "clinic-api": 4,
+        "clinic-worker": 4,
+        "notification-api": 4,
+        "notification-worker": 4
+      },
+      "A": {
+        "core-api": 4,
+        "core-outbox": 4,
+        "billing-worker": 4,
+        "clinic-api": 4,
+        "clinic-worker": 4,
+        "notification-api": 4,
+        "notification-worker": 4,
+        "clinic-read-worker": 1
+      },
+      "B": {
+        "core-api": 4,
+        "core-outbox": 4,
+        "billing-worker": 4,
+        "clinic-api": 4,
+        "clinic-audit": 1,
+        "clinic-worker": 4,
+        "notification-api": 4,
+        "notification-worker": 4,
+        "clinic-read-worker": 1
+      },
+      "harness": {
+        "stack-supervisor-per-database": 4
+      }
+    },
+    "sourceBuildManifests": {
+      "O": {
+        "source": "47bc79aaa64a6914ae5ec49e420bdb02d611bf59b132b05b20c6758a6394c958",
+        "buildNormalized": "5c3adfdf4c116de00eeb4cfdfd5913c5febc4b66bceaffdd17c4cc4c5e3c1e0b"
+      },
+      "AB": {
+        "source": "cd52a5bd4c5c75eaf820ac1971b2b3776a28fdd615b53048254ac6bb8f7432ec",
+        "buildNormalized": "fd83ed0deedd0748e9b11aa5f97ec25a9b5c13077f8bbe76000859e966c05064"
+      }
+    },
+    "logicalFixtureDigest": "c59b562de91004361c9c980db1c9007a3293ca3b55aa48f338786d595fcb1e15",
+    "traceDigest": "7bdfa3ce5fc421eb990a199a6033b09e99374c5625a24fc1de18af7f47d02180",
+    "harnessDigest": "868f4e9900a3987cd76713456b5258e5f39ea908042f43e49524449060ae6d62",
+    "policyDigest": "1ee0ff4474c9517ca732a7172ed17760ea084af7b17398421631afc56f4b72fd"
+  },
+  "profileKeySha256": "3d972289cd33b5f5ed00830bf9e090ab94237db30a861747c3539f9f57e6d0c8"
+}

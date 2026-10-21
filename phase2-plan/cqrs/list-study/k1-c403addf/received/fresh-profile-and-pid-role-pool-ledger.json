@@ -1,0 +1,91 @@
+{
+  "environment": {
+    "kind": "kaggle_shared_envelope_fresh_profile",
+    "capturedAtUtc": "2026-10-21T16:02:48.618439+00:00",
+    "cpuModel": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+    "architecture": "x86_64",
+    "logicalCpus": 4,
+    "affinity": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "cpuMax": "400000 100000",
+    "memoryMax": "32212254720",
+    "memTotalBytes": 33658318848,
+    "kernel": "6.18.48+",
+    "cgroupVersion": 2,
+    "loadAverage": "1.05 0.40 0.21 1/315 105",
+    "python": "3.13.15",
+    "isolation": "NONE_CLAIMED: stack, generator and controller share the kernel envelope"
+  },
+  "versions": {
+    "node": "v24.16.0",
+    "npm": "11.13.0",
+    "postgres": "postgres (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+    "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92",
+    "nginx": "nginx version: nginx/1.24.0 (Ubuntu)",
+    "rabbitmq": "3.12.1-1ubuntu1.7",
+    "erlang": "1:25.3.2.8+dfsg-1ubuntu4.8",
+    "python": "3.13.15",
+    "locust": "2.44.4",
+    "psutil": "7.0.0",
+    "kernel": "6.18.48+"
+  },
+  "profileKeySha256": "3d972289cd33b5f5ed00830bf9e090ab94237db30a861747c3539f9f57e6d0c8",
+  "poolCeilingsPerProcess": {
+    "O": {
+      "core-api": 4,
+      "core-outbox": 4,
+      "billing-worker": 4,
+      "clinic-api": 4,
+      "clinic-worker": 4,
+      "notification-api": 4,
+      "notification-worker": 4
+    },
+    "A": {
+      "core-api": 4,
+      "core-outbox": 4,
+      "billing-worker": 4,
+      "clinic-api": 4,
+      "clinic-worker": 4,
+      "notification-api": 4,
+      "notification-worker": 4,
+      "clinic-read-worker": 1
+    },
+    "B": {
+      "core-api": 4,
+      "core-outbox": 4,
+      "billing-worker": 4,
+      "clinic-api": 4,
+      "clinic-audit": 1,
+      "clinic-worker": 4,
+      "notification-api": 4,
+      "notification-worker": 4,
+      "clinic-read-worker": 1
+    },
+    "harness": {
+      "stack-supervisor-per-database": 4
+    }
+  },
+  "accounting": {
+    "collector": "tools/phase2/cqrs/activity/bench/collector.mjs via collector-cli.mjs, 1s, CLOCK_MONOTONIC windows",
+    "applicationRoles": [
+      "api",
+      "worker",
+      "relay",
+      "postgres",
+      "broker",
+      "redis",
+      "gateway"
+    ],
+    "separateRoles": [
+      "generator",
+      "controller"
+    ],
+    "missingCoverage": "TOTAL_COST_INCONCLUSIVE",
+    "measuredWindowObservation": "no stack observe/inspect actions inside measured windows; only the pool sampler (one pg_stat_activity catalog query/s over the private socket) runs, identically for O/A/B"
+  },
+  "ledgers": "per member in members/<id>/member-report.json"
+}

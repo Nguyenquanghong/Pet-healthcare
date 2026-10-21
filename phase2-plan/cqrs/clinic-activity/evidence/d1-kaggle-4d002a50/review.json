@@ -1,0 +1,129 @@
+{
+  "format": "clinic-activity-d1-v3-result-review-v1",
+  "reviewedAtUtc": "2026-10-21T01:41:52.353373+00:00",
+  "run": "4d002a50-8696-4eae-aeb9-a057c44749d2",
+  "status": "D1_PASS_IN_FUNCTIONAL_SCOPE",
+  "archive": {
+    "name": "clinic-activity-d1-4d002a50-8696-4eae-aeb9-a057c44749d2.zip",
+    "bytes": 23964,
+    "sha256": "d8862dcc92bbce07610dfbfce2eb7916c6ad4926f6c9d2d5b32d71f6a5f62be1",
+    "members": 12,
+    "manifestEntriesVerified": 11
+  },
+  "provenance": {
+    "sourceArchiveSha256": "6b8e2f740244de44f5a21fffab7e3e8c100a0cd1c871852e995f8a48dd528e45",
+    "sourceTreeSha256": "96831ab2333ad4670c7a3d49dda6a17070e67b66d6c1539eae75e87c87854251",
+    "sourceFilesVerified": 608,
+    "notebookSha256": "d67b65fde48c4f01f0e0978b64a96985f915bbd5794eb44ee841cc409990d02f",
+    "reportedLinuxBuildFiles": 322,
+    "reportedFrontendBuildFiles": 88,
+    "policySha256": "96f51be71168fb8b4f8ab78eaf09035bd12b48a2c6fbe5bc02ea9badce65d181"
+  },
+  "checks": {
+    "pgParityCases": 18,
+    "plainExplainCases": 9,
+    "httpCaseGroups": 35,
+    "httpRequests": 95,
+    "browserCaseGroups": 10,
+    "browserApiRequests": 42,
+    "warmCacheRoleProof": {
+      "status": "PASS",
+      "ttlMs": 5000,
+      "warmCacheVerified": true,
+      "deniedDirect": 403,
+      "deniedGateway": 403,
+      "monotonicTtlWindowVerified": true,
+      "sameCacheEntryAfterRoleRestore": true
+    },
+    "stageReceipts": 8,
+    "reportedOwnedProcessesShutdown": "PASS"
+  },
+  "planObservations": [
+    {
+      "range": "day",
+      "category": "all",
+      "scans": [
+        "Seq Scan"
+      ]
+    },
+    {
+      "range": "day",
+      "category": "clinic",
+      "scans": [
+        "Seq Scan"
+      ]
+    },
+    {
+      "range": "day",
+      "category": "spa",
+      "scans": [
+        "Seq Scan"
+      ]
+    },
+    {
+      "range": "30days",
+      "category": "all",
+      "scans": [
+        "Seq Scan"
+      ]
+    },
+    {
+      "range": "30days",
+      "category": "clinic",
+      "scans": [
+        "Seq Scan"
+      ]
+    },
+    {
+      "range": "30days",
+      "category": "spa",
+      "scans": [
+        "Seq Scan"
+      ]
+    },
+    {
+      "range": "366days",
+      "category": "all",
+      "scans": [
+        "Seq Scan"
+      ]
+    },
+    {
+      "range": "366days",
+      "category": "clinic",
+      "scans": [
+        "Seq Scan"
+      ]
+    },
+    {
+      "range": "366days",
+      "category": "spa",
+      "scans": [
+        "Seq Scan"
+      ]
+    }
+  ],
+  "gates": {
+    "d1": "PASS_IN_FUNCTIONAL_SCOPE_10K_SOURCE_CACHED_API_UI",
+    "d0": "PARTIAL_ENVIRONMENT",
+    "performance": "NOT_RUN_BLOCKED",
+    "fullyFrozen": false,
+    "d2": "NOT_STARTED"
+  },
+  "limits": [
+    "User-supplied reports checked locally; no independent agent connection to Kaggle/DB/browser.",
+    "Estimated plain plans all use Seq Scan; no runtime cost/latency, statistics freshness or 100k efficiency claim.",
+    "Linux binary build digests reported by runner; binaries and raw private logs are not exported.",
+    "Loopback functional composition; background workers/broker/Redis disabled, no full deployment/resource-enforcement proof.",
+    "Cleanup reported by owned runner; no independent post-run process probe."
+  ],
+  "agentExecuted": [
+    "local archive/CRC/inventory/hash/source/report validation"
+  ],
+  "agentNotExecuted": [
+    "application tests",
+    "Kaggle notebook",
+    "database connections/migration/seed/reset",
+    "benchmark"
+  ]
+}

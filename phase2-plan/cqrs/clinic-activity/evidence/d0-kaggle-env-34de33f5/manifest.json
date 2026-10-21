@@ -1,0 +1,11 @@
+{
+  "format": "clinic-activity-d0-probe-result-v1",
+  "probeSourceSha256": "d0c63bd069c8a9b83833b1b2b9f0d3e09260e007b8878fd84c435b783405000f",
+  "files": [
+    {
+      "path": "environment.json",
+      "bytes": 2381,
+      "sha256": "395a65f94b52266036f7c53fd62f7be1fa39b75e6cd965390f7efaffcd1e5881"
+    }
+  ]
+}

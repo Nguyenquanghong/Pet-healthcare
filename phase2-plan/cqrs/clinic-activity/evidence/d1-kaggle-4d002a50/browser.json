@@ -1,0 +1,77 @@
+{
+  "kind": "D1_REAL_GATEWAY_BROWSER_NOT_BENCHMARK",
+  "run": "4d002a50-8696-4eae-aeb9-a057c44749d2",
+  "status": "PASS_IN_SCOPE",
+  "modes": [
+    {
+      "mode": "source",
+      "status": "PASS_IN_SCOPE",
+      "cases": [
+        {
+          "operation": "real-login-and-session-reload",
+          "status": "PASS"
+        },
+        {
+          "operation": "render-real-activity-and-filter-parity",
+          "status": "PASS"
+        },
+        {
+          "operation": "ui-daily-clinic-medical-authoritative-drilldown",
+          "status": "PASS"
+        },
+        {
+          "operation": "real-role-revocation-clears-browser-aggregate",
+          "status": "PASS"
+        },
+        {
+          "operation": "logout-clears-state-and-stops-activity-requests",
+          "status": "PASS"
+        }
+      ],
+      "apiRequests": 22,
+      "activityRequests": 6,
+      "browserVersion": "153.0.8010.12",
+      "apiResponsesMocked": false,
+      "sessionInjected": false,
+      "frontendViaNginx": true,
+      "networkScopeViolations": 0,
+      "requestBudget": 160
+    },
+    {
+      "mode": "cached",
+      "status": "PASS_IN_SCOPE",
+      "cases": [
+        {
+          "operation": "real-login-and-session-reload",
+          "status": "PASS"
+        },
+        {
+          "operation": "render-real-activity-and-filter-parity",
+          "status": "PASS"
+        },
+        {
+          "operation": "ui-daily-clinic-medical-authoritative-drilldown",
+          "status": "PASS"
+        },
+        {
+          "operation": "real-role-revocation-clears-browser-aggregate",
+          "status": "PASS"
+        },
+        {
+          "operation": "logout-clears-state-and-stops-activity-requests",
+          "status": "PASS"
+        }
+      ],
+      "apiRequests": 20,
+      "activityRequests": 6,
+      "browserVersion": "153.0.8010.12",
+      "apiResponsesMocked": false,
+      "sessionInjected": false,
+      "frontendViaNginx": true,
+      "networkScopeViolations": 0,
+      "requestBudget": 160
+    }
+  ],
+  "performance": "NOT_RUN",
+  "fullDeploymentValidated": false
+}

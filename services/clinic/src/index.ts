@@ -6,8 +6,10 @@ import {PrismaClient} from './generated/client/index.js';
 import {ReadFreshness} from './readFreshness.js';
 import { CoreDirectory } from './directory.js';
 import { clinicRuntime } from './runtime.js';
+import {ActivitySummaryEvidence,AuditLane} from './activitySummaryEvidence.js';
+import {projectionCapability,capabilityReport} from './projectionVersions.js';
 const {db}=createDependencies();
-let freshnessDb:PrismaClient|undefined,freshness:ReadFreshness|undefined;
+let freshnessDb:PrismaClient|undefined,freshness:ReadFreshness|undefined,activityRows:ReadFreshness|undefined,summaryEvidence:ActivitySummaryEvidence|undefined;
 try{
     await db.$connect();
     const verify=process.env.JWT_PUBLIC_KEY?actorVerifier({publicKey:process.env.JWT_PUBLIC_KEY,issuer:process.env.JWT_ISSUER??'',audience:process.env.JWT_AUDIENCE??''}):undefined;
@@ -18,15 +20,28 @@ try{
     if(scopes&&new Set([...Object.values(scopes),credential('CORE_DIRECTORY_TOKEN')]).size!==4)throw new Error('DISTINCT_SERVICE_CREDENTIALS_REQUIRED');
     const source=process.env.CORE_SERVICE_URL?new CoreDirectory(process.env.CORE_SERVICE_URL,strict?credential('CORE_DIRECTORY_TOKEN'):process.env.CORE_DIRECTORY_TOKEN??process.env.CLINIC_SERVICE_TOKEN??'',scopes):undefined;
     const runtime=verify?clinicRuntime(db,verify):undefined;
-    if(process.env.CLINIC_READ_MODE==='projection'){
+    // One explicit audit connection for list freshness and/or activity summary
+    // evidence. Activity evidence never switches the list away from authoritative.
+    const activityEvidence=process.env.CLINIC_ACTIVITY_SUMMARY_EVIDENCE==='1';
+    // Summary serving (fixed or via operator control) is only possible with the
+    // background evidence sampler; refuse a configuration that could never be healthy.
+    if(['summary','control'].includes(process.env.CLINIC_ACTIVITY_MODE??'')&&!activityEvidence)throw new Error('CLINIC_ACTIVITY_SUMMARY_EVIDENCE_REQUIRED');
+    const capability=activityEvidence?projectionCapability():undefined;
+    if(process.env.CLINIC_READ_MODE==='projection'||activityEvidence){
       const url=new URL(databaseUrl());url.searchParams.set('connection_limit','1');url.searchParams.set('pool_timeout','1');
-      freshnessDb=new PrismaClient({datasourceUrl:url.href});freshness=new ReadFreshness(freshnessDb);
+      const lane=new AuditLane();
+      freshnessDb=new PrismaClient({datasourceUrl:url.href});
+      // List serving keeps its original guard/estimator; activity gets its own
+      // list-independent row evidence with the per-aggregate lag estimator.
+      if(process.env.CLINIC_READ_MODE==='projection')freshness=new ReadFreshness(freshnessDb,undefined,undefined,undefined,{lane});
+      if(capability){activityRows=new ReadFreshness(freshnessDb,undefined,undefined,undefined,{requireListProjection:false,perAggregateLag:true,lane});summaryEvidence=new ActivitySummaryEvidence(freshnessDb,activityRows,capability,lane);}
     }
-    const app=createApp(db,verify,source,runtime,freshness);
+    const app=createApp(db,verify,source,runtime,freshness,summaryEvidence);
+    app.locals.activitySummaryEvidence=summaryEvidence;app.locals.activity.start();
     await runtime?.start();
-    freshness?.start();
-    const server=app.listen(Number(process.env.PORT||5101),process.env.HOST||'127.0.0.1',()=>process.stdout.write(JSON.stringify({service:'clinic',status:'api-ready'})+'\n'));
+    freshness?.start();activityRows?.start();summaryEvidence?.start();
+    const server=app.listen(Number(process.env.PORT||5101),process.env.HOST||'127.0.0.1',()=>process.stdout.write(JSON.stringify({service:'clinic',status:'api-ready',activityMode:process.env.CLINIC_ACTIVITY_MODE??'source',...(capability?{activitySummaryEvidence:true,...capabilityReport(capability)}:{})})+'\n'));
     server.requestTimeout=15000;server.headersTimeout=10000;server.keepAliveTimeout=5000;
-    const disconnect=async()=>{await app.locals.appointmentShadow?.drain();await freshness?.close();await freshnessDb?.$disconnect();await db.$disconnect();};
+    const disconnect=async()=>{await app.locals.appointmentShadow?.drain();await app.locals.activity.close();await summaryEvidence?.close();await activityRows?.close();await freshness?.close();await freshnessDb?.$disconnect();await db.$disconnect();};
     installShutdown('clinic',async()=>{if(runtime)await runtime.drain(server,disconnect);else{await new Promise<void>(resolve=>server.close(()=>resolve()));await disconnect();}});
-}catch{process.stderr.write(JSON.stringify({service:'clinic',code:'STARTUP_FAILED'})+'\n');await freshness?.close();await freshnessDb?.$disconnect();await db.$disconnect();process.exitCode=1;}
+}catch{process.stderr.write(JSON.stringify({service:'clinic',code:'STARTUP_FAILED'})+'\n');await summaryEvidence?.close();await activityRows?.close();await freshness?.close();await freshnessDb?.$disconnect();await db.$disconnect();process.exitCode=1;}

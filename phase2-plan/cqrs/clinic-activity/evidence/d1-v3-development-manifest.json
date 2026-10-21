@@ -1,0 +1,747 @@
+{
+  "format": "clinic-activity-d1-v3-development-v1",
+  "recordedAtUtc": "2026-10-21T01:03:07.901427+00:00",
+  "head": "c4102b55a652dc8e4faa93eeada4d76cbe0753ef",
+  "branch": "phase2/clinic-activity-d0-20261020",
+  "candidate": {
+    "notebook": "benchmarks/phase2/clinic-activity-d1-kaggle-v3.ipynb",
+    "notebookSha256": "d67b65fde48c4f01f0e0978b64a96985f915bbd5794eb44ee841cc409990d02f",
+    "manifest": "benchmarks/phase2/clinic-activity-d1-kaggle-v3.manifest.json",
+    "manifestSha256": "90099c67465683c23ccc359d3c690f91058c9b1697a8cc52b9531ecb0ed80484",
+    "sourceArchiveSha256": "6b8e2f740244de44f5a21fffab7e3e8c100a0cd1c871852e995f8a48dd528e45",
+    "sourceTreeSha256": "96831ab2333ad4670c7a3d49dda6a17070e67b66d6c1539eae75e87c87854251",
+    "sourceFiles": 608,
+    "policyAtBuildSha256": "96f51be71168fb8b4f8ab78eaf09035bd12b48a2c6fbe5bc02ea9badce65d181"
+  },
+  "sourceChangesFromV2": {
+    "changed": [
+      "benchmarks/phase2/kaggle/activity_native.py",
+      "benchmarks/phase2/kaggle/make_activity_notebook.py",
+      "benchmarks/phase2/kaggle/test_activity_notebook.py",
+      "tools/phase2/cqrs/activity/trial.mjs"
+    ],
+    "added": [
+      "tools/phase2/cqrs/activity/trialBrowser.mjs",
+      "tools/phase2/cqrs/activity/trialCoverage.mjs",
+      "tools/phase2/cqrs/activity/trialCoverage.test.mjs"
+    ]
+  },
+  "fixture": {
+    "rows": 10000,
+    "seed": 20261020,
+    "businessDate": "2030-10-20",
+    "contentSha256": "dbe3b90fdef6cd96627c638ba8018d0669ae06613c6ffef4feaa101dcb63327a",
+    "v3DatabaseSeed": "NOT_RUN"
+  },
+  "lockSchemaMigrationFiles": [
+    {
+      "path": "backend/prisma/migrations/20260826000000_init/migration.sql",
+      "bytes": 12423,
+      "sha256": "8855f719fe6197a0957a4e356975fa6c99116c55a4b1fedb0eae780a560b8216"
+    },
+    {
+      "path": "backend/prisma/migrations/20260831000000_add_spa_appointment_types/migration.sql",
+      "bytes": 203,
+      "sha256": "dfdfd563d5826bdfb127674de63edaadf92b3960a01249887a2ba986cedbacde"
+    },
+    {
+      "path": "backend/prisma/migrations/20260927000000_active_appointment_slot/migration.sql",
+      "bytes": 1005,
+      "sha256": "589640ec0e6d23f3991977e707a78b7e4d207e66eb14611fdd4affd1e8014301"
+    },
+    {
+      "path": "backend/prisma/migrations/20260929170000_invoice_source_unique/migration.sql",
+      "bytes": 335,
+      "sha256": "e3d43fdf65b1207a05d85ab59a992be0d1025b68598ba86536e01ef94859aa5d"
+    },
+    {
+      "path": "backend/prisma/migrations/20260930090000_invoice_payment_request/migration.sql",
+      "bytes": 857,
+      "sha256": "176bf30ee37b5d46387cf28abfdc08654689ae02882ed9923cd364655876a9fa"
+    },
+    {
+      "path": "backend/prisma/migrations/20260930120000_manual_bank_transfer/migration.sql",
+      "bytes": 584,
+      "sha256": "a618d6bd46d1f6d46155ceb5efd20f73433b65143db8ec131248aceabd3805f8"
+    },
+    {
+      "path": "backend/prisma/migrations/20260930160000_invoice_transfer_code/migration.sql",
+      "bytes": 722,
+      "sha256": "2a90b426b89c8e1753cba0638d230fb09d2db82c3561f1af004905e89a111110"
+    },
+    {
+      "path": "backend/prisma/migrations/20261001090000_booking_status_history/migration.sql",
+      "bytes": 965,
+      "sha256": "68f1bc02b57ad3fd33f5c7b3f86cce73eca80e45c8d73dab95096e1b09abc624"
+    },
+    {
+      "path": "backend/prisma/migrations/20261002000000_paginated_reads/migration.sql",
+      "bytes": 1511,
+      "sha256": "d208bb4246458b0d3867141da4cbd5712ab6cafeba4157535eceab16359a0e5d"
+    },
+    {
+      "path": "backend/prisma/migrations/20261002100000_hotel_booking_requests/migration.sql",
+      "bytes": 624,
+      "sha256": "5fe8c08187a368877ebeb49f43143f44bbab23bd73080c4e5f294beeb751ad9f"
+    },
+    {
+      "path": "backend/prisma/migrations/20261002110000_payment_events/migration.sql",
+      "bytes": 735,
+      "sha256": "ce0f27d8573adc6e3a1246fc396616c4321392d588caf94f37a0f2e6506b1756"
+    },
+    {
+      "path": "backend/prisma/migrations/20261002120000_owner_activation/migration.sql",
+      "bytes": 807,
+      "sha256": "be753ad4c14e47ad3312e824ca2f7e5f41b90c815d97fda557df66dd0f315e03"
+    },
+    {
+      "path": "backend/prisma/migrations/20261011000400_notification_outbox/migration.sql",
+      "bytes": 476,
+      "sha256": "a5555e548c66ddbca8c9a8e4d0b364f9d9da18e46b205836ec3233f3dfa2ea88"
+    },
+    {
+      "path": "backend/prisma/migrations/20261011000600_directory_outbox/migration.sql",
+      "bytes": 3436,
+      "sha256": "cdeb48aaf8c72b6f5ae1245fe0aff24b4c95438af4352cae4108fcb7051ddb97"
+    },
+    {
+      "path": "backend/prisma/migrations/20261011000800_appointment_billing/migration.sql",
+      "bytes": 1798,
+      "sha256": "d8117c28362b3adb6bf563aeb01544a6d010a3980b1fa5271fea5b330017dc9e"
+    },
+    {
+      "path": "backend/prisma/migrations/20261014000100_admin_recent_appointments/migration.sql",
+      "bytes": 105,
+      "sha256": "2ba749a52d6da914c7a7b5e57c90734530398f1368f7cf024ced6761b2d5eaa3"
+    },
+    {
+      "path": "backend/prisma/migrations/migration_lock.toml",
+      "bytes": 25,
+      "sha256": "e0f301404b533bea819cafbc56ca2a9d9bcc2cf97d6350473e3a008f0637cc12"
+    },
+    {
+      "path": "backend/prisma/phase2/migrations/20261011000100_p1_proof/migration.sql",
+      "bytes": 2140,
+      "sha256": "e25d9e257f8770b6da6b00019357c0d2e873edf568ca063672569400d5c17e6c"
+    },
+    {
+      "path": "backend/prisma/phase2/migrations/migration_lock.toml",
+      "bytes": 24,
+      "sha256": "1db17a8d051aa136110736752c5e1f8b7ed92b6ea8e803112fbbe2497047c210"
+    },
+    {
+      "path": "backend/prisma/phase2/schema.prisma",
+      "bytes": 871,
+      "sha256": "82314d57803aaade22f26bd829a229a80a3d6f93f814b768d15043a75a342454"
+    },
+    {
+      "path": "backend/prisma/schema.prisma",
+      "bytes": 18487,
+      "sha256": "aa71250460ca7c6cfdb2366f376d6ac2e5a205a33b52c07ea440a5a2f5e4f172"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 189311,
+      "sha256": "7f8d26be45e322ff41c07974ac700d2c21451409ae428171e2c3ec602f3de0ea"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261011000100_p1_proof/migration.sql",
+      "bytes": 1832,
+      "sha256": "2d2030e468f2458535c3e054d8a3cd4e19804c6eb052a29ef5e427e9e449f0af"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261011000200_p1_inbox_directory/migration.sql",
+      "bytes": 576,
+      "sha256": "d2d8e1dec47b7002d881d8971d356bacb60caec921bc4ac34884011558b2dfdc"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261011000700_clinic_domains/migration.sql",
+      "bytes": 6945,
+      "sha256": "c73dbb06c0c07c731e06bed251ae86d329bca1538fc77cca37d22ec156798751"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261011000900_billing_terminal/migration.sql",
+      "bytes": 574,
+      "sha256": "b8b9b50376013a9208ed406cb7508af88eb1c86357671d08f090715fe709db60"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261014000100_admin_recent_appointments/migration.sql",
+      "bytes": 105,
+      "sha256": "2ba749a52d6da914c7a7b5e57c90734530398f1368f7cf024ced6761b2d5eaa3"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261015000100_appointment_read_projection/migration.sql",
+      "bytes": 2681,
+      "sha256": "9dbe657ebab0194ae9a77d0cbd5b657ec8a380f00d718533572265bee4bc6f62"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261015000200_projection_lock_privilege/migration.sql",
+      "bytes": 386,
+      "sha256": "574bb9e0f31da952bd1e4797ae7a0acead99f940284ecf85998f7b85921242c3"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261015000300_read_rebuild_checkpoint/migration.sql",
+      "bytes": 1583,
+      "sha256": "a6bcd8d9a07e7a8db14cf385e11cc37329b740369e4e6937d3cf5a8fee40d268"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261015000400_rebuild_writer_fence_lock/migration.sql",
+      "bytes": 719,
+      "sha256": "d2db5678dd8f0e230d442cd2a2f6b47facdf9485fef59c648f998f438eaf2199"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261015000500_rebuild_fence_owner/migration.sql",
+      "bytes": 1635,
+      "sha256": "9d0910d1289e173fde164bdb83463c0e1b36ced7a41dde3a40825ef2b375c37e"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261015000600_read_token_dedup/migration.sql",
+      "bytes": 232,
+      "sha256": "82bbd60ba6ee6b99682ff5fa30db27160940b19a5a984c5c11c09fbcb08d7476"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261016000100_read_query_indexes/migration.sql",
+      "bytes": 400,
+      "sha256": "61bb1d7cd96d1373f094dc44fac895409ff14ef1dac3e18e1b8f211e701d98cf"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261017000100_appointment_aggregate_epochs/migration.sql",
+      "bytes": 1911,
+      "sha256": "0b8c485c58a8513f565f01f1cdc155e1f0a3c52864633375ccd38887a6507fb2"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/20261019000100_appointment_aggregate_range_indexes/migration.sql",
+      "bytes": 553,
+      "sha256": "e68de61aa9b4e6a554048e1f9c8263c8622c7b7698007dc346ab82031ac674e8"
+    },
+    {
+      "path": "services/clinic/prisma/migrations/migration_lock.toml",
+      "bytes": 24,
+      "sha256": "1db17a8d051aa136110736752c5e1f8b7ed92b6ea8e803112fbbe2497047c210"
+    },
+    {
+      "path": "services/clinic/prisma/schema.prisma",
+      "bytes": 9223,
+      "sha256": "0a27c366870ddf4339ef7a038ce5c0745752cc934fb195d8451fa04ea065f170"
+    },
+    {
+      "path": "services/notification/prisma/migrations/20261011000100_p1_proof/migration.sql",
+      "bytes": 577,
+      "sha256": "16636b4a8da981aa1b0c92cbe5c84f674422a7a1fa3abc630a3dc98e37f66ea6"
+    },
+    {
+      "path": "services/notification/prisma/migrations/20261011000300_p2_notification/migration.sql",
+      "bytes": 1449,
+      "sha256": "b561a1830082b67ab847879baaef2e69d644e63bccb59b6a9793574b4c10674e"
+    },
+    {
+      "path": "services/notification/prisma/migrations/20261011000500_manual_send_dedup/migration.sql",
+      "bytes": 465,
+      "sha256": "556f40074f6079e3df2c286f026ad95662645e10af5eaa6c7bd662b5bbde0dda"
+    },
+    {
+      "path": "services/notification/prisma/migrations/migration_lock.toml",
+      "bytes": 24,
+      "sha256": "1db17a8d051aa136110736752c5e1f8b7ed92b6ea8e803112fbbe2497047c210"
+    },
+    {
+      "path": "services/notification/prisma/schema.prisma",
+      "bytes": 1061,
+      "sha256": "c162e29c180a04e3bf7a72571d693e36b810e236885e9b07f98a30ca2c6114b7"
+    }
+  ],
+  "localFrontendBuildFiles": [
+    {
+      "path": "frontend/dist/_redirects",
+      "bytes": 20,
+      "sha256": "94f76bf42ffc51f446f54963735cab3da50e9db2eb45d4934da61e45c717d599"
+    },
+    {
+      "path": "frontend/dist/assets/AdminAnalyticsPage-Dl6458sk.js",
+      "bytes": 3059,
+      "sha256": "54e1d2358075175c89030c81e103a9c1ff37f3e998a0d8d9013438c193b37480"
+    },
+    {
+      "path": "frontend/dist/assets/AdminAppointmentsPage-Ce6uctOt.js",
+      "bytes": 22911,
+      "sha256": "da94935fe39d33c97d11ea3cc54fc5fef1d0dc0da3972c84231bb207be338716"
+    },
+    {
+      "path": "frontend/dist/assets/AdminBillingPage-PK_70420.js",
+      "bytes": 29622,
+      "sha256": "4aa49769e7e587033454d3a120ba781eb02e230cf70833d7712132b0eef83ab1"
+    },
+    {
+      "path": "frontend/dist/assets/AdminCreateDialog-tKoxiGZM.js",
+      "bytes": 19383,
+      "sha256": "39cd6fa5b77d67bf4208fddefb3e42ea999ac6e36c5da7341772b2218f9ef055"
+    },
+    {
+      "path": "frontend/dist/assets/AdminDashboardPage-BTS6MdtT.js",
+      "bytes": 17407,
+      "sha256": "8255680d8e00d94606efc98969f3ac4e443230df2acbff04f81485fc62bf468e"
+    },
+    {
+      "path": "frontend/dist/assets/AdminHotelBookingsPage-61MTpEJB.js",
+      "bytes": 20843,
+      "sha256": "813aeb79e229d9487bc0e7c130ac279a54914689de9d27080333b3cffc32d9eb"
+    },
+    {
+      "path": "frontend/dist/assets/AdminLayout-CwFL0Vvi.js",
+      "bytes": 4496,
+      "sha256": "1c91cb8f051798f7d995739cd92c8220e7f814e8c34799c577f6cd931d0863b0"
+    },
+    {
+      "path": "frontend/dist/assets/AdminLoginPage-CDHaq3wM.js",
+      "bytes": 2536,
+      "sha256": "187594024828b25a6e9cfb010861e8085ea5fb4dbb705eb8b3ba95822516aa52"
+    },
+    {
+      "path": "frontend/dist/assets/AdminMedicalRecordsPage-cFd1T3BK.js",
+      "bytes": 29079,
+      "sha256": "256a78680de7fe9aa9a3dbf9af5f4aae7f1d938726be6cea79ac4038515e4130"
+    },
+    {
+      "path": "frontend/dist/assets/AdminNotificationsPage-Dr4GjL42.js",
+      "bytes": 10034,
+      "sha256": "e22adeb0ad9ad52a4bd6429b5b7b18272e88c8e568aeaae1526025b7c17c9e15"
+    },
+    {
+      "path": "frontend/dist/assets/AdminOwnersPage-CBil0Hox.js",
+      "bytes": 7822,
+      "sha256": "ec02691402d8e59fa54beeb1483d27ade2bea8060828853c8292a5c621a1fbe3"
+    },
+    {
+      "path": "frontend/dist/assets/AdminPetsPage-d_IEi8PH.js",
+      "bytes": 11900,
+      "sha256": "545455e99fdc7dfa815e821ee55052c0b64ac6b0edf599b888e0b01f02e3edc0"
+    },
+    {
+      "path": "frontend/dist/assets/AdminSettingsPage-m5vpLQXg.js",
+      "bytes": 4058,
+      "sha256": "ae0cedea08d0afcd317863a4d1b93c2bb96c1f270b6f780958320f1df841d35b"
+    },
+    {
+      "path": "frontend/dist/assets/apiClient-B47u58Df.js",
+      "bytes": 4097,
+      "sha256": "4d8fbab3d411a2e805baa3611fac9c666f5eeef9f917ce6211fe446a462bca42"
+    },
+    {
+      "path": "frontend/dist/assets/appointment-BWAB0oJo.js",
+      "bytes": 75,
+      "sha256": "2de8e67dd58f3fcd893749b805586046367481d40994ccd657a6481ebf66822f"
+    },
+    {
+      "path": "frontend/dist/assets/AppointmentsPage-B1rcmGj3.js",
+      "bytes": 4321,
+      "sha256": "8ac5c65b6a8b0daa07426488aa1e8925e259261a8935e7045137392246540ed7"
+    },
+    {
+      "path": "frontend/dist/assets/arrow-right-DhpZGf32.js",
+      "bytes": 154,
+      "sha256": "b955119cc17f1be5ed984730b8fdf9623f02e944bc275ee3eae210e9ac6fadec"
+    },
+    {
+      "path": "frontend/dist/assets/AuthShell-B0VdWzek.js",
+      "bytes": 2091,
+      "sha256": "742522784a0c430860b673860b953e8eff98e0d98ab577c13d0a8de06254deb1"
+    },
+    {
+      "path": "frontend/dist/assets/ban-DcrxsAIx.js",
+      "bytes": 170,
+      "sha256": "5787ae582ff1663397ab779aa821fad68594baac49b71a74bae1f6385b072b6a"
+    },
+    {
+      "path": "frontend/dist/assets/bed-double-CvhVIrCc.js",
+      "bytes": 286,
+      "sha256": "6e8128aa454ca0117d74c57235ccc1347b5e6e828cc0bbedb71f38a15713751d"
+    },
+    {
+      "path": "frontend/dist/assets/bookingCalculator-CBAF6gHE.js",
+      "bytes": 740,
+      "sha256": "129e6e617da1670887532d3622fcad92f89a62ae1c4dc6b0c71b5ee88e509b9b"
+    },
+    {
+      "path": "frontend/dist/assets/BrandLogo-kaf9tyhD.js",
+      "bytes": 312,
+      "sha256": "435eed3c849b6846f32f1816723dfa07b1028bf3c91d153cc68559663e5d1d60"
+    },
+    {
+      "path": "frontend/dist/assets/Button-DdfZybBp.js",
+      "bytes": 976,
+      "sha256": "1b698c135343f4bac95e5ba57a6dae705e436cec11c7b91b8403926acdc8659d"
+    },
+    {
+      "path": "frontend/dist/assets/calendar-DrLWgns8.js",
+      "bytes": 244,
+      "sha256": "c37cf94ae2bd04360a12cbb42e1801fbd3b6daf99b81ddedf1d643768aebfe81"
+    },
+    {
+      "path": "frontend/dist/assets/calendar-plus-DBSfQG8E.js",
+      "bytes": 344,
+      "sha256": "23384a57d397bf109a36cd3dfd3233501470e6485e778a3185f77e1933726e64"
+    },
+    {
+      "path": "frontend/dist/assets/CareNotesPanel-DdTuFU9s.js",
+      "bytes": 1047,
+      "sha256": "79ff75421c0ca226be03131908bc532d6b919bd8d5d7b60f3a7815920cd2fbc5"
+    },
+    {
+      "path": "frontend/dist/assets/check-check-moS3qLnv.js",
+      "bytes": 168,
+      "sha256": "6e440702870b4123a9dcb07be4b4d686b7b89e00177261676a56f9befd68ac86"
+    },
+    {
+      "path": "frontend/dist/assets/chevron-right-DO3KR47V.js",
+      "bytes": 119,
+      "sha256": "c13f910e530b7b0ee4637b203dac5b43d3b5bc0efd8555696adad8a1e481a35a"
+    },
+    {
+      "path": "frontend/dist/assets/circle-check-Cgl2MshO.js",
+      "bytes": 167,
+      "sha256": "5caaf7adb60a56d06754fded00ef25afc243a2c8564e1a4de2762ba6d20b7fc9"
+    },
+    {
+      "path": "frontend/dist/assets/clinicActivity-i4AV1xD6.js",
+      "bytes": 1660,
+      "sha256": "dcd5cfa71671aa069d3ba4137ce6ac1f31d4903e38942b645a35523d143780a9"
+    },
+    {
+      "path": "frontend/dist/assets/ClinicSavedChanges-CjXBz2Uz.js",
+      "bytes": 9675,
+      "sha256": "e9080c999cb06a5b37cabca343c4964099ba628b9a17e61943d51c33a1d9eb10"
+    },
+    {
+      "path": "frontend/dist/assets/clock-8D7rOiHU.js",
+      "bytes": 158,
+      "sha256": "f83ce598d8dc45dbcd37d8696abe4d8ef3133100d69bdf0f4aed88e6224ffddf"
+    },
+    {
+      "path": "frontend/dist/assets/DashboardPage-D4A58VTy.js",
+      "bytes": 14639,
+      "sha256": "ada54aa1a8c4424984db11e0b42453c593267d20c470948a718743323f2fb173"
+    },
+    {
+      "path": "frontend/dist/assets/date-DtJle5GG.js",
+      "bytes": 351,
+      "sha256": "0c86bc7ce09bd31588893d3af5aefe232fbfdb8e1222a8d665ca5571d469987a"
+    },
+    {
+      "path": "frontend/dist/assets/download-bzoUAK06.js",
+      "bytes": 402,
+      "sha256": "0c4d201e90f009f2f051612365bcf045632e095239b4137e66b2125b6b34af4d"
+    },
+    {
+      "path": "frontend/dist/assets/EmptyState-DaOA9W5_.js",
+      "bytes": 557,
+      "sha256": "84f58413afe438f8552b14a243a836b2b3f6961f64a8134023051ea5ed9a0914"
+    },
+    {
+      "path": "frontend/dist/assets/eye-Dwegw4w7.js",
+      "bytes": 245,
+      "sha256": "8841ae858f61b0d4f82bf50c9b5827255f94a11fb25da079e8bfb0dafb39d760"
+    },
+    {
+      "path": "frontend/dist/assets/eye-off-CC7pd5Ep.js",
+      "bytes": 419,
+      "sha256": "15b309e2373aedfc9ebddea22e7213d58b70964ceba5965d5264f82700099fe9"
+    },
+    {
+      "path": "frontend/dist/assets/file-plus-corner-COyHmq1K.js",
+      "bytes": 338,
+      "sha256": "e287c12b63d454e822492dbac53007cce4537efbf97ff991db171de0772c549d"
+    },
+    {
+      "path": "frontend/dist/assets/formatCurrency-i5Z7OlSI.js",
+      "bytes": 134,
+      "sha256": "d59dbe1e46712649d0e761cc7ca5c31d74b67a4d78ef7a465961ffdd5b5e8ca3"
+    },
+    {
+      "path": "frontend/dist/assets/HotelBookingDetailPage-BUQPNMON.js",
+      "bytes": 2964,
+      "sha256": "0190f4c301cf15bf99ae482666ad74e82af30207ff0d52db09d8f96fa0c38a79"
+    },
+    {
+      "path": "frontend/dist/assets/HotelBookingPage-tkXvHU1B.js",
+      "bytes": 12164,
+      "sha256": "a542c1298a7621227365e957089255c42d221a9a84ba72c79e352ee9c7757fa5"
+    },
+    {
+      "path": "frontend/dist/assets/image-plus-Calyj1pU.js",
+      "bytes": 352,
+      "sha256": "5cf29825980a16eecbc9592e7c7230241324086d823f7d588f513700aa4c241f"
+    },
+    {
+      "path": "frontend/dist/assets/index-CbJFtEAU.js",
+      "bytes": 206625,
+      "sha256": "18a2dc83dce542dd64c6bcd012d68b3318d1bc2560dce296ed2bc93a7f2ae453"
+    },
+    {
+      "path": "frontend/dist/assets/index-CRHlym02.css",
+      "bytes": 41195,
+      "sha256": "d4e2874e91de2e11b66dfcff5d1998e3888a76b6a56aed24ca81c980715c0204"
+    },
+    {
+      "path": "frontend/dist/assets/Input-DPpDVbKr.js",
+      "bytes": 825,
+      "sha256": "a3f1c7398bb60cb98259494a72e7ba027341534ac2e942814b48c025f4912f71"
+    },
+    {
+      "path": "frontend/dist/assets/jsx-runtime-9K18CD4O.js",
+      "bytes": 47533,
+      "sha256": "1ce50b3031a73ceb3022628054a01038e3437ce2f295cd016dc76bff85a6179d"
+    },
+    {
+      "path": "frontend/dist/assets/LandingPage-nJi2u9Sc.js",
+      "bytes": 2104,
+      "sha256": "b082b911774df74a87cdac75ac90a22fca955800fbc0adb3e442ecfdb8394a19"
+    },
+    {
+      "path": "frontend/dist/assets/lock-keyhole-DprKUVvf.js",
+      "bytes": 244,
+      "sha256": "e968fc08598600f5e719bd20f24433193ca4159eee9175388d5ec1add3b93486"
+    },
+    {
+      "path": "frontend/dist/assets/map-pin-CNR9RTo0.js",
+      "bytes": 248,
+      "sha256": "2b306439e5ec87f6b7cf5fb8827792cbea5683cf50d590fde034992b5929e31b"
+    },
+    {
+      "path": "frontend/dist/assets/MedicalRecordsPage-BszefsMM.js",
+      "bytes": 10061,
+      "sha256": "ac69cbf2f58e5540a7b8d26e099ede3e8ab881d5c5d332d1f57df76c4b6fcf01"
+    },
+    {
+      "path": "frontend/dist/assets/nipopeto-logo-cropped-yurHPMU2.png",
+      "bytes": 340396,
+      "sha256": "9167bb9a872e0e47a933c82d5cdf40cad0a20106ebf6183dbc197daad85e7440"
+    },
+    {
+      "path": "frontend/dist/assets/nipopeto-mark-B8x74150.png",
+      "bytes": 197453,
+      "sha256": "efb44dfdf00787ad2c97e6b36c3819ca79a3daba2c015e3f6a79c28651c263e7"
+    },
+    {
+      "path": "frontend/dist/assets/NotificationsPage-93bsY3ob.js",
+      "bytes": 5370,
+      "sha256": "a29b6529ac2d72dc33bc6751e10832fc0631ab85f1d61911270606c77463b9c6"
+    },
+    {
+      "path": "frontend/dist/assets/OwnerActivationPage-Cwnyfnyb.js",
+      "bytes": 4108,
+      "sha256": "5de9762a1afa93c34228b33034cd9ea16077cbfacd42fc5df6b32920d4d9177b"
+    },
+    {
+      "path": "frontend/dist/assets/OwnerAppointmentList-BWxrQfsz.js",
+      "bytes": 15882,
+      "sha256": "33925929af415b3360cdf274374ed5f46414ffa05b70fbc98b044bd4bc37a72c"
+    },
+    {
+      "path": "frontend/dist/assets/OwnerBillingPage-CVD0WfiW.js",
+      "bytes": 13721,
+      "sha256": "053c44a90848650d56e4187fca9eedbf19e5ad5516b9851f3dc019f6ca123382"
+    },
+    {
+      "path": "frontend/dist/assets/OwnerLayout-CNucdQSs.js",
+      "bytes": 4536,
+      "sha256": "43e090d6c081a00a7e7145083b95ed620a5801392bf796bd1d630ee38ec06daa"
+    },
+    {
+      "path": "frontend/dist/assets/OwnerLoginPage-D2EOROTm.js",
+      "bytes": 3472,
+      "sha256": "a04e1d4c37e198b3686a5ced1ef568f1c96068ffad7f2e6b730508a311650e03"
+    },
+    {
+      "path": "frontend/dist/assets/OwnerProfilePage-BdL5uwmr.js",
+      "bytes": 6687,
+      "sha256": "e750037a0257c50cd027a9f2e899f82bab69fb155dbdd3cd659ed54682d3e2c6"
+    },
+    {
+      "path": "frontend/dist/assets/OwnerRegisterPage-DsQkpSp5.js",
+      "bytes": 5202,
+      "sha256": "524322f2f298b3f384635d28d7f75318d2773bcf950b0440ba25fcffaef69a23"
+    },
+    {
+      "path": "frontend/dist/assets/PagedSelect-K12UBn1v.js",
+      "bytes": 1839,
+      "sha256": "0925741c015f8423f28c25b96c6780f583bf26a97da64e4e97718f2e5b1f9cec"
+    },
+    {
+      "path": "frontend/dist/assets/Pagination-DieiiFoH.js",
+      "bytes": 3438,
+      "sha256": "7b54a8cf99d9c179d933c199de9b16741722990394d53be3c6a74147b28a6564"
+    },
+    {
+      "path": "frontend/dist/assets/PetRescuePage-PBU_o0DS.js",
+      "bytes": 10989,
+      "sha256": "482c62cd24b6bdefcdf4af2866f2efe77205971346484cca34dd88d97679811f"
+    },
+    {
+      "path": "frontend/dist/assets/PetsPage-BHRPhBwR.js",
+      "bytes": 28971,
+      "sha256": "6ea4cd7759a810a586ca5111b72b7a1160cb3dc5d81e604a70e01cfaf4ea61c3"
+    },
+    {
+      "path": "frontend/dist/assets/phone-BxJHISzx.js",
+      "bytes": 821,
+      "sha256": "68130fd004916d6a2801d3fdbacaafc33933ccae5be0676da3791bb348688ca6"
+    },
+    {
+      "path": "frontend/dist/assets/plus-lWlUj7mH.js",
+      "bytes": 142,
+      "sha256": "cf0b120cff6e245659ec1ff85ea4cd645411032a6adb3efa31e95cd1d9ba2a07"
+    },
+    {
+      "path": "frontend/dist/assets/pricing-QD_JrvJd.js",
+      "bytes": 387,
+      "sha256": "a3427f08392aafd5e4b5e9ac37d95e0f9542993c9278fb1dda77b89a0924dc5c"
+    },
+    {
+      "path": "frontend/dist/assets/printer-B2OQ8k3R.js",
+      "bytes": 308,
+      "sha256": "1464d44bae40e1ebab63b941553c47d2a011dc9c2ed520b4d241756af0230ae5"
+    },
+    {
+      "path": "frontend/dist/assets/qr-code-CncA1ose.js",
+      "bytes": 639,
+      "sha256": "73643fc5082ee6c8f2cda6b4ca08bf00f6d710b647e1b21028dc0b3fe1ed298c"
+    },
+    {
+      "path": "frontend/dist/assets/QueryStatus-CpElXYqQ.js",
+      "bytes": 721,
+      "sha256": "dc4eb15ab3038f4ea5850eaa35541ff307cbad86bd23c74c4cbd60840058a673"
+    },
+    {
+      "path": "frontend/dist/assets/rotate-ccw-clock-DbweWCzG.js",
+      "bytes": 515,
+      "sha256": "2932aba5b617aa4828b77a08071cf1cd63305bd0f81681243efffbba05b967ed"
+    },
+    {
+      "path": "frontend/dist/assets/search-BRpmG3QB.js",
+      "bytes": 163,
+      "sha256": "4ecb9154eda4ab20d8da41b4b5c83c6211b3b97a859a7d59dd627188181b3afc"
+    },
+    {
+      "path": "frontend/dist/assets/Select-CJv72e-3.js",
+      "bytes": 1178,
+      "sha256": "3b99fee5fb84e29a97e965901b08187f28f6c44d7fcf54f5c8c463926d08ffde"
+    },
+    {
+      "path": "frontend/dist/assets/send-VNpObBSX.js",
+      "bytes": 279,
+      "sha256": "fc1bf98d85f6fefc912e46e209f104a18b525f2f921d41908337f2081203c510"
+    },
+    {
+      "path": "frontend/dist/assets/services-DXXjqKwl.js",
+      "bytes": 2545,
+      "sha256": "056db9d78fdec941b96268f0c470aeb885c16c14080696de1dc19234538f83bf"
+    },
+    {
+      "path": "frontend/dist/assets/shield-check-tX1kliCt.js",
+      "bytes": 309,
+      "sha256": "d0f9b78821e6957917a57d0333bf463a32eced2d247c3024129ff0a8f7d6862e"
+    },
+    {
+      "path": "frontend/dist/assets/SpaBookingPage-DmHnobP2.js",
+      "bytes": 6166,
+      "sha256": "cc5043c25ede8932a7dff61ee42da2bbf57bd50cceeaab619c38e204a46d9e33"
+    },
+    {
+      "path": "frontend/dist/assets/stethoscope-B_NAYGeT.js",
+      "bytes": 331,
+      "sha256": "6cfb048a2265a95f2cb9eb40db18a0b6a66127ef29df66526d4bbce2ca77fc64"
+    },
+    {
+      "path": "frontend/dist/assets/Textarea-BkXOJmUR.js",
+      "bytes": 781,
+      "sha256": "ba9804f40a551418910325278478038db8dfec150730999ec6eb5b7da0290e48"
+    },
+    {
+      "path": "frontend/dist/assets/trash-2-BsJTcr3K.js",
+      "bytes": 317,
+      "sha256": "bf486e3e6bd15be7da480f9e2e23242cdb13b05dae05bbd778ca535c53ed4255"
+    },
+    {
+      "path": "frontend/dist/assets/useBookingAction-Dh_vqJh7.js",
+      "bytes": 6963,
+      "sha256": "a5dff0e608cbbe67be4ce35c919530296a57214f97a68356874c72cb3ccc57b1"
+    },
+    {
+      "path": "frontend/dist/assets/useDashboard-B0zym6js.js",
+      "bytes": 782,
+      "sha256": "7a44147558a03c1ff665d85866617d6cb9ebfddda4902e3a014d7a0e311f6f2a"
+    },
+    {
+      "path": "frontend/dist/assets/useInvoiceOperation-B_8cLeTs.js",
+      "bytes": 2199,
+      "sha256": "7b35a9164df1354a502d4c56dd268472d8bbf4d88cd05c7749a6c11b64df22b3"
+    },
+    {
+      "path": "frontend/dist/assets/user-plus-BbIEXlzp.js",
+      "bytes": 299,
+      "sha256": "c73eeec1aef847bd322edcaa96ff286f7a9980d73a42dafd3fbd1dd9cef6b8f7"
+    },
+    {
+      "path": "frontend/dist/assets/useRequestIntent-AWmiTkjC.js",
+      "bytes": 364,
+      "sha256": "6cf9f49720c6fd43a45ecf69756c0d7574cb32106bcb04dc865c41d153699401"
+    },
+    {
+      "path": "frontend/dist/index.html",
+      "bytes": 651,
+      "sha256": "f949be83952865734ae278652b6510929fbc3ee68db79ceb6ba521f251a3cdaf"
+    }
+  ],
+  "localChecks": {
+    "activityUnit": "23/23 PASS; existing compiled production app modules, unchanged runtime source",
+    "packagingGuards": "12/12 PASS",
+    "frontendBuild": "PASS after sandbox spawn EPERM then authorized local escalation",
+    "nodeSyntax": "trial/trialBrowser/trialCoverage PASS",
+    "boundaries": "PASS",
+    "openapi": "70 operations PASS",
+    "artifact": "608 source file hashes and embedded archive/unexecuted cells PASS"
+  },
+  "failuresRetained": [
+    {
+      "command": "node --test tools/phase2/cqrs/activity/trialCoverage.test.mjs (with repository runner flags)",
+      "result": "4/5; nested Prisma Sql from different generated client treated as bound $1; no DB connection"
+    },
+    {
+      "log": "test-results/phase2/cqrs/activity/d1-v3-followup-20261021/unit-initial-failure.log",
+      "result": "22/23; Prisma.Sql is not exported as constructor; fixed explicit Prisma.sql(strings,...values)"
+    },
+    {
+      "log": "test-results/phase2/cqrs/activity/d1-v3-followup-20261021/frontend-sandbox-failure.log",
+      "result": "Vite spawn EPERM; retry outside sandbox passed"
+    }
+  ],
+  "gates": {
+    "d0": "PARTIAL_ENVIRONMENT",
+    "d1": "PARTIAL_CANDIDATE_V3_TRIAL_NOT_RUN",
+    "priorV2Result": "PG_AND_API_GATEWAY_PASS_IN_SCOPE_RETAINED_FOR_V2_SOURCE",
+    "plainExplainV3": "NOT_RUN",
+    "warmCacheRevocationV3": "NOT_RUN_ON_REAL_TRIAL",
+    "gatewayBrowserV3": "NOT_RUN",
+    "performance": "NOT_RUN_BLOCKED",
+    "d2": "NOT_STARTED"
+  },
+  "notRun": [
+    "Kaggle notebook v3",
+    "PostgreSQL/gateway/browser trial v3",
+    "package install/migration/seed/reset local",
+    "full benchmark",
+    "V2/worker cutover/projected list"
+  ],
+  "limits": {
+    "apiHarnessRequestBudget": 240,
+    "browserApiRequestBudgetPerMode": 160,
+    "browserModes": [
+      "source",
+      "cached"
+    ],
+    "backgroundDependencies": "DISABLED_FUNCTIONAL_COMPOSITION",
+    "resourceEnforcement": "UNVERIFIED",
+    "policyChanged": false,
+    "appRuntimeSourceChanged": false
+  }
+}

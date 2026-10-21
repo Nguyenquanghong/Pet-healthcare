@@ -235,7 +235,11 @@ model ReadProjectionGeneration {
  startedAt DateTime @default(now())
  verifiedAt DateTime?
  rows AppointmentReadRow[]
+ summaries AppointmentDailySummary[]
  activeIn ReadProjectionControl[]
+ // SQL migration 20261021000100 adds CHECK schemaVersion IN (1,2) and a trigger
+ // making schemaVersion immutable: V1 is never upgraded to V2 in place.
+ @@unique([id,schemaVersion])
 }
 model ReadProjectionControl {
  projectionName String @id
@@ -279,6 +283,30 @@ model AppointmentReadRow {
  @@id([generation,appointmentId])
  @@index([generation,deletedAt,status,createdAt(sort: Desc),appointmentId(sort: Desc)], map: "appointment_read_admin_page_idx")
  @@index([generation,deletedAt,ownerId,status,appointmentDate(sort: Desc),appointmentTime(sort: Desc),appointmentId(sort: Desc)], map: "appointment_read_owner_page_idx")
+}
+
+// Projection V2 daily activity counter: live AppointmentReadRow count per
+// (generation, appointment date, type, current status). SQL migration adds
+// CHECK appointmentCount>=0 and schemaVersion=2; the composite FK makes summary
+// rows impossible for a V1 generation. Zero rows are retained. No PII/billing.
+model AppointmentDailySummary {
+ generation String
+ appointmentDate DateTime @db.Date
+ type AppointmentType
+ status AppointmentStatus
+ schemaVersion Int @default(2)
+ appointmentCount BigInt @default(0)
+ generationRecord ReadProjectionGeneration @relation(fields:[generation,schemaVersion],references:[id,schemaVersion],onDelete:Restrict,onUpdate:Restrict)
+ @@id([generation,appointmentDate,type,status])
+}
+
+// Operator-owned activity serving mode singleton (SQL CHECK id=1 and mode).
+// The summary generation is read indirectly from ReadProjectionControl
+// ('appointments'); there is deliberately no second generation pointer.
+model ClinicActivityControl {
+ id Int @id @default(1)
+ servingMode String @default("source")
+ updatedAt DateTime @default(now())
 }
 
 // Durable trial rebuild fence/checkpoint. Only an operator may mutate this table.

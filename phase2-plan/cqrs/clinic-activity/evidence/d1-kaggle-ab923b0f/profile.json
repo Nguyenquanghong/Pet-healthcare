@@ -1,0 +1,1194 @@
+{
+  "kind": "D1_FUNCTIONAL_TRIAL_NOT_PERFORMANCE_ENVIRONMENT",
+  "run": "ab923b0f-f7c8-49d9-8f0b-47b2e068aef2",
+  "sourceArchiveSha256": "770fd6b8a135b66084ffb91d215abc914e0c02c1af55e0e3e073aa324f28e5d4",
+  "verifiedSourceTreeSha256": "10aa90d793f0c02cb7623b0b780008eefb11fdde9779259eaa62bed55e13ef24",
+  "node": "v24.16.0",
+  "npm": "11.13.0",
+  "postgresServerVersion": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+  "prismaVersion": "6.19.3",
+  "processComposition": "one PostgreSQL cluster; Node functional process hosts real Core/Clinic; Nginx per source/cached mode",
+  "poolLimits": {
+    "operatorPerClient": 2,
+    "coreApi": 2,
+    "clinicApi": 2,
+    "parityReader": 1
+  },
+  "runtimeBackgroundWorkers": "NOT_STARTED",
+  "listMode": "authoritative",
+  "resourceEnforcement": "UNVERIFIED",
+  "d0": "PARTIAL_ENVIRONMENT",
+  "performance": "NOT_RUN",
+  "linuxBuildFiles": [
+    {
+      "path": "backend/dist/openapi.json",
+      "bytes": 312217,
+      "sha256": "c2ae394676025cf949512983fb6cf3e24ed4a3fad8c94e8990bebc11243d4338"
+    },
+    {
+      "path": "backend/dist/prisma/seed.js",
+      "bytes": 3577,
+      "sha256": "4b0c5b0002f88dd5f594e197a7b38d441510188f7890d77c2296cc7e02b79d6e"
+    },
+    {
+      "path": "backend/dist/src/app.js",
+      "bytes": 8802,
+      "sha256": "749010c55303a98902948812b81577b433f640cad03d637f56d0505696e48ecf"
+    },
+    {
+      "path": "backend/dist/src/application/ports/appointments.js",
+      "bytes": 303,
+      "sha256": "97dc130db38fb78befcd34a314f0c04efb8beb7e0b20a705c047e6ed153a2e3a"
+    },
+    {
+      "path": "backend/dist/src/application/ports/auth.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/ports/bookingLifecycle.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/ports/bootstrap.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/ports/hotelBookings.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/ports/invoices.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/ports/lists.js",
+      "bytes": 164,
+      "sha256": "7dd92408b7a58c4fbbbe636d6d2af49e118a1205577ea248641671936fa588e1"
+    },
+    {
+      "path": "backend/dist/src/application/ports/medicalRecords.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/ports/notifications.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/ports/ownerActivation.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/ports/owners.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/ports/payments.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/ports/pets.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/ports/publicRescue.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "backend/dist/src/application/services/appointments.js",
+      "bytes": 6318,
+      "sha256": "0b13b5f48d2cbd77545eaa8cc15f03a5e3399e67dcaf1631473f1e4ab9acc3de"
+    },
+    {
+      "path": "backend/dist/src/application/services/auth.js",
+      "bytes": 6358,
+      "sha256": "654d8ab6ca1af6a43664303c4fd71123521c553b55f1656e3b3c96f692346975"
+    },
+    {
+      "path": "backend/dist/src/application/services/bookingLifecycle.js",
+      "bytes": 8185,
+      "sha256": "0a94d48f1ca6313ea17b8f64f71b072accd2e5f4dee22984d37afe4697e2d00e"
+    },
+    {
+      "path": "backend/dist/src/application/services/bootstrap.js",
+      "bytes": 611,
+      "sha256": "9c6f28d49602f903db9cdbb57e18f6b36454087eb4048ba7dea38cd8449ba0bf"
+    },
+    {
+      "path": "backend/dist/src/application/services/hotelBookings.js",
+      "bytes": 8178,
+      "sha256": "709be865f294ade86748446e3918b9b1050eb08e5e4a821ba460b6dd9466b5c7"
+    },
+    {
+      "path": "backend/dist/src/application/services/invoices.js",
+      "bytes": 9794,
+      "sha256": "b5af1a65fb84029c26e9adf080dd59efcaad1c55cef0b3317ee1cdcd34b4befd"
+    },
+    {
+      "path": "backend/dist/src/application/services/lists.js",
+      "bytes": 4200,
+      "sha256": "28229afd41860ae4eab1afee95c56dd20f94f4f90de9ae9ed39a61af353cb243"
+    },
+    {
+      "path": "backend/dist/src/application/services/medicalRecords.js",
+      "bytes": 6614,
+      "sha256": "0f863aa1479919651e57d644fcfd1d457d2a5e4f6c5a02fa222d62796e53376c"
+    },
+    {
+      "path": "backend/dist/src/application/services/notifications.js",
+      "bytes": 1966,
+      "sha256": "081b57a3b674beaaecb48e149db1a47f05b5f1c1ba6258bc847178f063545648"
+    },
+    {
+      "path": "backend/dist/src/application/services/ownerActivation.js",
+      "bytes": 4410,
+      "sha256": "d51608642d3914b8f9e2d3edaf039e30ce6af637f79fc7f6c67cf9765edcbaad"
+    },
+    {
+      "path": "backend/dist/src/application/services/owners.js",
+      "bytes": 1906,
+      "sha256": "060fdb9de164c6dc6a21c628d50c9c7646586096ae5566030fb0a4e9d09fea35"
+    },
+    {
+      "path": "backend/dist/src/application/services/payments.js",
+      "bytes": 2505,
+      "sha256": "fb80e5408a2652e016b8e6cffba225880c046d0033cb92319f390dcdaeacfc7b"
+    },
+    {
+      "path": "backend/dist/src/application/services/pets.js",
+      "bytes": 3850,
+      "sha256": "bf47dded2373c5154802e4e59dd45726ac3214a23b7fb5a5b7c8ca70201bc7f2"
+    },
+    {
+      "path": "backend/dist/src/application/services/publicRescue.js",
+      "bytes": 1920,
+      "sha256": "7cd3bd10134437d14d8839db699043ebf1308aee6a4e5b4d28e29a437d7bccba"
+    },
+    {
+      "path": "backend/dist/src/domain/auth.js",
+      "bytes": 60,
+      "sha256": "35131213cc9f520de6ac7deee5dad23931aaee9bb5918dd707adf38ce49e4df8"
+    },
+    {
+      "path": "backend/dist/src/domain/error.js",
+      "bytes": 152,
+      "sha256": "b99369c6f6cada0523c91a8ba25c696bd3bac42c587f5dc43bd234beb2f299cb"
+    },
+    {
+      "path": "backend/dist/src/domain/pricing.json",
+      "bytes": 526,
+      "sha256": "17afa3a0296bfc46b6328010d06de811682ef90b0fa8a613c22d348f6bcf24ae"
+    },
+    {
+      "path": "backend/dist/src/domain/validation.js",
+      "bytes": 2982,
+      "sha256": "d5e5f872ead9be0696ff1677fe5febb39c2c674673718400565448979cae2302"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/client.d.ts",
+      "bytes": 23,
+      "sha256": "d5eb5865d4cbaa9985cc3cfb920b230cdcf3363f1e70903a08dc4baab80b0ce1"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/client.js",
+      "bytes": 166,
+      "sha256": "7fb2958626ff9bd585ec82af0935a4f71e852a183a0345145b828e2a9c1fd44a"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/default.d.ts",
+      "bytes": 23,
+      "sha256": "d5eb5865d4cbaa9985cc3cfb920b230cdcf3363f1e70903a08dc4baab80b0ce1"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/default.js",
+      "bytes": 182,
+      "sha256": "773f2836a698a5fe850cf320d1f849ca04e620e9b47f05816683260cba2b8b1c"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/edge.d.ts",
+      "bytes": 25,
+      "sha256": "7378dd41401ba1acff435b9c317a5b919a3d38479ed3dbd4a25c8b4fd623a224"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/edge.js",
+      "bytes": 13025,
+      "sha256": "dfc449f3e02f48a6b745645c9e7117d21f1bdcdf6bbe876b2f30a600dd3c76db"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/index-browser.js",
+      "bytes": 7309,
+      "sha256": "a62e16bf877af69af333243ffa37fabad48fd8ed3d0bafadd8e1db9771d70015"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/index.d.ts",
+      "bytes": 192501,
+      "sha256": "992e48377042460d373de6d714161db30616bfad48c83e4a6cd1d4cb6f795cba"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/index.js",
+      "bytes": 13740,
+      "sha256": "bdf19ee84ff374a8943131f22412d7ac6032abae18f21ea641479fea6e94233b"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/libquery_engine-debian-openssl-3.0.x.so.node",
+      "bytes": 17547808,
+      "sha256": "a2924eab1c78a0a7bb67edac5738939fa10589ef073af5542f53812a22e4a7d8"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/package.json",
+      "bytes": 5309,
+      "sha256": "444f459ef9c044be7549feda92d99c889a9f13bc233b407edfdea7e8bc1f2c84"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/query_engine_bg.js",
+      "bytes": 16927,
+      "sha256": "2b50b4328595b0fb99a73cfed34cf11fa8e56511dcc4fb808af4516952448514"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/query_engine_bg.wasm",
+      "bytes": 2297601,
+      "sha256": "b199ed8bf8f3610c20a3f7398b3cbb875f99b7d6565f4887fc0af2b47dceb30f"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/runtime/edge-esm.js",
+      "bytes": 170223,
+      "sha256": "756ff8523f3027629cdc04c6dd5ee4371098a452f96014d18860530ceb0164d9"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/runtime/edge.js",
+      "bytes": 170771,
+      "sha256": "88dd7afeb92f0b3f60b666c26eafafb8899f262ff1d009c9a621f2f9d0617ef7"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/runtime/index-browser.d.ts",
+      "bytes": 11915,
+      "sha256": "556ca4c51df0dd6bdc52f3423a65108b044841195fed9b36bc4384849291e850"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/runtime/index-browser.js",
+      "bytes": 35462,
+      "sha256": "1ebb5effbf49ae68f1ce58a13d6263212ab3f8f2f262a4d8a1d4322ca5c56a0a"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/runtime/library.d.ts",
+      "bytes": 129753,
+      "sha256": "b845876de475c230a1e012150db8d2c2a62bd6835a93e8cd23ebb10f7de16266"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/runtime/library.js",
+      "bytes": 202629,
+      "sha256": "5a72b6f69474641f48a0f5ffee45802dc939c6333467371ebbd9102353eb7aae"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/runtime/react-native.js",
+      "bytes": 182663,
+      "sha256": "18e18bd258fa7713148768cca16ecf8fa18e2825c42ff25e788a711ed21ef1a8"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/runtime/wasm-compiler-edge.js",
+      "bytes": 206986,
+      "sha256": "64a7364ec074c63b25b647cfbe2bdd484f79effa4ee6fb2e8f1da7e6814f1a01"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/runtime/wasm-engine-edge.js",
+      "bytes": 147400,
+      "sha256": "ce00af0f9e8063937553c453f372c27eaf49c794cbd9f7f835b017855eb16fdb"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/schema.prisma",
+      "bytes": 1017,
+      "sha256": "3d66ecb1adef5f2635ffab8d2084281add318b1d2529fd42776c2b53edb7452f"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/wasm-edge-light-loader.mjs",
+      "bytes": 184,
+      "sha256": "48311a316daab3b1c21dd227b7277d03436a7d10d78b19b3b625cd25ffa1674b"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/wasm-worker-loader.mjs",
+      "bytes": 177,
+      "sha256": "48b4f73d61fe341ea5b59f09059f730dfb600249985a64f0456508dd4c81b01b"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/wasm.d.ts",
+      "bytes": 25,
+      "sha256": "7378dd41401ba1acff435b9c317a5b919a3d38479ed3dbd4a25c8b4fd623a224"
+    },
+    {
+      "path": "backend/dist/src/generated/phase2-core/wasm.js",
+      "bytes": 8524,
+      "sha256": "c8fda8e292990cb896c7eb83f625779f0baef5dd68d914c406c5d14bd5b969d5"
+    },
+    {
+      "path": "backend/dist/src/index.js",
+      "bytes": 1058,
+      "sha256": "9e2827a4e2fa012c1371378dfdd890506a8375889c3c774c6b99c5efc21e2117"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/config/bankTransfer.js",
+      "bytes": 802,
+      "sha256": "ed8b474c2e882e630784c1c342a6e70781d449277ce6b30922d7df71bbd4b05d"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/payments/vietqr.js",
+      "bytes": 1258,
+      "sha256": "3eef5cf3168f822c72292a5abe6f1dd7a6f6488f7f4fc7df0a86b0490f68371b"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/appointmentRepository.js",
+      "bytes": 2174,
+      "sha256": "0eab44301e9261a01951cafee92846ec89f35b0485406249367495d7caf1187b"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/appointmentSlotConflict.js",
+      "bytes": 956,
+      "sha256": "3410fe7f08ddb76d12adb68c56631feb5e7a0099f959c23469f08abe72b6b1a1"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/bookingLifecycleRepository.js",
+      "bytes": 4763,
+      "sha256": "b5346d2285ec6b7ac9e3cc5963566a275d6023b14c07ffffef52d0b70749d6ff"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/bootstrapRepository.js",
+      "bytes": 6789,
+      "sha256": "6ac217722377412bddbcf6394f1135353d20127f580ce915720b62cc1c1bde66"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/healthRepository.js",
+      "bytes": 123,
+      "sha256": "b6b847c062e6e027d9850eb1627a59d69e7634673d21a04c9b8503c1a0bd4db0"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/hotelRepository.js",
+      "bytes": 3163,
+      "sha256": "4de4242f5850b352d4344d80b4361a22b5f9409a8ed04ed4821775d2523938ac"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/invoiceRepository.js",
+      "bytes": 10693,
+      "sha256": "86abce16dbc591574d884ab4d48f68174d1247ee97cec6d31b159c481ed838c3"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/listsRepository.js",
+      "bytes": 12608,
+      "sha256": "5d391cac96b1f9b6181c4b649e766383d1e0e43a029cfc6fc60a020554daed52"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/medicalRepository.js",
+      "bytes": 2981,
+      "sha256": "8c4608a06b62bfbd750f851b3dcb0aaf1eb6832d4fdede31bf9f1562146e0b99"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/notificationOutbox.js",
+      "bytes": 1734,
+      "sha256": "276f46f3ab5de88b7a69f9fde31315ed55d183913063be67f5868f214fdf669f"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/notificationRepository.js",
+      "bytes": 1061,
+      "sha256": "969eb4db9020097cbfbca19a9b7917771cff1933763e9fbe067fd7fb2cdce6a1"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/ownerActivationRepository.js",
+      "bytes": 2859,
+      "sha256": "b1d6b8a7ef8bfd9dad330a384e61c85933439997b991c5ff7b3a5a4b2785363c"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/ownerRepository.js",
+      "bytes": 1249,
+      "sha256": "aded775b4e7708126f174066671d78b0f7c6ab3171b1a444cf860959d9ea6d3d"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/paymentRepository.js",
+      "bytes": 5359,
+      "sha256": "2a79552cf5a6da3560744ae6830ee6bcf4edd596ac6a8e4cb496abec67616268"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/petRepository.js",
+      "bytes": 1221,
+      "sha256": "1935594d96edb39911011caab1511d5d94cdd1d7ce9dee1feab892853316b098"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/publicRescueRepository.js",
+      "bytes": 1136,
+      "sha256": "820062cef2a06237adcf16d7d9b48170968b2a0f68abc2bcbecd27ea33348dd4"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js",
+      "bytes": 1354,
+      "sha256": "664dc73c5ca02af1a7560e6464b3fd247db3c1760007143c4abab55cd33ec713"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/persistence/userRepository.js",
+      "bytes": 1221,
+      "sha256": "e9338bd8e75ee213528032cffaac7e3444acbb660a190922d85faf7885c2a21f"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/security/activationToken.js",
+      "bytes": 295,
+      "sha256": "7cc2ca64127f558e208b2c1299698357a039c90a520ae7c9e1c65d7f200a9d32"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/security/authAdapters.js",
+      "bytes": 675,
+      "sha256": "c372701ea2faef6fd1913852848b423890c0c30e307a6bc8b4a84dfacec549f7"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/security/qrToken.js",
+      "bytes": 128,
+      "sha256": "39d6c77c03ac2ab02634d0d7d3e88b62132a8f4f14b862e2258110b6ebbea7af"
+    },
+    {
+      "path": "backend/dist/src/infrastructure/security/vnpay.js",
+      "bytes": 6337,
+      "sha256": "27b069ad3d047691ebeb7cec72446614366a27f6c9fd197750084711f840ebd0"
+    },
+    {
+      "path": "backend/dist/src/lib/listSerialize.js",
+      "bytes": 1317,
+      "sha256": "31df11dab83252da107f7b1562774cf724ed43db54bb65d827e6e8257973a2aa"
+    },
+    {
+      "path": "backend/dist/src/lib/password.js",
+      "bytes": 1764,
+      "sha256": "08a7c94768f771cad8a951400f9618a61014be6d9af1163126f2d88da38b0740"
+    },
+    {
+      "path": "backend/dist/src/lib/prisma.js",
+      "bytes": 217,
+      "sha256": "e57819195e19fb504115f81c810bc9df31c6d93d77c4943843670dada218f8a9"
+    },
+    {
+      "path": "backend/dist/src/lib/serialize.js",
+      "bytes": 4041,
+      "sha256": "8d0ab5da3402f407e8f9d7c6c560409d7ca3b74bb3425b9895d85335b86f007a"
+    },
+    {
+      "path": "backend/dist/src/lib/shutdown.js",
+      "bytes": 398,
+      "sha256": "f41f1f05926ca96d7256ed87f4021b93a06ba84acb56b3ba63f823456780db1c"
+    },
+    {
+      "path": "backend/dist/src/lib/token.js",
+      "bytes": 3147,
+      "sha256": "dbb9cf1d7cba2c62449d48959dc9bbbe21d831b5a07165b4d3f12700c81393e8"
+    },
+    {
+      "path": "backend/dist/src/middleware/auth.js",
+      "bytes": 763,
+      "sha256": "4fcf5cecc1f59f9340fe49fe8a71b4d59046f9216a6c011c0550b12085642498"
+    },
+    {
+      "path": "backend/dist/src/phase2/appointmentBilling.js",
+      "bytes": 16337,
+      "sha256": "1ea1f05844db9dab87c7cfa08edda4b65ea7065e5dd87f4be79ccb90145dd312"
+    },
+    {
+      "path": "backend/dist/src/phase2/billing.js",
+      "bytes": 3432,
+      "sha256": "2bfa71aabc591f14bb7d0adb069af0c89e86e55c044ba9e4fe736f25eec3c884"
+    },
+    {
+      "path": "backend/dist/src/phase2/billingApi.js",
+      "bytes": 4059,
+      "sha256": "522c673d577c951bddb3ea956a05dc739befeb868f1296defb2defb5140810ce"
+    },
+    {
+      "path": "backend/dist/src/phase2/billingWorker.js",
+      "bytes": 1828,
+      "sha256": "68e88f1590914c5674612abe017d5c598b6861b0913273952c41d9b877aa635c"
+    },
+    {
+      "path": "backend/dist/src/phase2/coreApp.js",
+      "bytes": 11701,
+      "sha256": "42129e6c5236c0ad5afad2eae04a50ec24d49b85ee882397690161538caf95d8"
+    },
+    {
+      "path": "backend/dist/src/phase2/coreDomains.js",
+      "bytes": 8648,
+      "sha256": "9b9e634639ed7f16ac5ff80786d286c21053a6c67b169d456bb418025c9a7ee3"
+    },
+    {
+      "path": "backend/dist/src/phase2/currentAccount.js",
+      "bytes": 1845,
+      "sha256": "9b1ecd8f3deb8cccd5c56dfab5aa825650049cb19da2b687486eab641358511c"
+    },
+    {
+      "path": "backend/dist/src/phase2/dashboardApi.js",
+      "bytes": 3020,
+      "sha256": "839d2c3c8ef90274ef82344e64fdcebc79551ed6afe29e44359145148780ebb1"
+    },
+    {
+      "path": "backend/dist/src/phase2/directoryApi.js",
+      "bytes": 6694,
+      "sha256": "e8da5408a1a18b314012102ed34a1d2f3cc23536f6b8fe6fa968a99405d8c14c"
+    },
+    {
+      "path": "backend/dist/src/phase2/notificationWorker.js",
+      "bytes": 1209,
+      "sha256": "315d24e0da57ac8bd979fbec242454d7e09cf2a919dbe55c720e9efb7a642bdf"
+    },
+    {
+      "path": "backend/dist/src/phase2/relay.js",
+      "bytes": 3111,
+      "sha256": "886a109f86665a4098e8ba3a6e0adce2c0506fe7bf5323f23644fdae3cadd019"
+    },
+    {
+      "path": "backend/dist/src/phase2/runtime.js",
+      "bytes": 1804,
+      "sha256": "9323559483796da36356357316f90803e37b8f37437827cc77cea90ebd81965e"
+    },
+    {
+      "path": "backend/dist/src/phase2/splitBootstrap.js",
+      "bytes": 4829,
+      "sha256": "548ece448ed3f2a4b4e34ee7d71c9ccee84e1af309af5921caed4799b1806b54"
+    },
+    {
+      "path": "backend/dist/src/phase2/worker.js",
+      "bytes": 1114,
+      "sha256": "27b9b0f78954dc4e6d7bfd539ff6c0c66bf31e1110f04e48ccfc115672ce5572"
+    },
+    {
+      "path": "backend/dist/src/routes/appointments.js",
+      "bytes": 2646,
+      "sha256": "dd12e6ef697fbf8c4d676a7f6b4b9d012360e3b52157ea0af9fb555aa7a0eef9"
+    },
+    {
+      "path": "backend/dist/src/routes/auth.js",
+      "bytes": 3187,
+      "sha256": "cf72d6cfb83e38279cfa455381ba9f061ddc0cf97d0f63d738b4d0cc1c6bf694"
+    },
+    {
+      "path": "backend/dist/src/routes/bootstrap.js",
+      "bytes": 1060,
+      "sha256": "06c199d421f93414a43ae883a82c8da0b468f71b7a2f798c509fd678d1d71cbf"
+    },
+    {
+      "path": "backend/dist/src/routes/hotelBookings.js",
+      "bytes": 2655,
+      "sha256": "126c65a962064006d3fea54c2622b9ad14118c5d6d35cc1bbc23577864948c25"
+    },
+    {
+      "path": "backend/dist/src/routes/invoices.js",
+      "bytes": 3220,
+      "sha256": "67a93922e65d31e84f92d9164f7569e25b0ec7daee261fa637facdb9e8da52d1"
+    },
+    {
+      "path": "backend/dist/src/routes/lists.js",
+      "bytes": 2351,
+      "sha256": "4f49eae9f364c031f6363166ec93458ad3710f976a806a5913f254184d08825c"
+    },
+    {
+      "path": "backend/dist/src/routes/medicalRecords.js",
+      "bytes": 1786,
+      "sha256": "600fc02f1031dd01253e284af4a3431089fb9f9192b0eaa46b51ba025bbf455a"
+    },
+    {
+      "path": "backend/dist/src/routes/notifications.js",
+      "bytes": 1350,
+      "sha256": "f8c54bdd799f72c76b73b65ea4a6b00a480b6d781481aba949feb81b0fdb38db"
+    },
+    {
+      "path": "backend/dist/src/routes/owners.js",
+      "bytes": 1111,
+      "sha256": "c51d2140cc7709fb097063bb0fd26dc443ecc77f6127fb2fdc35545c1bbec6b8"
+    },
+    {
+      "path": "backend/dist/src/routes/payments.js",
+      "bytes": 1465,
+      "sha256": "edb8a6c5e29d512ce729f10d870c01f734e6f7220354c6ff6ab2547c42b5c66a"
+    },
+    {
+      "path": "backend/dist/src/routes/pets.js",
+      "bytes": 1244,
+      "sha256": "c11ad25ecfce4972a375e3e62331489b27c2f42dbafba71efee32245ec4d928f"
+    },
+    {
+      "path": "backend/dist/src/routes/public.js",
+      "bytes": 1066,
+      "sha256": "e51ccd805f2ef893e684e9d581cca60b6e8f255fe149edd23fd7055886d5e88f"
+    },
+    {
+      "path": "services/clinic/dist/app.js",
+      "bytes": 16860,
+      "sha256": "d1f187f4602cb389dbdc8ae10ac7576e6ea19751bc096ac03eaa45b2564ad5da"
+    },
+    {
+      "path": "services/clinic/dist/application/ports/appointmentQueries.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "services/clinic/dist/application/ports/appointments.js",
+      "bytes": 303,
+      "sha256": "97dc130db38fb78befcd34a314f0c04efb8beb7e0b20a705c047e6ed153a2e3a"
+    },
+    {
+      "path": "services/clinic/dist/application/ports/bookingLifecycle.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "services/clinic/dist/application/ports/clinicActivityQueries.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "services/clinic/dist/application/ports/medicalRecords.js",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "services/clinic/dist/application/queries/appointments.js",
+      "bytes": 565,
+      "sha256": "e57ed1394aaf58b453057830b6ab1ea3e7be045d756e5bd295e71220c5b9d0a2"
+    },
+    {
+      "path": "services/clinic/dist/application/queries/clinicActivity.js",
+      "bytes": 4696,
+      "sha256": "9d0b2422e0607bdb78853de47f79fdbcd3f1c60f28c94b16e2e61b78d1ddbe11"
+    },
+    {
+      "path": "services/clinic/dist/application/services/appointments.js",
+      "bytes": 6318,
+      "sha256": "0b13b5f48d2cbd77545eaa8cc15f03a5e3399e67dcaf1631473f1e4ab9acc3de"
+    },
+    {
+      "path": "services/clinic/dist/application/services/bookingLifecycle.js",
+      "bytes": 7342,
+      "sha256": "c9654a0675656338fbf39caba06408db9de4d6bd7a5989ace668a62503f4af4c"
+    },
+    {
+      "path": "services/clinic/dist/application/services/medicalRecords.js",
+      "bytes": 7572,
+      "sha256": "ba993418611b539539651d4138dccbe540134a86dd537ed7da7a19158247a130"
+    },
+    {
+      "path": "services/clinic/dist/appointmentProjector.js",
+      "bytes": 5323,
+      "sha256": "4a3e07dc6ee91115bcaeac0797b5ebc539c94c9d0292c5bd14d89d00e6487a56"
+    },
+    {
+      "path": "services/clinic/dist/auth.js",
+      "bytes": 206,
+      "sha256": "e68c6db9fa963bef39b851053b5d3ff9cde2cbb46ea94fdbfb9651e338a5f318"
+    },
+    {
+      "path": "services/clinic/dist/backfill.js",
+      "bytes": 1502,
+      "sha256": "cbf1830661e1a2db3fdd9df1d220383d7f1e17e89bd42cba49b7b0140883fb3f"
+    },
+    {
+      "path": "services/clinic/dist/billing.js",
+      "bytes": 3534,
+      "sha256": "4de86a5804dd6c18e52ed3cf84e305e5cdb86d57f8f4e2d7cb5f48b075b64c60"
+    },
+    {
+      "path": "services/clinic/dist/billingApi.js",
+      "bytes": 3129,
+      "sha256": "e9a06413f689d174ae1bff13cedb5f73bcdb5dd3b2ab7b9a1f1f5b83ef070412"
+    },
+    {
+      "path": "services/clinic/dist/bootstrap.js",
+      "bytes": 2609,
+      "sha256": "964cece663f533dfcddb9ca8ce73aa3e5e004eec2aa50d866fdbd3b725069d47"
+    },
+    {
+      "path": "services/clinic/dist/composition.js",
+      "bytes": 258,
+      "sha256": "f28710f3397e48fcd136e14a9e58b170e28df79fed3a9b4b53e41fe1b62780d5"
+    },
+    {
+      "path": "services/clinic/dist/dedup.js",
+      "bytes": 2003,
+      "sha256": "fb4197b905879926bf9cf3e797835d9727353f9a92a7aeda861a60757f43ef4d"
+    },
+    {
+      "path": "services/clinic/dist/directory.js",
+      "bytes": 5678,
+      "sha256": "13d0264d911e5a2017e7aac6436eea9d9b5ccbbaa1e3b332a227f0bc8be1c446"
+    },
+    {
+      "path": "services/clinic/dist/directorySync.js",
+      "bytes": 1778,
+      "sha256": "70fa0a1428cbe054db66e2bdc201e859991b34c859f9806b25bf2b7a0671868c"
+    },
+    {
+      "path": "services/clinic/dist/domain/auth.js",
+      "bytes": 60,
+      "sha256": "35131213cc9f520de6ac7deee5dad23931aaee9bb5918dd707adf38ce49e4df8"
+    },
+    {
+      "path": "services/clinic/dist/domain/error.js",
+      "bytes": 152,
+      "sha256": "b99369c6f6cada0523c91a8ba25c696bd3bac42c587f5dc43bd234beb2f299cb"
+    },
+    {
+      "path": "services/clinic/dist/domain/validation.js",
+      "bytes": 2982,
+      "sha256": "d5e5f872ead9be0696ff1677fe5febb39c2c674673718400565448979cae2302"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/client.d.ts",
+      "bytes": 23,
+      "sha256": "d5eb5865d4cbaa9985cc3cfb920b230cdcf3363f1e70903a08dc4baab80b0ce1"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/client.js",
+      "bytes": 166,
+      "sha256": "7fb2958626ff9bd585ec82af0935a4f71e852a183a0345145b828e2a9c1fd44a"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/default.d.ts",
+      "bytes": 23,
+      "sha256": "d5eb5865d4cbaa9985cc3cfb920b230cdcf3363f1e70903a08dc4baab80b0ce1"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/default.js",
+      "bytes": 182,
+      "sha256": "773f2836a698a5fe850cf320d1f849ca04e620e9b47f05816683260cba2b8b1c"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/edge.d.ts",
+      "bytes": 25,
+      "sha256": "7378dd41401ba1acff435b9c317a5b919a3d38479ed3dbd4a25c8b4fd623a224"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/edge.js",
+      "bytes": 74168,
+      "sha256": "92b658215d2ef3eeeeef93fcb0101ad4ea2c954cbb0444a48edd20de1ea13a36"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/index-browser.js",
+      "bytes": 13148,
+      "sha256": "2c6a8383f77daced92d471326453a2d66ca2084ebf1a11195626e964c5b3314c"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/index.d.ts",
+      "bytes": 1137311,
+      "sha256": "ca599a611aaaf0c3404707eaeefb3fbd894b0bef1b68c6d0af73fceb35173dda"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/index.js",
+      "bytes": 74894,
+      "sha256": "1bf30308d30596b2ed870ce74ecb30ab92c2e5aab895614288b201ed618724ad"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/libquery_engine-debian-openssl-3.0.x.so.node",
+      "bytes": 17547808,
+      "sha256": "a2924eab1c78a0a7bb67edac5738939fa10589ef073af5542f53812a22e4a7d8"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/package.json",
+      "bytes": 5309,
+      "sha256": "cceb2e63a2f726c0ff72d3b52d778d5eddf51d505b0bc62b93bfdbc47ff9637f"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/query_engine_bg.js",
+      "bytes": 16927,
+      "sha256": "2b50b4328595b0fb99a73cfed34cf11fa8e56511dcc4fb808af4516952448514"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/query_engine_bg.wasm",
+      "bytes": 2297601,
+      "sha256": "b199ed8bf8f3610c20a3f7398b3cbb875f99b7d6565f4887fc0af2b47dceb30f"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/runtime/edge-esm.js",
+      "bytes": 170223,
+      "sha256": "756ff8523f3027629cdc04c6dd5ee4371098a452f96014d18860530ceb0164d9"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/runtime/edge.js",
+      "bytes": 170771,
+      "sha256": "88dd7afeb92f0b3f60b666c26eafafb8899f262ff1d009c9a621f2f9d0617ef7"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/runtime/index-browser.d.ts",
+      "bytes": 11915,
+      "sha256": "556ca4c51df0dd6bdc52f3423a65108b044841195fed9b36bc4384849291e850"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/runtime/index-browser.js",
+      "bytes": 35462,
+      "sha256": "1ebb5effbf49ae68f1ce58a13d6263212ab3f8f2f262a4d8a1d4322ca5c56a0a"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/runtime/library.d.ts",
+      "bytes": 129753,
+      "sha256": "b845876de475c230a1e012150db8d2c2a62bd6835a93e8cd23ebb10f7de16266"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/runtime/library.js",
+      "bytes": 202629,
+      "sha256": "5a72b6f69474641f48a0f5ffee45802dc939c6333467371ebbd9102353eb7aae"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/runtime/react-native.js",
+      "bytes": 182663,
+      "sha256": "18e18bd258fa7713148768cca16ecf8fa18e2825c42ff25e788a711ed21ef1a8"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/runtime/wasm-compiler-edge.js",
+      "bytes": 206986,
+      "sha256": "64a7364ec074c63b25b647cfbe2bdd484f79effa4ee6fb2e8f1da7e6814f1a01"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/runtime/wasm-engine-edge.js",
+      "bytes": 147400,
+      "sha256": "ce00af0f9e8063937553c453f372c27eaf49c794cbd9f7f835b017855eb16fdb"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/schema.prisma",
+      "bytes": 10380,
+      "sha256": "9f9e540b75bad62ffeaf2da8b7c7ce82fe5aec78402846ee75f84d616d323716"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/wasm-edge-light-loader.mjs",
+      "bytes": 184,
+      "sha256": "48311a316daab3b1c21dd227b7277d03436a7d10d78b19b3b625cd25ffa1674b"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/wasm-worker-loader.mjs",
+      "bytes": 177,
+      "sha256": "48b4f73d61fe341ea5b59f09059f730dfb600249985a64f0456508dd4c81b01b"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/wasm.d.ts",
+      "bytes": 25,
+      "sha256": "7378dd41401ba1acff435b9c317a5b919a3d38479ed3dbd4a25c8b4fd623a224"
+    },
+    {
+      "path": "services/clinic/dist/generated/client/wasm.js",
+      "bytes": 36869,
+      "sha256": "ac58b8e8ab1229f8108f00f7b95ae43dd2b6b674becadcb2d873e68df447349d"
+    },
+    {
+      "path": "services/clinic/dist/inbox.js",
+      "bytes": 3765,
+      "sha256": "0da411d660790ba51c2e4879389a7c9d26a76d25646da344209fec323a57c25c"
+    },
+    {
+      "path": "services/clinic/dist/index.js",
+      "bytes": 3104,
+      "sha256": "734c7325aaf57708385161192a69c08626e09471cd1250f3db0dc4a7d83f1db1"
+    },
+    {
+      "path": "services/clinic/dist/infrastructure/persistence/appointmentSlotConflict.js",
+      "bytes": 956,
+      "sha256": "3410fe7f08ddb76d12adb68c56631feb5e7a0099f959c23469f08abe72b6b1a1"
+    },
+    {
+      "path": "services/clinic/dist/infrastructure/persistence/repositories.js",
+      "bytes": 7614,
+      "sha256": "984dd3da66344b77622f4e233b448fbd9c77c91c62fe92f766926c8d01ff13c7"
+    },
+    {
+      "path": "services/clinic/dist/infrastructure/queries/appointmentAggregateCache.js",
+      "bytes": 5070,
+      "sha256": "1a3eb5a89f1478440abac1c639720317df7bf4457bf8c4c536958d7a712dce93"
+    },
+    {
+      "path": "services/clinic/dist/infrastructure/queries/authoritativeAppointments.js",
+      "bytes": 1301,
+      "sha256": "0c2222b3bbaa27db335c97a1bd6f24391d03537dbbe573b1a1252d4639344e5f"
+    },
+    {
+      "path": "services/clinic/dist/infrastructure/queries/authoritativeLists.js",
+      "bytes": 7515,
+      "sha256": "25db3b4e1288ac8ae0d40f4c2d64545e0892c24d9f7d05859faf4a0931bd3d4a"
+    },
+    {
+      "path": "services/clinic/dist/infrastructure/queries/boundedAppointmentAggregate.js",
+      "bytes": 2745,
+      "sha256": "cbf35c3541b338fce45c1c7855a411460c24df0acb621b8df60fa19e0ebf7fa3"
+    },
+    {
+      "path": "services/clinic/dist/infrastructure/queries/clinicActivity.js",
+      "bytes": 6098,
+      "sha256": "026f285155ccdbff59439a3ff0e9c01a11a23fc21e5d2094b759c1545ff512ab"
+    },
+    {
+      "path": "services/clinic/dist/infrastructure/queries/projectedAppointments.js",
+      "bytes": 13953,
+      "sha256": "6fd716bebfca53d896218f6d4b56d3913622958145bfcef4ebb4ab31880a3a29"
+    },
+    {
+      "path": "services/clinic/dist/infrastructure/queries/projectionAdmission.js",
+      "bytes": 2641,
+      "sha256": "27c4d7eb95c48fb072670b891c4059483f064fbc39d679d3bc5ad4d845dba833"
+    },
+    {
+      "path": "services/clinic/dist/infrastructure/queries/servingAppointments.js",
+      "bytes": 7272,
+      "sha256": "d40a934ab91a935018ec775ce5e11f12d61f60d62fca7204e25a4f3c08854257"
+    },
+    {
+      "path": "services/clinic/dist/infrastructure/queries/shadowAppointments.js",
+      "bytes": 5746,
+      "sha256": "abee0674879da9642865574bdf850514ed2c1490cbd0df1277c57ccb2a5f61c9"
+    },
+    {
+      "path": "services/clinic/dist/lib/serialize.js",
+      "bytes": 827,
+      "sha256": "99ae12804b4ab8afcb4e022d57e25a8098ed46a7cffc15268e73a3c9e3d99cb5"
+    },
+    {
+      "path": "services/clinic/dist/lists.js",
+      "bytes": 160,
+      "sha256": "2a290c9eb84eaad23b2368ef26e94e6640ad9b58b9f2e2962d44c6244d9c0067"
+    },
+    {
+      "path": "services/clinic/dist/notificationOutbox.js",
+      "bytes": 1008,
+      "sha256": "578c69b5a37e0c785dc7998a372b356fa042bc125e3cbfd3ba57a21ee8f90647"
+    },
+    {
+      "path": "services/clinic/dist/projectionSnapshot.js",
+      "bytes": 2923,
+      "sha256": "3cd0f12cea974c3f061042c3ab8d19ed4a000842c317752b85ad7bb183acd95c"
+    },
+    {
+      "path": "services/clinic/dist/readDiagnostics.js",
+      "bytes": 5369,
+      "sha256": "53a471269259ab78461c0b4480a0f8e89cfbd3f7de8b64935515c7044bd97d95"
+    },
+    {
+      "path": "services/clinic/dist/readFreshness.js",
+      "bytes": 6732,
+      "sha256": "78ef2380c2613e11109c67e111dc6d8fe1cd6e96ca896e3cea17328d690dd967"
+    },
+    {
+      "path": "services/clinic/dist/readRebuild.js",
+      "bytes": 10864,
+      "sha256": "3976b20d7d123fd83fa78389aa39a87e83df03339e29ae212f1ab104b00d676d"
+    },
+    {
+      "path": "services/clinic/dist/readRevision.js",
+      "bytes": 3602,
+      "sha256": "9a375d7bdb1599858962e48122757109fae02abf6052280042adcb06a054df4d"
+    },
+    {
+      "path": "services/clinic/dist/readToken.js",
+      "bytes": 3871,
+      "sha256": "b83de63c6353335eea389f50e862f7cf70672b8687d42d3f65350b3d4958a91f"
+    },
+    {
+      "path": "services/clinic/dist/readWorker.js",
+      "bytes": 2668,
+      "sha256": "720daf866e49bfcf26ffec07cb316b68425f54e25c33e6a6cb7537575a2ed947"
+    },
+    {
+      "path": "services/clinic/dist/relay.js",
+      "bytes": 2720,
+      "sha256": "cdde6d89f33799052003f232b88cfa6a098baa5d4d0f17f540a5b1a1b821ffb2"
+    },
+    {
+      "path": "services/clinic/dist/runtime.js",
+      "bytes": 1540,
+      "sha256": "9bc628374e20a91a7c4905a42c895efbb100ced59dba1fed568aeb2e20cec21f"
+    },
+    {
+      "path": "services/clinic/dist/runtimeBilling.js",
+      "bytes": 5095,
+      "sha256": "dc7d0d8b6da11acc00592a25bae28a1073e3e058ca1bf3bc8476d6475faf9a6d"
+    },
+    {
+      "path": "services/clinic/dist/worker.js",
+      "bytes": 2452,
+      "sha256": "073cdfccddc1ec9fbef42b0cf8cfad7e33541bc8359b71d0b05e7b1728715959"
+    },
+    {
+      "path": "packages/runtime/dist/admission.d.ts",
+      "bytes": 725,
+      "sha256": "9f63a6ced99c5c24a4c168170e873808aa9b37ec148adbf27a9bfb6f766783bf"
+    },
+    {
+      "path": "packages/runtime/dist/admission.js",
+      "bytes": 3021,
+      "sha256": "e12f132640647c55428cb7029b93bbec64926af19d0db2a1b11710902e8f9776"
+    },
+    {
+      "path": "packages/runtime/dist/config.d.ts",
+      "bytes": 369,
+      "sha256": "8aab1f8e82414b10da885ab6ac5cb2059f8e69285b4be4fe88e9438586d5f4c0"
+    },
+    {
+      "path": "packages/runtime/dist/config.js",
+      "bytes": 1589,
+      "sha256": "df7fd418dfe3fc585aa971d0fae10f2d8fd44b7b06b3236dfa2805da0f6e033b"
+    },
+    {
+      "path": "packages/runtime/dist/http.d.ts",
+      "bytes": 1633,
+      "sha256": "f83103a1fc4081107d168e5b1a007c1a47a3b70bb159e77ae7016afb60ce39a9"
+    },
+    {
+      "path": "packages/runtime/dist/http.js",
+      "bytes": 16951,
+      "sha256": "7fceea3e3b83381cf33b2deea452bb716726ff25ad432985763b6af0dee48b46"
+    },
+    {
+      "path": "packages/runtime/dist/index.d.ts",
+      "bytes": 175,
+      "sha256": "2406c33c5922c8d0d79e0a9d119d7c2214db627f507e9495b33611c54d95e395"
+    },
+    {
+      "path": "packages/runtime/dist/index.js",
+      "bytes": 175,
+      "sha256": "2406c33c5922c8d0d79e0a9d119d7c2214db627f507e9495b33611c54d95e395"
+    },
+    {
+      "path": "packages/runtime/dist/jwt.d.ts",
+      "bytes": 443,
+      "sha256": "528281274b46bffffb4b729479bc02a4d11aa4c908552fc37837f31a891771a7"
+    },
+    {
+      "path": "packages/runtime/dist/jwt.js",
+      "bytes": 2052,
+      "sha256": "7af3b820f8745e8429ad094c654379d9ce26fe69d814ecc2d1755094d72dc459"
+    },
+    {
+      "path": "packages/runtime/dist/limiter.d.ts",
+      "bytes": 899,
+      "sha256": "9a0d83f5d49d9f09bc32a3a9a7d87ff24efed9ef0cec9a4fbc71076340e3ffcd"
+    },
+    {
+      "path": "packages/runtime/dist/limiter.js",
+      "bytes": 5229,
+      "sha256": "8c9c8401e24221161dea9670702e1c38e85610f7772da118aa59243be66940bc"
+    },
+    {
+      "path": "packages/runtime/dist/shutdown.d.ts",
+      "bytes": 91,
+      "sha256": "cf89cbb73d204d7a180ee0a01a33f92c760167b7387808f1092bfe766a45216d"
+    },
+    {
+      "path": "packages/runtime/dist/shutdown.js",
+      "bytes": 1336,
+      "sha256": "a781e149b6933c6f9cd6270a687ac8313200f6beb470320e4a709cfa5a33a1c8"
+    },
+    {
+      "path": "packages/contracts/dist/index.d.ts",
+      "bytes": 1738,
+      "sha256": "337b364a2df9fb15d0f3daf946a9e31894f19cee0639c5834bb22eb2d53c8e62"
+    },
+    {
+      "path": "packages/contracts/dist/index.js",
+      "bytes": 4713,
+      "sha256": "a5cfea893445b3e3a5cff5a4b141e07d9aa44377a61c216241105c4adf2a0f9d"
+    },
+    {
+      "path": "packages/messaging/dist/index.d.ts",
+      "bytes": 1982,
+      "sha256": "bfd02a2d9004b36cf6b2446e5634ec31af7dc14d669665176cd13d9233b9a747"
+    },
+    {
+      "path": "packages/messaging/dist/index.js",
+      "bytes": 10416,
+      "sha256": "35716b07d2b28a98283012e0a0c2265653c6f2bce7a5095c0d87eb63c2660b90"
+    },
+    {
+      "path": "node_modules/.prisma/client/client.d.ts",
+      "bytes": 23,
+      "sha256": "d5eb5865d4cbaa9985cc3cfb920b230cdcf3363f1e70903a08dc4baab80b0ce1"
+    },
+    {
+      "path": "node_modules/.prisma/client/client.js",
+      "bytes": 166,
+      "sha256": "7fb2958626ff9bd585ec82af0935a4f71e852a183a0345145b828e2a9c1fd44a"
+    },
+    {
+      "path": "node_modules/.prisma/client/default.d.ts",
+      "bytes": 23,
+      "sha256": "d5eb5865d4cbaa9985cc3cfb920b230cdcf3363f1e70903a08dc4baab80b0ce1"
+    },
+    {
+      "path": "node_modules/.prisma/client/default.js",
+      "bytes": 182,
+      "sha256": "773f2836a698a5fe850cf320d1f849ca04e620e9b47f05816683260cba2b8b1c"
+    },
+    {
+      "path": "node_modules/.prisma/client/edge.d.ts",
+      "bytes": 25,
+      "sha256": "7378dd41401ba1acff435b9c317a5b919a3d38479ed3dbd4a25c8b4fd623a224"
+    },
+    {
+      "path": "node_modules/.prisma/client/edge.js",
+      "bytes": 120947,
+      "sha256": "3011f9d1b0fddb1d157399e0d6e0f2d5a7c022b9050be9b8afa85abb4ac36422"
+    },
+    {
+      "path": "node_modules/.prisma/client/index-browser.js",
+      "bytes": 15918,
+      "sha256": "ecce8fc4830723f80f7e888434de37c98c2f1d5fa96775342ea983a2172d301c"
+    },
+    {
+      "path": "node_modules/.prisma/client/index.d.ts",
+      "bytes": 1570404,
+      "sha256": "adff5b6bbafd1f4defdb2f054c38af0bb90796a2c7c15fb48f84f300598b2d9d"
+    },
+    {
+      "path": "node_modules/.prisma/client/index.js",
+      "bytes": 121646,
+      "sha256": "11b29b94e88b00456b5392069d3da67a1071ee7b3ad58e96d8a2acd254a25686"
+    },
+    {
+      "path": "node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node",
+      "bytes": 17547808,
+      "sha256": "a2924eab1c78a0a7bb67edac5738939fa10589ef073af5542f53812a22e4a7d8"
+    },
+    {
+      "path": "node_modules/.prisma/client/package.json",
+      "bytes": 5309,
+      "sha256": "a60b5413d5d88da1616ffaa90d81b3e0cfd375521d0b2dfc21d7d32d396dabe4"
+    },
+    {
+      "path": "node_modules/.prisma/client/query_engine_bg.js",
+      "bytes": 16927,
+      "sha256": "2b50b4328595b0fb99a73cfed34cf11fa8e56511dcc4fb808af4516952448514"
+    },
+    {
+      "path": "node_modules/.prisma/client/query_engine_bg.wasm",
+      "bytes": 2297601,
+      "sha256": "b199ed8bf8f3610c20a3f7398b3cbb875f99b7d6565f4887fc0af2b47dceb30f"
+    },
+    {
+      "path": "node_modules/.prisma/client/schema.prisma",
+      "bytes": 19226,
+      "sha256": "9b5eb6e8f53a579a5ce8f8f8899c7b85cf2fa0b5ebc153a7bca1c76b005f65fc"
+    },
+    {
+      "path": "node_modules/.prisma/client/wasm-edge-light-loader.mjs",
+      "bytes": 184,
+      "sha256": "48311a316daab3b1c21dd227b7277d03436a7d10d78b19b3b625cd25ffa1674b"
+    },
+    {
+      "path": "node_modules/.prisma/client/wasm-worker-loader.mjs",
+      "bytes": 177,
+      "sha256": "48b4f73d61fe341ea5b59f09059f730dfb600249985a64f0456508dd4c81b01b"
+    },
+    {
+      "path": "node_modules/.prisma/client/wasm.d.ts",
+      "bytes": 25,
+      "sha256": "7378dd41401ba1acff435b9c317a5b919a3d38479ed3dbd4a25c8b4fd623a224"
+    },
+    {
+      "path": "node_modules/.prisma/client/wasm.js",
+      "bytes": 59862,
+      "sha256": "8b741c0b99e92c826b31a695b2b6e248edb3ce38a1d23ef12f483bdd1f7b2d0b"
+    }
+  ]
+}

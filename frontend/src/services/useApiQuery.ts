@@ -2,16 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient, authToken } from "./apiClient";
 import { useSession } from "../store/SessionContext";
 import { useDataRefresh, queryScopes } from "../store/DataRefreshContext";
+import {ApiError} from '../utils/apiError';
 
-export type QueryOptions = { enabled?: boolean; debounceMs?: number; refreshOnTick?: boolean; pollMs?: number };
+export type QueryOptions = { enabled?: boolean; debounceMs?: number; refreshOnTick?: boolean; pollMs?: number; consistency?: 'authoritative'; clearOnAuthError?: boolean };
 type QueryState<T> = { key: string; data: T | undefined; loading: boolean; error: string; asOf?: string };
 
 // One request lifecycle for lists and detail/aggregate queries; callers own their data.
-export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, refreshOnTick = false, pollMs }: QueryOptions = {}) {
+export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, refreshOnTick = false, pollMs, consistency, clearOnAuthError = false }: QueryOptions = {}) {
   const { authRole, sessionKey } = useSession();
   const refresh = useDataRefresh();
   const token = authToken.get();
-  const key = JSON.stringify([url, sessionKey, authRole, enabled]);
+  const key = JSON.stringify([url, sessionKey, authRole, enabled, consistency, clearOnAuthError]);
   const [state, setState] = useState<QueryState<T>>({ key, data: undefined, loading: enabled, error: "" });
   const currentKey = useRef(key); currentKey.current = key;
   const mounted = useRef(false);
@@ -31,13 +32,14 @@ export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, re
       loading: previous.key !== key || previous.data === undefined, error: "" }));
     const promise = (async () => {
       try {
-        const result = await apiClient.get<T>(url, { signal: AbortSignal.any([active.signal, AbortSignal.timeout(15_000)]) });
+        const result = await apiClient.get<T>(url, { signal: AbortSignal.any([active.signal, AbortSignal.timeout(15_000)]), ...(consistency ? {headers:{'X-Clinic-Read-Consistency':consistency}} : {}) });
         if (!isCurrent() || active.signal.aborted) return undefined;
         setState({ key, data: result, loading: false, error: "", asOf: new Date().toISOString() });
         return result;
       } catch (reason) {
         if (isCurrent() && !active.signal.aborted) {
-          setState(previous => ({ ...previous, error: reason instanceof Error ? reason.message : "Không tải được dữ liệu." }));
+          const forbidden=clearOnAuthError&&reason instanceof ApiError&&[401,403].includes(reason.httpStatus);
+          setState(previous => ({ ...previous, ...(forbidden?{data:undefined,asOf:undefined}:{}), error: reason instanceof Error ? reason.message : "Không tải được dữ liệu." }));
           throw reason;
         }
       } finally {
@@ -47,7 +49,7 @@ export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, re
     })();
     flight.current = { key, sequence: request, promise };
     return promise;
-  }, [url, enabled, key, token]);
+  }, [url, enabled, key, token, consistency, clearOnAuthError]);
 
   const reload = useCallback(() => {
     if (!mounted.current || key !== currentKey.current || token !== authToken.get()) return Promise.resolve(undefined);

@@ -1,0 +1,248 @@
+{
+  "query-heavy": [
+    {
+      "index": 0,
+      "mode": "smoke",
+      "attempt": 0,
+      "order": [
+        "O",
+        "A",
+        "B"
+      ],
+      "profileKeySha256": "3d972289cd33b5f5ed00830bf9e090ab94237db30a861747c3539f9f57e6d0c8",
+      "records": [
+        {
+          "id": "query-heavy-smoke-b0-O",
+          "workload": "query-heavy",
+          "block": 0,
+          "configuration": "O",
+          "mode": "smoke",
+          "attempt": 0,
+          "exitCode": 0,
+          "status": "COMPLETE",
+          "failedStage": null,
+          "dir": "members/query-heavy-smoke-b0-O",
+          "cpu": {
+            "complete": true,
+            "reasons": [],
+            "roles": {
+              "api": 20.88,
+              "worker": 0.86,
+              "relay": 0.56,
+              "postgres": 38.56,
+              "broker": 1.08,
+              "redis": 0.23,
+              "gateway": 0.4,
+              "controller": 0.26,
+              "generator": 4.41
+            },
+            "applicationCpuSeconds": 62.56999999999999,
+            "separateCpuSeconds": {
+              "generator": 4.41,
+              "controller": 0.26
+            },
+            "totalEnvelopeCpuSeconds": 67.81609400000002,
+            "coveredMs": 59063.973,
+            "partialStartMs": 575.5471889999462,
+            "partialEndMs": 360.47981100005563
+          }
+        },
+        {
+          "id": "query-heavy-smoke-b0-A",
+          "workload": "query-heavy",
+          "block": 0,
+          "configuration": "A",
+          "mode": "smoke",
+          "attempt": 0,
+          "exitCode": 0,
+          "status": "COMPLETE",
+          "failedStage": null,
+          "dir": "members/query-heavy-smoke-b0-A",
+          "cpu": {
+            "complete": true,
+            "reasons": [],
+            "roles": {
+              "api": 22.52,
+              "worker": 0.98,
+              "relay": 0.63,
+              "postgres": 38.11,
+              "broker": 1.15,
+              "redis": 0.24,
+              "gateway": 0.43,
+              "controller": 0.28,
+              "generator": 4.68
+            },
+            "applicationCpuSeconds": 64.06,
+            "separateCpuSeconds": {
+              "generator": 4.68,
+              "controller": 0.28
+            },
+            "totalEnvelopeCpuSeconds": 69.47560500000009,
+            "coveredMs": 59066.27600000007,
+            "partialStartMs": 915.2371829999611,
+            "partialEndMs": 18.48681699996814
+          }
+        },
+        {
+          "id": "query-heavy-smoke-b0-B",
+          "workload": "query-heavy",
+          "block": 0,
+          "configuration": "B",
+          "mode": "smoke",
+          "attempt": 0,
+          "exitCode": 0,
+          "status": "COMPLETE",
+          "failedStage": null,
+          "dir": "members/query-heavy-smoke-b0-B",
+          "cpu": {
+            "complete": true,
+            "reasons": [],
+            "roles": {
+              "api": 24.34,
+              "worker": 0.97,
+              "relay": 0.62,
+              "postgres": 32.13,
+              "broker": 1.34,
+              "redis": 0.25,
+              "gateway": 0.44,
+              "controller": 0.27,
+              "generator": 4.68
+            },
+            "applicationCpuSeconds": 60.09,
+            "separateCpuSeconds": {
+              "generator": 4.68,
+              "controller": 0.27
+            },
+            "totalEnvelopeCpuSeconds": 65.49451299999998,
+            "coveredMs": 59064.33999999985,
+            "partialStartMs": 359.6903909998946,
+            "partialEndMs": 575.9696090002544
+          }
+        }
+      ]
+    }
+  ],
+  "pcn": [
+    {
+      "index": 0,
+      "mode": "smoke",
+      "attempt": 0,
+      "order": [
+        "O",
+        "A",
+        "B"
+      ],
+      "profileKeySha256": "3d972289cd33b5f5ed00830bf9e090ab94237db30a861747c3539f9f57e6d0c8",
+      "records": [
+        {
+          "id": "pcn-smoke-b0-O",
+          "workload": "pcn",
+          "block": 0,
+          "configuration": "O",
+          "mode": "smoke",
+          "attempt": 0,
+          "exitCode": 0,
+          "status": "COMPLETE",
+          "failedStage": null,
+          "dir": "members/pcn-smoke-b0-O",
+          "cpu": {
+            "complete": true,
+            "reasons": [],
+            "roles": {
+              "api": 12.75,
+              "worker": 1.98,
+              "relay": 1.5,
+              "postgres": 2.45,
+              "broker": 2.24,
+              "redis": 0.24,
+              "gateway": 0.28,
+              "controller": 3.14,
+              "generator": 1.79
+            },
+            "applicationCpuSeconds": 21.44,
+            "separateCpuSeconds": {
+              "generator": 1.79,
+              "controller": 3.14
+            },
+            "totalEnvelopeCpuSeconds": 26.83232200000009,
+            "coveredMs": 59065.07199999993,
+            "partialStartMs": 45.147582000121474,
+            "partialEndMs": 889.7804179999512
+          }
+        },
+        {
+          "id": "pcn-smoke-b0-A",
+          "workload": "pcn",
+          "block": 0,
+          "configuration": "A",
+          "mode": "smoke",
+          "attempt": 0,
+          "exitCode": 0,
+          "status": "COMPLETE",
+          "failedStage": null,
+          "dir": "members/pcn-smoke-b0-A",
+          "cpu": {
+            "complete": true,
+            "reasons": [],
+            "roles": {
+              "api": 13.08,
+              "worker": 3.16,
+              "relay": 2.31,
+              "postgres": 3.08,
+              "broker": 2.89,
+              "redis": 0.23,
+              "gateway": 0.27,
+              "controller": 3.18,
+              "generator": 1.79
+            },
+            "applicationCpuSeconds": 25.020000000000003,
+            "separateCpuSeconds": {
+              "generator": 1.79,
+              "controller": 3.18
+            },
+            "totalEnvelopeCpuSeconds": 30.454038000000082,
+            "coveredMs": 59065.41100000008,
+            "partialStartMs": 688.5188899999484,
+            "partialEndMs": 246.07010999997146
+          }
+        },
+        {
+          "id": "pcn-smoke-b0-B",
+          "workload": "pcn",
+          "block": 0,
+          "configuration": "B",
+          "mode": "smoke",
+          "attempt": 0,
+          "exitCode": 0,
+          "status": "COMPLETE",
+          "failedStage": null,
+          "dir": "members/pcn-smoke-b0-B",
+          "cpu": {
+            "complete": true,
+            "reasons": [],
+            "roles": {
+              "api": 13.31,
+              "worker": 2.91,
+              "relay": 2.13,
+              "postgres": 3.06,
+              "broker": 2.72,
+              "redis": 0.23,
+              "gateway": 0.27,
+              "controller": 3.22,
+              "generator": 1.8
+            },
+            "applicationCpuSeconds": 24.629999999999995,
+            "separateCpuSeconds": {
+              "generator": 1.8,
+              "controller": 3.22
+            },
+            "totalEnvelopeCpuSeconds": 30.13485400000002,
+            "coveredMs": 59059.09899999993,
+            "partialStartMs": 725.5300059998408,
+            "partialEndMs": 215.37099400022998
+          }
+        }
+      ]
+    }
+  ]
+}

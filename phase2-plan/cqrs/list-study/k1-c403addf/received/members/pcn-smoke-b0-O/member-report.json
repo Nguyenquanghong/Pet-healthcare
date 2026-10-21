@@ -1,0 +1,115 @@
+{
+  "workload": "pcn",
+  "configuration": "O",
+  "mode": "smoke",
+  "settings": {
+    "users": 10,
+    "spawn_rate": 10,
+    "warmup": 5,
+    "seconds": 60
+  },
+  "status": "COMPLETE",
+  "run": "6df5aed6-3966-4018-9b90-1bc6ce5ce711",
+  "dataset": {
+    "version": "phase1-pcn-shape-v1",
+    "accounts": 10,
+    "pets": 10,
+    "appointments": 10,
+    "medicalRecords": 10,
+    "hotelBookings": 10,
+    "invoices": 10,
+    "notifications": 10,
+    "synthetic": true,
+    "notes": "One pet and one row per read resource per owner, as phase-1 PCN; split databases and RS256 differ. Setup admin is additional; browser-only doctor fixture omitted."
+  },
+  "cqrs": {
+    "configuration": "O",
+    "readMode": "authoritative",
+    "projectorEnabled": false,
+    "shadowEnabled": false,
+    "apiPool": 4,
+    "projectorPool": 0,
+    "freshnessPool": 0,
+    "capacityAccepted": false,
+    "generation": null,
+    "rebuild": null
+  },
+  "cqrsPreflight": [
+    {
+      "operation": "list",
+      "status": 200,
+      "read_source": "absent",
+      "generation_matches": false,
+      "degraded": false
+    },
+    {
+      "operation": "calendar",
+      "status": 200,
+      "read_source": "absent",
+      "generation_matches": false,
+      "degraded": false
+    }
+  ],
+  "ledger": {
+    "api": [
+      14819,
+      14838,
+      14857
+    ],
+    "worker": [
+      14878,
+      14916,
+      14936
+    ],
+    "relay": [
+      14897
+    ],
+    "postgres": [
+      14559
+    ],
+    "broker": [
+      14585
+    ],
+    "redis": [
+      14580
+    ],
+    "gateway": [
+      14876
+    ],
+    "generator": [
+      14957
+    ],
+    "controller": [
+      49,
+      14528,
+      14529,
+      14662
+    ]
+  },
+  "pool": {
+    "peaks": {
+      "p8_notification": 4,
+      "p8_clinic": 6,
+      "p8_core": 7
+    },
+    "samples": 66,
+    "errors": 0
+  },
+  "locustExitCode": 0,
+  "reconciliation": {
+    "status": "PASS_IN_SCOPE",
+    "missing_success_ids": 0,
+    "writes_without_success_response": 0,
+    "duplicate_active_slots": 0,
+    "duplicate_response_ids": 0,
+    "unexpected_child_exit": false
+  },
+  "window": {
+    "startMonotonicMs": 1391386.172418,
+    "endMonotonicMs": 1451386.172418,
+    "completed": true,
+    "targetUsers": 10,
+    "populationMin": 10,
+    "populationMax": 10
+  }
+}

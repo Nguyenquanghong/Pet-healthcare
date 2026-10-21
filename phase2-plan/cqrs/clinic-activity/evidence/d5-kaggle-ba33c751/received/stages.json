@@ -1,0 +1,42 @@
+{
+  "kind": "D5_STAGE_RECEIPTS_NOT_BENCHMARK",
+  "run": "ba33c751-97d7-4083-bb0f-1086f1b4ae69",
+  "stages": [
+    {
+      "stage": "fresh-environment-profile",
+      "startedAtUtc": "2026-10-21T13:58:05.303770+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T13:58:05.305277+00:00"
+    },
+    {
+      "stage": "prerequisites",
+      "startedAtUtc": "2026-10-21T13:58:05.308802+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T13:59:17.488535+00:00"
+    },
+    {
+      "stage": "new-private-cluster",
+      "startedAtUtc": "2026-10-21T13:59:17.489749+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T13:59:25.160315+00:00"
+    },
+    {
+      "stage": "private-broker-and-redis",
+      "startedAtUtc": "2026-10-21T13:59:25.161642+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T13:59:33.169025+00:00"
+    },
+    {
+      "stage": "linux-build-and-migrations",
+      "startedAtUtc": "2026-10-21T13:59:33.170430+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T14:00:19.443149+00:00"
+    },
+    {
+      "stage": "readiness-controller",
+      "startedAtUtc": "2026-10-21T14:00:19.444437+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T14:08:15.371139+00:00"
+    }
+  ]
+}

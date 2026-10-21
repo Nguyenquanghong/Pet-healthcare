@@ -5,6 +5,7 @@ import type {AppointmentQueries,AppointmentQueryDirectory,AppointmentCalendarQue
 import {AuthoritativeAppointmentQueries} from './authoritativeAppointments.js';
 import {ProjectedAppointmentQueries} from './projectedAppointments.js';
 import {reconcileProjection} from '../../projectionSnapshot.js';
+import {isProjectionVersion} from '../../projectionVersions.js';
 
 function canonical(v:unknown):unknown{if(Array.isArray(v))return v.map(canonical);if(v&&typeof v==='object')return Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b)).map(([k,x])=>[k,canonical(x)]));return v;}
 export const responseHash=(v:unknown)=>createHash('sha256').update(JSON.stringify(canonical(JSON.parse(JSON.stringify(v))))).digest('hex');
@@ -27,7 +28,7 @@ export class ShadowAppointmentQueries implements AppointmentQueries{
       try{result=await this.db.$transaction(async tx=>{
         await tx.$executeRawUnsafe("SET LOCAL statement_timeout='200ms'");
         const control=await tx.readProjectionControl.findUnique({where:{projectionName:'appointments'},include:{activeGeneration:true}});
-        if(!control?.activeGenerationId||control.activeGeneration?.state!=='ACTIVE'||!control.activeGeneration.verifiedAt||control.activeGeneration.schemaVersion!==1||control.activeGeneration.projectionName!=='appointments')return {operation,result:'unavailable'} as ShadowReport;
+        if(!control?.activeGenerationId||control.activeGeneration?.state!=='ACTIVE'||!control.activeGeneration.verifiedAt||!isProjectionVersion(control.activeGeneration.schemaVersion)||control.activeGeneration.projectionName!=='appointments')return {operation,result:'unavailable'} as ShadowReport;
         const snapshot=snapshotDatabase(tx);
         const authoritative=await run(new AuthoritativeAppointmentQueries(snapshot));
         const projected=await run(new ProjectedAppointmentQueries(snapshot,control.activeGenerationId));

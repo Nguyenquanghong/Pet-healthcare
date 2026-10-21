@@ -1,0 +1,24 @@
+{
+  "complete": true,
+  "reasons": [],
+  "roles": {
+    "api": 12.75,
+    "worker": 1.98,
+    "relay": 1.5,
+    "postgres": 2.45,
+    "broker": 2.24,
+    "redis": 0.24,
+    "gateway": 0.28,
+    "controller": 3.14,
+    "generator": 1.79
+  },
+  "applicationCpuSeconds": 21.44,
+  "separateCpuSeconds": {
+    "generator": 1.79,
+    "controller": 3.14
+  },
+  "totalEnvelopeCpuSeconds": 26.83232200000009,
+  "coveredMs": 59065.07199999993,
+  "partialStartMs": 45.147582000121474,
+  "partialEndMs": 889.7804179999512
+}

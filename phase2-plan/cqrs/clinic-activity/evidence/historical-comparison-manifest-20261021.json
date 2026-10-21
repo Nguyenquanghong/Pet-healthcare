@@ -1,0 +1,117 @@
+{
+  "format": "clinic-activity-historical-comparison-amendment-v1",
+  "capturedAtUtc": "2026-10-21T06:15:08.348552+00:00",
+  "branch": "phase2/clinic-activity-d0-20261020",
+  "head": "c4102b55a652dc8e4faa93eeada4d76cbe0753ef",
+  "policyVersion": 7,
+  "policySha256": "297c0ee1efaf15df170804be54762fb379634fe644a7afa9857a2fee439c294a",
+  "previousPolicyVersion": 6,
+  "preservedPreviousSha256": "101079f2a40133d8160d80c2e24566be628c30074b319fce124fab1fe70b625b",
+  "scope": "Historical comparison requirements/Git-spec-artifact audit only; no runtime or measurement changes",
+  "historicalComparison": "PENDING_BASELINE_IDENTITY_AND_COMPARABILITY",
+  "d0": "DESIGN_PROTOCOL_ACCEPTED",
+  "performance": "NOT_RUN_BLOCKED",
+  "activityThresholdsWorkloadsSamplesResourceProtocolUnchanged": true,
+  "sourceFilesUnchanged": 608,
+  "files": [
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/04-delivery-plan.md",
+      "change": "modified",
+      "bytes": 9202,
+      "sha256": "f06d2f30785de46fc5bf0c44f4346ccee1c7486f909efd900d98416f2c254fe0"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/05-validation.md",
+      "change": "modified",
+      "bytes": 9833,
+      "sha256": "7b58e2c403e38730a8ab08cdcebce149e19cfa6e03ee13a1a7f55737b70c4201"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/06-benchmark-and-decision.md",
+      "change": "modified",
+      "bytes": 13070,
+      "sha256": "0ce6b528ee09028e552cd71e7204ce0ae5b2d2f8ee2de9ec88ca49998ce7612d"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/08-agent-prompts.md",
+      "change": "modified",
+      "bytes": 16573,
+      "sha256": "d876a116de71409345a45ddbffedfaacdeb5b03aae3393b7851f4edd9b14d243"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/README.md",
+      "change": "modified",
+      "bytes": 8821,
+      "sha256": "e092dc6483b8daa6d2105add8162cba0d197cb65186784648f16b3b236e61399"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/STATUS.md",
+      "change": "modified",
+      "bytes": 23144,
+      "sha256": "049eb756477e28862f1416defc9c1270d1f96a494b41adccb62093119173d174"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/acceptance.frozen.json",
+      "change": "modified",
+      "bytes": 37689,
+      "sha256": "297c0ee1efaf15df170804be54762fb379634fe644a7afa9857a2fee439c294a"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/acceptance.frozen.sha256",
+      "change": "modified",
+      "bytes": 89,
+      "sha256": "ec5d9a0b92f41e0b7425b0829b575315e512cd375d524df38a8581eaa6f5fef3"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/adr-activity-02.md",
+      "change": "modified",
+      "bytes": 11197,
+      "sha256": "ee3cc5fb301243a5af07ff05feef608489d10f919529b320e0ab8bc1e60ca7ca"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/adr-activity-03.md",
+      "change": "new",
+      "bytes": 8600,
+      "sha256": "f2ab42d01eba1053136e5ad0c438fa5e35da542e9d048ec070bcb85e7c4470ba"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/historical-comparison-20261021.md",
+      "change": "new",
+      "bytes": 7247,
+      "sha256": "434244e6b25f3724eca26d32234c94d70bb51c8c9a8ee7478c9a7d0af8f4b8db"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/historical-comparison-inventory-20261021.json",
+      "change": "new",
+      "bytes": 3161,
+      "sha256": "c92e23201dc2048bd60913bb31dbf6db431b8acd2062e59376a093a2520aacf6"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/preregistration-v6/acceptance.frozen.json",
+      "change": "new",
+      "bytes": 33105,
+      "sha256": "101079f2a40133d8160d80c2e24566be628c30074b319fce124fab1fe70b625b"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/preregistration-v6/acceptance.frozen.sha256",
+      "change": "new",
+      "bytes": 89,
+      "sha256": "25bc69e4006081a4cd01751d04bb25f6def83e7309d138ecea9bd97a561cf56b"
+    }
+  ],
+  "auditScripts": [
+    {
+      "path": "test-results/phase2/cqrs/activity/historical-comparison-20261021/edit_docs.py",
+      "sha256": "503b9d0d5c3367645745cd7f15daf4c1927443469b6690d425f49791eeef71df"
+    },
+    {
+      "path": "test-results/phase2/cqrs/activity/historical-comparison-20261021/revise.py",
+      "sha256": "4584e02632bb7afbc46ad03864783c20a37fd7306f9b0cd3204ff33fc92163a3"
+    },
+    {
+      "path": "test-results/phase2/cqrs/activity/historical-comparison-20261021/validate.py",
+      "sha256": "7fc22f20d21f5262c3b75e3a8666d25f1106c97652cfb027f6410fe8eaa33d4b"
+    }
+  ],
+  "hashConvention": "Exact UTF-8 LF JSON; manifest and sidecar excluded from files; external sidecar has SHA256"
+}

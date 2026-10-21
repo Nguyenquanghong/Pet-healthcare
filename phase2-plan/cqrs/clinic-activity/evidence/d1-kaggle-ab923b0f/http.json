@@ -1,0 +1,337 @@
+{
+  "kind": "D1_BOUNDED_FUNCTIONAL_HTTP_NOT_BENCHMARK",
+  "run": "ab923b0f-f7c8-49d9-8f0b-47b2e068aef2",
+  "status": "PASS_IN_SCOPE",
+  "cases": [
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "all",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "all",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "all",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "all",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "clinic",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "clinic",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "clinic",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "clinic",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "spa",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "spa",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "spa",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "spa",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "daily-clinic-medical-status-authoritative-drilldown",
+      "entrypoint": "direct",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "daily-clinic-medical-status-authoritative-drilldown",
+      "entrypoint": "gateway",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "auth-current-role-and-cache-hit",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "bounded-source-failure-through-gateway",
+      "status": "PASS"
+    },
+    {
+      "mode": "source",
+      "operation": "strict-params-and-client-mode-cannot-switch-reader",
+      "status": "PASS",
+      "gatewayPort": 36407
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "all",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "all",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "all",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "all",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "clinic",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "clinic",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "clinic",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "clinic",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "spa",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "spa",
+      "groupBy": "day",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "direct-clinic",
+      "category": "spa",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "business-parity",
+      "entrypoint": "nginx-core-clinic",
+      "category": "spa",
+      "groupBy": "month",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "daily-clinic-medical-status-authoritative-drilldown",
+      "entrypoint": "direct",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "daily-clinic-medical-status-authoritative-drilldown",
+      "entrypoint": "gateway",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "absolute-cache-ttl-and-forwarded-metadata",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "auth-current-role-and-cache-hit",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "bounded-source-failure-through-gateway",
+      "status": "PASS"
+    },
+    {
+      "mode": "cached",
+      "operation": "strict-params-and-client-mode-cannot-switch-reader",
+      "status": "PASS",
+      "gatewayPort": 37973
+    }
+  ],
+  "runtimeIdentities": [
+    {
+      "mode": "source",
+      "core": {
+        "database": "activity_ab923b0ff7c849d98f0b47b2e068aef2_core",
+        "role": "activity_ab923b0ff7c849d98f0b47b2e068aef2_core",
+        "schema": "activity_ab923b0ff7c849d98f0b47b2e068aef2",
+        "port": 33913,
+        "serverVersionNumber": "160015",
+        "markerVerified": true,
+        "nonSuperuser": true
+      },
+      "clinic": {
+        "database": "activity_ab923b0ff7c849d98f0b47b2e068aef2_clinic",
+        "role": "activity_ab923b0ff7c849d98f0b47b2e068aef2_clinic",
+        "schema": "activity_ab923b0ff7c849d98f0b47b2e068aef2",
+        "port": 33913,
+        "serverVersionNumber": "160015",
+        "markerVerified": true,
+        "nonSuperuser": true
+      },
+      "grants": {
+        "clinicAppointments": {
+          "select": true,
+          "insert": false,
+          "update": false,
+          "delete": false
+        },
+        "coreUsers": {
+          "select": true,
+          "update": false
+        }
+      }
+    },
+    {
+      "mode": "cached",
+      "core": {
+        "database": "activity_ab923b0ff7c849d98f0b47b2e068aef2_core",
+        "role": "activity_ab923b0ff7c849d98f0b47b2e068aef2_core",
+        "schema": "activity_ab923b0ff7c849d98f0b47b2e068aef2",
+        "port": 33913,
+        "serverVersionNumber": "160015",
+        "markerVerified": true,
+        "nonSuperuser": true
+      },
+      "clinic": {
+        "database": "activity_ab923b0ff7c849d98f0b47b2e068aef2_clinic",
+        "role": "activity_ab923b0ff7c849d98f0b47b2e068aef2_clinic",
+        "schema": "activity_ab923b0ff7c849d98f0b47b2e068aef2",
+        "port": 33913,
+        "serverVersionNumber": "160015",
+        "markerVerified": true,
+        "nonSuperuser": true
+      },
+      "grants": {
+        "clinicAppointments": {
+          "select": true,
+          "insert": false,
+          "update": false,
+          "delete": false
+        },
+        "coreUsers": {
+          "select": true,
+          "update": false
+        }
+      }
+    }
+  ],
+  "requestCount": 92,
+  "composition": "Real Core/Clinic apps + PostgreSQL + Nginx; runtime background dependencies disabled",
+  "benchmark": false,
+  "snapshotProof": {
+    "status": "PASS",
+    "isolation": "repeatable read",
+    "readOnly": true,
+    "concurrentCommitInvisibleUntilNextSnapshot": true
+  }
+}

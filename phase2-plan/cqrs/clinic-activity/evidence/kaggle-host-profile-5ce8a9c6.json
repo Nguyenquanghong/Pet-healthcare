@@ -1,0 +1,63 @@
+{
+  "format": "clinic-activity-kaggle-host-profile-v1",
+  "profileId": "5ce8a9c6-e270-4a66-a151-7844abdddcde",
+  "capturedAtUtc": "2026-10-20T16:21:52.631264+00:00",
+  "status": "HOST_OBSERVATIONS_ONLY_ENVIRONMENT_GATE_PENDING",
+  "applicationPerformanceMeasurements": "NOT_RUN",
+  "mutatesServicesDbOrQuota": false,
+  "platform": "Linux-6.18.48+-x86_64-with-glibc2.39",
+  "python": "3.13.15",
+  "isKaggleLinux": true,
+  "actualTrialIdentity": null,
+  "actualGrants": null,
+  "stackEnforcementProof": null,
+  "generatorEnforcementProof": null,
+  "uid": 0,
+  "logicalCpuCount": 4,
+  "cpuAffinity": [0, 1, 2, 3],
+  "hostMemTotalLine": "MemTotal:       32869452 kB",
+  "selfCgroupMembership": "0::/",
+  "cgroupVersion2Resolved": true,
+  "cgroupAncestors": [
+    {
+      "path": "/sys/fs/cgroup",
+      "controls": {
+        "cpu.max": "400000 100000",
+        "memory.max": "32212254720",
+        "cpuset.cpus.effective": "0-3",
+        "io.max": "",
+        "cgroup.controllers": "cpuset cpu io memory hugetlb pids rdma",
+        "cgroup.subtree_control": ""
+      },
+      "writeAccessIndicationOnly": {
+        "cgroup.procs": false,
+        "cgroup.subtree_control": false
+      }
+    }
+  ],
+  "cgroupMount": "/sys/fs/cgroup",
+  "cgroupCurrent": "/sys/fs/cgroup",
+  "ancestorWalkReachedMount": true,
+  "installedVersionsNotLiveServerProof": {
+    "node": {"exitCode": 0, "text": "v20.19.0"},
+    "npm": {"exitCode": 0, "text": "10.8.2"},
+    "psql": {"status": "NOT_INSTALLED"},
+    "packages": {
+      "exitCode": 1,
+      "text": "dpkg-query: no packages found matching postgresql\ndpkg-query: no packages found matching rabbitmq-server\ndpkg-query: no packages found matching redis-server\ndpkg-query: no packages found matching nginx"
+    }
+  },
+  "binaryDigests": {
+    "python": "bac00abc4dfc76da8fd1a09023b9454e4d34f591172af79bbfa7ee43091165d6",
+    "node": "34bc6627675906f8431892630b5e91fc4cc9f1e03ce15e9716025aa551e5c823"
+  },
+  "serviceProcessCandidatesNotOwnedIdentityProof": [],
+  "notes": [
+    "Historical Q6 limits are not this kernel's verified stack budget.",
+    "Write access flags do not prove controller delegation or actual enforcement.",
+    "Record actual effective limits at every process cgroup and ancestor.",
+    "Keep API, every worker, PG children, broker, Redis, gateway and audit inside stack budget.",
+    "Record generator separately; installed versions do not prove live server versions.",
+    "No DB/broker identity, marker, grants, queue or process-role assertion was performed."
+  ]
+}

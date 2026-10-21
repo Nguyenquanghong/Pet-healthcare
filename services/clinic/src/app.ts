@@ -20,13 +20,19 @@ import { ReadFreshness } from './readFreshness.js';
 import {readDiagnostics,diagnosticOperation} from './readDiagnostics.js';
 import { ReadTokens,committedVersions,type ReadVersions } from './readToken.js';
 import {bootstrap} from './bootstrap.js';
+import {parseActivityFilter} from './application/queries/clinicActivity.js';
+import {ClinicActivityQueries,type SummaryEligibility} from './infrastructure/queries/clinicActivity.js';
 import {mountBilling} from './billingApi.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
 import { requestActor } from '@nipopeto/runtime';
 
-export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?:CoreDirectory,runtime?:ServiceRuntime,readFreshness?:ReadFreshness){
+export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?:CoreDirectory,runtime?:ServiceRuntime,readFreshness?:ReadFreshness,activityEvidence?:SummaryEligibility){
   const app=express();app.disable('x-powered-by');
   const authoritative=new AuthoritativeAppointmentQueries(db);
+  // Activity mode is server configuration (fixed or operator control), never a
+  // client parameter; it is independent of CLINIC_READ_MODE for lists.
+  const activity=new ClinicActivityQueries(db,(process.env.CLINIC_ACTIVITY_MODE??'source') as 'source',undefined,undefined,activityEvidence);
+  app.locals.activity=activity;
   const shadow=process.env.CLINIC_READ_MODE==='shadow'?new ShadowAppointmentQueries(authoritative,db,Number(process.env.CLINIC_SHADOW_EVERY??20)):undefined;
   const projected=process.env.CLINIC_READ_MODE==='projection';
   const secret=process.env.CLINIC_READ_TOKEN_SECRET;
@@ -42,9 +48,11 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   app.get('/health/live',(_req,res)=>res.json({service:'clinic',status:'alive'}));
   app.get('/health/ready',async(_req,res)=>{try{await db.appointment.count();await db.medicalRecord.count();await db.medicalImage.count();await db.requestDedup.count();res.json({service:'clinic',status:'ready'});}catch{res.status(503).json({service:'clinic',status:'unavailable'});}});
   const router=express.Router();
+  router.use('/dashboard/clinic/activity',(_req,res,next)=>{res.setHeader('Cache-Control','no-store');next();});
   app.use('/internal/clinic', (req,res,next)=>{if(req.path!=='/bootstrap'||req.method!=='GET'){res.status(404).json({error:'Clinic route not found.'});return;}if(!source||!source.acceptsService(req.headers['x-service-token'],'bootstrap')){res.status(401).json({error:'Service authentication required.'});return;}next();});
   router.use((req,res,next)=>{if(!verify||!source){res.status(503).json({error:'Clinic authentication or directory is not configured.'});return;}const bearer=req.headers.authorization;if(!bearer?.startsWith('Bearer ')||bearer.length>8192){res.status(401).json({error:'Authentication required.'});return;}try{res.locals.actor=requestActor(req,verify);next();}catch{res.status(401).json({error:'Invalid or expired token.'});}});
   router.use(express.json({limit:'8mb'}));
+  router.use((req,_res,next)=>{if(req.path==='/dashboard/clinic/activity'&&_res.locals.actor.role!=='admin')throw new BusinessError(403,'Admin activity access is required.');next();});
   router.use(async(req,res,next)=>{
     const actor=res.locals.actor as Actor;
     if(actor.role==='owner'&&req.path.startsWith('/medical-records')&&req.method!=='GET')throw new BusinessError(403,'Staff access is required.');
@@ -52,7 +60,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
     if(req.body!==undefined)objectInput(req.body);
     const petIds:string[]=[];
     const add=(v:unknown)=>{if(v!==undefined&&v!==null&&v!==''){if(typeof v!=='string'||v.length>200)throw new BusinessError(422,'Invalid pet ID.');petIds.push(v);}};
-    if(req.method==='GET'){const id=typeof req.query.petId==='string'?req.query.petId.trim():req.query.petId;if(id!=='all')add(id);}else add(req.path==='/medical-records'&&typeof req.body?.petId==='string'?req.body.petId.trim():req.body?.petId);
+    if(req.method==='GET'){if(req.path!=='/dashboard/clinic/activity'){const id=typeof req.query.petId==='string'?req.query.petId.trim():req.query.petId;if(id!=='all')add(id);}}else add(req.path==='/medical-records'&&typeof req.body?.petId==='string'?req.body.petId.trim():req.body?.petId);
     const match=req.path.match(/^\/(appointments|medical-records)\/(?:images\/)?([^/]+)(?:\/|$)/);
     if(match&&!['calendar','images'].includes(match[2]!)){
       const id=decodeURIComponent(match[2]!);
@@ -103,6 +111,14 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   router.delete('/medical-records/images/:id',async(req,res)=>{await medical(res).deleteImage(res.locals.actor,req.params.id);res.status(204).end();});
   router.get('/bootstrap',async(req,res)=>res.json(await bootstrap(db,res.locals.actor,res.locals.directory,req.query.view)));
   router.get('/dashboard/clinic',async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({...await bootstrap(db,res.locals.actor,res.locals.directory,'dashboard'),asOf:new Date().toISOString()});});
+  router.get('/dashboard/clinic/activity',async(req,res)=>{
+    // Express also matches trailing slashes/case variants; authorize the matched
+    // operation itself, independently of the early exact-path rejection above.
+    if(res.locals.actor.role!=='admin')throw new BusinessError(403,'Admin activity access is required.');
+    const filter=parseActivityFilter(req.query);
+    try{const result=await activity.read(filter);res.setHeader('X-Clinic-Read-Source',result.meta.source);if(result.meta.generation)res.setHeader('X-Clinic-Projection-Generation',result.meta.generation);if(result.meta.degraded)res.setHeader('X-Service-Degraded','clinic-activity');res.json(result);}
+    catch(error){if(error instanceof BusinessError)throw error;throw new BusinessError(503,'Clinic activity is unavailable. Retry later.');}
+  });
   app.use('/internal/clinic',router);
   // Internal compatibility data is never reachable through the public router.
   app.use('/api/bootstrap',(_req,res)=>res.status(404).json({error:'Clinic route not found.'}));

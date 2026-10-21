@@ -6,7 +6,7 @@ import { useApiQuery, type QueryOptions } from "./useApiQuery";
 export type { PaginationInfo, RelatedData, ListPage } from "../types/list";
 export { emptyRelated } from "../types/list";
 
-export function usePagedList<T>(endpoint: string, filters: Record<string, string | undefined> = {}, enabled = true, options: Pick<QueryOptions, 'pollMs'> = {}) {
+export function usePagedList<T>(endpoint: string, filters: Record<string, string | undefined> = {}, enabled = true, options: Pick<QueryOptions, 'pollMs' | 'consistency'> = {}) {
   const { authRole } = useSession();
   const params = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1]) && (entry[1] !== "all" || entry[0] === "q" || entry[0] === "id")).sort(([a], [b]) => a.localeCompare(b)));
   const key = endpoint + "?" + params.toString();

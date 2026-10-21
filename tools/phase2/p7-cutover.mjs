@@ -3,23 +3,29 @@ import {catalogs,targets,sourceNames} from './p7-manifest.mjs';
 import {validateMigration,assertFrozenSource} from './p7-migration.mjs';
 
 const targetKinds=['core','clinic','notification'];
-function runtimeTables(kind){const names=[...targets[kind],...(kind==='clinic'?['OutboxEvent','RequestDedup','ClinicReadRevision','AppointmentReadRow','ReadProjectionGeneration','ReadProjectionControl','ReadRebuildRun']:kind==='notification'?['RequestDedup']:[])];return [...new Set(names.map(n=>catalogs[kind][n].table))];}
+function runtimeTables(kind){const names=[...targets[kind],...(kind==='clinic'?['OutboxEvent','RequestDedup','ClinicReadRevision','AppointmentReadRow','AppointmentDailySummary','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun']:kind==='notification'?['RequestDedup']:[])];return [...new Set(names.map(n=>catalogs[kind][n].table))];}
+// Exact runtime ACL statements. role/schema must already be quoted identifiers.
+// Exported so guarded trial harnesses test these grants, not a copied variant.
+export function runtimeGrantStatements(kind,role,write,schema='runtime'){
+  const q=t=>schema+'.'+ident(t),statements=[`REVOKE ALL ON ALL TABLES IN SCHEMA ${schema} FROM ${role}`];
+  // Table-level REVOKE does not revoke column-level grants from a prior open.
+  if(kind==='clinic')statements.push(`REVOKE UPDATE ("lockAnchor") ON ${q('ReadProjectionControl')} FROM ${role}`);
+  statements.push(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA ${schema} FROM ${role}`);
+  statements.push(`GRANT SELECT ON ${runtimeTables(kind).map(q).concat(schema+'."_prisma_migrations"').join(',')} TO ${role}`);
+  if(write){
+    const writable=runtimeTables(kind).filter(t=>kind!=='clinic'||!['ClinicReadRevision','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','AppointmentDailySummary'].includes(t));
+    statements.push(`GRANT INSERT,UPDATE,DELETE ON ${writable.map(q).join(',')} TO ${role}`);
+    if(kind==='clinic')statements.push(`GRANT INSERT,UPDATE ON ${q('ClinicReadRevision')} TO ${role}`,`GRANT UPDATE ("lockAnchor") ON ${q('ReadProjectionControl')} TO ${role}`,
+      // Projector counters: atomic upsert/decrement only, zero rows are kept.
+      // Activity serving mode is operator-owned; runtime only reads it.
+      `GRANT INSERT,UPDATE ON ${q('AppointmentDailySummary')} TO ${role}`);
+    if(kind==='core')statements.push(`GRANT USAGE,SELECT ON SEQUENCE ${schema}.invoice_transfer_code_seq TO ${role}`);
+  }
+  return statements;
+}
 export async function targetPermissions(ctx,write){
   for(const kind of targetKinds)await withDatabase(ctx,kind,db=>db.$transaction(async tx=>{
-    const role=ident(ctx.components[kind].role);
-    await tx.$executeRawUnsafe(`REVOKE ALL ON ALL TABLES IN SCHEMA runtime FROM ${role}`);
-      // Table-level REVOKE does not revoke column-level grants from a prior open.
-      if(kind==='clinic')await tx.$executeRawUnsafe(`REVOKE UPDATE ("lockAnchor") ON runtime."ReadProjectionControl" FROM ${role}`);
-    await tx.$executeRawUnsafe(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA runtime FROM ${role}`);
-    const tables=runtimeTables(kind).map(t=>'runtime.'+ident(t)).concat('runtime."_prisma_migrations"');
-    await tx.$executeRawUnsafe(`GRANT SELECT ON ${tables.join(',')} TO ${role}`);
-    if(write){
-      const writable=runtimeTables(kind).filter(t=>kind!=='clinic'||!['ClinicReadRevision','ReadProjectionGeneration','ReadProjectionControl','ReadRebuildRun'].includes(t));
-      await tx.$executeRawUnsafe(`GRANT INSERT,UPDATE,DELETE ON ${writable.map(t=>'runtime.'+ident(t)).join(',')} TO ${role}`);
-      if(kind==='clinic')await tx.$executeRawUnsafe(`GRANT INSERT,UPDATE ON runtime."ClinicReadRevision" TO ${role}`);
-      if(kind==='clinic')await tx.$executeRawUnsafe(`GRANT UPDATE ("lockAnchor") ON runtime."ReadProjectionControl" TO ${role}`);
-      if(kind==='core')await tx.$executeRawUnsafe(`GRANT USAGE,SELECT ON SEQUENCE runtime.invoice_transfer_code_seq TO ${role}`);
-    }
+    for(const statement of runtimeGrantStatements(kind,ident(ctx.components[kind].role),write))await tx.$executeRawUnsafe(statement);
   }),{admin:true});
 }
 export async function cutoverState(ctx){return withDatabase(ctx,'legacy',async db=>(await db.$queryRaw`SELECT state,snapshot_hash,opened_at FROM public.p7_cutover WHERE id=1`)[0]);}

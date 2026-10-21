@@ -1,0 +1,29 @@
+{
+  "format": "clinic-activity-environment-profile-candidate-v1",
+  "status": "CANDIDATE_NOT_FROZEN",
+  "fromRun": "ba33c751-97d7-4083-bb0f-1086f1b4ae69",
+  "fromFiles": {"environment.json": "74434c51e11c21f4d58993c55f52bc75a39bb78d7aee3b29e80f28ee0305c5f3", "fresh-profile-and-pid-role-pool-ledger.json": "4ceaf84a063f3c68bc487d3e7df04d8ff8bc1dedd846be47874eb2c08961a066", "plan-and-hashes.json": "2e631431cebb7de41150a066d6d4717cfbc052b3172697e4cc06500b3de35358"},
+  "resourceClass": "kaggle_shared_envelope",
+  "isolation": "NONE_CLAIMED: stack, generator and controller share the kernel envelope",
+  "cpuModel": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+  "architecture": "x86_64",
+  "logicalCpus": 4,
+  "cpuQuotaAndAffinity": {"quota": "400000 100000", "affinity": [0, 1, 2, 3]},
+  "memoryMax": "32212254720",
+  "kernel": "6.18.48+",
+  "cgroupVersion": 2,
+  "liveSoftwareVersions": {"node": "v24.16.0", "npm": "11.13.0", "prisma": "6.19.3", "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)", "redis": "7.0.15", "nginx": "1.24.0", "rabbitmq": "3.12.1-1ubuntu1.7", "erlang": "1:25.3.2.8+dfsg-1ubuntu4.8"},
+  "replicas": {"clinic": 1, "core": 1, "notification": 1},
+  "poolCeilingsPerProcess": {"core-api": 4, "core-outbox": 4, "billing-worker": 4, "clinic-api": 4, "clinic-audit": 1, "clinic-worker": 4, "read-worker": 1, "notification-api": 4, "notification-worker": 4},
+  "poolPeaksPerRoleObserved": {"core": 4, "clinic": 6, "projector": 1, "notification": 2},
+  "logicalFixtureDigest": "dd29ca40cc98758ab7245d8ae908b86427eabaedb8edc18a144027134d9fbe24",
+  "policyDigest": "d8fbedbceacc82a79897be25315b4e16fa16823a3226f20493e882762784434e",
+  "sourceTreeSha256": "40f430d03e9d6e6b2b4d9dde1fa5c070db698a157a2bdd6ce01189db24b6ca50",
+  "notReusableAsIs": {
+    "buildSha256": "30e613637f937285fdf2a0ab80e6a140bc329e87043fac9ce5c07fba89b6b9fa (run-path dependent; see review F1)",
+    "traceDigest": "D5 smoke only",
+    "harnessDigest": "D5 harness only",
+    "profileKeySha256": "5ee445219381ea12876b5e7e1d303b20002cc2fe61fba8fb3ca610add3c8656c (D5 readiness session only)"
+  },
+  "sessionRule": "Kaggle may assign another CPU model/kernel in a later session; that is a different profile stratum (benchmark-plan sessions.profileMismatchRule). Complete all matched blocks under one comparable key; never combine unmatched halves."
+}

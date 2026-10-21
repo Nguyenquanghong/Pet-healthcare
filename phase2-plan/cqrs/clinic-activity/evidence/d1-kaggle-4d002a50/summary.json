@@ -1,0 +1,12 @@
+{
+  "kind": "CLINIC_ACTIVITY_D1_FUNCTIONAL_NOT_BENCHMARK",
+  "harnessRevision": 3,
+  "run": "4d002a50-8696-4eae-aeb9-a057c44749d2",
+  "status": "PASS_IN_FUNCTIONAL_SCOPE",
+  "performance": "NOT_RUN",
+  "d0": "PARTIAL_ENVIRONMENT",
+  "d1": "PG_PLANS_WARM_CACHE_AND_GATEWAY_BROWSER_PASS_REVIEW_REPORTS",
+  "resourceEnforcement": "UNVERIFIED",
+  "fullDeploymentValidated": false,
+  "ownedProcessesShutdown": "PASS"
+}

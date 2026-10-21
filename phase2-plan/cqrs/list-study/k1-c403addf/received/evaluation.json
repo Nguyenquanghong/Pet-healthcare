@@ -1,0 +1,4 @@
+{
+  "decision": "NOT_RUN",
+  "scope": "session-partial: combine all sessions offline with list_evaluate.py before any claim"
+}

@@ -1,0 +1,69 @@
+{
+  "format": "clinic-activity-d1-result-review-v1",
+  "reviewedAtUtc": "2026-10-21T00:36:10.912124+00:00",
+  "run": "ab923b0f-f7c8-49d9-8f0b-47b2e068aef2",
+  "status": "PASS_REPORTED_PG_AND_API_GATEWAY_FUNCTIONAL_SCOPE",
+  "archive": {
+    "name": "clinic-activity-d1-ab923b0f-f7c8-49d9-8f0b-47b2e068aef2.zip",
+    "bytes": 14768,
+    "sha256": "c85dd0a4a1eec6fa71ed82a4bac4974353d4f6946a4bf0fc4749088fea70d8b1",
+    "members": 8,
+    "manifestEntriesVerified": 7
+  },
+  "provenance": {
+    "notebookSha256": "46718ab8ecfea4415639b145c325cc0887fe897864adf71d26a3223ebb5ecc96",
+    "notebookManifestSha256": "1bee8dbf2df4542deb61595163a57ac5337e63665819af10fc7802c8e9e9984b",
+    "sourceArchiveSha256": "770fd6b8a135b66084ffb91d215abc914e0c02c1af55e0e3e073aa324f28e5d4",
+    "sourceTreeSha256": "10aa90d793f0c02cb7623b0b780008eefb11fdde9779259eaa62bed55e13ef24",
+    "currentSourceFilesVerified": 605,
+    "reportedLinuxBuildFiles": 234,
+    "policyAtBuildSha256": "ee875bb6c4bfe8b1b6918ff9558eb67a46dbd469e345c079b915c19dc53a8063",
+    "currentPartialPolicySha256": "96f51be71168fb8b4f8ab78eaf09035bd12b48a2c6fbe5bc02ea9badce65d181"
+  },
+  "checks": {
+    "postgresCases": 18,
+    "httpReportedCaseGroups": 35,
+    "httpBusinessParityCases": 24,
+    "httpRequests": 92,
+    "modes": [
+      "source",
+      "cached"
+    ],
+    "fixtureRows": 10000,
+    "snapshotProof": {
+      "status": "PASS",
+      "isolation": "repeatable read",
+      "readOnly": true,
+      "concurrentCommitInvisibleUntilNextSnapshot": true
+    },
+    "identityMarkersGrants": "CONSISTENT_WITH_HARNESS",
+    "ownedProcessesShutdown": "REPORTED_PASS"
+  },
+  "gates": {
+    "d0": "PARTIAL_ENVIRONMENT",
+    "d1FunctionalPgAndApiGateway": "PASS_IN_SCOPE",
+    "d1Overall": "PARTIAL_REMAINING_COVERAGE",
+    "performance": "NOT_RUN_BLOCKED",
+    "d2": "NOT_STARTED"
+  },
+  "limitations": [
+    "User-supplied reports reviewed locally; agent did not independently connect to Kaggle, DB or gateway.",
+    "Linux build digests recorded by runner; build bytes/raw command logs and execution timestamps are not in the archive.",
+    "Real Nginx loopback API composition, one Node process, background dependencies disabled; no public deployment/frontend/browser integration.",
+    "SQL EXPLAIN/query-plan evidence NOT_RUN; 100k trial and performance NOT_RUN.",
+    "Live role revocation tested after TTL expiry probe; label auth-current-role-and-cache-hit does not prove a still-valid warm cache at revocation.",
+    "Separate stack/generator enforced budgets, full worker/broker/Redis process and pool coverage remain unverified.",
+    "No independent post-run process probe; owned process shutdown is a runner report.",
+    "No application runtime change, policy freeze or threshold revision from these functional results."
+  ],
+  "agentExecuted": [
+    "local ZIP/CRC/path/inventory/hash/report/source validation only"
+  ],
+  "agentNotExecuted": [
+    "Kaggle notebook",
+    "DB connections",
+    "migration/seed/reset",
+    "application test suites",
+    "benchmark"
+  ]
+}

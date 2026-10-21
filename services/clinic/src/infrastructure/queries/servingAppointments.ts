@@ -10,6 +10,7 @@ import {snapshotDatabase} from './shadowAppointments.js';
 import {ReadDiagnostics,readDiagnostics,type DiagnosticReason} from '../../readDiagnostics.js';
 import {AppointmentAggregateCache} from './appointmentAggregateCache.js';
 import {ProjectionAdmission} from './projectionAdmission.js';
+import {isProjectionVersion} from '../../projectionVersions.js';
 export type ReadResult<T>={data:T;source:'authoritative'|'projection';generation?:string;degraded?:boolean};
 class PendingVersion extends Error{}
 export class ServingAppointmentQueries{
@@ -59,7 +60,7 @@ export class ServingAppointmentQueries{
             this.diagnostics.mark('projection-control');
             // The pointer and token check share the query's RepeatableRead snapshot.
             const c=await tx.readProjectionControl.findUnique({where:{projectionName:'appointments'},include:{activeGeneration:true}});
-            if(!c?.activeGenerationId||c.servingMode!=='projection'||c.activeGeneration?.state!=='ACTIVE'||!c.activeGeneration.verifiedAt||c.activeGeneration.schemaVersion!==1||c.activeGeneration.projectionName!=='appointments'){reason='control_unavailable';throw new Error('PROJECTION_UNAVAILABLE');}
+            if(!c?.activeGenerationId||c.servingMode!=='projection'||c.activeGeneration?.state!=='ACTIVE'||!c.activeGeneration.verifiedAt||!isProjectionVersion(c.activeGeneration.schemaVersion)||c.activeGeneration.projectionName!=='appointments'){reason='control_unavailable';throw new Error('PROJECTION_UNAVAILABLE');}
             if(!this.freshness.usable(c.activeGenerationId)){reason=this.freshness.unusableReason(c.activeGenerationId)??'freshness_missing';throw new Error('PROJECTION_UNAVAILABLE');}
             const ids=Object.keys(versions);
             if(ids.length){

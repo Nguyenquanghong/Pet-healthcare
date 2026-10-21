@@ -1,0 +1,170 @@
+{
+  "format": "clinic-activity-d0-protocol-revision-manifest-v1",
+  "recordedAtUtc": "2026-10-21T05:43:40.601146+00:00",
+  "branch": "phase2/clinic-activity-d0-20261020",
+  "head": "c4102b55a652dc8e4faa93eeada4d76cbe0753ef",
+  "scope": "User-approved D0 documents/ADR/policy only; no application code/fixture/harness/runtime changes",
+  "policy": {
+    "version": 6,
+    "sha256": "101079f2a40133d8160d80c2e24566be628c30074b319fce124fab1fe70b625b",
+    "previousVersion": 5,
+    "preservedPreviousSha256": "96f51be71168fb8b4f8ab78eaf09035bd12b48a2c6fbe5bc02ea9badce65d181"
+  },
+  "d0": "DESIGN_PROTOCOL_ACCEPTED",
+  "performanceReadiness": "NOT_READY",
+  "performance": "NOT_RUN_BLOCKED",
+  "d1": "PASS_IN_FUNCTIONAL_SCOPE_10K_SOURCE_CACHED_API_UI",
+  "d2": "NOT_STARTED",
+  "selectedResourceClass": "kaggle_shared_envelope",
+  "retainedSubtreesDeepEqual": [
+    "primaryMetric",
+    "semantics",
+    "primary",
+    "matrix",
+    "productLoad",
+    "regression",
+    "freshness",
+    "recovery",
+    "correctness",
+    "fallback",
+    "diagnosticIterationLimitPerBottleneck",
+    "decisions",
+    "cache",
+    "summaryEvidence",
+    "fixture",
+    "timeEstimate",
+    "thresholdsFrozenDate"
+  ],
+  "existingMeasurementRulesUnchanged": true,
+  "D1SourceFilesUnchanged": 608,
+  "files": [
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/04-delivery-plan.md",
+      "change": "modified",
+      "bytes": 8692,
+      "sha256": "a32f77bd09b588045a702184efa71beccd1375317b0a349648643bc039d783d4"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/05-validation.md",
+      "change": "modified",
+      "bytes": 9245,
+      "sha256": "a44448280eb4bf4a5d523a63b3d977d58d73b3be34d4de0e44f0a0d3ed59f254"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/06-benchmark-and-decision.md",
+      "change": "modified",
+      "bytes": 11938,
+      "sha256": "eca24b3db8e28c7bedfa0a1963018081c7ea123f5293d5cea94c303da7b3df8e"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/07-operations-and-pitfalls.md",
+      "change": "modified",
+      "bytes": 8497,
+      "sha256": "03da0ecfed6e709d084cb060e029aa99b03187c9ef306d7ffca51206c76b36d5"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/08-agent-prompts.md",
+      "change": "modified",
+      "bytes": 15736,
+      "sha256": "e7f39eaf983721a09dfa79dace04caa13333469f821e025d70dbab0ee1c46af7"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/README.md",
+      "change": "modified",
+      "bytes": 8261,
+      "sha256": "7a114faf587e765a216ef42fc85ecceb12ba053ad87ae053b4ffbf39e41b9a36"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/START-HERE-PROMPT.md",
+      "change": "modified",
+      "bytes": 4050,
+      "sha256": "91fcad848fa54e6ced2ea7ecea50e2fbb11e2b12fd53af561b469470224f0943"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/STATUS.md",
+      "change": "modified",
+      "bytes": 21025,
+      "sha256": "6386fe5255fbd0c33e1f4c31765b133e79bd82e1e975e0ae1399834176a2d946"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/acceptance.frozen.json",
+      "change": "modified",
+      "bytes": 33105,
+      "sha256": "101079f2a40133d8160d80c2e24566be628c30074b319fce124fab1fe70b625b"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/acceptance.frozen.sha256",
+      "change": "modified",
+      "bytes": 89,
+      "sha256": "25bc69e4006081a4cd01751d04bb25f6def83e7309d138ecea9bd97a561cf56b"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/adr-activity-01.md",
+      "change": "modified",
+      "bytes": 18093,
+      "sha256": "471f0e409b058da3f8aa2a477ddfc382c5ecba2d50ddb58291b703d9efbbf4ef"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/adr-activity-02.md",
+      "change": "new",
+      "bytes": 10919,
+      "sha256": "1273241b32aa8ac4f3d399a43855cd3b20e8864f80f0282ae45cace0417134ce"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/d0-enforcement-followup-20261021.md",
+      "change": "modified",
+      "bytes": 8771,
+      "sha256": "56b60fefb5da9bfee68ab42a398ab224b99ca34a761242caf27fdd0bf82d55b9"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/d0-inventory.md",
+      "change": "modified",
+      "bytes": 29416,
+      "sha256": "f32bbc18759480b2ed7b759aaf683b5dc6f522aac094cfd226bd149a36762880"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/d0-kaggle-environment-result-34de33f5-20261021.md",
+      "change": "modified",
+      "bytes": 8408,
+      "sha256": "584437c7afa2b31c46388500e70a68cfcf76072807d0a740411c6f313ce4fb08"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/d0-protocol-v6-20261021.md",
+      "change": "new",
+      "bytes": 7964,
+      "sha256": "4b6a5a8f7f651bb07ddec080dd794d40a75c2515a65e9c2c8f28165c2d14d398"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/preregistration-v5/acceptance.frozen.json",
+      "change": "new",
+      "bytes": 24469,
+      "sha256": "96f51be71168fb8b4f8ab78eaf09035bd12b48a2c6fbe5bc02ea9badce65d181"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/preregistration-v5/acceptance.frozen.sha256",
+      "change": "new",
+      "bytes": 90,
+      "sha256": "10f257c82d01735b4a41edc6f21f91cde4aacde0310dd9e4fdbed75df7dbf13d"
+    }
+  ],
+  "localEditingAndValidationScripts": [
+    {
+      "path": "test-results/phase2/cqrs/activity/d0-protocol-v6-20261021/revise_handoff.py",
+      "sha256": "50ddc67039268f92323a518b98d328bbf38a0489495a98f279f571ebe079b34d"
+    },
+    {
+      "path": "test-results/phase2/cqrs/activity/d0-protocol-v6-20261021/revise_policy.py",
+      "sha256": "fac392ee8e67bb2fa5d3daf47ab4b6b01f01fd1588cad51a87abafccf35fe0a5"
+    },
+    {
+      "path": "test-results/phase2/cqrs/activity/d0-protocol-v6-20261021/validate.py",
+      "sha256": "b22e6e8f809044dbd6ce455afb70c6c9ad1f527baee02fcdc74a43ca16dc125e"
+    }
+  ],
+  "preservationSnapshot": {
+    "path": "test-results/phase2/cqrs/activity/d0-protocol-v6-20261021/before.json",
+    "sha256": "560eb3256788c3ea5255450706a21474b23da77cbe5f285300361a073b32eee5",
+    "files": 1781
+  },
+  "hashConvention": "Exact UTF-8 LF JSON bytes; sidecar external; this manifest and its sidecar excluded from files"
+}

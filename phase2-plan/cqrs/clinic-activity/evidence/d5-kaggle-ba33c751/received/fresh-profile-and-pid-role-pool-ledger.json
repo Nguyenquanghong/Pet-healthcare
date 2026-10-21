@@ -1,0 +1,132 @@
+{
+  "environment": {
+    "kind": "kaggle_shared_envelope_fresh_profile",
+    "capturedAtUtc": "2026-10-21T13:58:05.304847+00:00",
+    "cpuModel": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+    "architecture": "x86_64",
+    "logicalCpus": 4,
+    "affinity": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "cpuMax": "400000 100000",
+    "memoryMax": "32212254720",
+    "memTotalBytes": 33658318848,
+    "kernel": "6.18.48+",
+    "cgroupVersion": 2,
+    "loadAverage": "0.42 0.23 0.16 2/324 112",
+    "python": "3.13.15",
+    "isolation": "NONE_CLAIMED: stack, generator and controller share the kernel envelope"
+  },
+  "versions": {
+    "node": "v24.16.0",
+    "npm": "11.13.0",
+    "prisma": "6.19.3",
+    "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+    "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92",
+    "nginx": "nginx version: nginx/1.24.0 (Ubuntu)",
+    "rabbitmq": "3.12.1-1ubuntu1.7",
+    "erlang": "1:25.3.2.8+dfsg-1ubuntu4.8",
+    "kernel": "6.18.48+"
+  },
+  "ledger": {
+    "api": [
+      9070,
+      9089,
+      9110
+    ],
+    "worker": [
+      9051,
+      9131,
+      9169,
+      9188
+    ],
+    "relay": [
+      9150
+    ],
+    "postgres": [
+      8206
+    ],
+    "broker": [
+      8350
+    ],
+    "redis": [
+      8345
+    ],
+    "gateway": [
+      9129
+    ],
+    "controller": [
+      8957
+    ]
+  },
+  "poolLimits": {
+    "coreApi": 4,
+    "clinicApi": 4,
+    "clinicAudit": 1,
+    "readWorker": 1,
+    "notificationApi": 4,
+    "operator": "per client",
+    "source": "DB_POOL_LIMIT/connection_limit as configured"
+  },
+  "poolPeaks": {
+    "core:d5_ba33c75197d74083_core": 4,
+    "core:d5_ba33c75197d74083_operator": 1,
+    "clinic:d5_ba33c75197d74083_clinic": 6,
+    "clinic:d5_ba33c75197d74083_operator": 3,
+    "clinic:d5_ba33c75197d74083_projector": 1,
+    "notification:d5_ba33c75197d74083_notification": 2,
+    "notification:d5_ba33c75197d74083_operator": 1
+  },
+  "accounting": "role CPU = /proc utime+stime incl. descendants; generator/controller separate; root cgroup total separate; no isolation claimed",
+  "profileKey": {
+    "resourceClass": "kaggle_shared_envelope",
+    "cpuModel": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+    "architecture": "x86_64",
+    "cpuQuotaAndAffinity": {
+      "quota": "400000 100000",
+      "affinity": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "memoryMax": "32212254720",
+    "liveSoftwareVersions": {
+      "node": "v24.16.0",
+      "npm": "11.13.0",
+      "prisma": "6.19.3",
+      "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+      "redis": "Redis server v=7.0.15 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d064f9f48c901a92",
+      "nginx": "nginx version: nginx/1.24.0 (Ubuntu)",
+      "rabbitmq": "3.12.1-1ubuntu1.7",
+      "erlang": "1:25.3.2.8+dfsg-1ubuntu4.8",
+      "kernel": "6.18.48+"
+    },
+    "replicas": {
+      "clinic": 1,
+      "core": 1,
+      "notification": 1
+    },
+    "poolLimits": {
+      "coreApi": 4,
+      "clinicApi": 4,
+      "clinicAudit": 1,
+      "readWorker": 1,
+      "notificationApi": 4,
+      "operator": "per client",
+      "source": "DB_POOL_LIMIT/connection_limit as configured"
+    },
+    "sourceBuildManifests": {
+      "source": "40f430d03e9d6e6b2b4d9dde1fa5c070db698a157a2bdd6ce01189db24b6ca50",
+      "build": "30e613637f937285fdf2a0ab80e6a140bc329e87043fac9ce5c07fba89b6b9fa"
+    },
+    "logicalFixtureDigest": "dd29ca40cc98758ab7245d8ae908b86427eabaedb8edc18a144027134d9fbe24",
+    "traceDigest": "41e18025aa9eb92b03c2e85e8536534a4614eb8c9623c7d6578ab2b615be20ce",
+    "harnessDigest": "c595c6cbedb051ce58ecf94527a0021e9746785b7ad4218102b94b0f70fa4760",
+    "policyDigest": "d8fbedbceacc82a79897be25315b4e16fa16823a3226f20493e882762784434e"
+  }
+}

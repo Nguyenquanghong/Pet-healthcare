@@ -1,0 +1,177 @@
+{
+  "workload": "query-heavy",
+  "configuration": "A",
+  "mode": "smoke",
+  "settings": {
+    "warmup": 5,
+    "seconds": 60,
+    "rate": 12,
+    "concurrency": 16
+  },
+  "status": "COMPLETE",
+  "run": "922f2b7e-efc1-4a75-8d7a-49930243e0bd",
+  "dataset": {
+    "version": "cqrs-query-heavy-v1",
+    "synthetic": true,
+    "accounts": 100,
+    "pets": 100,
+    "appointments": 100000,
+    "reservations": 5900,
+    "medicalRecords": 100,
+    "month": "2028-02",
+    "distribution": "1000 appointments/owner; 7 statuses, 10 types, 21 dates; UUID IDs; fixed dates/order keys; no measured writes"
+  },
+  "cqrs": {
+    "configuration": "A",
+    "readMode": "authoritative",
+    "projectorEnabled": true,
+    "shadowEnabled": false,
+    "apiPool": 4,
+    "projectorPool": 1,
+    "freshnessPool": 0,
+    "capacityAccepted": false,
+    "generation": "44586873-eb76-4e37-a894-9835104ed436",
+    "rebuild": {
+      "seconds": 39.089456492,
+      "appointments": 100000,
+      "diff": {
+        "missing": 0,
+        "extra": 0,
+        "lag": 0,
+        "ahead": 0,
+        "corrupt": 0,
+        "registry": 0
+      }
+    }
+  },
+  "cqrsPreflight": [
+    {
+      "operation": "list",
+      "status": 200,
+      "diagnostic_id": 1,
+      "read_source": "authoritative",
+      "generation_matches": false,
+      "degraded": false
+    },
+    {
+      "operation": "calendar",
+      "status": 200,
+      "diagnostic_id": 2,
+      "read_source": "authoritative",
+      "generation_matches": false,
+      "degraded": false
+    }
+  ],
+  "ownerPreflight": [
+    {
+      "check": "owner-scope-0",
+      "status": 200,
+      "valid": true,
+      "counts": {
+        "pending": 143,
+        "confirmed": 143,
+        "checked_in": 143,
+        "in_progress": 143,
+        "completed": 143,
+        "cancelled": 143,
+        "no_show": 142,
+        "billingHeld": 20
+      },
+      "pagination": {
+        "page": 1,
+        "pageSize": 20,
+        "total": 1000,
+        "totalPages": 50
+      }
+    },
+    {
+      "check": "owner-scope-1",
+      "status": 200,
+      "valid": true,
+      "counts": {
+        "pending": 143,
+        "confirmed": 143,
+        "checked_in": 143,
+        "in_progress": 143,
+        "completed": 143,
+        "cancelled": 143,
+        "no_show": 142,
+        "billingHeld": 20
+      },
+      "pagination": {
+        "page": 1,
+        "pageSize": 20,
+        "total": 1000,
+        "totalPages": 50
+      }
+    },
+    {
+      "check": "anonymous-denied",
+      "status": 401,
+      "valid": true
+    }
+  ],
+  "ledger": {
+    "api": [
+      13110,
+      13129,
+      13149
+    ],
+    "worker": [
+      13091,
+      13170,
+      13208,
+      13228
+    ],
+    "relay": [
+      13189
+    ],
+    "postgres": [
+      12782
+    ],
+    "broker": [
+      12808
+    ],
+    "redis": [
+      12803
+    ],
+    "gateway": [
+      13168
+    ],
+    "generator": [
+      12752
+    ],
+    "controller": [
+      49,
+      12751,
+      12885
+    ]
+  },
+  "warmup": {
+    "startMonotonicMs": 1074531.5155789999,
+    "endMonotonicMs": 1079531.5155789999,
+    "drainSeconds": 0.0009093409998968127,
+    "scheduled": 60,
+    "seconds": 5
+  },
+  "measured": {
+    "startMonotonicMs": 1079533.094817,
+    "endMonotonicMs": 1139533.094817,
+    "drainSeconds": 0.056540324000025066,
+    "scheduled": 720,
+    "seconds": 60
+  },
+  "pool": {
+    "peaks": {
+      "p8_notification": 3,
+      "p8_clinic": 8,
+      "p8_core": 5
+    },
+    "samples": 61,
+    "errors": 0
+  },
+  "reconciliation": {
+    "status": "PASS",
+    "unexpectedExit": false
+  }
+}

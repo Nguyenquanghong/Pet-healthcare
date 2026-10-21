@@ -1,0 +1,415 @@
+{
+  "kind": "CLINIC_ACTIVITY_D5_READINESS_NOT_ACCEPTANCE",
+  "run": "ba33c751-97d7-4083-bb0f-1086f1b4ae69",
+  "policy": "v9 partial: fullyFrozen=false, performanceMeasurementsAllowed=false",
+  "checks": {
+    "identity": {
+      "status": "PASS",
+      "identities": [
+        {
+          "component": "core",
+          "access": "operator",
+          "db": "d5_ba33c75197d74083_core",
+          "role": "d5_ba33c75197d74083_operator",
+          "superuser": false
+        },
+        {
+          "component": "core",
+          "access": "api",
+          "db": "d5_ba33c75197d74083_core",
+          "role": "d5_ba33c75197d74083_core",
+          "superuser": false
+        },
+        {
+          "component": "clinic",
+          "access": "operator",
+          "db": "d5_ba33c75197d74083_clinic",
+          "role": "d5_ba33c75197d74083_operator",
+          "superuser": false
+        },
+        {
+          "component": "clinic",
+          "access": "api",
+          "db": "d5_ba33c75197d74083_clinic",
+          "role": "d5_ba33c75197d74083_clinic",
+          "superuser": false
+        },
+        {
+          "component": "clinic",
+          "access": "projector",
+          "db": "d5_ba33c75197d74083_clinic",
+          "role": "d5_ba33c75197d74083_projector",
+          "superuser": false
+        },
+        {
+          "component": "notification",
+          "access": "operator",
+          "db": "d5_ba33c75197d74083_notification",
+          "role": "d5_ba33c75197d74083_operator",
+          "superuser": false
+        },
+        {
+          "component": "notification",
+          "access": "api",
+          "db": "d5_ba33c75197d74083_notification",
+          "role": "d5_ba33c75197d74083_notification",
+          "superuser": false
+        }
+      ]
+    },
+    "grants": {
+      "status": "PASS",
+      "source": "tools/phase2/p7-cutover.mjs runtimeGrantStatements",
+      "matrix": [
+        {
+          "role": "d5_ba33c75197d74083_clinic",
+          "table": "AppointmentDailySummary",
+          "priv": "DELETE",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "role": "d5_ba33c75197d74083_clinic",
+          "table": "ClinicActivityControl",
+          "priv": "UPDATE",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "role": "d5_ba33c75197d74083_clinic",
+          "table": "ReadProjectionGeneration",
+          "priv": "UPDATE",
+          "actual": false,
+          "expected": false
+        },
+        {
+          "role": "d5_ba33c75197d74083_projector",
+          "table": "AppointmentDailySummary",
+          "priv": "INSERT",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "role": "d5_ba33c75197d74083_projector",
+          "table": "AppointmentDailySummary",
+          "priv": "UPDATE",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "role": "d5_ba33c75197d74083_projector",
+          "table": "ClinicActivityControl",
+          "priv": "SELECT",
+          "actual": true,
+          "expected": true
+        },
+        {
+          "role": "d5_ba33c75197d74083_clinic",
+          "table": "appointments",
+          "priv": "UPDATE",
+          "actual": true,
+          "expected": true
+        }
+      ]
+    },
+    "fixture-and-rebuild": {
+      "status": "PASS",
+      "fixture": {
+        "format": "clinic-activity-fixture-v1",
+        "rows": 100000,
+        "seed": 20261020,
+        "businessDate": "2030-10-20",
+        "syntheticOnly": true,
+        "distribution": {
+          "historyDays": 1461,
+          "busyAnchorProbability": 0.002,
+          "excludedHistoryMonth": 2,
+          "excludedWeekday": 0,
+          "typeWeights": [
+            40,
+            15,
+            3,
+            8,
+            1,
+            3,
+            12,
+            10,
+            6,
+            2
+          ],
+          "statusWeights": [
+            6,
+            8,
+            2,
+            2,
+            65,
+            12,
+            5
+          ],
+          "first70CoverAllEnumPairs": true
+        },
+        "contentSha256": "dd29ca40cc98758ab7245d8ae908b86427eabaedb8edc18a144027134d9fbe24"
+      },
+      "generation": "d296e1b3-6dda-466f-a373-d5305da728a5",
+      "rebuildFreezeMs": 30203,
+      "analyzeAfterRebuildMs": 1474
+    },
+    "composition": {
+      "status": "PASS",
+      "clinicApiReady": {
+        "service": "clinic",
+        "status": "api-ready",
+        "activityMode": "control",
+        "activitySummaryEvidence": true,
+        "projectionVersions": [
+          1,
+          2
+        ],
+        "summaryEnabled": true
+      },
+      "readWorkerReady": {
+        "service": "clinic-read-v1",
+        "status": "worker-ready",
+        "poolLimit": 1,
+        "prefetch": 1,
+        "projectionVersions": [
+          1,
+          2
+        ],
+        "summaryEnabled": true
+      },
+      "processes": [
+        {
+          "name": "clinic-read-worker",
+          "pid": 9051
+        },
+        {
+          "name": "core",
+          "pid": 9070
+        },
+        {
+          "name": "clinic-0",
+          "pid": 9089
+        },
+        {
+          "name": "notification",
+          "pid": 9110
+        },
+        {
+          "name": "core-outbox",
+          "pid": 9131
+        },
+        {
+          "name": "clinic-worker",
+          "pid": 9150
+        },
+        {
+          "name": "notification-worker",
+          "pid": 9169
+        },
+        {
+          "name": "billing-worker",
+          "pid": 9188
+        },
+        {
+          "name": "nginx",
+          "pid": 9129
+        }
+      ],
+      "gateway": "nginx -> /api/appointments|medical-records Clinic, /api/* Core (activity via Core proxy)"
+    },
+    "generator-calibration": {
+      "status": "PASS",
+      "label": "calibration",
+      "kind": "calibration",
+      "originWallMs": 1792591283132,
+      "plan": {
+        "screens": 20,
+        "pollMs": 15000,
+        "warmupMs": 0,
+        "measuredMs": 120000,
+        "writesPerSecond": 0.2,
+        "seed": 20261020,
+        "ops": 184
+      },
+      "validity": {
+        "valid": true,
+        "reasons": [],
+        "planned": 184,
+        "recorded": 184,
+        "drops": 0,
+        "latenessP99Ms": 1.7939030000015919,
+        "latenessMaxMs": 4.720159999999851,
+        "insideFraction": 1
+      },
+      "outcomes": {
+        "success:204": 184
+      },
+      "cpu": {
+        "complete": true,
+        "reasons": [],
+        "roles": {
+          "api": 4.04,
+          "worker": 3.93,
+          "relay": 2.78,
+          "postgres": 12.77,
+          "broker": 3.84,
+          "redis": 0.18,
+          "gateway": 0,
+          "controller": 1.26,
+          "generator": 1.03
+        },
+        "applicationCpuSeconds": 27.54,
+        "separateCpuSeconds": {
+          "generator": 1.03,
+          "controller": 1.26
+        },
+        "totalEnvelopeCpuSeconds": 30.732579000000015,
+        "coveredMs": 118148,
+        "partialStartMs": 455,
+        "partialEndMs": 1397
+      }
+    },
+    "smoke": {
+      "status": "PASS",
+      "smoke": [
+        {
+          "label": "S",
+          "mode": "source",
+          "counts": {
+            "success": 288
+          },
+          "headerMismatch": 0,
+          "validity": {
+            "valid": true,
+            "reasons": [],
+            "planned": 288,
+            "recorded": 345,
+            "drops": 0,
+            "latenessP99Ms": 1.4351749999987078,
+            "latenessMaxMs": 5.278641999990214,
+            "insideFraction": 1
+          },
+          "cpuCoverage": {
+            "complete": true,
+            "reasons": [],
+            "applicationCpuSeconds": 33.78,
+            "separate": {
+              "generator": 1,
+              "controller": 0.32
+            },
+            "totalEnvelopeCpuSeconds": 35.72001
+          }
+        },
+        {
+          "label": "C",
+          "mode": "cached",
+          "counts": {
+            "success": 288
+          },
+          "headerMismatch": 0,
+          "validity": {
+            "valid": true,
+            "reasons": [],
+            "planned": 288,
+            "recorded": 345,
+            "drops": 0,
+            "latenessP99Ms": 1.4191589999973075,
+            "latenessMaxMs": 1.49252400000114,
+            "insideFraction": 1
+          },
+          "cpuCoverage": {
+            "complete": true,
+            "reasons": [],
+            "applicationCpuSeconds": 23.160000000000004,
+            "separate": {
+              "generator": 1.01,
+              "controller": 0.37
+            },
+            "totalEnvelopeCpuSeconds": 25.011837000000014
+          }
+        },
+        {
+          "label": "P",
+          "mode": "summary",
+          "counts": {
+            "success": 288
+          },
+          "headerMismatch": 0,
+          "validity": {
+            "valid": true,
+            "reasons": [],
+            "planned": 288,
+            "recorded": 345,
+            "drops": 0,
+            "latenessP99Ms": 1.3401510000003327,
+            "latenessMaxMs": 2.4895350000006147,
+            "insideFraction": 1
+          },
+          "cpuCoverage": {
+            "complete": true,
+            "reasons": [],
+            "applicationCpuSeconds": 27.840000000000003,
+            "separate": {
+              "generator": 1,
+              "controller": 0.31
+            },
+            "totalEnvelopeCpuSeconds": 29.708612000000016
+          }
+        }
+      ],
+      "parity": [
+        {
+          "scenario": "primary30day",
+          "source": "summary",
+          "equal": true
+        },
+        {
+          "scenario": "12month",
+          "source": "summary",
+          "equal": true
+        },
+        {
+          "scenario": "clinic",
+          "source": "summary",
+          "equal": true
+        },
+        {
+          "scenario": "spa",
+          "source": "summary",
+          "equal": true
+        },
+        {
+          "scenario": "zero",
+          "source": "summary",
+          "equal": true
+        }
+      ],
+      "correctness": {
+        "sourceToReadRowMismatch": 0,
+        "readRowToSummaryMismatch": 0
+      }
+    },
+    "cpu-coverage": {
+      "status": "PASS",
+      "expectedRoles": [
+        "api",
+        "worker",
+        "relay",
+        "postgres",
+        "broker",
+        "redis",
+        "gateway",
+        "controller",
+        "generator"
+      ],
+      "auditRunsInside": "api (Clinic API process)",
+      "relayRunsInside": "relay (Clinic worker)"
+    },
+    "profile": {
+      "status": "PASS",
+      "profileKeySha256": "5ee445219381ea12876b5e7e1d303b20002cc2fe61fba8fb3ca610add3c8656c"
+    }
+  },
+  "status": "READY_FOR_POLICY_FREEZE_REVIEW"
+}

@@ -6,6 +6,7 @@ import { useNotificationCount } from '../../store/NotificationCountContext';
 import { QueryStatus } from '../../components/ui/QueryStatus';
 import { appointmentStatusLabels, bookingStatusLabels } from "../../utils/statusLabels";
 import { formatCurrency } from "../../utils/formatCurrency";
+import { ClinicActivitySection } from '../../components/admin/ClinicActivitySection';
 
 function StatCard({ label, value, icon: Icon, subtitle }: { label: string; value: number | string; icon: React.ElementType; subtitle?: string }) {
   return (
@@ -50,6 +51,7 @@ export function AdminDashboardPage() {
       </div>
 
       {/* Quick Actions Panel */}
+      <ClinicActivitySection />
       {(pendingAppointments.length > 0 || pendingBookings.length > 0) && (
         <div className="mt-6 rounded-lg border border-amber-200 bg-white p-4">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">

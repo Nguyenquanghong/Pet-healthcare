@@ -1,0 +1,134 @@
+{
+  "format": "clinic-activity-monolith-baseline-intake-manifest-v1",
+  "recordedAtUtc": "2026-10-21T06:38:43.999699+00:00",
+  "branch": "phase2/clinic-activity-d0-20261020",
+  "head": "c4102b55a652dc8e4faa93eeada4d76cbe0753ef",
+  "policyVersion": 8,
+  "policySha256": "a55ce41925691098e9303e915d425c9629ba8550804b15a1464e84bd6d699fa7",
+  "previousPolicyVersion": 7,
+  "previousPolicySha256": "297c0ee1efaf15df170804be54762fb379634fe644a7afa9857a2fee439c294a",
+  "reportedMSourceSha": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+  "archiveSha256": "9a5d881d8a70a9da4993667cc9663a768ff102ddaac12d5035a76b3d34f39950",
+  "historicalComparison": "BASELINE_IDENTIFIED_COMPARABILITY_PENDING",
+  "newPerformanceMeasurements": "NOT_RUN",
+  "scope": "Legacy artifact offline consistency review and policy/docs only; no runtime/harness/fixture changes",
+  "retainedActivityThresholdsWorkloadsSamplesResourceProtocol": true,
+  "sourceFilesUnchanged": 608,
+  "files": [
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/04-delivery-plan.md",
+      "change": "modified",
+      "bytes": 9274,
+      "sha256": "32d11b79de97a5ed711c2d143117d54b7fe38d83151af6925ea9578fa44cab33"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/05-validation.md",
+      "change": "modified",
+      "bytes": 9859,
+      "sha256": "7ad9b45bed626a8ba19e83d3f09a17afd6fbd0c859bc4705c5ca01153e2600c4"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/06-benchmark-and-decision.md",
+      "change": "modified",
+      "bytes": 13275,
+      "sha256": "141e2025f2a28db95d1244ca76ab618daddf1aef9c967c9236f1605a982d6ba3"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/08-agent-prompts.md",
+      "change": "modified",
+      "bytes": 16737,
+      "sha256": "8efbc63f797c06cbc4ed1285137bc3c145e15deb426b4201200caebb0d4a5f27"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/README.md",
+      "change": "modified",
+      "bytes": 8861,
+      "sha256": "97de6a7f9f85bf7b644fb8cc5b8bed16263fe678e2998413bf7d7c0c26cab418"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/STATUS.md",
+      "change": "modified",
+      "bytes": 23911,
+      "sha256": "7cf421732fc7d2d2a4efe7f2a0aee6c4e2e5e2a5c1311498d07687d13e815f8d"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/acceptance.frozen.json",
+      "change": "modified",
+      "bytes": 40820,
+      "sha256": "a55ce41925691098e9303e915d425c9629ba8550804b15a1464e84bd6d699fa7"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/acceptance.frozen.sha256",
+      "change": "modified",
+      "bytes": 89,
+      "sha256": "6d882ab79941de6178a9f6978ddabf5349e9948c5cfb63a6789327e2b1cb20cb"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/adr-activity-03.md",
+      "change": "modified",
+      "bytes": 8891,
+      "sha256": "2e0b91304319bc450884a4cbc02c2ec8f77a5774901c3a21341f127230b3d683"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/monolith-nipopeto-20261021.md",
+      "change": "new",
+      "bytes": 9630,
+      "sha256": "ced9251d2b4b3774b1772e9ea4829a9691fe62594f4bdb4083c575f17cf5704a"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/monolith-nipopeto-20261021/SHA256SUMS",
+      "change": "new",
+      "bytes": 245,
+      "sha256": "1e9dc35ba169e2072621608be2676cf0658179ccfb1a8b1c4d5ef945c38bf448"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/monolith-nipopeto-20261021/members.json",
+      "change": "new",
+      "bytes": 32917,
+      "sha256": "09131efa3b70900ff6e6d21362db47ce27a085c02d10afd81333f7eb870ae49b"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/monolith-nipopeto-20261021/nipopeto-evidence.zip",
+      "change": "new",
+      "bytes": 294548,
+      "sha256": "9a5d881d8a70a9da4993667cc9663a768ff102ddaac12d5035a76b3d34f39950"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/monolith-nipopeto-20261021/review.json",
+      "change": "new",
+      "bytes": 40093,
+      "sha256": "d04b4606fdce525359397abce8d1e0774c3db569e990c1d76e0f4c9bbc34a65e"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/preregistration-v7/acceptance.frozen.json",
+      "change": "new",
+      "bytes": 37689,
+      "sha256": "297c0ee1efaf15df170804be54762fb379634fe644a7afa9857a2fee439c294a"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/preregistration-v7/acceptance.frozen.sha256",
+      "change": "new",
+      "bytes": 89,
+      "sha256": "ec5d9a0b92f41e0b7425b0829b575315e512cd375d524df38a8581eaa6f5fef3"
+    }
+  ],
+  "auditScripts": [
+    {
+      "path": "test-results/phase2/cqrs/activity/monolith-nipopeto-20261021/edit_docs.py",
+      "sha256": "70ea71c0c85a4e7dd75e079a766b0fd0410c68b2cbc08486303a0564a08c928f"
+    },
+    {
+      "path": "test-results/phase2/cqrs/activity/monolith-nipopeto-20261021/review.py",
+      "sha256": "980d35beeca144c84ce378d60312e8691e3249a547355f5dbdff5d50c41e9834"
+    },
+    {
+      "path": "test-results/phase2/cqrs/activity/monolith-nipopeto-20261021/revise_policy.py",
+      "sha256": "1e1ddbc632e5a8ba28e39d5a874485ce6323a02b04a4f2e5efd01fad4b3f2383"
+    },
+    {
+      "path": "test-results/phase2/cqrs/activity/monolith-nipopeto-20261021/validate.py",
+      "sha256": "09195966765f6e723f916bb735f76559102475e53efa1597a740d7e262ac96d8"
+    }
+  ],
+  "hashConvention": "Exact UTF-8 LF bytes; manifest/sidecar external to files list; no self-reference"
+}

@@ -1,0 +1,90 @@
+{
+  "scope": "FUNCTIONAL_SMOKE_NOT_TIMING",
+  "generation": "d296e1b3-6dda-466f-a373-d5305da728a5",
+  "smoke": [
+    {
+      "label": "S",
+      "mode": "source",
+      "counts": {
+        "success": 288
+      },
+      "headerMismatch": 0,
+      "validity": {
+        "valid": true,
+        "reasons": [],
+        "planned": 288,
+        "recorded": 345,
+        "drops": 0,
+        "latenessP99Ms": 1.4351749999987078,
+        "latenessMaxMs": 5.278641999990214,
+        "insideFraction": 1
+      },
+      "cpuCoverage": {
+        "complete": true,
+        "reasons": [],
+        "applicationCpuSeconds": 33.78,
+        "separate": {
+          "generator": 1,
+          "controller": 0.32
+        },
+        "totalEnvelopeCpuSeconds": 35.72001
+      }
+    },
+    {
+      "label": "C",
+      "mode": "cached",
+      "counts": {
+        "success": 288
+      },
+      "headerMismatch": 0,
+      "validity": {
+        "valid": true,
+        "reasons": [],
+        "planned": 288,
+        "recorded": 345,
+        "drops": 0,
+        "latenessP99Ms": 1.4191589999973075,
+        "latenessMaxMs": 1.49252400000114,
+        "insideFraction": 1
+      },
+      "cpuCoverage": {
+        "complete": true,
+        "reasons": [],
+        "applicationCpuSeconds": 23.160000000000004,
+        "separate": {
+          "generator": 1.01,
+          "controller": 0.37
+        },
+        "totalEnvelopeCpuSeconds": 25.011837000000014
+      }
+    },
+    {
+      "label": "P",
+      "mode": "summary",
+      "counts": {
+        "success": 288
+      },
+      "headerMismatch": 0,
+      "validity": {
+        "valid": true,
+        "reasons": [],
+        "planned": 288,
+        "recorded": 345,
+        "drops": 0,
+        "latenessP99Ms": 1.3401510000003327,
+        "latenessMaxMs": 2.4895350000006147,
+        "insideFraction": 1
+      },
+      "cpuCoverage": {
+        "complete": true,
+        "reasons": [],
+        "applicationCpuSeconds": 27.840000000000003,
+        "separate": {
+          "generator": 1,
+          "controller": 0.31
+        },
+        "totalEnvelopeCpuSeconds": 29.708612000000016
+      }
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "format": "clinic-activity-historical-comparison-inventory-v1",
+  "capturedAtUtc": "2026-10-21T06:08:01.499933+00:00",
+  "scope": "Read Git blobs/specs/reports and archive hashes; no runtime or benchmark execution",
+  "policyVersion": 7,
+  "policySha256": "297c0ee1efaf15df170804be54762fb379634fe644a7afa9857a2fee439c294a",
+  "baselineMStatus": "CANDIDATE_NOT_VERIFIED_AS_USER_HISTORICAL_RUN",
+  "historicalMArchiveSearchScope": "ZIP filenames under benchmarks only; historical temp directories excluded; no matching phase1 ZIP found there",
+  "revisions": [
+    {
+      "sourceSha": "add596e4488e3cac2584115874c2f65a97af7047",
+      "gitTree": "b53d0bf3a710193ad557ab7f083beeba5d035110",
+      "openApiBlobSha256": "f1c5faa00f5b48226c019ef93bef0cca70e75cc1192fedc26fbb92247e4b705b",
+      "openApiServers": [
+        {
+          "url": "/api"
+        }
+      ],
+      "openApiPathCount": 56,
+      "clinicServiceEntrypointPresent": false,
+      "commonPathMethods": {
+        "appointments": [
+          "get",
+          "post"
+        ],
+        "pets": [
+          "get",
+          "post"
+        ],
+        "medical-records": [
+          "get",
+          "post"
+        ],
+        "hotel-bookings": [
+          "get",
+          "post"
+        ],
+        "invoices": [
+          "get",
+          "post"
+        ],
+        "notifications": [
+          "get"
+        ]
+      },
+      "activityPathPresent": false,
+      "presenceIsRuntimeSemanticsProof": false
+    },
+    {
+      "sourceSha": "3e88d7e57fbf4f74da363d320f286244237a4389",
+      "gitTree": "0c71cfcb72e88f56ba70c1fc3640e9e607f41725",
+      "openApiBlobSha256": "9521cb0b366e53bb19c009f61662559ce0b87436853834d4b791c0e09944c066",
+      "openApiServers": [
+        {
+          "url": "/api"
+        }
+      ],
+      "openApiPathCount": 60,
+      "clinicServiceEntrypointPresent": true,
+      "commonPathMethods": {
+        "appointments": [
+          "get",
+          "post"
+        ],
+        "pets": [
+          "get",
+          "post"
+        ],
+        "medical-records": [
+          "get",
+          "post"
+        ],
+        "hotel-bookings": [
+          "get",
+          "post"
+        ],
+        "invoices": [
+          "get",
+          "post"
+        ],
+        "notifications": [
+          "get"
+        ]
+      },
+      "activityPathPresent": false,
+      "presenceIsRuntimeSemanticsProof": false
+    }
+  ],
+  "archives": [
+    {
+      "path": "benchmarks/phase2/Results/cqrs-q0-query-heavy-c606628a-1acf-4c9f-a2d9-bbb49d6ea4ca.zip",
+      "bytes": 2340299,
+      "sha256": "8b006e560d31a373661990bfe4fcb7129e816143f4698eaf922a6444d3fc4bdf",
+      "check": "SHA_MATCHES_EXISTING_AUDIT_REPORT; NOT_REMEASURED_OR_RAW_REEVALUATED"
+    },
+    {
+      "path": "benchmarks/phase2/Results/cqrs-q0-pcn-b65d3e6a-09a4-466d-bd23-2f06bbf38349.zip",
+      "bytes": 7039059,
+      "sha256": "1f3b284cb56e6e045a16088b0b3c1a2ee3dfe10e411daf2af99be2981e9f6f76",
+      "check": "SHA_MATCHES_EXISTING_AUDIT_REPORT; NOT_REMEASURED_OR_RAW_REEVALUATED"
+    }
+  ],
+  "measurements": "NOT_RUN",
+  "runtimeContractParity": "NOT_RUN",
+  "historicalComparison": "PENDING_BASELINE_IDENTITY_AND_COMPARABILITY"
+}

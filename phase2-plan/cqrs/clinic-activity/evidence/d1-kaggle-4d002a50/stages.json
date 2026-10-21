@@ -1,0 +1,55 @@
+{
+  "kind": "D1_FUNCTIONAL_STAGE_RECEIPTS_NOT_BENCHMARK",
+  "run": "4d002a50-8696-4eae-aeb9-a057c44749d2",
+  "performance": "NOT_RUN",
+  "stages": [
+    {
+      "stage": "prerequisites",
+      "startedAtUtc": "2026-10-21T01:18:10.235942+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T01:19:01.820524+00:00"
+    },
+    {
+      "stage": "new-private-cluster",
+      "startedAtUtc": "2026-10-21T01:19:01.821445+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T01:19:10.676269+00:00"
+    },
+    {
+      "stage": "linux-build-and-existing-migrations",
+      "startedAtUtc": "2026-10-21T01:19:10.677105+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T01:20:49.797836+00:00"
+    },
+    {
+      "stage": "seed-10k-and-reconcile",
+      "startedAtUtc": "2026-10-21T01:20:49.798692+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T01:20:56.349325+00:00"
+    },
+    {
+      "stage": "read-only-pg-parity",
+      "startedAtUtc": "2026-10-21T01:20:56.350135+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T01:20:57.070207+00:00"
+    },
+    {
+      "stage": "read-only-explain-no-analyze",
+      "startedAtUtc": "2026-10-21T01:20:57.070994+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T01:20:59.009216+00:00"
+    },
+    {
+      "stage": "direct-nginx-and-browser-functional",
+      "startedAtUtc": "2026-10-21T01:20:59.010199+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T01:21:21.297348+00:00"
+    },
+    {
+      "stage": "actual-trial-profile",
+      "startedAtUtc": "2026-10-21T01:21:21.309179+00:00",
+      "status": "PASS",
+      "finishedAtUtc": "2026-10-21T01:21:22.327432+00:00"
+    }
+  ]
+}

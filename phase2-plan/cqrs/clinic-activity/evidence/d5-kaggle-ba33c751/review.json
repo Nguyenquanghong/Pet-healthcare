@@ -1,0 +1,47 @@
+{
+  "format": "clinic-activity-d5-kaggle-review-v1",
+  "reviewedAtLocal": "2026-10-21 (UTC+7)",
+  "run": "ba33c751-97d7-4083-bb0f-1086f1b4ae69",
+  "received": {
+    "form": "EXTRACTED_DIRECTORY_NO_ORIGINAL_ZIP",
+    "location": "benchmarks/phase2/Results/clinic-activity-d5-ba33c751-97d7-4083-bb0f-1086f1b4ae69 (left untouched)",
+    "copy": "received/ (byte-identical, SHA256SUMS.received)",
+    "integrity": "all 9 result-manifest entries match bytes+sha256; no unlisted or missing files; result-manifest.json itself has no external anchor because the ZIP was not provided",
+    "secretScan": "clean (postgresql/amqp/redis URLs, private key, password, Bearer token patterns)"
+  },
+  "provenance": {
+    "notebookSha256": "638668355daab5f5bedab9f400b9e6e90b0cb0c7069a2b9377d4d17f17458e5c",
+    "sourceArchiveSha256": "7f9c98e8410a7709428cb0673ffe4155c87bbe293119a0463e29b72e0ea626a0",
+    "sourceArchiveMatchesPublishedNotebook": true,
+    "policySha256": "d8fbedbceacc82a79897be25315b4e16fa16823a3226f20493e882762784434e",
+    "sameAsLocalDryRun4": {"sourceTree": true, "fixture": true, "trace": true, "harness": true, "policy": true, "migration": true, "build": false}
+  },
+  "result": {
+    "status": "READY_FOR_POLICY_FREEZE_REVIEW",
+    "stages": "6/6 PASS, cleanup PASS",
+    "checks": {"identity": "PASS", "grants": "PASS", "fixture-and-rebuild": "PASS", "composition": "PASS", "generator-calibration": "PASS", "smoke": "PASS", "cpu-coverage": "PASS", "profile": "PASS"},
+    "stageSeconds": {"prerequisites": 72, "cluster": 8, "brokers": 8, "buildAndMigrations": 46, "controller": 476},
+    "rebuildV2": {"rows": 100000, "freezeMs": 30203, "analyzeAfterRebuildMs": 1474},
+    "calibration": {"planned": 184, "recorded": 184, "drops": 0, "latenessP99Ms": 1.79, "latenessMaxMs": 4.72, "insideFraction": 1, "cpuCoverageComplete": true},
+    "smoke": {"S": {"success": 288, "headerMismatch": 0, "valid": true, "cpuComplete": true}, "C": {"success": 288, "headerMismatch": 0, "valid": true, "cpuComplete": true}, "P": {"success": 288, "headerMismatch": 0, "valid": true, "cpuComplete": true}},
+    "parityViaNginx": "5/5 scenarios summary == source after quiesce",
+    "observationsOnly": "CPU seconds, latency and lateness are functional observations; policy performanceMeasurementsAllowed=false"
+  },
+  "findings": [
+    {"id": "F1", "severity": "BLOCKS_CROSS_SESSION_PROFILE_MATCH", "topic": "build digest is path-dependent",
+     "detail": "buildSha256 differs from dry run 4 (30e61363 vs 012b7efc) with identical source tree. Prisma generated clients copied into dist (backend/dist/src/generated/phase2-core, services/clinic/dist/generated/client, services/notification/dist/generated/client: index.js/edge.js/wasm.js) embed absolute generator.output and sourceFilePath; on Kaggle these contain /tmp/clinic-activity-d5-<run>/source, so every run yields a different build digest and therefore a different profileKey.",
+     "required": "Before timing, the D6 harness must record a path-normalized build digest (replace the run root in raw and JSON-escaped forms) next to the raw digest and use the normalized one in profileKey. Not changed in D5 source."},
+    {"id": "F2", "severity": "PROFILE_LEDGER_INCOMPLETE", "topic": "poolLimits omit worker processes",
+     "detail": "poolLimits list coreApi/clinicApi/clinicAudit/readWorker/notificationApi only. All processes use runtime databaseUrl() with DB_POOL_LIMIT=4 (PHASE2_RUNTIME_REQUIRED=1), audit 1, read worker CLINIC_READ_PROJECTOR_POOL_LIMIT=1. Clinic role is shared by API (4) + audit (1) + clinic-worker/relay (4): observed peak 6 <= 9; Core role shared by API + core-outbox + billing-worker: peak 4 <= 12. Within limits, but per-process ceilings must be in the frozen profile.",
+     "required": "D6 profile records per-process pool ceilings (core-api 4, core-outbox 4, billing-worker 4, clinic-api 4, clinic-audit 1, clinic-worker 4, read-worker 1, notification-api 4, notification-worker 4) and peaks per role."},
+    {"id": "F3", "severity": "INFO", "topic": "profileKey trace/harness digests are D5-smoke specific",
+     "detail": "traceDigest/harnessDigest describe the D5 readiness smoke, not a D6 workload; a D6 session will carry its own digests. The reusable frozen part is the environment class, software versions, replicas, pool ceilings, fixture and policy."}
+  ],
+  "decision": {
+    "d5": "PASS_KAGGLE_READINESS",
+    "environmentProfile": "CANDIDATE_RECORDED (environment-profile-candidate.json); not yet a frozen policy version",
+    "policy": "v9 unchanged and preserved; new version to be created together with the D6 harness (normalized build digest, full pool ledger, D6 trace/harness digests) before any timing",
+    "performance": "NOT_RUN",
+    "d6": "NOT_STARTED (not assigned)"
+  }
+}

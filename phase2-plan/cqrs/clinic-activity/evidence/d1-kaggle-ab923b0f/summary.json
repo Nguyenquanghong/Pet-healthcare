@@ -1,0 +1,11 @@
+{
+  "kind": "CLINIC_ACTIVITY_D1_FUNCTIONAL_NOT_BENCHMARK",
+  "run": "ab923b0f-f7c8-49d9-8f0b-47b2e068aef2",
+  "status": "PASS_IN_FUNCTIONAL_SCOPE",
+  "performance": "NOT_RUN",
+  "d0": "PARTIAL_ENVIRONMENT",
+  "d1": "PG_AND_GATEWAY_FUNCTIONAL_PASS_REVIEW_REPORTS",
+  "resourceEnforcement": "UNVERIFIED",
+  "fullDeploymentValidated": false,
+  "ownedProcessesShutdown": "PASS"
+}

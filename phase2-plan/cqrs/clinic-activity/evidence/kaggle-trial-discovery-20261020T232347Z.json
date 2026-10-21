@@ -1,0 +1,21 @@
+{
+  "format": "clinic-activity-trial-discovery-v1",
+  "capturedAtUtc": "2026-10-20T23:23:47.403978+00:00",
+  "identityVerified": false,
+  "fixtureVerified": false,
+  "resourceEnforcementVerified": false,
+  "performance": "NOT_RUN",
+  "databaseConnections": 0,
+  "mutatesServicesDbOrQuota": false,
+  "environmentPresenceOnly": {
+    "ACTIVITY_TRIAL_DATABASE_URL": false,
+    "ACTIVITY_TRIAL_CONTEXT": false,
+    "ACTIVITY_TRIAL_CONTEXT_FILE": false
+  },
+  "processNameCountsNotOwnershipProof": {},
+  "unreadableProcessNames": 0,
+  "contextFilenameCandidatesRelativeToKaggleWorking": [],
+  "searchScope": "working only; max depth6/files3000/3seconds/20matches; skipped heavy dirs and symlinks",
+  "searchStoppedAtBound": false,
+  "status": "DISCOVERY_ONLY_NO_DATABASE_OR_GATE_PROOF"
+}

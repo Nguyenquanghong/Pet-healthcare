@@ -1,0 +1,129 @@
+{
+  "workload": "pcn",
+  "configuration": "A",
+  "mode": "smoke",
+  "settings": {
+    "users": 10,
+    "spawn_rate": 10,
+    "warmup": 5,
+    "seconds": 60
+  },
+  "status": "COMPLETE",
+  "run": "d28ff4d8-9a81-4a70-91e9-a4337d625d50",
+  "dataset": {
+    "version": "phase1-pcn-shape-v1",
+    "accounts": 10,
+    "pets": 10,
+    "appointments": 10,
+    "medicalRecords": 10,
+    "hotelBookings": 10,
+    "invoices": 10,
+    "notifications": 10,
+    "synthetic": true,
+    "notes": "One pet and one row per read resource per owner, as phase-1 PCN; split databases and RS256 differ. Setup admin is additional; browser-only doctor fixture omitted."
+  },
+  "cqrs": {
+    "configuration": "A",
+    "readMode": "authoritative",
+    "projectorEnabled": true,
+    "shadowEnabled": false,
+    "apiPool": 4,
+    "projectorPool": 1,
+    "freshnessPool": 0,
+    "capacityAccepted": false,
+    "generation": "b769b138-5cb5-43d0-8815-ad1950c3f46c",
+    "rebuild": {
+      "seconds": 0.12350066399999923,
+      "appointments": 10,
+      "diff": {
+        "missing": 0,
+        "extra": 0,
+        "lag": 0,
+        "ahead": 0,
+        "corrupt": 0,
+        "registry": 0
+      }
+    }
+  },
+  "cqrsPreflight": [
+    {
+      "operation": "list",
+      "status": 200,
+      "diagnostic_id": 1,
+      "read_source": "authoritative",
+      "generation_matches": false,
+      "degraded": false
+    },
+    {
+      "operation": "calendar",
+      "status": 200,
+      "diagnostic_id": 2,
+      "read_source": "authoritative",
+      "generation_matches": false,
+      "degraded": false
+    }
+  ],
+  "ledger": {
+    "api": [
+      15470,
+      15489,
+      15508
+    ],
+    "worker": [
+      15451,
+      15529,
+      15567,
+      15587
+    ],
+    "relay": [
+      15548
+    ],
+    "postgres": [
+      15190
+    ],
+    "broker": [
+      15216
+    ],
+    "redis": [
+      15211
+    ],
+    "gateway": [
+      15527
+    ],
+    "generator": [
+      15609
+    ],
+    "controller": [
+      49,
+      15159,
+      15160,
+      15293
+    ]
+  },
+  "pool": {
+    "peaks": {
+      "p8_notification": 3,
+      "p8_clinic": 8,
+      "p8_core": 7
+    },
+    "samples": 65,
+    "errors": 0
+  },
+  "locustExitCode": 0,
+  "reconciliation": {
+    "status": "PASS_IN_SCOPE",
+    "missing_success_ids": 0,
+    "writes_without_success_response": 0,
+    "duplicate_active_slots": 0,
+    "duplicate_response_ids": 0,
+    "unexpected_child_exit": false
+  },
+  "window": {
+    "startMonotonicMs": 1504798.05711,
+    "endMonotonicMs": 1564798.05711,
+    "completed": true,
+    "targetUsers": 10,
+    "populationMin": 10,
+    "populationMax": 10
+  }
+}

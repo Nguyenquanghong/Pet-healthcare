@@ -1,0 +1,31 @@
+{
+  "validity": {
+    "planned": 2880,
+    "recorded": 2880,
+    "drops": 0,
+    "latenessP99Ms": 0.4742036666129934,
+    "latenessMaxMs": 1.3554303334331053,
+    "insideFraction": 1.0,
+    "valid": true,
+    "reasons": []
+  },
+  "offeredRps": 24,
+  "seconds": 120,
+  "cpu": {
+    "complete": true,
+    "reasons": [],
+    "roles": {
+      "generator": 2.75,
+      "controller": 2.19
+    },
+    "applicationCpuSeconds": null,
+    "separateCpuSeconds": {
+      "generator": 2.75,
+      "controller": 2.19
+    },
+    "totalEnvelopeCpuSeconds": 7.772716000000003,
+    "coveredMs": 119149.17099999997,
+    "partialStartMs": 54.14611200010404,
+    "partialEndMs": 796.682887999923
+  }
+}

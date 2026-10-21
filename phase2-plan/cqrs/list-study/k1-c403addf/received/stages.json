@@ -1,0 +1,26 @@
+[
+  {
+    "stage": "fresh-environment-profile",
+    "startedAtUtc": "2026-10-21T16:02:48.588893+00:00",
+    "status": "PASS",
+    "finishedAtUtc": "2026-10-21T16:02:48.618862+00:00"
+  },
+  {
+    "stage": "prerequisites",
+    "startedAtUtc": "2026-10-21T16:02:48.619084+00:00",
+    "status": "PASS",
+    "finishedAtUtc": "2026-10-21T16:04:30.944099+00:00"
+  },
+  {
+    "stage": "verified-build-o-ab",
+    "startedAtUtc": "2026-10-21T16:04:30.944581+00:00",
+    "status": "PASS",
+    "finishedAtUtc": "2026-10-21T16:05:39.307662+00:00"
+  },
+  {
+    "stage": "profile-and-hashes",
+    "startedAtUtc": "2026-10-21T16:05:39.334309+00:00",
+    "status": "PASS",
+    "finishedAtUtc": "2026-10-21T16:05:39.853333+00:00"
+  }
+]
