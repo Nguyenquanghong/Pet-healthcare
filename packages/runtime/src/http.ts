@@ -31,7 +31,7 @@ function routeTemplate(path:string){
   if(p.startsWith('/internal/'))return '/internal/:scope';
   const fixed=/^\/api\/(auth\/(owner\/(login|register|activation(\/inspect)?)|admin\/login|me(\/password)?)|dashboard\/(core|clinic)|appointments\/calendar|medical-records\/images|notifications\/(unread-count|send|read-all)|invoices\/checkout|bootstrap|analytics\/summary|openapi.json|docs|pets|owners|appointments|medical-records|hotel-bookings|notifications|invoices|operations|payments)$/;
   if(fixed.test(p))return p;
-  const item=p.match(/^\/api\/(pets|owners|appointments|medical-records|hotel-bookings|notifications|invoices|operations)\/[^/]{1,200}(\/(status|reschedule|cancel|status-history|undo-status|reminder|read|pay|daily-care|activation))?$/);
+  const item=p.match(/^\/api\/(pets|owners|appointments|medical-records|hotel-bookings|notifications|invoices|operations)\/[^/]{1,200}(\/(status|reschedule|cancel|status-history|history|undo-status|reminder|read|pay|daily-care|activation))?$/);
   if(item)return `/api/${item[1]}/:id${item[2]??''}`;
   if(/^\/api\/medical-records\/images\/[^/]{1,200}$/.test(p))return '/api/medical-records/images/:id';
   if(/^\/api\/public\/rescue\/[^/]{1,200}(\/report)?$/.test(p))return '/api/public/rescue/:token';

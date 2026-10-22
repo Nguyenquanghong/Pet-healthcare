@@ -6,6 +6,8 @@
 //     binding; producers only emit declared types; parseEnvelope rejects other
 //     schema versions and undeclared types (run against the built contracts).
 //  3. Gateways never expose /internal, /metrics or /health to clients.
+//  4. P7 least-privilege runtime grants cover every Prisma model, or the model is
+//     explicitly excluded with a reason (stale exclusions also fail).
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -94,8 +96,36 @@ rule('gateway-hides-internal-routes',()=>{
   return GATEWAYS.length+' gateway configs';
 });
 
+// ---- 4. Runtime grants cover every model ---------------------------------------
+// The P7 runtime role is least-privilege, so a model added after P7 without a
+// grant only fails after cutover (AppointmentQueryEpoch was read by the aggregate
+// cache but never granted). Every model is granted or explicitly excluded here.
+const NOT_RUNTIME={
+  core:{appointments:'Phase 1 table moved to Clinic (P7 revokes it)',medical_records:'moved to Clinic',medical_images:'moved to Clinic',notifications:'moved to Notification'},
+  clinic:{ProofAppointment:'P1 proof model, not used by runtime services',BillingReservation:'P1 proof model, not used by runtime services'},
+  notification:{},
+};
+export function ungranted(statements,tables,excluded){
+  const sql=statements.join(' ');
+  return tables.filter(t=>!sql.includes('."'+t+'"')&&!(t in excluded));
+}
+const grantsCheck=Promise.all([import(pathToFileURL(resolve(root,'tools/phase2/p7-cutover.mjs')).href),import(pathToFileURL(resolve(root,'tools/phase2/p7-manifest.mjs')).href)])
+  .then(([cutover,manifest])=>rule('runtime-grants-cover-every-model',()=>{
+    const bad=[],stale=[];
+    for(const kind of ['core','clinic','notification']){
+      const tables=Object.values(manifest.catalogs[kind]).map(d=>d.table),statements=cutover.runtimeGrantStatements(kind,'"r"',true,'runtime');
+      bad.push(...ungranted(statements,tables,NOT_RUNTIME[kind]).map(t=>kind+'.'+t));
+      stale.push(...Object.keys(NOT_RUNTIME[kind]).filter(t=>!tables.includes(t)).map(t=>kind+'.'+t));
+    }
+    assert.deepEqual(bad,[],'models without runtime grant or explicit exclusion: '+bad.join(', '));
+    assert.deepEqual(stale,[],'exclusions for models that no longer exist: '+stale.join(', '));
+    assert.deepEqual(ungranted(['GRANT SELECT ON runtime."a" TO r'],['a','b'],{}),['b']);
+    return 'core/clinic/notification models granted or excluded with a reason';
+  }),error=>rule('runtime-grants-cover-every-model',()=>{throw error;}));
+
 await envelopeCheck;
+await grantsCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, negative fixtures.\n');
+else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, negative fixtures.\n');

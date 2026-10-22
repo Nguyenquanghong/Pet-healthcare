@@ -4,6 +4,7 @@ import { BusinessError } from "../../domain/error.js";
 import type { BookingKind, BookingLifecycleStore, LifecycleTransaction } from "../../application/ports/bookingLifecycle.js";
 import { appointmentSlotWrite } from "./appointmentSlotConflict.js";
 import { writeNotification } from './notificationOutbox.js';
+import { hotelStayWrite } from "./hotelStayConflict.js";
 
 export async function appendStatusEvent(tx: Prisma.TransactionClient, kind: BookingKind, bookingId: string, actor: Actor,
   action: string, fromStatus: string, toStatus: string, revision: number, reason?: string, reversesId?: string) {
@@ -45,8 +46,8 @@ export class PrismaBookingLifecycleStore implements BookingLifecycleStore {
         latestTransition: () => tx.bookingStatusEvent.findFirst({ where: { kind, bookingId: id, action: { not: "note_updated" } }, orderBy: { revision: "desc" } }),
         save: (status, patch = {}) => kind === "appointment"
           ? appointmentSlotWrite(tx.appointment.update({ where: { id }, data: { ...patch, status: status as Prisma.AppointmentUpdateInput["status"], statusRevision: { increment: 1 } } }))
-          : tx.hotelBooking.update({ where: { id }, data: { internalNote: patch.internalNote, ownerNote: patch.ownerNote,
-            status: status as Prisma.HotelBookingUpdateInput["status"], statusRevision: { increment: 1 } }, include: { dailyCareNotes: { select: { id: true } } } }),
+          : hotelStayWrite(tx.hotelBooking.update({ where: { id }, data: { internalNote: patch.internalNote, ownerNote: patch.ownerNote,
+            status: status as Prisma.HotelBookingUpdateInput["status"], statusRevision: { increment: 1 } }, include: { dailyCareNotes: { select: { id: true } } } })),
         event: (actor, action, from, to, version, reason, original) => appendStatusEvent(tx, kind, id, actor, action, from, to, version, reason, original),
         notify: async (message, recipientRole = "owner") => { await writeNotification(tx, {
           recipientOwnerId: recipientRole === "owner" ? booking.ownerId : undefined, recipientRole, type: "booking_status_updated", title: "Cập nhật lịch dịch vụ", message,

@@ -61,7 +61,7 @@ export class MedicalRecordsService {
           throw new BusinessError(422, "Appointment does not belong to this pet and owner.");
         }
       }
-      const created = await records.create(data);
+      const created = await records.create(data, actor);
       if (created.appointmentId) await records.completeAppointment(created.appointmentId, actor);
       await notifications.create({
         recipientOwnerId: pet.ownerId, recipientRole: "owner", type: "medical_record_updated",
@@ -99,12 +99,20 @@ export class MedicalRecordsService {
       ...(input.heartRateBpm !== undefined ? { heartRateBpm: positiveNumber(input.heartRateBpm, "heartRateBpm", 2_147_483_647, true) } : {}),
       ...(input.internalNote !== undefined ? { internalNote: optionalText(input.internalNote, "Internal note") } : {}),
     };
-    return this.deps.records.update(existing.id, data);
+    return this.deps.records.update(existing.id, data, actor);
   }
 
   async delete(actor: Actor, id: string) {
     staffOnly(actor);
-    await this.deps.records.delete(id);
+    await this.deps.records.delete(id, actor);
+  }
+
+  // AQ-15: staff-only audit history; still readable after the record is deleted.
+  async history(actor: Actor, id: string) {
+    staffOnly(actor);
+    const revisions = await this.deps.records.history(id);
+    if (!revisions.length) throw new BusinessError(404, "Medical record not found.");
+    return revisions;
   }
 
   async createImage(actor: Actor, input: ImageInput) {

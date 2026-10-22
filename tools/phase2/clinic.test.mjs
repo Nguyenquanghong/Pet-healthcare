@@ -138,3 +138,21 @@ test('Clinic API commit survives broker outage; built relay/inbox deliver notifi
   assert.ok(!JSON.stringify(events).includes('P3_PRIVATE_MARKER'));
   status(await request(`/api/appointments/${a.id}/reminder`,{method:'POST'}),403);
 });
+test('AQ-15 medical record audit: create/update/delete revisions in the same transaction, staff-only, kept after delete, immutable',async()=>{
+  const created=status(await request('/api/medical-records',{method:'POST',token:tokens.doctor,key:randomUUID(),body:record(null,{title:'Audit '+run})}),201).record;
+  status(await request(`/api/medical-records/${created.id}`,{method:'PATCH',token:tokens.admin,body:{title:'Audit edited '+run,diagnosis:'Revised diagnosis'}}),200);
+  // A rejected change (reassignment, 422) rolls back with no revision.
+  status(await request(`/api/medical-records/${created.id}`,{method:'PATCH',token:tokens.admin,body:{petId:otherPet.id}}),422);
+  status(await request(`/api/medical-records/${created.id}/history`,{token:tokens.owner}),403);
+  let history=status(await request(`/api/medical-records/${created.id}/history`,{token:tokens.staff}),200).items;
+  assert.deepEqual(history.map(r=>r.action),['create','update']);
+  assert.equal(history[0].before,null);assert.equal(history[0].after.title,'Audit '+run);assert.equal(history[0].actorId,doctor);assert.equal(history[0].actorRole,'doctor');
+  assert.equal(history[1].before.title,'Audit '+run);assert.equal(history[1].after.title,'Audit edited '+run);assert.equal(history[1].after.diagnosis,'Revised diagnosis');assert.equal(history[1].actorId,admin);
+  status(await request(`/api/medical-records/${created.id}`,{method:'DELETE',token:tokens.admin}),204);
+  history=status(await request(`/api/medical-records/${created.id}/history`,{token:tokens.admin}),200).items;
+  assert.deepEqual(history.map(r=>r.action),['create','update','delete']);assert.equal(history[2].after,null);assert.equal(history[2].before.title,'Audit edited '+run);
+  status(await request(`/api/medical-records/${randomUUID()}/history`,{token:tokens.admin}),404);
+  for(const sql of ['UPDATE medical_record_revisions SET actor_id=\'forged\' WHERE record_id=$1','DELETE FROM medical_record_revisions WHERE record_id=$1'])
+    await assert.rejects(clinic.$executeRawUnsafe(sql,created.id),/MEDICAL_RECORD_REVISION_IMMUTABLE/);
+  assert.equal(await clinic.medicalRecordRevision.count({where:{recordId:created.id}}),3);
+});

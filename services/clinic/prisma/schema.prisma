@@ -154,6 +154,23 @@ model MedicalImage {
   @@map("medical_images")
 }
 
+// AQ-15: append-only before/after history of medical record writes, written in
+// the same transaction as the change. No FK, so history survives deletion; an
+// UPDATE/DELETE trigger and runtime grants (INSERT/SELECT only) keep it immutable.
+model MedicalRecordRevision {
+  id        String   @id @default(uuid())
+  recordId  String   @map("record_id")
+  action    String
+  before    Json?
+  after     Json?
+  actorId   String   @map("actor_id")
+  actorRole String   @map("actor_role")
+  changedAt DateTime @default(now()) @map("changed_at")
+
+  @@index([recordId, changedAt, id], map: "medical_record_revisions_record_idx")
+  @@map("medical_record_revisions")
+}
+
 model BookingStatusEvent {
   id          String @id @default(uuid())
   kind        String

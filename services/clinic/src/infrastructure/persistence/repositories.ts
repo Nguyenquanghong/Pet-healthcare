@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from '../../generated/client/index.js';
 import type { Actor } from '../../domain/auth.js';
 import { BusinessError } from '../../domain/error.js';
 import type { AppointmentRepository,AppointmentDependencies } from '../../application/ports/appointments.js';
-import type { MedicalRecordRepository,MedicalDependencies } from '../../application/ports/medicalRecords.js';
+import type { MedicalRecordRepository,MedicalDependencies,MedicalRevisionValue } from '../../application/ports/medicalRecords.js';
 import type { BookingLifecycleStore,LifecycleTransaction,BookingKind } from '../../application/ports/bookingLifecycle.js';
 import { appointmentSlotWrite } from './appointmentSlotConflict.js';
 import { writeNotification } from '../../notificationOutbox.js';
@@ -36,9 +36,19 @@ class Records implements MedicalRecordRepository {
   findPet(id:string){return this.directory.pet(id);}
   async findAppointment(id:string){await this.db.$queryRaw`SELECT id FROM appointments WHERE id=${id} FOR UPDATE`;await unlocked(this.db,id);return this.db.appointment.findUnique({where:{id},select:{id:true,petId:true,ownerId:true}});}
   find(id:string){return this.db.medicalRecord.findUnique({where:{id}});}
-  create(data:Parameters<MedicalRecordRepository['create']>[0]){return this.db.medicalRecord.create({data});}
-  async update(id:string,data:Parameters<MedicalRecordRepository['update']>[1]){return this.db.medicalRecord.update({where:{id},data});}
-  async delete(id:string){await this.db.medicalRecord.delete({where:{id}});}
+  // AQ-15: callers run these inside the record's transaction (unit of work or
+  // medicalMutation), so the revision commits or rolls back with the change.
+  private revise(recordId:string,action:'create'|'update'|'delete',before:unknown,after:unknown,actor:Actor){
+    const snapshot=(v:unknown)=>v==null?Prisma.DbNull:JSON.parse(JSON.stringify(v));
+    return this.db.medicalRecordRevision.create({data:{recordId,action,before:snapshot(before),after:snapshot(after),actorId:actor.sub,actorRole:actor.role}});
+  }
+  async create(data:Parameters<MedicalRecordRepository['create']>[0],actor:Actor){const created=await this.db.medicalRecord.create({data});await this.revise(created.id,'create',null,created,actor);return created;}
+  async update(id:string,data:Parameters<MedicalRecordRepository['update']>[1],actor:Actor){
+    const before=await this.db.medicalRecord.findUniqueOrThrow({where:{id}}),after=await this.db.medicalRecord.update({where:{id},data});
+    await this.revise(id,'update',before,after,actor);return after;
+  }
+  async delete(id:string,actor:Actor){const before=await this.db.medicalRecord.delete({where:{id}});await this.revise(id,'delete',before,null,actor);}
+  history(recordId:string){return this.db.medicalRecordRevision.findMany({where:{recordId},orderBy:[{changedAt:'asc'},{id:'asc'}]}) as Promise<MedicalRevisionValue[]>;}
   async createImage(data:Parameters<MedicalRecordRepository['createImage']>[0]){const pet=await this.directory.pet(data.petId);const {ownerId,...image}=await this.db.medicalImage.create({data:{...data,ownerId:pet.ownerId}});return image;}
   async deleteImage(id:string){await this.db.medicalImage.delete({where:{id}});}
   async completeAppointment(id:string,actor:Actor){
