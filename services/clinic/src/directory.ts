@@ -17,6 +17,9 @@ export class CoreDirectory {
   async request(actor:Actor,token:string,ids:{petIds?:string[];ownerIds?:string[];doctorId?:string},lookup=false):Promise<DirectorySnapshot>{
     try{
       const res=await fetch(new URL('/internal/directory/'+(lookup?'lookup':'authorize'),this.origin),{method:'POST',headers:{...traceHeaders(),Authorization:`Bearer ${token}`,'X-Service-Token':this.credential,'Content-Type':'application/json'},body:JSON.stringify(ids),redirect:'error',signal:AbortSignal.timeout(2000)});
+      // AQ-05: only an explicit revocation becomes a client 401; any other 401 is
+      // a service-credential/config failure and keeps failing closed below.
+      if(res.status===401&&(await res.clone().json().catch(()=>null) as {code?:unknown}|null)?.code==='SESSION_REVOKED')throw new BusinessError(401,'Your password was changed. Sign in again.');
       if([403,404,422].includes(res.status))throw new BusinessError(res.status as 403|404|422,res.status===403?'Owner or staff permission required.':res.status===404?'Source not found.':'Invalid source IDs.');
       if(res.status!==200)throw new Error();
       const value=await res.json() as DirectorySnapshot;

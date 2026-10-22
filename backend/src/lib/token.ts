@@ -39,6 +39,15 @@ export function signToken(userId: string, role: Role) {
   });
 }
 
+// AQ-05: a token issued before the account's last password change is revoked.
+// Call only after the signature was verified; iat is in seconds, so a token
+// issued in the same second as the change is still accepted.
+export function issuedBeforePasswordChange(token: string, passwordChangedAt: Date | null | undefined): boolean {
+  if (!passwordChangedAt) return false;
+  const iat = (jwt.decode(token) as { iat?: unknown } | null)?.iat;
+  return typeof iat !== "number" || iat < Math.floor(passwordChangedAt.getTime() / 1000);
+}
+
 export function verifyToken(token: string): AuthPayload {
   const config = asymmetricConfig();
   if(token.length>8192)throw new Error('Invalid token payload.');

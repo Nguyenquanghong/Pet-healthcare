@@ -218,6 +218,8 @@ test('registration, password change and counter activation retain the same owner
   const nextPassword='P6Changed-only-2026!';
   expectStatus(await request('/api/auth/me/password',{method:'POST',body:{currentPassword:password,newPassword:nextPassword,confirmPassword:nextPassword}}),204);
   expectStatus(await login(0),401);const changed=expectStatus(await login(0,{body:{email:users[0].email,password:nextPassword}}),200);assert.equal(changed.user.id,users[0].id);
+  // AQ-05: the session issued before the change is revoked; later tests use the new login.
+  expectStatus(await request('/api/pets'),401);tokens.owner=changed.token;expectStatus(await request('/api/pets'),200);
   const counter=await db.core.user.create({data:{id:randomUUID(),role:'owner',fullName:'P6 counter',passwordHash:'',passwordSalt:''}}),counterPet=await db.core.pet.create({data:{ownerId:counter.id,name:'P6 counter pet',species:'cat',allergies:[]}});
   let a=await create('14:00',{petId:counterPet.id,type:'general_checkup'},{token:tokens.admin});
   for(const state of ['confirmed','checked_in'])a=expectStatus(await request('/api/appointments/'+a.id+'/status',{method:'PATCH',token:tokens.admin,body:{status:state,expectedRevision:a.statusRevision}}),200).appointment;

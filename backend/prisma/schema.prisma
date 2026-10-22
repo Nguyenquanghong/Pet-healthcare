@@ -95,6 +95,9 @@ model User {
   email          String?  @unique
   passwordHash   String   @map("password_hash")
   passwordSalt   String   @map("password_salt")
+  // AQ-05: tokens issued before this instant (JWT iat, seconds) are rejected by
+  // Core currentAccount and the Clinic directory request.
+  passwordChangedAt DateTime? @map("password_changed_at")
   fullName       String   @map("full_name")
   role           Role     @default(owner)
   address        String?

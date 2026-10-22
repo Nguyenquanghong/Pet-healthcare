@@ -2,7 +2,7 @@ import type { Express, Request, Response } from 'express';
 import express from 'express';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
-import { verifyToken } from '../lib/token.js';
+import { issuedBeforePasswordChange, verifyToken } from '../lib/token.js';
 import { ownerDto, petDto } from '../lib/serialize.js';
 
 export function mountDirectory(app: Express, db: PrismaClient, credential?: string) {
@@ -24,8 +24,10 @@ export function mountDirectory(app: Express, db: PrismaClient, credential?: stri
     if(!petIds||!ownerIds||(data.doctorId!==undefined&&(typeof data.doctorId!=='string'||!data.doctorId||data.doctorId.length>200))){res.status(422).json({error:'Invalid directory IDs.'});return;}
     try {
       const result=await db.$transaction(async tx=>{
-        const sender=await tx.user.findUnique({where:{id:actor.sub},select:{id:true,role:true,fullName:true}});
+        const sender=await tx.user.findUnique({where:{id:actor.sub},select:{id:true,role:true,fullName:true,passwordChangedAt:true}});
         if(!sender||sender.role!==actor.role)return {status:403,error:'Actor permission changed.'};
+        // AQ-05: Clinic forwards the caller's bearer; a session issued before a password change is revoked.
+        if(issuedBeforePasswordChange(req.headers.authorization!.slice(7),sender.passwordChangedAt))return {status:401,error:'Password changed. Sign in again.',code:'SESSION_REVOKED'};
         const pets=await tx.pet.findMany({where:{id:{in:petIds}}});
         if(pets.length!==petIds.length)return {status:404,error:'Pet not found.'};
         if(actor.role==='owner'&&(pets.some(p=>p.ownerId!==actor.sub)||ownerIds.some(id=>id!==actor.sub)))return {status:403,error:'Owner scope required.'};

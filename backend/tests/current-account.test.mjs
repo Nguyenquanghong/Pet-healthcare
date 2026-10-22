@@ -48,3 +48,22 @@ test('Core shares signature verification within a request but checks current acc
     account=null;assert.equal((await get()).status,401);assert.equal(signatures,3);assert.equal(queries,3);
   }finally{jwt.verify=original;server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 });
+
+test('AQ-05: tokens issued before the last password change are revoked; same-second and later tokens stay valid',async()=>{
+  for(const key of ['JWT_PRIVATE_KEY','JWT_PUBLIC_KEY','JWT_ISSUER','JWT_AUDIENCE','JWT_KEY_ID'])delete process.env[key];
+  process.env.JWT_SECRET=randomBytes(32).toString('hex');
+  let account={id:'fixture',role:'owner',passwordChangedAt:null};
+  const db={user:{findUnique:async query=>{assert.deepEqual(query.select,{id:true,role:true,passwordChangedAt:true});return account;}}};
+  const app=express();app.use('/api',currentAccount(db));app.use((_req,res)=>res.json({ok:true}));
+  const server=app.listen(0,'127.0.0.1');await once(server,'listening');
+  const at=seconds=>jwt.sign({role:'owner',iat:seconds},process.env.JWT_SECRET,{algorithm:'HS256',subject:'fixture',expiresIn:'1h'});
+  const get=token=>fetch(`http://127.0.0.1:${server.address().port}/api/pets`,{headers:{Authorization:'Bearer '+token}});
+  try{
+    const now=Math.floor(Date.now()/1000),old=at(now-120);
+    assert.equal((await get(old)).status,200,'no change recorded yet');
+    account={...account,passwordChangedAt:new Date((now-60)*1000+500)};
+    const revoked=await get(old);assert.equal(revoked.status,401);assert.match((await revoked.json()).error,/password was changed/);
+    assert.equal((await get(at(now-60))).status,200,'issued in the same second as the change');
+    assert.equal((await get(at(now))).status,200,'issued after the change');
+  }finally{await new Promise(ok=>server.close(ok));}
+});

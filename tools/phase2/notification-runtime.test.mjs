@@ -234,6 +234,22 @@ test('real DB failure of outbox insert rolls back the domain write without leaki
     assert.equal(await core.outboxEvent.count({ where: { envelope: { path: ['payload','relatedPetId'], equals: failedPet.id } } }), 0);
   } finally { await core.$executeRawUnsafe(`ALTER TABLE "OutboxEvent" DROP CONSTRAINT "${name}"`); }
 });
+test('AQ-05 real password change through the API revokes the previous session; a new login works', async () => {
+  const id = randomUUID(), email = `${id}@example.invalid`;
+  await core.user.create({ data: { id, role: 'owner', fullName: `AQ-05 ${run}`, email, ...await hashPasswordAsync('P2-fixture-password-only!') } });
+  const login = password => request('/api/auth/owner/login', { method: 'POST', token: null, body: { email, password } });
+  const first = requireStatus(await login('P2-fixture-password-only!'), 200).token;
+  requireStatus(await request('/api/pets', { token: first }), 200);
+  await new Promise(r => setTimeout(r, 1100)); // change lands in a later second than the token's iat
+  const changed = await request('/api/auth/me/password', { method: 'POST', token: first, body: { currentPassword: 'P2-fixture-password-only!', newPassword: 'AQ05-new-password!', confirmPassword: 'AQ05-new-password!' } });
+  assert.equal(changed.status, 204);
+  const revoked = await request('/api/pets', { token: first });
+  assert.equal(revoked.status, 401); assert.match(revoked.body.error, /password was changed/i);
+  requireStatus(await login('P2-fixture-password-only!'), 401);
+  const second = requireStatus(await login('AQ05-new-password!'), 200).token;
+  requireStatus(await request('/api/pets', { token: second }), 200);
+  assert.ok((await core.user.findUniqueOrThrow({ where: { id } })).passwordChangedAt);
+});
 test('AQ-10 hotel stays: API 409 plus a database exclusion constraint for writers that bypass the service', async () => {
   const stayPet = await core.pet.create({ data: { ownerId: owner, name: 'AQ-10 stay pet', species: 'dog', allergies: [] } });
   const day = n => new Date(Date.now() + 7 * 3600000 + n * 86400000).toISOString().slice(0, 10);
