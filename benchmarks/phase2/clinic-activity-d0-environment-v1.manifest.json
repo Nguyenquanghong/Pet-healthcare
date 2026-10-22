@@ -1,0 +1,11 @@
+{
+  "format": "clinic-activity-d0-environment-notebook-v1",
+  "notebook": "benchmarks/phase2/clinic-activity-d0-environment-v1.ipynb",
+  "notebookSha256": "d7e3193fac90150aead1280131259ee3dd619509c9059bf2b35e4df34e20fb19",
+  "probeSource": "benchmarks/phase2/kaggle/activity_environment.py",
+  "probeSourceSha256": "d0c63bd069c8a9b83833b1b2b9f0d3e09260e007b8878fd84c435b783405000f",
+  "execution": "NOT_RUN",
+  "d0": "PARTIAL_ENVIRONMENT",
+  "performance": "NOT_RUN",
+  "policySha256": "96f51be71168fb8b4f8ab78eaf09035bd12b48a2c6fbe5bc02ea9badce65d181"
+}

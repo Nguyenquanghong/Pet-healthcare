@@ -31,9 +31,11 @@ try{
       const url=new URL(databaseUrl());url.searchParams.set('connection_limit','1');url.searchParams.set('pool_timeout','1');
       const lane=new AuditLane();
       freshnessDb=new PrismaClient({datasourceUrl:url.href});
-      // List serving keeps its original guard/estimator; activity gets its own
-      // list-independent row evidence with the per-aggregate lag estimator.
-      if(process.env.CLINIC_READ_MODE==='projection')freshness=new ReadFreshness(freshnessDb,undefined,undefined,undefined,{lane});
+      // List serving keeps its guard and, since list study v2 K3v2-F1, the same
+      // per-aggregate lag estimator as activity: the carried estimator made lag
+      // grow without bound under steady writes. Activity keeps its own
+      // list-independent row evidence.
+      if(process.env.CLINIC_READ_MODE==='projection')freshness=new ReadFreshness(freshnessDb,undefined,undefined,undefined,{lane,perAggregateLag:true});
       if(capability){activityRows=new ReadFreshness(freshnessDb,undefined,undefined,undefined,{requireListProjection:false,perAggregateLag:true,lane});summaryEvidence=new ActivitySummaryEvidence(freshnessDb,activityRows,capability,lane);}
     }
     const app=createApp(db,verify,source,runtime,freshness,summaryEvidence);

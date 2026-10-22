@@ -51,6 +51,26 @@ export function calendarDate(value: unknown, field: string): Date {
   return parsed;
 }
 
+// AQ-09: direct clients bypass the browser file picker, so the server checks the
+// declared MIME, the data URL prefix and the decoded file signature together.
+const imageSignatures: Record<string, (bytes: Buffer) => boolean> = {
+  "image/png": bytes => bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  "image/jpeg": bytes => bytes.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])),
+  "image/gif": bytes => ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("latin1")),
+  "image/webp": bytes => bytes.subarray(0, 4).toString("latin1") === "RIFF" && bytes.subarray(8, 12).toString("latin1") === "WEBP",
+};
+export const allowedImageTypes = Object.keys(imageSignatures);
+
+export function imageContent(imageUrl: string, mimeType: string): void {
+  const signature = imageSignatures[mimeType];
+  if (!signature) throw new BusinessError(422, `MIME type must be one of ${allowedImageTypes.join(", ")}.`);
+  const prefix = `data:${mimeType};base64,`, data = imageUrl.slice(prefix.length);
+  if (!imageUrl.startsWith(prefix) || !data || data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data))
+    throw new BusinessError(422, "Image must be a base64 data URL matching its MIME type.");
+  if (!signature(Buffer.from(data.slice(0, 24), "base64")))
+    throw new BusinessError(422, "Image content does not match its MIME type.");
+}
+
 export function todayInVietnam(now = Date.now()): string {
   return new Date(now + 7 * 3_600_000).toISOString().slice(0, 10);
 }

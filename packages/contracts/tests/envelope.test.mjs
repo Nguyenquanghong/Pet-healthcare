@@ -24,9 +24,14 @@ test('internal OpenAPI validates actual billing and Core directory/send contract
   assert.ok(spec.paths['/internal/billing-reservations/{operationId}'].put.security[0].ActorBearer);
   assert.equal(spec.paths['/internal/billing-reservations/{operationId}/release'].post.requestBody.content['application/json'].schema.additionalProperties,false);
 });
-test('Clinic OpenAPI covers 17 public operations, bootstrap and 5 private billing operations',async()=>{
+test('Clinic OpenAPI covers 18 public operations, bootstrap and 5 private billing operations',async()=>{
   const spec=await SwaggerParser.validate(fileURLToPath(new URL('../../../services/clinic/openapi.json',import.meta.url)));
-  assert.equal(Object.values(spec.paths).flatMap(p=>Object.keys(p).filter(k=>['get','post','patch','put','delete'].includes(k))).length,23);
+  // 18 public = the 17 of P3-P5 + GET /api/dashboard/clinic/activity (clinic-activity D1, admin-only).
+  assert.equal(Object.values(spec.paths).flatMap(p=>Object.keys(p).filter(k=>['get','post','patch','put','delete'].includes(k))).length,24);
+  const activity=spec.paths['/api/dashboard/clinic/activity'].get;
+  assert.ok(activity.security[0].BearerAuth);
+  for(const status of ['401','403','422','503'])assert.ok(activity.responses[status],status);
+  assert.deepEqual(activity.parameters.map(p=>p.name).sort(),['category','from','groupBy','to']);
   for(const path of ['/api/appointments','/api/medical-records'])assert.ok(spec.paths[path].post.parameters.some(p=>p.name==='Idempotency-Key'&&p.required));
   assert.ok(spec.paths['/internal/clinic/bootstrap'].get.security[0].ServiceCredential);
   assert.ok(spec.paths['/api/dashboard/clinic'].get.responses['503']);

@@ -1,0 +1,343 @@
+{
+  "version": "cqrs-list-matched-kaggle-v3-policy-1",
+  "status": "FROZEN_BEFORE_MEASUREMENT",
+  "study": "cqrs-list-matched-kaggle-v3",
+  "derivedFrom": {
+    "path": "phase2-plan/cqrs/list-study/cqrs-list-matched-kaggle-v2.policy.json",
+    "sha256": "e5a2279d25fe44c5867cf6ab614c975134069c18860e7af7e1983ba5b85fd646",
+    "v2DerivedFrom": {
+      "path": "phase2-plan/cqrs/list-study/cqrs-list-matched-kaggle-v1.policy.json",
+      "sha256": "1ee0ff4474c9517ca732a7172ed17760ea084af7b17398421631afc56f4b72fd",
+      "v1DerivedFrom": {
+        "path": "phase2-plan/cqrs/clinic-activity/evidence/benchmark-plan-20261021.json",
+        "sha256": "6b058747e66734c40e302a1da7aa712fa516608ad531c8b780fe65665d27474c"
+      },
+      "v1Result": "phase2-plan/cqrs/list-study/result-k2-k3-20261022.md (FINAL, FAIL_CORRECTNESS)"
+    },
+    "v2Result": "phase2-plan/cqrs/list-study/k3v2-fd95963d/review.json (K3v2 FAIL_CORRECTNESS at pcn-b0)"
+  },
+  "resourceClass": "kaggle_shared_envelope",
+  "isolationClaimed": false,
+  "sources": {
+    "O": {
+      "gitSha": "3e88d7e57fbf4f74da363d320f286244237a4389",
+      "sharedEnvironmentPatch": {
+        "bundleSha256": "ca4a920463660b838c3723bc519bce731bdd024214da9f07eebb67649e6068e4",
+        "from": "limit(read?'API_READ_IP_LIMIT':'API_WRITE_IP_LIMIT',read?3000:1000)",
+        "group": "O",
+        "path": "packages/runtime/src/http.ts",
+        "sourceSha256": "8d424d343dea0e76891ff47244d29440462625f3656d5edea092e07870807f43",
+        "to": "limit(read?'API_READ_IP_LIMIT':'API_WRITE_IP_LIMIT',read?6000:1000)"
+      }
+    },
+    "AB_list": {
+      "sourceBundle": "test-results/phase2/cqrs/list-v3/cqrs-list-source-v11.zip",
+      "sourceBundleSha256": "8c87465e9034aa1627038d2a656719a4da45d9c9877718bba03d45846df47fc9",
+      "sourceManifestSha256": "ff77bc71aa0e35de3c60d397d7a518aafaf6f49bec4de16b3e8cacf4e1432a1b",
+      "declaredManifestDigest": "2b6f20a6d7e91d974afbb5ccd6a1911b9321c1257db2945574aac11cf0540812",
+      "abSourceTreeSha256": "74d9652b90bd41053604166b01c1b1e47bc92676a6c1c1308c55cf870646503a",
+      "oSourceTreeSha256": "0ebfd1261c02b3afaaaa9d0ce1106e3080c2d3636853e6d81ad12da8e339fd23",
+      "actualGitHead": "21cbcff67b7d2d7625148cad09b1c590cc97dd6f",
+      "projectionVersion": 1,
+      "sameBuildOnlyReaderChanges": true,
+      "newHarnessOverlayMustBeManifested": true,
+      "abExclusions": {
+        "decision": "user 2026-10-22: exclude E-b rescue limiter from the measured AB source",
+        "patchedFiles": [
+          {
+            "bundleSha256": "5c2b410f77f627374f517f714c3c0f101de3ef5262799dd10237c2818741b3fe",
+            "path": "packages/runtime/src/http.ts",
+            "removedText": "    // AQ-01: unauthenticated rescue reports notify an owner. The token bucket caps\n    // a flood against one pet across IPs; the token is HMACed with the other keys.\n    const rescue=req.method==='POST'?req.path.match(/^\\/public\\/pets\\/([^/]{1,200})\\/rescue-reports$/):null;\n    if(rescue){let token=rescue[1]!;try{token=decodeURIComponent(token);}catch{}\n      return{group:'public-rescue',read:false,buckets:[b(ip,limit('RESCUE_REPORT_IP_LIMIT',20)),b('rescue-token:'+token,limit('RESCUE_REPORT_TOKEN_LIMIT',5))]};}\n",
+            "worktreeSha256": "2f397e4f7a6d53e00cdf54f020a3cd4e367d0c3cb90a8d0d5d71a92a5c4312ce"
+          }
+        ],
+        "reason": "pinned stack strips env (RESCUE_REPORT_* cannot be set); PCN trace sends ~12.5k rescue reports/30 min from one IP over 100 tokens; O has no such limiter",
+        "removedFiles": [
+          {
+            "path": "packages/runtime/tests/rescue-limit.test.mjs",
+            "worktreeSha256": "a82205633be925dacede651fdb0d426f7a1314d5f9e0fe1957c7dcc858dc307b"
+          }
+        ]
+      },
+      "sharedEnvironmentPatch": {
+        "decision": "user 2026-10-22 (K3v2-F2): raise the default per-IP read limit for O and AB alike",
+        "patches": [
+          {
+            "bundleSha256": "ca4a920463660b838c3723bc519bce731bdd024214da9f07eebb67649e6068e4",
+            "from": "limit(read?'API_READ_IP_LIMIT':'API_WRITE_IP_LIMIT',read?3000:1000)",
+            "group": "O",
+            "path": "packages/runtime/src/http.ts",
+            "sourceSha256": "8d424d343dea0e76891ff47244d29440462625f3656d5edea092e07870807f43",
+            "to": "limit(read?'API_READ_IP_LIMIT':'API_WRITE_IP_LIMIT',read?6000:1000)"
+          },
+          {
+            "bundleSha256": "fd8a10abd568235c19ffe5fd250a3ba5c23fe8a9b774f6d9bbb90194f4a319c4",
+            "from": "limit(read?'API_READ_IP_LIMIT':'API_WRITE_IP_LIMIT',read?3000:1000)",
+            "group": "AB",
+            "path": "packages/runtime/src/http.ts",
+            "sourceSha256": "5c2b410f77f627374f517f714c3c0f101de3ef5262799dd10237c2818741b3fe",
+            "to": "limit(read?'API_READ_IP_LIMIT':'API_WRITE_IP_LIMIT',read?6000:1000)"
+          }
+        ],
+        "reason": "pinned stack: one client IP, all non-Clinic reads via Core (~2,900/min vs 3000/min) -> random 429 in any configuration"
+      }
+    }
+  },
+  "configurations": {
+    "O": "Pinned pre-CQRS source with its original schema and required components; shared per-IP read limit patch (6000/min)",
+    "A": "Pinned AB_list v3 (V1 projection plus post-v1 and post-v2 fixes), authoritative reader; producer/projector enabled, shadow disabled; shared read limit patch",
+    "B": "Identical AB_list v3 build and maintenance; projected reader, unbilled authoritative control"
+  },
+  "blocksForEachWorkload": [
+    [
+      "O",
+      "A",
+      "B"
+    ],
+    [
+      "B",
+      "O",
+      "A"
+    ],
+    [
+      "A",
+      "B",
+      "O"
+    ]
+  ],
+  "queryHeavy": {
+    "basedOnProtocol": "cqrs-q0-query-heavy-v2",
+    "fixtureAppointments": 100000,
+    "owners": 100,
+    "pets": 100,
+    "reservations": 5900,
+    "medicalRecords": 100,
+    "fixtureMonth": "2028-02",
+    "warmupSeconds": 120,
+    "measuredSeconds": 800,
+    "arrivalsPerSecond": 12,
+    "concurrency": 16,
+    "operationWeights": "eight operations equal round-robin",
+    "operations": [
+      "owner-list",
+      "admin-list",
+      "admin-search",
+      "admin-unbilled",
+      "owner-calendar",
+      "admin-calendar",
+      "admin-filter",
+      "admin-page"
+    ],
+    "plannedSamplesPerOperationPerRun": 1200,
+    "minimumSuccessfulSamplesPerOperationPerRun": 1000,
+    "primaryOperation": "admin-list",
+    "primaryRequest": "GET /api/appointments?pageSize=100",
+    "adminActorLimitPerMinute": 600,
+    "ipLimitPerMinute": 3000,
+    "adminActors": 1,
+    "queryMeasuredWrites": 0
+  },
+  "pcn": {
+    "basedOnProtocol": "pet-healthcare-pcn-v1",
+    "users": 100,
+    "spawnPerSecond": 10,
+    "warmupAfterRampSeconds": 30,
+    "measuredSeconds": 1800,
+    "thinkTimeSeconds": [
+      0.5,
+      1.5
+    ],
+    "closedLoopNotFixedRps": true,
+    "operationWeights": {
+      "pets": 4,
+      "appointments": 2,
+      "medical": 2,
+      "hotel": 1,
+      "invoices": 1,
+      "notifications": 1,
+      "appointment-write": 2,
+      "rescue-write": 1
+    },
+    "fixture": "phase1-pcn-shape-v1: 100 owners/pets and one appointment, medical, hotel, invoice and notification per owner",
+    "minimumSuccessfulWriteSamplesPerConfiguration": 1000,
+    "calendarMeasured": false,
+    "requestPathAndGenerationEvidenceRequired": true,
+    "minimumSuccessfulAppointmentWriteSamplesPerConfiguration": 1000
+  },
+  "acceptance": {
+    "readPathImprovement": {
+      "medianPairedBtoAP95RatioMax": 0.8,
+      "everyPairRatioMax": 1.1
+    },
+    "improvementAgainstPreCqrs": {
+      "medianPairedBtoOP95RatioMax": 0.8,
+      "everyPairRatioMax": 1.1
+    },
+    "wholeFeatureNonRegressionAgainstO": {
+      "writeP95RatioMax": 1.1,
+      "applicationCpuPerSuccessRatioMax": 1.1,
+      "successfulThroughputRatioMin": 0.9
+    },
+    "pcnAppointmentListP95RatioMax": 1.1,
+    "healthyUnexpectedErrorsAndDrops": 0,
+    "noOwnerLeakOrContractMismatch": true,
+    "freshnessAndRecoveryReference": "phase2-plan/cqrs/acceptance.json: V1 freshness p95 2000ms/p99 5000ms, 3x1000 mutations; recovery 3x60s, catch-up <=120s; other correctness/fallback/rebuild gates unchanged",
+    "allPairsReportedWithWorstAndMedian": true,
+    "allMandatoryGatesRequiredForRecommendation": true,
+    "wholeFeatureRegressionGrading": "Every valid matched pair and workload separately; insufficient appointment write samples are inconclusive, not rescued by rescue-write counts.",
+    "queryHeavyOwnerAndAdminCalendarP95RatioToOMax": 1.1
+  },
+  "generatorValidity": {
+    "status": "RULE_LOCKED_COLLECTOR_IMPLEMENTATION_PENDING",
+    "openLoopCalibrationSeconds": 120,
+    "openLoopCalibrationRateMultiplier": 2,
+    "calibrationTarget": "Local no-op/loopback outside application, with the planned concurrency, observer and resource collector running; never lower application arrival rate from calibration",
+    "plannedCountAndAllOutcomesRetained": true,
+    "maximumGeneratorDropsForHealthyAcceptance": 0,
+    "dispatchLatenessP99MaxMs": 100,
+    "dispatchLatenessMaxMs": 1000,
+    "minimumPlannedDispatchFractionInsideMeasuredWindow": 0.99,
+    "percentile": "nearest_rank",
+    "openLoopLatency": "Both completion minus dispatch and completion minus scheduled; use scheduled end-to-end latency for acceptance, retain all failures/drops in outcome counts",
+    "closedLoop": "100 active users throughout measured window, no ramp/warmup samples, raw per-user task/wait/start/completion, event-loop delay probe at 10Hz with the same 100ms p99/1000ms maximum; actual RPS is an outcome",
+    "invalidRule": "Do not grade latency/throughput from invalid scheduling, missing timestamps or population; preserve raw and report INVALID_ENVIRONMENT or INCONCLUSIVE"
+  },
+  "sessions": {
+    "unit": "One complete matched block in one notebook kernel; multiple blocks allowed if profile remains identical",
+    "profileKey": [
+      "resourceClass",
+      "cpuModel",
+      "architecture",
+      "cpuQuotaAndAffinity",
+      "memoryMax",
+      "liveSoftwareVersions",
+      "replicas",
+      "poolLimits",
+      "sourceBuildManifests",
+      "logicalFixtureDigest",
+      "traceDigest",
+      "harnessDigest",
+      "policyDigest"
+    ],
+    "plannedBlockMembershipFixedBeforeTiming": true,
+    "maximumEnvironmentalReplacementBlocksPerPlannedBlock": 1,
+    "replacementRule": "Only objectively incomplete/invalid-environment blocks, never a valid slow/losing block; retain original and replacement, first valid complete block wins. A second environmental invalidity stops the study as incomplete. Correctness/application failures halt for diagnosis, not replacement.",
+    "profileMismatchRule": "Keep separate strata; complete all three blocks under one comparable key for an acceptance. Never combine unmatched halves or choose a winning session.",
+    "accounting": "All API/worker/PG-child/broker/Redis/gateway/audit CPU in measured window; generator/controller separately, root cgroup total separately; uncovered/unreadable process CPU means TOTAL_COST_INCONCLUSIVE",
+    "protectedData": "Disposable owned trial DB/schema/marker/roles/queues only, correct schema per source. Never use main DB, mix V1/V2 consumers or run V1 binary on V2."
+  },
+  "scope": "Demonstrates the pinned AB_list v3 revision only (V1 projection with the post-v1/v2 fixes) under the shared read-limit patch; no V2 projection or future integrated-product recommendation",
+  "excludes": [
+    "engineering",
+    "new freshness/recovery/rebuild drills if existing evidence does not match the build/profile",
+    "historical business bridge",
+    "activity study"
+  ],
+  "profile": {
+    "keyFields": [
+      "resourceClass",
+      "cpuModel",
+      "architecture",
+      "cpuQuotaAndAffinity",
+      "memoryMax",
+      "liveSoftwareVersions",
+      "replicas",
+      "poolLimits",
+      "sourceBuildManifests",
+      "logicalFixtureDigest",
+      "traceDigest",
+      "harnessDigest",
+      "policyDigest"
+    ],
+    "buildDigest": "path-normalized (tools/phase2/cqrs/activity/bench/profile.mjs); raw digest reported, not keyed",
+    "poolCeilingsPerProcess": {
+      "O": {
+        "core-api": 4,
+        "core-outbox": 4,
+        "billing-worker": 4,
+        "clinic-api": 4,
+        "clinic-worker": 4,
+        "notification-api": 4,
+        "notification-worker": 4
+      },
+      "A": {
+        "core-api": 4,
+        "core-outbox": 4,
+        "billing-worker": 4,
+        "clinic-api": 4,
+        "clinic-worker": 4,
+        "notification-api": 4,
+        "notification-worker": 4,
+        "clinic-read-worker": 1
+      },
+      "B": {
+        "core-api": 4,
+        "core-outbox": 4,
+        "billing-worker": 4,
+        "clinic-api": 4,
+        "clinic-audit": 1,
+        "clinic-worker": 4,
+        "notification-api": 4,
+        "notification-worker": 4,
+        "clinic-read-worker": 1
+      },
+      "harness": {
+        "stack-supervisor-per-database": 4
+      }
+    },
+    "poolCheck": "observed pg_stat_activity peak per database role <= sum of ceilings of the processes sharing that role"
+  },
+  "accounting": {
+    "collector": "tools/phase2/cqrs/activity/bench/collector.mjs via collector-cli.mjs, 1s, CLOCK_MONOTONIC windows",
+    "applicationRoles": [
+      "api",
+      "worker",
+      "relay",
+      "postgres",
+      "broker",
+      "redis",
+      "gateway"
+    ],
+    "separateRoles": [
+      "generator",
+      "controller"
+    ],
+    "missingCoverage": "TOTAL_COST_INCONCLUSIVE",
+    "measuredWindowObservation": "no stack observe/inspect actions inside measured windows; only the pool sampler (one pg_stat_activity catalog query/s over the private socket) runs, identically for O/A/B; v2 adds the diagnostics sampler (one set of catalog/count queries every 5 s over the same socket), identically for O/A/B"
+  },
+  "readPath": {
+    "queryHeavy": "Q6 correct_path unchanged: O absent, A authoritative, B projection with matching generation (admin-unbilled authoritative); anything else is a contract error",
+    "pcn": "GET appointments: O absent, A authoritative, B projection with matching generation OR authoritative with X-Service-Degraded: clinic-read (V1 bounded fallback, counted and reported as listFallbackRate, no threshold); anything else is a path error"
+  },
+  "latencyForGrading": {
+    "openLoop": "scheduled -> completion (total_ms)",
+    "closedLoop": "request start -> completion"
+  },
+  "percentile": "nearest_rank",
+  "freshnessRecovery": "Reference only (listStudy.acceptance.freshnessAndRecoveryReference); NOT_RUN in this study unless matching evidence is supplied",
+  "performanceMeasurementsAllowed": "only after a readiness smoke in the same session records the profileKey and passes",
+  "changesFromV1": [
+    "AB source: bundle v10 from the working tree at 21cbcff + uncommitted changes, including F1 batched persistent Clinic relay and F3 projected statement_timeout = remaining budget capped at 1000 ms; E-b rescue limiter excluded (user decision)",
+    "Diagnostics sampler added identically for O/A/B (see diagnostics); thresholds, primary, blocks, workloads, sessions and read-path contract unchanged"
+  ],
+  "diagnostics": {
+    "sampler": "benchmarks/phase2/kaggle/list_study_v2.py MemberDiagnostics, one thread per member, identical for O/A/B",
+    "intervalSeconds": 5,
+    "queries": [
+      "outbox pending count and oldest age per service DB (core, clinic)",
+      "pg_stat_activity non-idle wait-event summary",
+      "pg_stat_bgwriter checkpoint counters"
+    ],
+    "files": [
+      "postgres.log lines: checkpoint, automatic vacuum/analyze, ERROR/STATEMENT (SQL text only, parameters are placeholders)",
+      "Clinic API CLINIC_READ_DIAGNOSTIC lines (already sanitized by readDiagnostics.ts)"
+    ],
+    "cost": "catalog/count queries over the private admin socket every 5 s inside measured windows; counted under the postgres role; reported, not subtracted",
+    "grading": "diagnostic only; never used for grading or replacement decisions"
+  },
+  "changesFromV2": [
+    "AB source: bundle v11 = v10 plus F4 (list freshness uses the per-aggregate lag estimator, K3v2-F1)",
+    "O and AB: identical default per-IP read limit 3000 -> 6000/min in packages/runtime/src/http.ts (K3v2-F2, measurement environment, user decision)",
+    "Thresholds, primary, blocks, workloads, sessions, read-path contract and diagnostics sampler unchanged"
+  ]
+}

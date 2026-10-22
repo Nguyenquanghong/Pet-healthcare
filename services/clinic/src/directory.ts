@@ -2,9 +2,8 @@ import type { Actor } from './domain/auth.js';
 import { BusinessError } from './domain/error.js';
 import {createHash,timingSafeEqual} from 'node:crypto';
 import { traceHeaders } from '@nipopeto/runtime';
-export type PetSnapshot={id:string;ownerId:string;name:string;directoryVersion:number;[key:string]:unknown};
-export type OwnerSnapshot={id:string;fullName:string;directoryVersion:number;[key:string]:unknown};
-export type DirectorySnapshot={actor:Actor&{fullName:string};pets:PetSnapshot[];owners:OwnerSnapshot[]};
+import type { PetSnapshot, OwnerSnapshot, DirectorySnapshot, DirectoryLookup } from './application/ports/directory.js';
+export type { PetSnapshot, OwnerSnapshot, DirectorySnapshot } from './application/ports/directory.js';
 export class CoreDirectory {
   private readonly origin:URL;
   constructor(url:string,private readonly credential:string,private readonly scopes?:{billing:string;bootstrap:string;evidence:string}) {
@@ -28,7 +27,7 @@ export class CoreDirectory {
   }
 }
 // Request-local authorized snapshots only; no global user cache or projection auth.
-export class RequestDirectory {
+export class RequestDirectory implements DirectoryLookup {
   private readonly pets=new Map<string,PetSnapshot>();
   private readonly owners=new Map<string,OwnerSnapshot>();
   constructor(private readonly source:CoreDirectory,readonly actor:Actor,readonly token:string,readonly snapshot:DirectorySnapshot){

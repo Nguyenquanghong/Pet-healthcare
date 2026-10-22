@@ -1,0 +1,14 @@
+{
+  "format": "cqrs-list-dataset-notebook-v1",
+  "fromNotebook": {
+    "path": "benchmarks/phase2/cqrs-list-matched-kaggle-v3.ipynb",
+    "sha256": "63e86bcf00f3539e9d634b6d9e85f29857007adee3aab7425ae64f95c545c4b5"
+  },
+  "notebook": "benchmarks/phase2/cqrs-list-matched-kaggle-v3-dataset.ipynb",
+  "notebookSha256": "d3b739de1fd2946089b2262504f8dd107119aa42f523cb90aedd03cac3b48af1",
+  "notebookBytes": 6978,
+  "datasetFile": "benchmarks/phase2/cqrs-list-source-699fee87.bin",
+  "sourceArchiveSha256": "699fee87ca4ddb23703d2cf861b8ed0cc8a85d01bc70a1508a57e7b128ce399c",
+  "sourceArchiveBytes": 2541251,
+  "change": "only the archive delivery (embedded base64 -> /kaggle/input file with the same pinned SHA256)"
+}

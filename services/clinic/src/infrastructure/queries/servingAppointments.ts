@@ -13,6 +13,7 @@ import {ProjectionAdmission} from './projectionAdmission.js';
 import {isProjectionVersion} from '../../projectionVersions.js';
 export type ReadResult<T>={data:T;source:'authoritative'|'projection';generation?:string;degraded?:boolean};
 class PendingVersion extends Error{}
+export const PROJECTED_STATEMENT_MAX_MS=1000;
 export class ServingAppointmentQueries{
   private fallbacks=0;
   private readonly admission=new ProjectionAdmission();
@@ -56,7 +57,10 @@ export class ServingAppointmentQueries{
           const result=await this.db.$transaction(async tx=>{
             this.diagnostics.mark('projection-setup');
             await tx.$executeRawUnsafe('SET TRANSACTION READ ONLY');
-            await tx.$executeRawUnsafe(`SET LOCAL statement_timeout='${Math.min(200,remaining)}ms'`);
+            // Each projected statement may use the request's remaining budget (capped).
+            // A fixed 200ms cap was ~1.7x the normal p95 and turned brief DB jitter into
+            // whole-query fallback (list study v1 K2-F1); the deadline still bounds it.
+            await tx.$executeRawUnsafe(`SET LOCAL statement_timeout='${Math.min(PROJECTED_STATEMENT_MAX_MS,remaining)}ms'`);
             this.diagnostics.mark('projection-control');
             // The pointer and token check share the query's RepeatableRead snapshot.
             const c=await tx.readProjectionControl.findUnique({where:{projectionName:'appointments'},include:{activeGeneration:true}});

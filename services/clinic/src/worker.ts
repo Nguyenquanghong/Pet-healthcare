@@ -4,6 +4,7 @@ import { createDependencies } from './composition.js';
 import { ClinicInbox } from './inbox.js';
 import { OutboxRelay } from './relay.js';
 import { DirectorySync } from './directorySync.js';
+import { withRequestId, eventCorrelation, integer } from '@nipopeto/runtime';
 const { db } = createDependencies();
 await startWorker('clinic', async signal => {
   try {
@@ -11,11 +12,11 @@ await startWorker('clinic', async signal => {
     await db.$connect();
     const sync=process.env.CORE_SERVICE_URL?new DirectorySync(process.env.CORE_SERVICE_URL,process.env.CORE_DIRECTORY_TOKEN??process.env.CLINIC_SERVICE_TOKEN??''):undefined;
     const config = requireBrokerConfig(), inbox = new ClinicInbox(db,sync?(kind,p)=>sync.hydrate(kind,p):undefined), workerId = randomUUID();
-    const relay = new OutboxRelay(db, config.brokerUrl, process.env.OUTBOX_AGGREGATE_ID);
+    const relay = new OutboxRelay(db, config.brokerUrl, process.env.OUTBOX_AGGREGATE_ID, { batchSize: integer('CLINIC_RELAY_BATCH', 50, 1, 500), persistent: true });
     await Promise.all([
       reconnect('clinic-consumer', signal, async () => {
         await declareTopology(config.brokerUrl, config.topology);
-        const consumer = await consumeEvents(config.brokerUrl, config.topology.clinic, 'clinic', raw => inbox.apply(raw));
+        const consumer = await consumeEvents(config.brokerUrl, config.topology.clinic, 'clinic', raw => withRequestId(eventCorrelation(raw), () => inbox.apply(raw)));
         process.stdout.write(JSON.stringify({ service: 'clinic', status: 'worker-ready' }) + '\n');
         const stopped = new AbortController();
         const abort = () => stopped.abort(); signal.addEventListener('abort', abort, { once: true });
@@ -25,7 +26,8 @@ await startWorker('clinic', async signal => {
       }),
       reconnect('clinic-relay', signal, async () => {
         await declareTopology(config.brokerUrl, config.topology);
-        while (!signal.aborted) if (!await relay.once(workerId, config.topology)) await delay(250, signal);
+        try { while (!signal.aborted) if (!await relay.once(workerId, config.topology)) await delay(250, signal); }
+        finally { await relay.close(); }
       })
     ]);
   } finally { await db.$disconnect(); }

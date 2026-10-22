@@ -39,7 +39,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   if(projected&&!secret)throw new Error('CLINIC_READ_TOKEN_SECRET_REQUIRED');
   if(secret&&['JWT_SECRET','JWT_PRIVATE_KEY','JWT_PUBLIC_KEY','CORE_DIRECTORY_TOKEN','CLINIC_SERVICE_TOKEN','CLINIC_BILLING_TOKEN','CLINIC_BOOTSTRAP_TOKEN','CORE_BILLING_EVIDENCE_TOKEN','RATE_LIMIT_KEY_SECRET','OBSERVABILITY_TOKEN'].some(key=>process.env[key]===secret))throw new Error('DISTINCT_READ_TOKEN_CREDENTIAL_REQUIRED');
   const tokens=secret?new ReadTokens(secret):undefined;
-  const serving=projected?new ServingAppointmentQueries(db,readFreshness??new ReadFreshness(db)):undefined;
+  const serving=projected?new ServingAppointmentQueries(db,readFreshness??new ReadFreshness(db,undefined,undefined,undefined,{perAggregateLag:true})):undefined;
   const appointmentQueries=selectAppointmentQueries(authoritative,projected?'authoritative':process.env.CLINIC_READ_MODE,shadow);
   app.locals.appointmentShadow=shadow;
   app.locals.appointmentServing=serving;

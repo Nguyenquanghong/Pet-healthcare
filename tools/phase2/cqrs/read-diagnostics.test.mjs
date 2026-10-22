@@ -39,8 +39,20 @@ test('projection SQL failure keeps fallback contract, stage, correlation and ori
  assert.deepEqual(result,{data:{count:123},source:'authoritative',degraded:true});assert.equal(calls,2);
  assert.equal(options[0].maxWait,50);assert.ok(options[0].timeout>0&&options[0].timeout<=1250);
  assert.deepEqual([options[1].maxWait,options[1].timeout],[50,2500]);
- assert.deepEqual(statements,['SET TRANSACTION READ ONLY',"SET LOCAL statement_timeout='200ms'","SET LOCAL statement_timeout='1500ms'"]);
+ // K2-F1: projected statements use the remaining 1250ms budget capped at 1000ms, not a fixed 200ms.
+ assert.deepEqual(statements,['SET TRANSACTION READ ONLY',"SET LOCAL statement_timeout='1000ms'","SET LOCAL statement_timeout='1500ms'"]);
  assert.deepEqual(rows.filter(r=>!['enabled','admission_ready'].includes(r.event)).map(r=>[r.id,r.event,r.stage,r.sqlState]),[[1,'projection_failure','projection-counts','57014'],[1,'fallback_ok','fallback-commit',null]]);
+});
+
+test('token reads give projected statements the remaining 500ms budget instead of a fixed 200ms cap',async()=>{
+ const {diag}=capture(),statements=[];
+ const tx={$executeRawUnsafe:async sql=>statements.push(sql),readProjectionControl:{findUnique:async()=>control},
+  $queryRaw:async()=>[{id:'a',version:2,deleted:false,projected:2,deletedAt:null}]};
+ const serving=new ServingAppointmentQueries({$transaction:async fn=>fn(tx)},{usable:()=>true},diag);
+ const result=await diag.run('owner-list',()=>serving.read(async()=>({count:1}),{a:2}));
+ assert.equal(result.source,'projection');
+ const ms=Number(statements.find(s=>s.includes('statement_timeout')).match(/'(\d+)ms'/)[1]);
+ assert.ok(ms>200&&ms<=500,String(ms));
 });
 
 test('fallback busy and source failure remain distinct and propagate the original failure',async()=>{

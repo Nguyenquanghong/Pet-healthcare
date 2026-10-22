@@ -1,0 +1,198 @@
+{
+  "format": "cqrs-benchmark-finalization-v1",
+  "recordedAtUtc": "2026-10-21T07:06:18.780323+00:00",
+  "head": "c4102b55a652dc8e4faa93eeada4d76cbe0753ef",
+  "branch": "phase2/clinic-activity-d0-20261020",
+  "scope": "Finalize benchmark specification and preserve old evidence; no runtime or measurement execution",
+  "policyVersion": 9,
+  "policySha256": "d8fbedbceacc82a79897be25315b4e16fa16823a3226f20493e882762784434e",
+  "planSha256": "6b058747e66734c40e302a1da7aa712fa516608ad531c8b780fe65665d27474c",
+  "gates": {
+    "D0": "DESIGN_PROTOCOL_ACCEPTED",
+    "D1": "PASS_IN_FUNCTIONAL_SCOPE_10K_SOURCE_CACHED_API_UI",
+    "D2": "NOT_STARTED",
+    "performanceReadiness": "NOT_READY",
+    "newPerformanceMeasurements": "NOT_RUN"
+  },
+  "commandsActuallyRun": [
+    {
+      "command": "python test-results/phase2/cqrs/activity/benchmark-final-20261021/prepare.py",
+      "exitCode": 0,
+      "scope": "Snapshot, archive v8, draft v9 specification"
+    },
+    {
+      "command": "python test-results/phase2/cqrs/activity/benchmark-final-20261021/update_docs.py",
+      "exitCode": 0,
+      "scope": "Complete v9 preregistration and cross-reference docs"
+    },
+    {
+      "command": "python test-results/phase2/cqrs/activity/benchmark-final-20261021/finalize.py",
+      "exitCode": 0,
+      "scope": "Lock calendar rule, distinguish declared manifest digest from byte hash, validate and write evidence"
+    }
+  ],
+  "readOnlyAudit": [
+    "Get-Location; git branch/HEAD/status",
+    "AGENTS ancestor checks",
+    "rg/Get-Content/Python UTF-8 reads of policy, docs, query/PCN source and fixture",
+    "git ls-tree/show of M source, ZIP manifest/CRC/digests read as data without execution"
+  ],
+  "readFailuresRetained": [
+    "Initial Get-Content used nonexistent 05-experiments-and-rollout.md; resolved actual06-benchmark-and-decision.md/05-validation.md",
+    "Initial rg named nonexistent helper paths; located actual cqrs_benchmark.py/pcn_dataset.mjs/stack.mjs",
+    "Broad AGENTS search encountered pre-existing unreadable temporary directories; relevant ancestor/path checks found no applicable AGENTS; those directories untouched"
+  ],
+  "validation": {
+    "format": "cqrs-benchmark-finalization-validation-v1",
+    "status": "PASS_POLICY_ARTIFACT_AND_PRESERVATION_ONLY",
+    "policyVersion": 9,
+    "policySha256": "d8fbedbceacc82a79897be25315b4e16fa16823a3226f20493e882762784434e",
+    "planSha256": "6b058747e66734c40e302a1da7aa712fa516608ad531c8b780fe65665d27474c",
+    "lockedActivitySubtrees": [
+      "primary",
+      "matrix",
+      "productLoad",
+      "regression",
+      "freshness",
+      "recovery",
+      "correctness",
+      "fallback",
+      "cache",
+      "semantics",
+      "fixture",
+      "measurementProtocol",
+      "timeEstimate",
+      "decisions"
+    ],
+    "oldQ6PolicyUnchanged": true,
+    "v8ArchivedExactBytes": true,
+    "d1SourceFilesUnchanged": 608,
+    "oldV1BundleFileDigestsVerified": 837,
+    "protectedFilesBefore": 1803,
+    "protectedMarkdownBefore": 979,
+    "missingProtectedFiles": [],
+    "changedProtectedFiles": [
+      "phase2-plan/cqrs/README.md",
+      "phase2-plan/cqrs/clinic-activity/04-delivery-plan.md",
+      "phase2-plan/cqrs/clinic-activity/06-benchmark-and-decision.md",
+      "phase2-plan/cqrs/clinic-activity/08-agent-prompts.md",
+      "phase2-plan/cqrs/clinic-activity/README.md",
+      "phase2-plan/cqrs/clinic-activity/START-HERE-PROMPT.md",
+      "phase2-plan/cqrs/clinic-activity/STATUS.md",
+      "phase2-plan/cqrs/clinic-activity/acceptance.frozen.json",
+      "phase2-plan/cqrs/clinic-activity/acceptance.frozen.sha256",
+      "phase2-plan/cqrs/clinic-activity/evidence/adr-activity-03.md"
+    ],
+    "unchangedProtectedFiles": 1793,
+    "applicationTestsBuildIntegrationPerformance": "NOT_RUN"
+  },
+  "filesCreatedOrModifiedExcludingThisSelfHashedManifest": [
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/04-delivery-plan.md",
+      "bytes": 9560,
+      "sha256": "8ab7412d4d33c808ebec8e7ef98d581b7a4b68cb1ee21e8dad1c102703506e97"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/06-benchmark-and-decision.md",
+      "bytes": 13901,
+      "sha256": "e93358b1cdea98cbe28d56bc6a5755d889c76db547e544131891c1552774d563"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/08-agent-prompts.md",
+      "bytes": 17245,
+      "sha256": "14dd68094e7583275ddfca31989ac4910a487a1ac971d91068d3c96216d06743"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/acceptance.frozen.json",
+      "bytes": 41698,
+      "sha256": "d8fbedbceacc82a79897be25315b4e16fa16823a3226f20493e882762784434e"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/acceptance.frozen.sha256",
+      "bytes": 90,
+      "sha256": "6429e4e33a949be0f657f2e78c5acc3f8ea71b1f0a39a3793ee747f1cdc661a3"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/BENCHMARK-FINAL.md",
+      "bytes": 20592,
+      "sha256": "8ef9de98cb7efcca7c31e58e46ceeb7200702fa84c3108d29c5f58e96d3ae78f"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/adr-activity-03.md",
+      "bytes": 9531,
+      "sha256": "3ac3d649d33778f6847f7bd977c3f019c508ea68a9821e81685f0b0cbcbd89d1"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/benchmark-plan-20261021.json",
+      "bytes": 12963,
+      "sha256": "6b058747e66734c40e302a1da7aa712fa516608ad531c8b780fe65665d27474c"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/benchmark-plan-20261021.sha256",
+      "bytes": 96,
+      "sha256": "b551e71e82cf50fd1826fdf9b43cc33006eac38400754b8a8cda05c593b833df"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/preregistration-v8/acceptance.frozen.json",
+      "bytes": 40820,
+      "sha256": "a55ce41925691098e9303e915d425c9629ba8550804b15a1464e84bd6d699fa7"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/evidence/preregistration-v8/acceptance.frozen.sha256",
+      "bytes": 89,
+      "sha256": "6d882ab79941de6178a9f6978ddabf5349e9948c5cfb63a6789327e2b1cb20cb"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/README.md",
+      "bytes": 9339,
+      "sha256": "3b2fd4f20ae8d32f15e5c8988e5b5aff76398ac824cf1ff2572085a177840051"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/START-HERE-PROMPT.md",
+      "bytes": 4480,
+      "sha256": "4691a308b367f5ddaeebdedd97178582bad6e76c84141aa129641c4d4a1bb22f"
+    },
+    {
+      "path": "phase2-plan/cqrs/clinic-activity/STATUS.md",
+      "bytes": 25219,
+      "sha256": "bf6acfe206069bbac127d737c96e8c36049ffc6ebb5567459af69a5a082fbb58"
+    },
+    {
+      "path": "phase2-plan/cqrs/README.md",
+      "bytes": 11926,
+      "sha256": "873b767f09af715b54e3279a520609f718279b534a8bc7363264ccaf9e5d07d5"
+    }
+  ],
+  "auditHelpers": [
+    {
+      "path": "test-results/phase2/cqrs/activity/benchmark-final-20261021/prepare.py",
+      "sha256": "58848d1f097904f2e005e371632aace6cf92f6f2e2b147863b74f2f6f84f537f"
+    },
+    {
+      "path": "test-results/phase2/cqrs/activity/benchmark-final-20261021/update_docs.py",
+      "sha256": "56156183202652b115385a2fee4af6aed6e73064f0e499e497bf22d157c341fb"
+    },
+    {
+      "path": "test-results/phase2/cqrs/activity/benchmark-final-20261021/finalize.py",
+      "sha256": "99e0f8c285df31d56892ca73f378904a191e47702155cc890e681ed7ecc88229"
+    },
+    {
+      "path": "test-results/phase2/cqrs/activity/benchmark-final-20261021/before.json",
+      "sha256": "3c4486905ff4ce262154caecb90618d9a6345b0083e2b55af73678daf84303da"
+    },
+    {
+      "path": "test-results/phase2/cqrs/activity/benchmark-final-20261021/validation.json",
+      "sha256": "bbbb3678b5fa4f40df178704d95b011c38688e9aaf40d1cf8b491e3874bba1f8"
+    }
+  ],
+  "notRun": [
+    "Application suites/build",
+    "new PG/gateway/browser integration",
+    "DB writes/migrate/seed/reset",
+    "service/Docker/notebook startup",
+    "performance/freshness/recovery/rebuild timing or load",
+    "D2/V2 runtime/cutover",
+    "commit/push/delete/subagents"
+  ],
+  "nextStep": "D2 source/projector/migration files and focused tests under existing development gate; keep integration NOT_RUN without valid guarded trial context, lists authoritative and source default. Separate measurement assignment only after live readiness."
+}
