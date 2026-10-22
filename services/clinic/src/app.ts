@@ -24,10 +24,11 @@ import {parseActivityFilter} from './application/queries/clinicActivity.js';
 import {ClinicActivityQueries,type SummaryEligibility} from './infrastructure/queries/clinicActivity.js';
 import {mountBilling} from './billingApi.js';
 import {assertReadProjectionConfig} from './readProjection.js';
+import {S3BlobStore,blobStoreFromEnv,type BlobStore} from './blobStore.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
 import { requestActor } from '@nipopeto/runtime';
 
-export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?:CoreDirectory,runtime?:ServiceRuntime,readFreshness?:ReadFreshness,activityEvidence?:SummaryEligibility){
+export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?:CoreDirectory,runtime?:ServiceRuntime,readFreshness?:ReadFreshness,activityEvidence?:SummaryEligibility,blobs:BlobStore=blobStoreFromEnv()){
   assertReadProjectionConfig();
   const app=express();app.disable('x-powered-by');
   const authoritative=new AuthoritativeAppointmentQueries(db);
@@ -49,7 +50,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   runtime?.install(app);
   mountBilling(app,db,verify,source);
   app.get('/health/live',(_req,res)=>res.json({service:'clinic',status:'alive'}));
-  app.get('/health/ready',async(_req,res)=>{try{await db.appointment.count();await db.medicalRecord.count();await db.medicalImage.count();await db.requestDedup.count();res.json({service:'clinic',status:'ready'});}catch{res.status(503).json({service:'clinic',status:'unavailable'});}});
+  app.get('/health/ready',async(_req,res)=>{try{await db.appointment.count();await db.medicalRecord.count();await db.medicalImage.count();await db.requestDedup.count();if(blobs instanceof S3BlobStore)await blobs.check();res.json({service:'clinic',status:'ready'});}catch{res.status(503).json({service:'clinic',status:'unavailable'});}});
   const router=express.Router();
   router.use('/dashboard/clinic/activity',(_req,res,next)=>{res.setHeader('Cache-Control','no-store');next();});
   app.use('/internal/clinic', (req,res,next)=>{if(req.path!=='/bootstrap'||req.method!=='GET'){res.status(404).json({error:'Clinic route not found.'});return;}if(!source||!source.acceptsService(req.headers['x-service-token'],'bootstrap')){res.status(401).json({error:'Service authentication required.'});return;}next();});
@@ -80,7 +81,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
     res.locals.directory=new RequestDirectory(source!,actor,token,snapshot);next();
   });
   const appointment=(res:express.Response,bound?:Parameters<typeof appointmentDependencies>[2])=>new AppointmentService(appointmentDependencies(db,res.locals.directory,bound),new BookingLifecycleService(new Lifecycle(db,res.locals.directory,bound)));
-  const medical=(res:express.Response,bound?:Parameters<typeof medicalDependencies>[2])=>new MedicalRecordsService(medicalDependencies(db,res.locals.directory,bound));
+  const medical=(res:express.Response,bound?:Parameters<typeof medicalDependencies>[3])=>new MedicalRecordsService(medicalDependencies(db,res.locals.directory,blobs,bound));
   const read=async(req:express.Request,res:express.Response,run:(reader:typeof appointmentQueries)=>Promise<unknown>)=>readDiagnostics.run(diagnosticOperation(res.locals.actor.role==='owner',req.path.endsWith('/calendar'),req.query),async diagnosticId=>{
     if(diagnosticId!==undefined)res.setHeader('X-Clinic-Read-Diagnostic-Id',String(diagnosticId));
     res.setHeader('Cache-Control','no-store');
@@ -116,8 +117,8 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   router.patch('/medical-records/:id',async(req,res)=>res.json({record:medicalRecordDto(await medicalMutation(db,req.params.id,tx=>medical(res,tx).update(res.locals.actor,req.params.id,req.body??{})))}));
   router.delete('/medical-records/:id',async(req,res)=>{await medicalMutation(db,req.params.id,tx=>medical(res,tx).delete(res.locals.actor,req.params.id));res.status(204).end();});
   router.get('/medical-records/:id/history',async(req,res)=>res.json({items:await medical(res).history(res.locals.actor,req.params.id)}));
-  router.get('/medical-records/images',async(req,res)=>res.json(await list(db,'medicalImages',res.locals.actor,res.locals.directory,req.query)));
-  router.post('/medical-records/images',async(req,res)=>res.status(201).json({image:await medical(res).createImage(res.locals.actor,req.body)}));
+  router.get('/medical-records/images',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await list(db,'medicalImages',res.locals.actor,res.locals.directory,req.query,blobs));});
+  router.post('/medical-records/images',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.status(201).json({image:await medical(res).createImage(res.locals.actor,req.body)});});
   router.delete('/medical-records/images/:id',async(req,res)=>{await medical(res).deleteImage(res.locals.actor,req.params.id);res.status(204).end();});
   router.get('/bootstrap',async(req,res)=>res.json(await bootstrap(db,res.locals.actor,res.locals.directory,req.query.view)));
   router.get('/dashboard/clinic',async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({...await bootstrap(db,res.locals.actor,res.locals.directory,'dashboard'),asOf:new Date().toISOString()});});

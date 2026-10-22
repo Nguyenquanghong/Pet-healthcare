@@ -9,6 +9,7 @@ import { clinicRuntime } from './runtime.js';
 import {ActivitySummaryEvidence,AuditLane} from './activitySummaryEvidence.js';
 import {projectionCapability,capabilityReport} from './projectionVersions.js';
 import {assertReadProjectionConfig} from './readProjection.js';
+import {S3BlobStore,blobStoreFromEnv} from './blobStore.js';
 const {db}=createDependencies();
 let freshnessDb:PrismaClient|undefined,freshness:ReadFreshness|undefined,activityRows:ReadFreshness|undefined,summaryEvidence:ActivitySummaryEvidence|undefined;
 try{
@@ -40,7 +41,11 @@ try{
       if(process.env.CLINIC_READ_MODE==='projection')freshness=new ReadFreshness(freshnessDb,undefined,undefined,undefined,{lane,perAggregateLag:true});
       if(capability){activityRows=new ReadFreshness(freshnessDb,undefined,undefined,undefined,{requireListProjection:false,perAggregateLag:true,lane});summaryEvidence=new ActivitySummaryEvidence(freshnessDb,activityRows,capability,lane);}
     }
-    const app=createApp(db,verify,source,runtime,freshness,summaryEvidence);
+    // Medical image bucket (AQ-09). Misconfiguration fails startup; an unreachable
+    // bucket only fails image requests and readiness, not the whole service.
+    const blobs=blobStoreFromEnv();
+    if(blobs instanceof S3BlobStore)await blobs.ensureBucket().catch(()=>{process.stderr.write(JSON.stringify({service:'clinic',code:'BLOB_BUCKET_UNAVAILABLE'})+'\n');});
+    const app=createApp(db,verify,source,runtime,freshness,summaryEvidence,blobs);
     app.locals.activitySummaryEvidence=summaryEvidence;app.locals.activity.start();
     await runtime?.start();
     freshness?.start();activityRows?.start();summaryEvidence?.start();

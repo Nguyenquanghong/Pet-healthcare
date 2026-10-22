@@ -3,8 +3,8 @@ import { execFileSync } from 'node:child_process';
 // Read-only infrastructure identity check, before any database client/write.
 export function assertTestProject() {
   const ids = execFileSync('docker', ['compose', '-f', 'deploy/phase2/compose.test.yml', 'ps', '-q'], { encoding: 'utf8' }).trim().split(/\s+/).filter(Boolean);
-  if (ids.length !== 3) throw new Error('Start exactly the dedicated three-container pet-phase2-p1-test project with npm run phase2:up');
-  const expected = new Set(['postgres', 'rabbitmq', 'redis']);
+  if (ids.length !== 4) throw new Error('Start exactly the dedicated four-container pet-phase2-p1-test project with npm run phase2:up');
+  const expected = new Set(['postgres', 'rabbitmq', 'redis', 'blob']);
   for (const id of ids) {
     const info = JSON.parse(execFileSync('docker', ['inspect', id], { encoding: 'utf8' }))[0];
     const labels = info.Config.Labels;

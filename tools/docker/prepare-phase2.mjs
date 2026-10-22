@@ -19,9 +19,23 @@ export function preparePhase2(path) {
   }
   // Validate the new group before the compatibility helper can append anything.
   const changed = prepareNotifications(path);
-  if (present.length) return changed;
+  const blob = prepareBlob(path);
+  if (present.length) return changed || blob;
   appendFileSync(path, '\n# Strict three-service local configuration; keep private.\n' +
     phase2Keys.map(name => `${name}='${randomBytes(32).toString('hex')}'`).join('\n') + '\n');
+  return true;
+}
+// AQ-09 medical image bucket credentials: own group, so existing configurations gain it on rerun.
+export function prepareBlob(path) {
+  const env = parseEnv(readFileSync(path, 'utf8')), names = ['BLOB_ACCESS_KEY', 'BLOB_SECRET_KEY'];
+  const present = names.filter(name => Object.hasOwn(env, name));
+  if (present.length === names.length) return false;
+  if (present.length) throw new Error('PARTIAL_BLOB_CONFIGURATION: review existing keys; nothing was changed.');
+  appendFileSync(path, `
+# Medical image bucket (AQ-09); keep private.
+BLOB_ACCESS_KEY='clinic${randomBytes(8).toString('hex')}'
+BLOB_SECRET_KEY='${randomBytes(32).toString('hex')}'
+`);
   return true;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

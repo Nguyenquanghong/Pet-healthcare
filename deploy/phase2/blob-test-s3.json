@@ -1,0 +1,1 @@
+{"identities":[{"name":"clinic","credentials":[{"accessKey":"p2blobaccess","secretKey":"p2_blob_secret_fixture_only_0123456789abcdef"}],"actions":["Admin","Read","Write","List","Tagging"]}]}

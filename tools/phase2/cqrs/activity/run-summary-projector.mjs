@@ -12,7 +12,7 @@ import {PrismaClient} from '../../../../services/clinic/src/generated/client/ind
 
 const help=`Usage: node tools/phase2/cqrs/activity/run-summary-projector.mjs --run | --run-rebuild | --run-reader | --run-fault | --run-smoke
 Build first: npm run activity:build (generated Clinic client must include migration 20261021000100).
-Requires exactly the dedicated three-container pet-phase2-p1-test Compose project; this tool never
+Requires exactly the dedicated four-container pet-phase2-p1-test Compose project; this tool never
 starts, builds, pulls, downs or resets it. Before any write it checks container labels/port,
 current_database=p2_clinic_test, current_user=p2_clinic (not superuser), public.p2_test_marker and
 that the run schema is absent. Then it creates schema activity_d2_<run> (COMMENT marker), applies

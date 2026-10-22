@@ -5,6 +5,8 @@ import { ClinicInbox } from './inbox.js';
 import { OutboxRelay } from './relay.js';
 import { DirectorySync } from './directorySync.js';
 import { withRequestId, eventCorrelation, integer } from '@nipopeto/runtime';
+import { blobStoreConfigured, blobStoreFromEnv } from './blobStore.js';
+import { drainBlobCleanup } from './blobCleanup.js';
 const { db } = createDependencies();
 await startWorker('clinic', async signal => {
   try {
@@ -24,6 +26,10 @@ await startWorker('clinic', async signal => {
         try { await Promise.race([consumer.done, delay(2147483647, stopped.signal)]); }
         finally { stopped.abort(); signal.removeEventListener('abort', abort); await consumer.close(); }
       }),
+      ...(blobStoreConfigured() ? [reconnect('clinic-blob-cleanup', signal, async () => {
+        const blobs = blobStoreFromEnv();
+        while (!signal.aborted) { await drainBlobCleanup(db, blobs); await delay(integer('BLOB_CLEANUP_INTERVAL_MS', 30000, 1000, 3600000), signal); }
+      })] : []),
       reconnect('clinic-relay', signal, async () => {
         await declareTopology(config.brokerUrl, config.topology);
         try { while (!signal.aborted) if (!await relay.once(workerId, config.topology)) await delay(250, signal); }

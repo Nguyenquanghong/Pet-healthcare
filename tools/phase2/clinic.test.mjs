@@ -19,8 +19,12 @@ import {RuntimeOutboxStore} from '../../backend/dist/src/infrastructure/persiste
 import {OutboxRelay as ClinicRelay} from '../../services/clinic/dist/relay.js';
 import {topology,declareTopology,publishConfirmed} from '@nipopeto/messaging';
 import amqp from 'amqplib';
+import {blobTestEnv} from './blob-test.mjs';
+import {blobStoreFromEnv} from '../../services/clinic/dist/blobStore.js';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test','Use guarded phase2:test:clinic');
+Object.assign(process.env,blobTestEnv);// spawned Clinic processes use the dedicated test bucket
+const blobs=blobStoreFromEnv();
 const urls={core:'postgresql://p2_core:p2_core_fixture_only@127.0.0.1:55432/p2_core_test?schema=core_runtime_test',clinic:'postgresql://p2_clinic:p2_clinic_fixture_only@127.0.0.1:55432/p2_clinic_test?schema=p1_proof',notification:'postgresql://p2_notification:p2_notification_fixture_only@127.0.0.1:55432/p2_notification_test?schema=p1_proof'};
 const core=new CoreClient({datasourceUrl:urls.core}),clinic=new ClinicClient({datasourceUrl:urls.clinic}),notification=new NotificationClient({datasourceUrl:urls.notification});
 const run=randomUUID(),credential='p3-directory-fixture-'+randomUUID(),owner=randomUUID(),other=randomUUID(),admin=randomUUID(),doctor=randomUUID(),staff=randomUUID();
@@ -95,7 +99,12 @@ test('every medical read/write scopes through Core; pagination/filter/count/rela
   const ownerPage=status(await request(`/api/medical-records?petId=${pet.id}&pageSize=1`),200);assert.equal(ownerPage.items.length,1);assert.ok(ownerPage.pagination.total>=1);assert.ok(!JSON.stringify(ownerPage).includes('P3_PRIVATE_MARKER'));assert.ok(!JSON.stringify(ownerPage).includes('password'));assert.ok(ownerPage.related.pets.every(p=>p.ownerId===owner));status(await request(`/api/medical-records?petId=${otherPet.id}`),403);status(await request(`/api/medical-records/${foreign.id}`,{method:'DELETE'}),403);
   for(const body of [{imageUrl:'data:image/png;base64,AA==',mimeType:'image/png'},{imageUrl:'data:image/svg+xml;base64,PHN2Zz4=',mimeType:'image/svg+xml'}])status(await request('/api/medical-records/images',{method:'POST',token:tokens.staff,body:{petId:pet.id,title:'Rejected '+run,...body}}),422);
   const image=status(await request('/api/medical-records/images',{method:'POST',token:tokens.staff,body:{petId:pet.id,title:'Image '+run,imageUrl:'data:image/png;base64,iVBORw0KGgo=',mimeType:'image/png'}}),201).image;assert.ok(!('ownerId'in image));
-  const images=status(await request(`/api/medical-records/images?petId=${pet.id}`),200);assert.equal(images.pagination.total,1);assert.equal(images.items[0].id,image.id);assert.ok(images.related.pets.some(p=>p.id===pet.id));status(await request('/api/medical-records/images',{method:'POST',body:{petId:pet.id}}),403);status(await request(`/api/medical-records/images/${image.id}`,{method:'DELETE',token:tokens.doctor}),204);status(await request(`/api/medical-records/${foreign.id}`,{method:'DELETE',token:tokens.admin}),204);
+  // AQ-09 Claim Check: the row holds a claim, the bytes live in the bucket, the response carries a valet key.
+  assert.ok(!('imageUrl'in image)&&!('storageKey'in image)&&image.sizeBytes===8&&image.mimeType==='image/png'&&typeof image.urlExpiresAt==='string');
+  const stored=await clinic.medicalImage.findUniqueOrThrow({where:{id:image.id}});assert.equal(stored.imageUrl,null);assert.equal(stored.storageKey,'images/'+image.id);assert.equal(stored.sizeBytes,8);assert.match(stored.sha256,/^[0-9a-f]{64}$/);
+  const fetched=await fetch(image.url);assert.equal(fetched.status,200);assert.equal(fetched.headers.get('content-type'),'image/png');assert.deepEqual([...Buffer.from(await fetched.arrayBuffer())],[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
+  assert.equal((await fetch(image.url.replace(/(X-Amz-Signature=)(.)/,(_,p,c)=>p+(c==='0'?'1':'0')))).status,403);
+  const images=status(await request(`/api/medical-records/images?petId=${pet.id}`),200);assert.equal(images.pagination.total,1);assert.equal(images.items[0].id,image.id);assert.ok(!('imageUrl'in images.items[0])&&!('storageKey'in images.items[0])&&!('sha256'in images.items[0])&&typeof images.items[0].url==='string');assert.equal((await fetch(images.items[0].url)).status,200);assert.ok(images.related.pets.some(p=>p.id===pet.id));status(await request('/api/medical-records/images',{method:'POST',body:{petId:pet.id}}),403);status(await request(`/api/medical-records/images/${image.id}`,{method:'DELETE',token:tokens.doctor}),204);assert.equal(await clinic.medicalImage.count({where:{id:image.id}}),0);assert.equal(await clinic.blobCleanup.count({where:{storageKey:stored.storageKey}}),0);assert.equal((await fetch(image.url)).status,404);status(await request(`/api/medical-records/${foreign.id}`,{method:'DELETE',token:tokens.admin}),204);
   const all=status(await request(`/api/appointments?petId=${pet.id}&pageSize=1&statusGroup=completed`),200);assert.equal(all.items[0].status,'completed');assert.ok(all.counts.pending>=1);assert.ok(all.counts.completed>=1);assert.equal(all.related.appointments.length,0);assert.ok(all.related.pets.every(p=>p.id===pet.id));
   status(await request('/api/appointments?petId='+encodeURIComponent(' '+pet.id+' ')),200);
   const calendar=status(await request('/api/appointments/calendar?month='+date.slice(0,7)),200);assert.ok(calendar[date]>=1);status(await request('/api/appointments?pageSize=101'),422);status(await request('/api/appointments?date=2026-02-30'),422);
@@ -158,6 +167,24 @@ test('AQ-15 medical record audit: create/update/delete revisions in the same tra
   for(const sql of ['UPDATE medical_record_revisions SET actor_id=\'forged\' WHERE record_id=$1','DELETE FROM medical_record_revisions WHERE record_id=$1'])
     await assert.rejects(clinic.$executeRawUnsafe(sql,created.id),/MEDICAL_RECORD_REVISION_IMMUTABLE/);
   assert.equal(await clinic.medicalRecordRevision.count({where:{recordId:created.id}}),3);
+});
+test('AQ-09 guarded tool moves legacy base64 images into the bucket; list payload carries claims, not content; orphans reported',{timeout:60000},async()=>{
+  const tool=(...args)=>JSON.parse(execFileSync(process.execPath,['tools/phase2/migrate-medical-images.mjs',...args],{env:{...process.env,DATABASE_URL:urls.clinic},encoding:'utf8'}));
+  const png=Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]),Buffer.alloc(200000,7)]),dataUrl='data:image/png;base64,'+png.toString('base64');
+  const ids=[];for(let i=0;i<3;i++)ids.push((await clinic.medicalImage.create({data:{petId:pet.id,ownerId:owner,title:'Legacy '+i+' '+run,imageUrl:dataUrl,mimeType:'image/png'}})).id);
+  const dry=tool('--dry-run');assert.ok(dry.legacyRows>=3&&dry.legacyBytes>=3*dataUrl.length);assert.equal(await clinic.medicalImage.count({where:{id:{in:ids},imageUrl:null}}),0);
+  const moved=tool('--run');assert.ok(moved.migrated>=3);assert.equal(moved.legacyRowsAfter,0);assert.deepEqual(moved.failed,[]);
+  for(const row of await clinic.medicalImage.findMany({where:{id:{in:ids}}})){assert.equal(row.imageUrl,null);assert.equal(row.storageKey,'images/'+row.id);assert.equal(row.sizeBytes,png.length);}
+  assert.equal(tool('--run').migrated,0);
+  const page=status(await request(`/api/medical-records/images?petId=${pet.id}&pageSize=100`),200),mine=page.items.filter(i=>ids.includes(i.id));assert.equal(mine.length,3);
+  for(const item of mine)assert.ok(Buffer.from(await (await fetch(item.url)).arrayBuffer()).equals(png));
+  // Before/after: the old list returned every data URL inline; now one page is metadata plus valet keys.
+  const before=3*dataUrl.length,after=Buffer.byteLength(JSON.stringify(mine));assert.ok(after*100<before,JSON.stringify({before,after}));
+  process.stdout.write(JSON.stringify({aq09Payload:{images:3,legacyInlineBytes:before,claimBytes:after},tableBytesAfterMove:moved.tableBytes})+'\n');
+  const stray='images/orphan-'+run;await blobs.put(stray,png,'image/png');
+  assert.ok(tool('--orphans','--min-age-seconds','0').orphans.includes(stray));assert.ok(!tool('--orphans').orphans.includes(stray));
+  assert.ok(tool('--orphans','--delete-orphans','--min-age-seconds','0').orphans.includes(stray));assert.ok(!tool('--orphans','--min-age-seconds','0').orphans.includes(stray));
+  for(const id of ids)status(await request(`/api/medical-records/images/${id}`,{method:'DELETE',token:tokens.admin}),204);
 });
 test('AQ-05 password change revokes earlier sessions on Core and on direct Clinic calls (directory SESSION_REVOKED)',async()=>{
   const id=randomUUID();await core.user.create({data:{id,role:'staff',fullName:'AQ-05 staff '+run,passwordHash:'fixture',passwordSalt:'fixture'}});
