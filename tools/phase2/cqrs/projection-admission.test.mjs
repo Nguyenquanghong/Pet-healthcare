@@ -86,3 +86,25 @@ test('admission stays occupied until commit or rollback settles, including a fai
  await new Promise(r=>setImmediate(r));assert.equal(transactions,1);commit.resolve();
  assert.equal((await first).source,'authoritative');assert.equal((await second).source,'projection');assert.equal(transactions,3);
 });
+
+test('two-slot admission runs two snapshots at once, keeps FIFO, waiter bound and deadlines; bad slot counts refused',async()=>{
+ const gate=new ProjectionAdmission(undefined,2),a=await gate.acquire(performance.now()+1000);assert.equal(gate.busy,false);
+ const b=await gate.acquire(performance.now()+1000);assert.equal(gate.busy,true);
+ const order=[],waiting=Array.from({length:16},(_,i)=>gate.acquire(performance.now()+1000).then(r=>{order.push(i);return r;}));
+ await assert.rejects(gate.acquire(performance.now()+1000),/ADMISSION_BUSY/);
+ a();b();for(const w of waiting)(await w)();
+ assert.deepEqual(order,Array.from({length:16},(_,i)=>i));assert.equal(gate.busy,false);
+ let now=0;const timed=new ProjectionAdmission(()=>now,2),x=await timed.acquire(1000),y=await timed.acquire(1000);
+ const late=assert.rejects(timed.acquire(10),/ADMISSION_BUSY/);now=11;x();await late;y();assert.equal(timed.busy,false);
+ for(const bad of [0,5,1.5])assert.throws(()=>new ProjectionAdmission(undefined,bad),/INVALID_PROJECTION_SLOTS/);
+});
+
+test('serving with two slots opens two projected transactions concurrently and queues the rest outside Prisma',async()=>{
+ const held=deferred();let active=0,max=0,transactions=0;
+ const db={$transaction:async fn=>{transactions++;active++;max=Math.max(max,active);try{return await fn(makeTx());}finally{active--;}}};
+ const serving=new ServingAppointmentQueries(db,{usable:()=>true},new ReadDiagnostics(false),null,2);
+ const reads=Array.from({length:5},()=>serving.read(async()=>{await held.promise;return 1;}));
+ await new Promise(r=>setImmediate(r));assert.equal(transactions,2);assert.equal(active,2);
+ held.resolve();const results=await Promise.all(reads);
+ assert.ok(results.every(r=>r.source==='projection'));assert.equal(max,2);assert.equal(transactions,5);
+});

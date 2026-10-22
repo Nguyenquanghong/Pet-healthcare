@@ -1,40 +1,52 @@
-import amqp from 'amqplib';
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '../generated/phase2-core/index.js';
-import { parseEnvelope } from '@nipopeto/contracts';
-import { publishConfirmed, logEvent, type Topology } from '@nipopeto/messaging';
+import { ConfirmPublisher, type Topology } from '@nipopeto/messaging';
+type Claimed = { id: string; envelope: unknown; attempts: number };
+// batchSize/persistent default to the original one-event, one-connection relay;
+// the runtime notification worker enables both (same fix as the Clinic relay,
+// list study v1 K3-F1). Batches need a store with claimBatch.
+export type RelayOptions = { batchSize?: number; persistent?: boolean };
 export class OutboxRelay {
   private readonly store: OutboxStore;
+  private readonly publisher: ConfirmPublisher;
+  private readonly batchSize: number;
   // createdAfter (ISO instant) is a guarded-test scope like scopeAggregateId: a
   // run relays only its own rows from a shared trial schema.
-  constructor(db: PrismaClient | OutboxStore, private readonly brokerUrl: string, private readonly scopeAggregateId?: string, private readonly createdAfter?: string) {
+  constructor(db: PrismaClient | OutboxStore, brokerUrl: string, private readonly scopeAggregateId?: string, private readonly createdAfter?: string, options: RelayOptions = {}) {
     this.store = 'claim' in db ? db : new ProofOutboxStore(db);
+    this.batchSize = options.batchSize ?? 1;
+    if (!Number.isSafeInteger(this.batchSize) || this.batchSize < 1 || this.batchSize > 500 || (this.batchSize > 1 && !this.store.claimBatch)) throw new Error('INVALID_RELAY_BATCH');
+    this.publisher = new ConfirmPublisher(brokerUrl, 'core-relay', options.persistent ?? false);
+  }
+  get connection() { return this.publisher.connection; }
+  close() { return this.publisher.close(); }
+  private async claim(leaseOwner: string): Promise<Claimed[]> {
+    const scope = this.scopeAggregateId ?? null, after = this.createdAfter ?? null;
+    if (this.batchSize > 1) return this.store.claimBatch!(leaseOwner, scope, after, this.batchSize);
+    const one = await this.store.claim(leaseOwner, scope, after);
+    return one ? [one] : [];
   }
   async once(workerId: string, destination: string | Topology, afterConfirm?: () => void) {
     const started=performance.now();
     const leaseOwner = `${workerId}:${randomUUID()}`;
-    const claimed = await this.store.claim(leaseOwner, this.scopeAggregateId ?? null, this.createdAfter ?? null);
-    if (!claimed) return false;
-    let connection: amqp.ChannelModel | undefined;
-    try {
-      const raw = JSON.stringify(claimed.envelope), event = parseEnvelope(raw);
-      connection = await amqp.connect(this.brokerUrl, { timeout: 5000 });
-      connection.on('error', () => {});
-      const channel = await connection.createConfirmChannel();
-      channel.on('error', () => {});
-      await publishConfirmed(channel, typeof destination === 'string' ? '' : destination.exchange, typeof destination === 'string' ? destination : event.eventType, Buffer.from(raw), { messageId: claimed.id, contentType: 'application/json' });
-      logEvent('core-relay',event,'publish-confirmed',started);
+    const claimed = await this.claim(leaseOwner);
+    if (!claimed.length) return false;
+    const { confirmed, failed, error } = await this.publisher.publish(claimed, destination, started);
+    if (confirmed.length) {
       afterConfirm?.();
-      await this.store.markPublished(claimed.id, leaseOwner);
-      return true;
-    } catch (error) {
-      if (!afterConfirm) await this.store.retry(claimed.id, leaseOwner, new Date(Date.now() + Math.min(60000, 1000 * 2 ** Math.min(claimed.attempts, 6))));
+      for (const id of confirmed) await this.store.markPublished(id, leaseOwner);
+    }
+    if (failed.length) {
+      if (!afterConfirm) for (const row of claimed.filter(r => failed.includes(r.id)))
+        await this.store.retry(row.id, leaseOwner, new Date(Date.now() + Math.min(60000, 1000 * 2 ** Math.min(row.attempts, 6))));
       throw error;
-    } finally { await connection?.close().catch(() => {}); }
+    }
+    return true;
   }
 }
 export interface OutboxStore {
-  claim(leaseOwner: string, scope: string | null, createdAfter?: string | null): Promise<{ id: string; envelope: unknown; attempts: number } | null>;
+  claim(leaseOwner: string, scope: string | null, createdAfter?: string | null): Promise<Claimed | null>;
+  claimBatch?(leaseOwner: string, scope: string | null, createdAfter: string | null, limit: number): Promise<Claimed[]>;
   markPublished(id: string, leaseOwner: string): Promise<void>;
   retry(id: string, leaseOwner: string, nextAttemptAt: Date): Promise<void>;
 }

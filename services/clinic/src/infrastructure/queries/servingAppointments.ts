@@ -16,9 +16,11 @@ class PendingVersion extends Error{}
 export const PROJECTED_STATEMENT_MAX_MS=1000;
 export class ServingAppointmentQueries{
   private fallbacks=0;
-  private readonly admission=new ProjectionAdmission();
+  private readonly admission:ProjectionAdmission;
   readonly stats={projection:0,fallback:0,rejected:0};
-  constructor(private readonly db:PrismaClient,readonly freshness:ReadFreshness,private readonly diagnostics:ReadDiagnostics=readDiagnostics,private readonly aggregateCache:AppointmentAggregateCache|null=new AppointmentAggregateCache()){}
+  constructor(private readonly db:PrismaClient,readonly freshness:ReadFreshness,private readonly diagnostics:ReadDiagnostics=readDiagnostics,private readonly aggregateCache:AppointmentAggregateCache|null=new AppointmentAggregateCache(),projectionSlots=1){
+    this.admission=new ProjectionAdmission(undefined,projectionSlots);
+  }
   private async source<T>(run:(reader:AppointmentQueries)=>Promise<T>,reason:DiagnosticReason):Promise<ReadResult<T>>{
     this.diagnostics.mark('fallback-acquire');
     if(this.fallbacks>=2){this.stats.rejected++;this.diagnostics.emit('fallback_busy',reason);throw new BusinessError(503,'Clinic read fallback is busy. Retry later.');}
