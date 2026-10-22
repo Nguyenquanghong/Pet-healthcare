@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { BusinessError } from "../../domain/error.js";
 import { writeNotification } from './notificationOutbox.js';
 import type { HotelBookingRepository, HotelDependencies, HotelNotificationWriter, HotelTransaction, HotelUnitOfWork } from "../../application/ports/hotelBookings.js";
+import { hotelStayWrite } from "./hotelStayConflict.js";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 const noteIds = { dailyCareNotes: { select: { id: true } } } as const;
@@ -39,7 +40,7 @@ class PrismaHotelBookingRepository implements HotelBookingRepository {
       checkIn: { lt: checkOut }, checkOut: { gt: checkIn } } }) > 0;
   }
   create(data: Parameters<HotelBookingRepository["create"]>[0]) {
-    return this.client.hotelBooking.create({ data: { ...data, roomType: data.roomType as "standard" | "deluxe" | "vip" } });
+    return hotelStayWrite(this.client.hotelBooking.create({ data: { ...data, roomType: data.roomType as "standard" | "deluxe" | "vip" } }));
   }
   async createCareNote(data: Parameters<HotelBookingRepository["createCareNote"]>[0]) {
     await this.client.$queryRaw`SELECT id FROM hotel_bookings WHERE id = ${data.bookingId} FOR UPDATE`;

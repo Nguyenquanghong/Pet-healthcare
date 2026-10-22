@@ -234,6 +234,20 @@ test('real DB failure of outbox insert rolls back the domain write without leaki
     assert.equal(await core.outboxEvent.count({ where: { envelope: { path: ['payload','relatedPetId'], equals: failedPet.id } } }), 0);
   } finally { await core.$executeRawUnsafe(`ALTER TABLE "OutboxEvent" DROP CONSTRAINT "${name}"`); }
 });
+test('AQ-10 hotel stays: API 409 plus a database exclusion constraint for writers that bypass the service', async () => {
+  const stayPet = await core.pet.create({ data: { ownerId: owner, name: 'AQ-10 stay pet', species: 'dog', allergies: [] } });
+  const day = n => new Date(Date.now() + 7 * 3600000 + n * 86400000).toISOString().slice(0, 10);
+  const body = (from, to) => ({ petId: stayPet.id, checkIn: day(from), checkOut: day(to), roomType: 'standard', services: [] });
+  requireStatus(await request('/api/hotel-bookings', { method: 'POST', key: randomUUID(), body: body(10, 13) }), 201);
+  requireStatus(await request('/api/hotel-bookings', { method: 'POST', key: randomUUID(), body: body(12, 14) }), 409);
+  const row = (from, to, status = 'pending') => ({ petId: stayPet.id, ownerId: owner, checkIn: new Date(day(from)), checkOut: new Date(day(to)), nights: to - from, roomType: 'standard', serviceKeys: [], totalAmount: 1, status });
+  // Direct writes bypass the pet lock and interval check: the constraint still rejects overlaps.
+  await assert.rejects(core.hotelBooking.create({ data: row(11, 12) }), /hotel_bookings_pet_active_stay_excl|23P01/);
+  await core.hotelBooking.create({ data: row(13, 15) }); // half-open: check-out day can be the next check-in
+  const cancelled = await core.hotelBooking.create({ data: row(10, 13, 'cancelled') });
+  await assert.rejects(core.hotelBooking.update({ where: { id: cancelled.id }, data: { status: 'confirmed' } }), /hotel_bookings_pet_active_stay_excl|23P01/);
+  await core.hotelBooking.create({ data: { ...row(10, 13), petId: pet.id } }); // another pet is independent
+});
 test('legacy export/dry-run/import/verify preserve IDs/status/timestamps; resume and deleted/read rows never regress', async () => {
   const source = [];
   for (const status of ['sent','read']) source.push(await core.notification.create({ data: { recipientOwnerId: owner, recipientRole: 'owner', type: 'general', title: run, message: 'Historical fixture', status, actionUrl: '/owner/notifications', relatedPetId: pet.id, sentByStaffId: staff, createdAt: new Date('2024-02-03T04:05:06.007Z'), sentAt: new Date('2024-02-03T04:05:07.008Z') } }));

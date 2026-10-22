@@ -3387,6 +3387,74 @@
         }
       }
     },
+    "/medical-records/{id}/history": {
+      "get": {
+        "tags": [
+          "Medical records"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "operationId": "medicalRecordHistory",
+        "summary": "Staff-only append-only audit history (create/update/delete with before/after snapshots); kept after the record is deleted",
+        "responses": {
+          "200": {
+            "description": "Revisions oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MedicalRecordRevision"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Owner or non-staff actor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No history for this record id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/RequestFailed"
+          }
+        }
+      }
+    },
     "/appointments/{id}/status-history": {
       "get": {
         "tags": [
@@ -7965,6 +8033,55 @@
             }
           }
         }
+      },
+      "MedicalRecordRevision": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "recordId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "update",
+              "delete"
+            ]
+          },
+          "before": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "after": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "actorRole": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "recordId",
+          "action",
+          "before",
+          "after",
+          "actorId",
+          "actorRole",
+          "changedAt"
+        ]
       }
     }
   }

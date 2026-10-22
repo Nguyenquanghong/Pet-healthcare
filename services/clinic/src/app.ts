@@ -65,7 +65,13 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
     const match=req.path.match(/^\/(appointments|medical-records)\/(?:images\/)?([^/]+)(?:\/|$)/);
     if(match&&!['calendar','images'].includes(match[2]!)){
       const id=decodeURIComponent(match[2]!);
-      const row=match[1]==='appointments'?await db.appointment.findUnique({where:{id}}):req.path.startsWith('/medical-records/images/')?await db.medicalImage.findUnique({where:{id}}):await db.medicalRecord.findUnique({where:{id}});
+      let row:{petId:string}|null=match[1]==='appointments'?await db.appointment.findUnique({where:{id}}):req.path.startsWith('/medical-records/images/')?await db.medicalImage.findUnique({where:{id}}):await db.medicalRecord.findUnique({where:{id}});
+      // AQ-15: history outlives a deleted record; scope it by the pet in its last snapshot.
+      if(!row&&req.method==='GET'&&req.path===`/medical-records/${match[2]}/history`){
+        const last=await db.medicalRecordRevision.findFirst({where:{recordId:id},orderBy:[{changedAt:'desc'},{id:'desc'}]});
+        const snapshot=(last?.before??last?.after) as {petId?:unknown}|null|undefined;
+        if(typeof snapshot?.petId==='string')row={petId:snapshot.petId};
+      }
       if(!row)throw new BusinessError(404,'Clinic resource not found.');add(row.petId);
     }
     const token=req.headers.authorization!.slice(7),snapshot=await source!.request(actor,token,{petIds:[...new Set(petIds)],...(req.body?.doctorId?{doctorId:req.body.doctorId}:{})});
@@ -107,6 +113,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   router.post('/medical-records',async(req,res)=>{const result=await deduplicated(db,res.locals.actor.sub,'medical-record.create',req.headers['idempotency-key'],normalizeCreate(req.body,true),async tx=>{const row=await medical(res,tx).create(res.locals.actor,req.body);return{resourceId:row.id,appointmentId:row.appointmentId,response:{record:medicalRecordDto(row)}};},true);sendMutation(res,result as {response:unknown;versions:ReadVersions},201);});
   router.patch('/medical-records/:id',async(req,res)=>res.json({record:medicalRecordDto(await medicalMutation(db,req.params.id,tx=>medical(res,tx).update(res.locals.actor,req.params.id,req.body??{})))}));
   router.delete('/medical-records/:id',async(req,res)=>{await medicalMutation(db,req.params.id,tx=>medical(res,tx).delete(res.locals.actor,req.params.id));res.status(204).end();});
+  router.get('/medical-records/:id/history',async(req,res)=>res.json({items:await medical(res).history(res.locals.actor,req.params.id)}));
   router.get('/medical-records/images',async(req,res)=>res.json(await list(db,'medicalImages',res.locals.actor,res.locals.directory,req.query)));
   router.post('/medical-records/images',async(req,res)=>res.status(201).json({image:await medical(res).createImage(res.locals.actor,req.body)}));
   router.delete('/medical-records/images/:id',async(req,res)=>{await medical(res).deleteImage(res.locals.actor,req.params.id);res.status(204).end();});

@@ -7,7 +7,7 @@ const root=resolve(import.meta.dirname,'../..');
 const checks=[
   {name:'inter-service boundaries',protects:'ADR-01, NFR05',command:[process.execPath,'tools/phase2/check-boundaries.mjs']},
   {name:'Core layering',protects:'Phase 1 layering, AQ-13',command:[process.execPath,'backend/scripts/check-architecture.mjs']},
-  {name:'architecture rules (Clinic layering, events, gateway)',protects:'ADR-03, NFR04, NFR12',command:[process.execPath,'tools/phase2/check-architecture-rules.mjs']},
+  {name:'architecture rules (layering, events, gateway, grants)',protects:'ADR-03, NFR04, NFR12, P7 least privilege',command:[process.execPath,'tools/phase2/check-architecture-rules.mjs']},
   {name:'OpenAPI matches routes',protects:'NFR10, NFR12',command:[process.execPath,'backend/scripts/check-openapi.mjs']},
   // One fixed command string (no user input): npm needs a shell on Windows.
   {name:'wire contracts + OpenAPI inventory',protects:'ADR-03/04, NFR10',command:['npm run phase2:test:contracts'],shell:true},

@@ -3,7 +3,9 @@ import {catalogs,targets,sourceNames} from './p7-manifest.mjs';
 import {validateMigration,assertFrozenSource} from './p7-migration.mjs';
 
 const targetKinds=['core','clinic','notification'];
-function runtimeTables(kind){const names=[...targets[kind],...(kind==='clinic'?['OutboxEvent','RequestDedup','ClinicReadRevision','AppointmentReadRow','AppointmentDailySummary','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun']:kind==='notification'?['RequestDedup']:[])];return [...new Set(names.map(n=>catalogs[kind][n].table))];}
+// AppointmentQueryEpoch: read by the aggregate cache, written only by its
+// SECURITY DEFINER trigger, so runtime gets SELECT and no DML.
+function runtimeTables(kind){const names=[...targets[kind],...(kind==='clinic'?['OutboxEvent','RequestDedup','ClinicReadRevision','AppointmentReadRow','AppointmentDailySummary','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','MedicalRecordRevision','AppointmentQueryEpoch']:kind==='notification'?['RequestDedup']:[])];return [...new Set(names.map(n=>catalogs[kind][n].table))];}
 // Exact runtime ACL statements. role/schema must already be quoted identifiers.
 // Exported so guarded trial harnesses test these grants, not a copied variant.
 export function runtimeGrantStatements(kind,role,write,schema='runtime'){
@@ -13,12 +15,14 @@ export function runtimeGrantStatements(kind,role,write,schema='runtime'){
   statements.push(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA ${schema} FROM ${role}`);
   statements.push(`GRANT SELECT ON ${runtimeTables(kind).map(q).concat(schema+'."_prisma_migrations"').join(',')} TO ${role}`);
   if(write){
-    const writable=runtimeTables(kind).filter(t=>kind!=='clinic'||!['ClinicReadRevision','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','AppointmentDailySummary'].includes(t));
+    const writable=runtimeTables(kind).filter(t=>kind!=='clinic'||!['ClinicReadRevision','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','AppointmentDailySummary','medical_record_revisions','AppointmentQueryEpoch'].includes(t));
     statements.push(`GRANT INSERT,UPDATE,DELETE ON ${writable.map(q).join(',')} TO ${role}`);
     if(kind==='clinic')statements.push(`GRANT INSERT,UPDATE ON ${q('ClinicReadRevision')} TO ${role}`,`GRANT UPDATE ("lockAnchor") ON ${q('ReadProjectionControl')} TO ${role}`,
       // Projector counters: atomic upsert/decrement only, zero rows are kept.
       // Activity serving mode is operator-owned; runtime only reads it.
-      `GRANT INSERT,UPDATE ON ${q('AppointmentDailySummary')} TO ${role}`);
+      `GRANT INSERT,UPDATE ON ${q('AppointmentDailySummary')} TO ${role}`,
+      // AQ-15 audit history is append-only for the runtime role.
+      `GRANT INSERT ON ${q('medical_record_revisions')} TO ${role}`);
     if(kind==='core')statements.push(`GRANT USAGE,SELECT ON SEQUENCE ${schema}.invoice_transfer_code_seq TO ${role}`);
   }
   return statements;
