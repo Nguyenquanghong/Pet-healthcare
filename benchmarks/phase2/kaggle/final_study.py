@@ -17,8 +17,8 @@ import final_evaluate as fe  # noqa: E402
 
 base = v2.base
 base.STUDY = 'cqrs-final-matched-kaggle-v1'
-base.BUNDLE = 'test-results/phase2/cqrs/final-v1/cqrs-final-source-v12.zip'
-base.BUNDLE_SHA = 'b09c57525749c6da529bde85e15ad33fbdd5c42699bee2183dfa8536d5fc63f2'
+base.BUNDLE = 'test-results/phase2/cqrs/final-v1/cqrs-final-source-v13.zip'
+base.BUNDLE_SHA = 'e7180abd9f5721fcf65c2761f95b00bfee3837c9feb67727dda618ebb75c1cbc'
 base.POLICY = 'phase2-plan/cqrs/final/cqrs-final-matched-kaggle-v1.policy.json'
 # final_trial.py runs the member (list_trial.py does the work, so it is copied too).
 base.OVERLAY = ('benchmarks/phase2/kaggle/final_trial.py', 'benchmarks/phase2/kaggle/list_pcn_locust.py',

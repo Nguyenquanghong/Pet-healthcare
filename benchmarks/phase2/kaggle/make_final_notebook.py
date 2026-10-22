@@ -2,7 +2,7 @@
 
 Self-contained like the list-study builders (the notebook executes this file's
 verified_members() from the embedded archive before extracting anything), with
-final identity: source bundle v12 (final product AB, F harness), the final policy
+final identity: source bundle v13 (final product AB, F harness), the final policy
 and the final controller final_study.py (v2 list controller with O and F members).
 Also writes the Kaggle Dataset variant (Save Version limit is 1 MB) through
 make_list_dataset_notebook.build. Reads files locally only.
@@ -19,8 +19,8 @@ import zipfile
 REPO = Path(__file__).resolve().parents[3]
 FORMAT = 'cqrs-final-matched-kaggle-v1-source-1'
 STUDY = 'cqrs-final-matched-kaggle-v1'
-BUNDLE = 'test-results/phase2/cqrs/final-v1/cqrs-final-source-v12.zip'
-BUNDLE_SHA = 'b09c57525749c6da529bde85e15ad33fbdd5c42699bee2183dfa8536d5fc63f2'
+BUNDLE = 'test-results/phase2/cqrs/final-v1/cqrs-final-source-v13.zip'
+BUNDLE_SHA = 'e7180abd9f5721fcf65c2761f95b00bfee3837c9feb67727dda618ebb75c1cbc'
 POLICY = 'phase2-plan/cqrs/final/cqrs-final-matched-kaggle-v1.policy.json'
 Q6_HARNESS = ('benchmarks/phase2/dataset.mjs', 'benchmarks/phase2/kaggle/native_stack.py', 'benchmarks/phase2/kaggle/stack.mjs',
               'benchmarks/phase2/kaggle/benchmark.py', 'benchmarks/phase2/kaggle/acceptance.json', 'benchmarks/phase2/kaggle/query_heavy.py',

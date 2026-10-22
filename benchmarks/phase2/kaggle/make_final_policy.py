@@ -19,8 +19,8 @@ V3 = REPO / 'phase2-plan/cqrs/list-study/cqrs-list-matched-kaggle-v3.policy.json
 V3_SHA = '0c3ea454fed4f17173788e8f5cf5be00b4d968735099a04fbf42e21f3d3905eb'
 TARGET = REPO / 'phase2-plan/cqrs/final/cqrs-final-matched-kaggle-v1.policy.json'
 STUDY = 'cqrs-final-matched-kaggle-v1'
-BUNDLE = 'test-results/phase2/cqrs/final-v1/cqrs-final-source-v12.zip'
-BUNDLE_SHA = 'b09c57525749c6da529bde85e15ad33fbdd5c42699bee2183dfa8536d5fc63f2'
+BUNDLE = 'test-results/phase2/cqrs/final-v1/cqrs-final-source-v13.zip'
+BUNDLE_SHA = 'e7180abd9f5721fcf65c2761f95b00bfee3837c9feb67727dda618ebb75c1cbc'
 UNCHANGED = ('resourceClass', 'isolationClaimed', 'queryHeavy', 'pcn', 'generatorValidity', 'sessions', 'excludes',
              'latencyForGrading', 'percentile', 'performanceMeasurementsAllowed', 'accounting', 'diagnostics')
 
@@ -45,7 +45,9 @@ def policy():
     for key in ('changesFromV1', 'changesFromV2'):
         final.pop(key, None)
     final.update({
-        'version': STUDY + '-policy-1',
+        'version': STUDY + '-policy-2',
+        'supersedes': {'version': STUDY + '-policy-1', 'sha256': '71ca0dde559524196c502387eae6cc27340e7d173e5d305392cb15f5267c13f4',
+                       'reason': 'bundle v12 predated the Circuit Breaker and the Notification AQ-05 check on measured paths; replaced before any measurement'},
         'status': 'FROZEN_BEFORE_MEASUREMENT',
         'study': STUDY,
         'derivedFrom': {'path': V3.relative_to(REPO).as_posix(), 'sha256': V3_SHA,
@@ -82,7 +84,7 @@ def policy():
         'changesFromV3': [
             'Configurations O and F (final product) instead of O/A/B; blocks O,F / F,O / O,F',
             'Gates: F/O non-regression with v3 bounds; no read-path improvement gates (the projection was rejected by K2v2)',
-            'Source bundle v12: AB = working tree at the CQRS decision and AQ-09 (minus E-b), same shared read-limit patch as v11',
+            'Source bundle v13: AB = working tree after the CQRS decision, AQ-09, the Clinic->Core Circuit Breaker and the Notification AQ-05 check (minus E-b), same shared read-limit patch as v11',
             'Harness overlay: F configuration added to cqrs_runtime.mjs, stack.mjs, native_stack.py, cqrs_probe.py; O/A/B unchanged',
             'Member runner final_trial.py (list_trial.py unchanged, configurations O and F)'],
         'scope': 'Final product F against the pre-CQRS source O on the Kaggle shared envelope; includes every change since 3e88d7e, not only the CQRS switch',

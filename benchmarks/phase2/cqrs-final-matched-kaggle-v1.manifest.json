@@ -2,8 +2,8 @@
   "format": "cqrs-final-notebook-artifact-v1",
   "study": "cqrs-final-matched-kaggle-v1",
   "notebook": "benchmarks/phase2/cqrs-final-matched-kaggle-v1.ipynb",
-  "notebookSha256": "f8114c8ec73537b955198c4a2d127fab6c0cbaf71fa7bc5d63555b965dbce4e8",
-  "sourceArchiveSha256": "73f934eeab282e5a91208ff893ea0327b93d564e02ea9ac15f47a27b973aa7c9",
+  "notebookSha256": "7467e05359cc093bdac80f4dc16c837841e2ffcc1055f35203f9323d8f5b1879",
+  "sourceArchiveSha256": "6b510cb95e9931c45ef3bae51dc0481733e6249f2c7aa09d92c004b4576dc56c",
   "sourceManifest": {
     "format": "cqrs-final-matched-kaggle-v1-source-1",
     "study": "cqrs-final-matched-kaggle-v1",
@@ -85,13 +85,13 @@
       },
       {
         "path": "benchmarks/phase2/kaggle/final_source.py",
-        "bytes": 5730,
-        "sha256": "7940cb49acce05b179a8650081e41af159708de0e9dc6b563cf8bd000ca42c62"
+        "bytes": 5947,
+        "sha256": "4eb7b22ad5f95caa1cc3981922e874998ef6b6060475674d68de4c722d663c44"
       },
       {
         "path": "benchmarks/phase2/kaggle/final_study.py",
         "bytes": 2865,
-        "sha256": "1eff3cec12680ddc7f41f9aed68e769d12d38b1e075562de02e4e7914b21713b"
+        "sha256": "24dd3c7118b2a62b32729e81c792349fb96a20a305df23e8db4fe84ea3060381"
       },
       {
         "path": "benchmarks/phase2/kaggle/final_trial.py",
@@ -141,12 +141,12 @@
       {
         "path": "benchmarks/phase2/kaggle/make_final_notebook.py",
         "bytes": 15247,
-        "sha256": "600831bfe23f243fa36711616b7638d87a66edd1142ce52301417fb3248bf780"
+        "sha256": "76a90aed59e11051d35290eba1d439c0f4fe83e80b9769e314e4614d4d8c6bcd"
       },
       {
         "path": "benchmarks/phase2/kaggle/make_final_policy.py",
-        "bytes": 7025,
-        "sha256": "3c047c272e9f679dcf035ac25f370897fd605c9f689b95ccd870b7e47a25c5db"
+        "bytes": 7386,
+        "sha256": "cc63619f54f741fc53c131eb9caf68dc379dca6432dbe1d0a85cc2ddddb9432d"
       },
       {
         "path": "benchmarks/phase2/kaggle/make_list_notebook.py",
@@ -250,13 +250,13 @@
       },
       {
         "path": "phase2-plan/cqrs/final/cqrs-final-matched-kaggle-v1.policy.json",
-        "bytes": 14435,
-        "sha256": "71ca0dde559524196c502387eae6cc27340e7d173e5d305392cb15f5267c13f4"
+        "bytes": 14803,
+        "sha256": "80df7faa942c89eca48bd2da15b5ca0cb422d475da9d90677255b10aee6072fa"
       },
       {
         "path": "phase2-plan/cqrs/final/cqrs-final-matched-kaggle-v1.sha256",
         "bytes": 107,
-        "sha256": "f9dc05a5a8cd82870a499af04e404241f17afb1b93483e885e9623736d54a052"
+        "sha256": "182767c20ebb5784ffb5d1bcf19bf8958969ac87dfc4d06a59a9128196bf0722"
       },
       {
         "path": "phase2-plan/cqrs/list-study/cqrs-list-matched-kaggle-v1.policy.json",
@@ -289,9 +289,9 @@
         "sha256": "45116bdb9dafe66cf819eed7cc2664dae434480b47d480d355557132a644b561"
       },
       {
-        "path": "test-results/phase2/cqrs/final-v1/cqrs-final-source-v12.zip",
-        "bytes": 2483202,
-        "sha256": "b09c57525749c6da529bde85e15ad33fbdd5c42699bee2183dfa8536d5fc63f2"
+        "path": "test-results/phase2/cqrs/final-v1/cqrs-final-source-v13.zip",
+        "bytes": 2490013,
+        "sha256": "e7180abd9f5721fcf65c2761f95b00bfee3837c9feb67727dda618ebb75c1cbc"
       },
       {
         "path": "tools/phase2/cqrs/activity/bench/collector-cli.mjs",
@@ -309,11 +309,11 @@
         "sha256": "c6708efa17191585f5e83553aa14774650267b4e3e3ba2655c6300e6f894b78a"
       }
     ],
-    "sourceTreeSha256": "02cfa653f6295f33a80957c62d6f8ac2b9a75d03975bf101e5d80e621902ef0b",
-    "head": "2b2a0689c036f25ceb9c30a2aa447139bde7a884",
+    "sourceTreeSha256": "cce9c00af80a56b413ccd3884a093540b7ffae755e50eaa4cd0affb6f942a2f9",
+    "head": "ae6748d8b6fcc12fdb6581ef6f472eded16b8417",
     "dirtyWorkingCopyIncluded": true,
-    "sourceBundleSha256": "b09c57525749c6da529bde85e15ad33fbdd5c42699bee2183dfa8536d5fc63f2",
-    "policySha256": "71ca0dde559524196c502387eae6cc27340e7d173e5d305392cb15f5267c13f4"
+    "sourceBundleSha256": "e7180abd9f5721fcf65c2761f95b00bfee3837c9feb67727dda618ebb75c1cbc",
+    "policySha256": "80df7faa942c89eca48bd2da15b5ca0cb422d475da9d90677255b10aee6072fa"
   },
   "notebookExecution": "NOT_RUN",
   "performance": "NOT_RUN"
