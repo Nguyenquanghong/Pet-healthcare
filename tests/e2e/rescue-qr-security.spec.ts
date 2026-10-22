@@ -14,9 +14,12 @@ async function mockOwner(page: Page, name = "Mochi") {
     const json = (body: unknown, status = 200) => route.fulfill({ status, json: body, headers: { "access-control-allow-origin": "*" } });
     if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: {
       "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
-    if (path.endsWith("/auth/me")) return json({ user: { role: "owner" } });
+    if (path.endsWith("/auth/me")) return json({ user: { id: "owner", role: "owner", fullName: "Owner", phone: state.owners[0].phone } });
     if (path.endsWith("/bootstrap")) return control.failRefresh ? json({ error: "Refresh unavailable" }, 503) : json(structuredClone(state));
-    if (req.method() === "GET") { const paged = pagedFixture(req.url(), state); if (paged) return json(paged); }
+    if (req.method() === "GET") {
+      if (control.failRefresh) return json({ error: "Refresh unavailable" }, 503);
+      const paged = pagedFixture(req.url(), state); if (paged) return json(paged);
+    }
 
     if (req.method() === "POST" || req.method() === "PATCH") {
       const body = req.postDataJSON(); control.writes.push({ path, body });
@@ -28,11 +31,26 @@ async function mockOwner(page: Page, name = "Mochi") {
     }
     return json({ error: `Unexpected ${path}` }, 501);
   });
-  await page.route("https://api.qrserver.com/**", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"/>' }));
   await page.goto("/owner/pets");
   await expect(page.getByRole("heading", { name: "Hồ sơ cứu hộ công khai" })).toBeVisible();
   return control;
 }
+
+test("rescue QR is drawn in the browser; the rescue token never goes to another origin (E-c)", async ({ page }) => {
+  const leaked: string[] = [];
+  page.on("request", request => {
+    const url = request.url();
+    if (!url.startsWith("data:") && new URL(url).origin !== new URL(page.url() || "http://127.0.0.1:5173").origin && /old-token|rescue=/.test(url)) leaked.push(url);
+  });
+  await mockOwner(page);
+  const qr = page.getByRole("img", { name: /Mã QR cứu hộ/ });
+  await expect(qr).toHaveAttribute("src", /^data:image\/gif;base64,/);
+  await expect.poll(() => qr.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(100);
+  const download = page.getByRole("link", { name: "Tải QR" });
+  await expect(download).toHaveAttribute("href", /^data:image\/gif;base64,/);
+  await expect(download).toHaveAttribute("download", /\.gif$/);
+  expect(leaked).toEqual([]);
+});
 
 test("printing treats stored pet and contact fields as text", async ({ page }) => {
   const name = '</title><script>opener.document.body.dataset.injected="yes"</script>';
@@ -58,7 +76,7 @@ test("printing treats stored pet and contact fields as text", async ({ page }) =
   await popup.close();
 });
 
-test("QR rotation uses the server response even when bootstrap refresh fails", async ({ page }) => {
+test("QR rotation uses the server response even when the data refresh fails", async ({ page }) => {
   const control = await mockOwner(page);
   control.failWrite = true;
   await page.getByRole("button", { name: "Đổi mã QR mới" }).click();
