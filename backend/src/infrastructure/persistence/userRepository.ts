@@ -28,6 +28,7 @@ export class PrismaUserRepository implements UserRepository {
     return this.client.user.update({ where: { id }, data });
   }
   async updatePassword(id: string, data: Parameters<UserRepository["updatePassword"]>[1]) {
-    await this.client.user.update({ where: { id }, data });
+    // AQ-05: sessions issued before this instant stop working (currentAccount / directory).
+    await this.client.user.update({ where: { id }, data: { ...data, passwordChangedAt: new Date() } });
   }
 }

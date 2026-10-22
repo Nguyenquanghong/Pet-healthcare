@@ -156,3 +156,12 @@ test('AQ-15 medical record audit: create/update/delete revisions in the same tra
     await assert.rejects(clinic.$executeRawUnsafe(sql,created.id),/MEDICAL_RECORD_REVISION_IMMUTABLE/);
   assert.equal(await clinic.medicalRecordRevision.count({where:{recordId:created.id}}),3);
 });
+test('AQ-05 password change revokes earlier sessions on Core and on direct Clinic calls (directory SESSION_REVOKED)',async()=>{
+  const id=randomUUID();await core.user.create({data:{id,role:'staff',fullName:'AQ-05 staff '+run,passwordHash:'fixture',passwordSalt:'fixture'}});
+  const old=signToken(id,'staff'),iat=JSON.parse(Buffer.from(old.split('.')[1],'base64url').toString()).iat;
+  for(const base of [coreUrl,bases[0]])status(await request('/api/appointments?pageSize=1',{base,token:old}),200);
+  await core.user.update({where:{id},data:{passwordChangedAt:new Date((iat+1)*1000)}});
+  for(const base of [coreUrl,bases[0]]){const r=await request('/api/appointments?pageSize=1',{base,token:old});assert.equal(r.status,401,base+' '+JSON.stringify(r.body));assert.match(r.body.error,/password was changed/i);}
+  await sleep(1100);const fresh=signToken(id,'staff');
+  for(const base of [coreUrl,bases[0]])status(await request('/api/appointments?pageSize=1',{base,token:fresh}),200);
+});

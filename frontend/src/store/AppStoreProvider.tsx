@@ -49,7 +49,13 @@ function useAppActions() {
       const { user } = await apiClient.patch<{ user: SessionUser }>('/auth/me', input);
       if (current()) session.updateUser(user, token);
     }, ['profile', 'owners', 'clinic']),
-    changePassword: (input: { currentPassword: string; newPassword: string; confirmPassword: string }) => writeAndReload(() => apiClient.post('/auth/me/password', input), []),
+    // AQ-05: the server revokes every session issued before the change, this one included;
+    // sign out on purpose instead of letting the next request fail with 401.
+    changePassword: async (input: { currentPassword: string; newPassword: string; confirmPassword: string }) => {
+      const saved = await writeAndReload(() => apiClient.post('/auth/me/password', input), []);
+      session.logout();
+      return saved;
+    },
     createPet: (input: Omit<Pet, 'id' | 'ownerId' | 'qrToken'>) => writeAndReload(async () => { const { pet } = await apiClient.post<{ pet: Pet }>('/pets', input); rememberPet(pet); }, ['pets']),
     updatePet: (id: string, input: UpdatePetInput) => writeAndReload(async () => { const { pet } = await apiClient.patch<{ pet: Pet }>(`/pets/${id}`, input); rememberPet(pet); }, ['pets', 'clinic']),
     rotatePetQrToken: (id: string) => writeAndReload(async () => { const { pet } = await apiClient.post<{ pet: Pet }>(`/pets/${id}/qr-token`, {}); rememberPet(pet); }, ['pets']),
