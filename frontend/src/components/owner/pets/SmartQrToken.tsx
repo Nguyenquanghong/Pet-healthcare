@@ -15,6 +15,7 @@ import { useAppStore } from "../../../store/AppStoreProvider";
 import { Button } from "../../ui/Button";
 import { Textarea } from "../../ui/Textarea";
 import { printRescueTag } from "./printRescueTag";
+import { qrCodeDataUrl } from "../../../utils/qrCode";
 
 interface SmartQrTokenProps {
   pet?: Pet;
@@ -49,9 +50,7 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
   // Keep the public QR on the site root so static hosts can serve it without
   // requiring a server-side SPA rewrite for deep links.
   const publicRescueUrl = qrToken ? `${origin}/?rescue=${encodeURIComponent(qrToken)}` : "";
-  const qrImageUrl = qrToken ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&data=${encodeURIComponent(
-    publicRescueUrl,
-  )}` : "";
+  const qrImageUrl = qrToken ? qrCodeDataUrl(publicRescueUrl) : "";
   const publicProfile = pet.publicProfile ?? {
     showOwnerPhone: true,
     showOwnerEmail: false,
@@ -153,9 +152,7 @@ export function SmartQrToken({ pet }: SmartQrTokenProps) {
         <a
           href={qrToken ? qrImageUrl : undefined}
           aria-disabled={!qrToken}
-          download={`QR_${pet.name}.png`}
-          target="_blank"
-          rel="noreferrer"
+          download={`QR_${pet.name}.gif`}
           className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
         >
           <Download size={13} /> Tải QR
