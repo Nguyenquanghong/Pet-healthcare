@@ -17,6 +17,8 @@ export function query(resource:Resource,raw:Record<string,unknown>){
   return result;
 }
 type ListDatabase=Pick<PrismaClient,'$transaction'>;
+// Never select image_url: a legacy row carries up to 7 MB of base64 the list does not return.
+const imageColumns={id:true,ownerId:true,petId:true,title:true,mimeType:true,createdAt:true,storageKey:true,sizeBytes:true} as const;
 type ClinicListResult=Omit<AppointmentListResult,'items'>&{items:unknown[]};
 export function list(db:ListDatabase,resource:'appointments',actor:Actor,directory:AppointmentQueryDirectory,raw:Record<string,unknown>):Promise<AppointmentListResult>;
 export function list(db:ListDatabase,resource:Resource,actor:Actor,directory:AppointmentQueryDirectory,raw:Record<string,unknown>,blobs?:BlobStore):Promise<ClinicListResult>;
@@ -29,7 +31,7 @@ export async function list(db:ListDatabase,resource:Resource,actor:Actor,directo
     let petMatches:string[]=[],ownerMatches:string[]=[];
     if(q.q){const matches=await tx.directoryProjection.findMany({where:{deletedAt:null,OR:[text('displayName'),text('phone'),text('breed'),text('email'),text('microchipId'),text('id')]},select:{kind:true,id:true}});ownerMatches=matches.filter(m=>m.kind==='owner').map(m=>m.id);petMatches=matches.filter(m=>m.kind==='pet').map(m=>m.id);const owned=await tx.directoryProjection.findMany({where:{kind:'pet',deletedAt:null,ownerId:{in:ownerMatches}},select:{id:true}});petMatches.push(...owned.map(m=>m.id));}
     const identity=q.id?{id:q.id as string}:{},scope={...(ownerId?{ownerId}:{}),...(q.petId?{petId:q.petId as string}:{})},bounds={skip:(q.page-1)*q.pageSize,take:q.pageSize};
-    let total=0,counts:Record<string,number>={},appointments:Awaited<ReturnType<typeof tx.appointment.findMany>>=[],records:Awaited<ReturnType<typeof tx.medicalRecord.findMany>>=[],images:Awaited<ReturnType<typeof tx.medicalImage.findMany>>=[];
+    let total=0,counts:Record<string,number>={},appointments:Awaited<ReturnType<typeof tx.appointment.findMany>>=[],records:Awaited<ReturnType<typeof tx.medicalRecord.findMany>>=[],images:Prisma.MedicalImageGetPayload<{select:typeof imageColumns}>[]=[];
     const joined=[{petId:{in:petMatches}},{ownerId:{in:ownerMatches}}];
     if(resource==='appointments'){
       const base:Prisma.AppointmentWhereInput={...scope,...identity,...(q.date?{appointmentDate:new Date(`${q.date}T00:00:00Z`)}:{}),...(q.category?{type:q.category==='spa'?{in:[...spa]}:{notIn:[...spa]}}:{}),...(q.mode==='unbilled'?{status:'completed',reservations:{none:{state:{in:['HELD','INVOICED']}}}}:{}),...(q.q?{OR:[...joined,text('serviceName'),text('id')]}:{})};
@@ -46,7 +48,7 @@ export async function list(db:ListDatabase,resource:Resource,actor:Actor,directo
       total=await tx.medicalRecord.count({where});records=await tx.medicalRecord.findMany({where,...bounds,orderBy:[{visitDate:'desc'},{id:'desc'}]});appointments=await tx.appointment.findMany({where:{id:{in:records.flatMap(r=>r.appointmentId?[r.appointmentId]:[])},...(ownerId?{ownerId}:{})}});
     }else{
       const where:Prisma.MedicalImageWhereInput={...identity,...(actor.role==='owner'?{ownerId:actor.sub}:{}),...(q.petId?{petId:q.petId as string}:{}),...(q.q?{OR:[text('title'),{petId:{in:petMatches}}]}:{})};
-      total=await tx.medicalImage.count({where});images=await tx.medicalImage.findMany({where,...bounds,orderBy:[{createdAt:'desc'},{id:'desc'}]});
+      total=await tx.medicalImage.count({where});images=await tx.medicalImage.findMany({where,...bounds,orderBy:[{createdAt:'desc'},{id:'desc'}],select:imageColumns});
     }
     const projection=q.petId?await tx.directoryProjection.findUnique({where:{kind_id:{kind:'pet',id:q.petId as string}},select:{sourceVersion:true,deletedAt:true}}):null;
     return{total,counts,appointments,records,images,projectionVersion:projection&&!projection.deletedAt?projection.sourceVersion:0};

@@ -7,7 +7,8 @@ import type { MedicalImage } from "../types/medicalImage";
 // valid but fails (missing object) only shows the placeholder, so there is no loop.
 export function MedicalImageView({ image, className, onExpired }: { image: MedicalImage; className?: string; onExpired?: () => void }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  if (!image.url || failedUrl === image.url) {
+  const src = image.url ?? image.imageUrl ?? null;
+  if (!src || failedUrl === src) {
     return (
       <div className={`flex flex-col items-center justify-center gap-1 bg-slate-100 text-slate-400 ${className ?? ""}`} role="img" aria-label={image.title}>
         <ImageOff size={20} />
@@ -16,8 +17,8 @@ export function MedicalImageView({ image, className, onExpired }: { image: Medic
     );
   }
   return (
-    <img src={image.url} alt={image.title} className={className} onError={() => {
-      setFailedUrl(image.url);
+    <img src={src} alt={image.title} className={className} onError={() => {
+      setFailedUrl(src);
       if (image.urlExpiresAt && Date.parse(image.urlExpiresAt) <= Date.now() + 5000) onExpired?.();
     }} />
   );

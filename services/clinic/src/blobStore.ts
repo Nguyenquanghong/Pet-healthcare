@@ -51,7 +51,9 @@ export class S3BlobStore implements BlobStore {
       ...(method==='PUT'?{body:new Uint8Array(body)}:{}),signal:AbortSignal.timeout(this.timeoutMs)});
   }
   async put(key:string,body:Buffer,contentType:string){
-    const response=await this.send('PUT',this.path(key),body,contentType);
+    let response=await this.send('PUT',this.path(key),body,contentType);
+    // Bucket missing (unreachable at startup, or recreated): create it once and retry.
+    if(response.status===404){await this.ensureBucket();response=await this.send('PUT',this.path(key),body,contentType);}
     if(!response.ok)throw new Error('BLOB_PUT_FAILED_'+response.status);
   }
   async remove(key:string){
@@ -85,14 +87,18 @@ export class S3BlobStore implements BlobStore {
   }
   // Presigned GET (SigV4 query string). Only `host` is signed, against the
   // browser-facing endpoint, so the URL is a bearer for exactly this object and TTL.
+  // Signed at the start of a window (TTL/5, at most 60 s): lists repeated within the
+  // window return the same URL, so the browser keeps the image it already downloaded
+  // instead of fetching it again after every refresh. Each URL stays valid >= 80% of the TTL.
   signedGetUrl(key:string,{now=new Date()}:{now?:Date}={}){
-    const stamp=stampOf(now),date=stamp.slice(0,8),scope=`${date}/${this.config.region}/s3/aws4_request`,path=this.path(key);
+    const window=Math.min(60,Math.max(1,Math.floor(this.config.urlTtlSeconds/5)))*1000,signedAt=new Date(Math.floor(now.getTime()/window)*window);
+    const stamp=stampOf(signedAt),date=stamp.slice(0,8),scope=`${date}/${this.config.region}/s3/aws4_request`,path=this.path(key);
     const query:Record<string,string>={'X-Amz-Algorithm':'AWS4-HMAC-SHA256','X-Amz-Credential':`${this.config.accessKey}/${scope}`,'X-Amz-Date':stamp,
       'X-Amz-Expires':String(this.config.urlTtlSeconds),'X-Amz-SignedHeaders':'host'};
     const canonicalQuery=Object.keys(query).sort().map(name=>`${encode(name)}=${encode(query[name]!)}`).join('&');
     const canonical=['GET',path,canonicalQuery,`host:${this.publicEndpoint.host}\n`,'host','UNSIGNED-PAYLOAD'].join('\n');
     const signature=hmac(this.signingKey(date),['AWS4-HMAC-SHA256',stamp,scope,sha256(canonical)].join('\n')).toString('hex');
-    return{url:`${this.publicEndpoint.origin}${path}?${canonicalQuery}&X-Amz-Signature=${signature}`,expiresAt:new Date(now.getTime()+this.config.urlTtlSeconds*1000)};
+    return{url:`${this.publicEndpoint.origin}${path}?${canonicalQuery}&X-Amz-Signature=${signature}`,expiresAt:new Date(signedAt.getTime()+this.config.urlTtlSeconds*1000)};
   }
 }
 

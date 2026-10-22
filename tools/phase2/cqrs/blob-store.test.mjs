@@ -15,7 +15,11 @@ test('signed GET URL is a short-lived path-style bearer for one object on the pu
   assert.match(parsed.searchParams.get('X-Amz-Signature'),/^[0-9a-f]{64}$/);assert.equal(expiresAt.toISOString(),'2030-01-01T00:05:00.000Z');
   assert.ok(!url.includes(config.secretKey));assert.ok(!url.includes('127.0.0.1'));
   assert.equal(store.signedGetUrl('images/abc',{now}).url,url);assert.notEqual(store.signedGetUrl('images/abd',{now}).url,url);
-  assert.notEqual(store.signedGetUrl('images/abc',{now:new Date(now.getTime()+1000)}).url,url);
+  // Same URL within a 60 s window (browser keeps the downloaded image), a new one after it;
+  // expiry counts from the window start, so a URL is valid for at least 240 of its 300 s.
+  const later=store.signedGetUrl('images/abc',{now:new Date(now.getTime()+59000)});assert.equal(later.url,url);assert.equal(later.expiresAt.toISOString(),'2030-01-01T00:05:00.000Z');
+  assert.notEqual(store.signedGetUrl('images/abc',{now:new Date(now.getTime()+60000)}).url,url);
+  assert.equal(new S3BlobStore({...config,urlTtlSeconds:30}).signedGetUrl('images/abc',{now:new Date(now.getTime()+7000)}).expiresAt.toISOString(),'2030-01-01T00:00:36.000Z');
   assert.notEqual(new S3BlobStore({...config,secretKey:'t'.repeat(40)}).signedGetUrl('images/abc',{now}).url,url);
 });
 
