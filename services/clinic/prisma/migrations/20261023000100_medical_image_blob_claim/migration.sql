@@ -7,7 +7,9 @@ ALTER TABLE "medical_images" ADD COLUMN "storage_key" TEXT, ADD COLUMN "size_byt
 CREATE UNIQUE INDEX "medical_images_storage_key_key" ON "medical_images"("storage_key");
 ALTER TABLE "medical_images" ADD CONSTRAINT "medical_images_content_check" CHECK (
   ("image_url" IS NOT NULL AND "storage_key" IS NULL AND "size_bytes" IS NULL AND "sha256" IS NULL) OR
-  ("image_url" IS NULL AND "storage_key" IS NOT NULL AND "size_bytes" > 0 AND "sha256" ~ '^[0-9a-f]{64}$'));
+  ("image_url" IS NULL AND "storage_key" IS NOT NULL AND "size_bytes" > 0 AND "sha256" ~ '^[0-9a-f]{64}$')) NOT VALID;
+-- NOT VALID: enforced for new writes at once; existing rows are checked by the next
+-- migration under a lock that does not block reads and writes.
 
 CREATE TABLE "blob_cleanup" (
   "storage_key" TEXT NOT NULL,

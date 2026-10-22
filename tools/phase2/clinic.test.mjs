@@ -19,6 +19,7 @@ import {RuntimeOutboxStore} from '../../backend/dist/src/infrastructure/persiste
 import {OutboxRelay as ClinicRelay} from '../../services/clinic/dist/relay.js';
 import {topology,declareTopology,publishConfirmed} from '@nipopeto/messaging';
 import amqp from 'amqplib';
+import {readFileSync} from 'node:fs';
 import {blobTestEnv} from './blob-test.mjs';
 import {blobStoreFromEnv} from '../../services/clinic/dist/blobStore.js';
 
@@ -184,6 +185,18 @@ test('AQ-09 guarded tool moves legacy base64 images into the bucket; list payloa
   const stray='images/orphan-'+run;await blobs.put(stray,png,'image/png');
   assert.ok(tool('--orphans','--min-age-seconds','0').orphans.includes(stray));assert.ok(!tool('--orphans').orphans.includes(stray));
   assert.ok(tool('--orphans','--delete-orphans','--min-age-seconds','0').orphans.includes(stray));assert.ok(!tool('--orphans','--min-age-seconds','0').orphans.includes(stray));
+  // Least privilege: the Clinic identity administers only its own bucket.
+  await assert.rejects(blobStoreFromEnv({...blobTestEnv,BLOB_BUCKET:'p2-other-bucket'}).ensureBucket(),/403/);
+  // Contract step: ready once no inline base64 is left; the SQL guard refuses otherwise (applied with ROLLBACK here).
+  const contract=()=>execFileSync('docker',['compose','-f','deploy/phase2/compose.test.yml','exec','-T','postgres','psql','-v','ON_ERROR_STOP=1','-U','p2_clinic','-d','p2_clinic_test'],
+    {input:`SET search_path=${new URL(urls.clinic).searchParams.get('schema')};\n`+readFileSync('deploy/phase2/medical-images-contract.sql','utf8').replace(/^COMMIT;$/m,'ROLLBACK;'),encoding:'utf8',stdio:['pipe','pipe','pipe']});
+  assert.equal(tool('--check-contract').contractReady,true);assert.match(contract(),/ROLLBACK/);
+  const legacy=await clinic.medicalImage.create({data:{petId:pet.id,ownerId:owner,title:'Legacy guard '+run,imageUrl:dataUrl,mimeType:'image/png'}});
+  try{
+    assert.throws(()=>tool('--check-contract'),error=>error.status===3&&JSON.parse(error.stdout).contractReady===false);
+    assert.throws(contract,error=>/AQ09_LEGACY_IMAGES_REMAIN/.test(String(error.stderr)));
+  }finally{await clinic.medicalImage.delete({where:{id:legacy.id}});}
+  assert.equal(await clinic.medicalImage.count({where:{imageUrl:{not:null}}}),0);
   for(const id of ids)status(await request(`/api/medical-records/images/${id}`,{method:'DELETE',token:tokens.admin}),204);
 });
 test('AQ-05 password change revokes earlier sessions on Core and on direct Clinic calls (directory SESSION_REVOKED)',async()=>{

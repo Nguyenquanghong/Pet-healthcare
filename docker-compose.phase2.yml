@@ -166,7 +166,9 @@ services:
     image: chrislusf/seaweedfs:3.97
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - printf '{"identities":[{"name":"clinic","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List"]}]}' "$$BLOB_ACCESS_KEY" "$$BLOB_SECRET_KEY" > /tmp/s3.json && exec weed server -dir=/data -s3 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=1024
+      # Least privilege: the Clinic identity administers only its own bucket (it creates it
+      # through the S3 API on startup); every other bucket answers 403.
+      - printf '{"identities":[{"name":"clinic","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin:medical-images","Read:medical-images","Write:medical-images","List:medical-images"]}]}' "$$BLOB_ACCESS_KEY" "$$BLOB_SECRET_KEY" > /tmp/s3.json && exec weed server -dir=/data -s3 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=1024
     environment:
       BLOB_ACCESS_KEY: ${BLOB_ACCESS_KEY:?Prepare phase2 configuration}
       BLOB_SECRET_KEY: ${BLOB_SECRET_KEY:?Prepare phase2 configuration}
