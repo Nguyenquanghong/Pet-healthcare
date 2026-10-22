@@ -52,7 +52,7 @@
     "phase2:test:e2e": "node --import tsx tools/phase2/run-e2e.mjs",
     "phase2:test:resilience": "node tools/phase2/run-proof.mjs --resilience",
     "phase2:test:runtime": "npm test -w @nipopeto/runtime && node --test tools/phase2/dependencies.test.mjs && npm run phase2:test:source",
-    "phase2:test:request-performance": "node --test packages/runtime/tests/request-performance.test.mjs tools/phase2/directory-cache.test.mjs backend/tests/current-account.test.mjs",
+    "phase2:test:request-performance": "node --test packages/runtime/tests/request-performance.test.mjs tools/phase2/directory-cache.test.mjs tools/phase2/directory-breaker.test.mjs backend/tests/current-account.test.mjs",
     "phase2:prepare:nginx": "powershell -NoProfile -File tools/phase2/prepare-nginx.ps1",
     "phase2:test:migration": "node tools/phase2/run-proof.mjs --migration",
     "phase2:verify:clean-local": "node tools/phase2/clean-local.mjs",
