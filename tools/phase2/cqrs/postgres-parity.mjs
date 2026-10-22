@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {createHash, randomUUID} from 'node:crypto';
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
-import {resolve} from 'node:path';
+import {dirname, posix, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {performance} from 'node:perf_hooks';
 import {stripTypeScriptTypes} from 'node:module';
@@ -63,21 +63,26 @@ try {
   execFileSync(process.execPath, ['node_modules/typescript/bin/tsc', '-p', 'services/clinic/tsconfig.json'], {stdio: 'pipe'});
   execFileSync(process.execPath, ['../../tools/phase2/copy-client.mjs'], {cwd: 'services/clinic', stdio: 'pipe'});
   const {AuthoritativeAppointmentQueries} = await import('../../../services/clinic/dist/infrastructure/queries/authoritativeAppointments.js');
-  // Only relative import paths are relocated; transpile the exact pinned reader.
-  const original = execFileSync('git', ['show', baselineSha + ':services/clinic/src/lists.ts'], {encoding: 'utf8'});
-  for (const file of ['domain/error.ts', 'domain/validation.ts', 'lib/serialize.ts']) {
-    const path = 'services/clinic/src/' + file;
-    // Git stores LF while this Windows worktree uses CRLF; compare source text.
-    const normalized = value => value.toString().replaceAll('\r\n', '\n');
-    assert.equal(hash(normalized(readFileSync(path))), hash(normalized(execFileSync('git', ['show', baselineSha + ':' + path]))), 'Baseline dependency changed: ' + path);
+  // The pinned reader runs with its own pinned helpers (error, validation, serialize), so
+  // parity compares the pre-CQRS reader with today's reader, not today's helpers twice;
+  // every other relative import (generated client) resolves to the current build.
+  const pinned = ['lists', 'domain/error', 'domain/validation', 'lib/serialize'];
+  const baselineRoot = resolve(output, 'baseline');
+  const source = Object.fromEntries(pinned.map(name => [name, execFileSync('git', ['show', baselineSha + ':services/clinic/src/' + name + '.ts'], {encoding: 'utf8'})]));
+  for (const name of pinned) {
+    const code = stripTypeScriptTypes(source[name], {mode: 'transform'}).replace(/from ['"](\.{1,2}\/[^'"]+)['"]/g, (_, spec) => {
+      const target = posix.normalize(posix.join(posix.dirname(name), spec)).replace(/\.js$/, '');
+      return 'from ' + JSON.stringify(pathToFileURL(pinned.includes(target) ? resolve(baselineRoot, target + '.mjs') : resolve('services/clinic/dist', target + '.js')).href);
+    });
+    mkdirSync(dirname(resolve(baselineRoot, name + '.mjs')), {recursive: true});
+    writeFileSync(resolve(baselineRoot, name + '.mjs'), code);
   }
-  const code = stripTypeScriptTypes(original)
-    .replace(/from ['"]\.\/([^'"]+)['"]/g, (_, path) => 'from ' + JSON.stringify(pathToFileURL(resolve('services/clinic/dist', path)).href));
-  writeFileSync(resolve(output, 'baseline-reader.mjs'), code);
-  const old = await import(pathToFileURL(resolve(output, 'baseline-reader.mjs')).href);
+  const original = source.lists;
+  const old = await import(pathToFileURL(resolve(baselineRoot, 'lists.mjs')).href);
   for (const file of ['tools/phase2/cqrs/postgres-parity.mjs', 'services/clinic/src/infrastructure/queries/authoritativeLists.ts',
     'services/clinic/src/infrastructure/queries/authoritativeAppointments.ts', 'services/clinic/prisma/schema.prisma', 'phase2-plan/cqrs/acceptance.json', 'package-lock.json']) report.hashes[file] = hash(readFileSync(file));
   report.hashes.baselineReader = hash(original);
+  report.hashes.baselineHelpers = Object.fromEntries(pinned.filter(name => name !== 'lists').map(name => [name, hash(source[name])]));
   report.node = process.version;
   report.database = identity;
   report.postgres = (await db.$queryRaw`SELECT version() AS version`)[0].version;
@@ -151,8 +156,13 @@ try {
       report.parityCases++;
     }
     const {list} = await import('../../../services/clinic/dist/lists.js');
+    // AQ-09: an image list returns metadata and a valet key, never the content or the
+    // storage columns. The pinned reader returns whole rows (now with the claim columns),
+    // so the fixture's legacy base64 rows list as that row without content and storage fields.
+    const aq09 = (resource, page) => resource !== 'medicalImages' ? page
+      : {...page, items: page.items.map(({imageUrl, storageKey, sha256, ...item}) => ({...item, sizeBytes: null, url: null, urlExpiresAt: null}))};
     for (const resource of ['medicalRecords', 'medicalImages']) for (const raw of [{}, {q: 'thử'}, {petId: pets[0].id}, {page: '2', pageSize: '1'}]) {
-      assert.deepEqual(json(await list(readerDb, resource, actor, directory, raw)), json(await old.list(readerDb, resource, actor, directory, raw)));
+      assert.deepEqual(json(await list(readerDb, resource, actor, directory, raw)), aq09(resource, json(await old.list(readerDb, resource, actor, directory, raw))));
       report.parityCases++;
     }
   }
