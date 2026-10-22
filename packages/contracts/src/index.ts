@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-export const eventTypes = ['notification.requested.v1', 'billing.invoice-issued.v1', 'billing.operation-aborted.v1', 'directory.owner-upserted.v1', 'directory.pet-upserted.v1', 'directory.staff-upserted.v1', 'clinic.appointment-read-changed.v1'] as const;
+export const eventTypes = ['notification.requested.v1', 'billing.invoice-issued.v1', 'billing.operation-aborted.v1', 'directory.owner-upserted.v1', 'directory.pet-upserted.v1', 'directory.staff-upserted.v1', 'clinic.appointment-read-changed.v1', 'identity.sessions-revoked.v1'] as const;
 export type EventType = typeof eventTypes[number];
 export interface Envelope {
   eventId: string; eventType: EventType; schemaVersion: 1; producer: 'core' | 'clinic';
@@ -18,6 +18,8 @@ export interface NotificationPayload {
   actionUrl?: string | null; relatedPetId?: string | null; relatedAppointmentId?: string | null;
   relatedBookingId?: string | null; sentByStaffId?: string | null; createdAt?: string; sentAt?: string;
 }
+// AQ-05: tokens of `userId` issued before `revokedBefore` (iat in whole seconds) are revoked.
+export interface SessionRevocationPayload { userId: string; revokedBefore: string }
 export function parseEnvelope(raw: string): Envelope {
   if (Buffer.byteLength(raw) > 32768) throw new Error('EVENT_TOO_LARGE');
   const e = JSON.parse(raw);
@@ -43,6 +45,13 @@ export function parseEnvelope(raw: string): Envelope {
       || (e.eventType === 'directory.pet-upserted.v1' && (typeof p.ownerId !== 'string' || !p.ownerId))
       || (p.ownerId !== undefined && (typeof p.ownerId !== 'string' || !p.ownerId))
       || (p.species !== undefined && !['dog', 'cat', 'rabbit', 'other'].includes(p.species))) throw new Error('INVALID_DIRECTORY');
+    return e;
+  }
+  if (e.eventType === 'identity.sessions-revoked.v1') {
+    const p = e.payload, at = typeof p.revokedBefore === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,3})?Z$/.test(p.revokedBefore) ? Date.parse(p.revokedBefore) : NaN;
+    if (e.producer !== 'core' || e.aggregateType !== 'user' || p.userId !== e.aggregateId || !Number.isFinite(at)
+      || e.aggregateVersion !== Math.floor(at / 1000) || Object.keys(p).length !== 2
+      || !Object.keys(p).every(k => ['userId', 'revokedBefore'].includes(k))) throw new Error('INVALID_SESSION_REVOCATION');
     return e;
   }
   if (e.eventType.startsWith('billing.') && e.producer !== 'core') throw new Error('INVALID_PRODUCER');

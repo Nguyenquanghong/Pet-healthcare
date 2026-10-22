@@ -11,6 +11,15 @@ test('notification payload preserves owner/admin scope and legacy metadata witho
   for (const patch of [{ recipientOwnerId: null }, { recipientRole: null }, { recipientRole: 'doctor' }, { status: 'pending' }, { createdAt: 'bad' }, { internalNote: 'private' }, { passwordHash: 'private' }]) assert.throws(() => parseEnvelope(JSON.stringify({ ...owner, payload: { ...owner.payload, ...patch } })));
   assert.throws(() => parseEnvelope(JSON.stringify({ ...admin, payload: { ...admin.payload, recipientOwnerId: 'owner' } })));
 });
+test('AQ-05 session revocation: Core user aggregate, version = whole epoch second of revokedBefore, two-field payload', () => {
+  const at = '2026-10-23T01:02:03.456Z', revoked = { ...valid, eventType: 'identity.sessions-revoked.v1', aggregateType: 'user', aggregateId: 'u1',
+    aggregateVersion: Math.floor(Date.parse(at) / 1000), payload: { userId: 'u1', revokedBefore: at } };
+  assert.deepEqual(parseEnvelope(JSON.stringify(revoked)), revoked);
+  for (const patch of [{ producer: 'clinic' }, { aggregateType: 'owner' }, { aggregateVersion: Math.floor(Date.parse(at) / 1000) + 1 },
+    { payload: { userId: 'u2', revokedBefore: at } }, { payload: { userId: 'u1', revokedBefore: '2026-10-23 01:02:03' } },
+    { payload: { userId: 'u1' } }, { payload: { userId: 'u1', revokedBefore: at, passwordHash: 'x' } }])
+    assert.throws(() => parseEnvelope(JSON.stringify({ ...revoked, ...patch })), JSON.stringify(patch));
+});
 test('wire contract rejects unsupported schema, missing fields and oversized payload', () => {
   assert.deepEqual(parseEnvelope(JSON.stringify(valid)), valid);
   for (const patch of [{ schemaVersion: 2 }, { aggregateVersion: 0 }, { producer: 'browser' }, { payload: {} }, { occurredAt: 'bad' }, { payload: { operationId: 'o', data: 'x'.repeat(32768) } }]) assert.throws(() => parseEnvelope(JSON.stringify({ ...valid, ...patch })));

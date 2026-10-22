@@ -20,6 +20,7 @@ export async function declareTopology(brokerUrl: string, t: Topology) {
       await channel.assertQueue(`${t[consumer]}.dlq`, { durable: true });
     }
     await channel.bindQueue(t.notification, t.exchange, 'notification.requested.v1');
+    await channel.bindQueue(t.notification, t.exchange, 'identity.sessions-revoked.v1');
     await channel.bindQueue(t.clinic, t.exchange, 'directory.#');
     await channel.bindQueue(t.clinic, t.exchange, 'billing.#');
     await channel.bindQueue(t.clinicRead, t.exchange, 'clinic.appointment-read-changed.v1');
@@ -122,7 +123,7 @@ export async function consumeEvents(brokerUrl: string, queue: string, consumerNa
     try {
       const event = parseEnvelope(message.content.toString('utf8'));
       observed=event;
-      valid = consumerName === 'notification' ? event.eventType === 'notification.requested.v1' : consumerName === 'clinic-read-v1' ? event.eventType === 'clinic.appointment-read-changed.v1' : event.eventType.startsWith('billing.') || event.eventType.startsWith('directory.');
+      valid = consumerName === 'notification' ? ['notification.requested.v1', 'identity.sessions-revoked.v1'].includes(event.eventType) : consumerName === 'clinic-read-v1' ? event.eventType === 'clinic.appointment-read-changed.v1' : event.eventType.startsWith('billing.') || event.eventType.startsWith('directory.');
       if (!valid) reason = 'UNSUPPORTED_EVENT';
     } catch {}
     if (valid) {
