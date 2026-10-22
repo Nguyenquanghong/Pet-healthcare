@@ -28,7 +28,8 @@
         "directory.owner-upserted.v1",
         "directory.pet-upserted.v1",
         "directory.staff-upserted.v1",
-        "clinic.appointment-read-changed.v1"
+        "clinic.appointment-read-changed.v1",
+        "identity.sessions-revoked.v1"
       ]
     },
     "schemaVersion": {
@@ -571,6 +572,44 @@
                 "type": "boolean"
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "eventType": {
+            "const": "identity.sessions-revoked.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "producer": {
+            "const": "core"
+          },
+          "aggregateType": {
+            "const": "user"
+          },
+          "payload": {
+            "type": "object",
+            "required": [
+              "userId",
+              "revokedBefore"
+            ],
+            "properties": {
+              "userId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "revokedBefore": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false
           }
         }
       }

@@ -5,6 +5,7 @@ import { ManualSend } from './manualSend.js';
 import type { SendAuthorization } from './coreAuthorization.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
 import { requestActor } from '@nipopeto/runtime';
+import { sessionRevoked } from './sessions.js';
 
 export function createApp(db: PrismaClient, verify?: (token: string) => Actor, authorization?: SendAuthorization,runtime?:ServiceRuntime) {
   const app = express();
@@ -18,12 +19,16 @@ export function createApp(db: PrismaClient, verify?: (token: string) => Actor, a
     catch { res.status(503).json({ service: 'notification', status: 'unavailable' }); }
   });
   const router = express.Router();
-  router.use((req, res, next) => {
+  router.use(async (req, res, next) => {
     if (!verify) { res.status(503).json({ error: 'Notification authentication is not configured.' }); return; }
     const token = req.headers.authorization;
     if (!token?.startsWith('Bearer ') || token.length > 8192) { res.status(401).json({ error: 'Authentication required.' }); return; }
-    try { res.locals.actor = requestActor(req,verify); next(); }
-    catch { res.status(401).json({ error: 'Invalid or expired token.' }); }
+    try { res.locals.actor = requestActor(req,verify); }
+    catch { res.status(401).json({ error: 'Invalid or expired token.' }); return; }
+    try {
+      if (await sessionRevoked(db, res.locals.actor.sub, token.slice(7))) { res.status(401).json({ error: 'Your password was changed. Sign in again.', code: 'SESSION_REVOKED' }); return; }
+      next();
+    } catch (error) { next(error); }
   });
   router.post('/send', express.json({ limit: '96kb' }), async (req, res) => {
     const response = await manual.send(res.locals.actor, req.headers.authorization!.slice(7), req.body ?? {}, req.headers['idempotency-key']);

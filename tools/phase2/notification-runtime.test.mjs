@@ -46,6 +46,8 @@ let coreServer, notificationServer, coreUrl, notificationUrl, corePort, pet, con
 let runStartedAt, olderPending;
 const workers = [];
 const tokens = {};
+let aq05; // user and sessions from the AQ-05 password-change test, checked again at Notification after the relay
+
 const docker = (...args) => execFileSync('docker', ['compose','-f','deploy/phase2/compose.test.yml',...args], { stdio: 'pipe', timeout: 30000 });
 async function until(check, label, timeout = 12000) {
   const deadline = Date.now() + timeout;
@@ -248,7 +250,13 @@ test('AQ-05 real password change through the API revokes the previous session; a
   requireStatus(await login('P2-fixture-password-only!'), 401);
   const second = requireStatus(await login('AQ05-new-password!'), 200).token;
   requireStatus(await request('/api/pets', { token: second }), 200);
-  assert.ok((await core.user.findUniqueOrThrow({ where: { id } })).passwordChangedAt);
+  const changedAt = (await core.user.findUniqueOrThrow({ where: { id } })).passwordChangedAt;
+  assert.ok(changedAt);
+  // The same transaction wrote identity.sessions-revoked.v1 for the other services (trigger).
+  const revocation = await core.outboxEvent.findFirstOrThrow({ where: { AND: [{ envelope: { path: ['eventType'], equals: 'identity.sessions-revoked.v1' } }, { envelope: { path: ['aggregateId'], equals: id } }] } });
+  assert.deepEqual(revocation.envelope.payload, { userId: id, revokedBefore: changedAt.toISOString() });
+  assert.equal(revocation.envelope.aggregateVersion, Math.floor(changedAt.getTime() / 1000));
+  aq05 = { id, first, second };
 });
 test('AQ-10 hotel stays: API 409 plus a database exclusion constraint for writers that bypass the service', async () => {
   const stayPet = await core.pet.create({ data: { ownerId: owner, name: 'AQ-10 stay pet', species: 'dog', allergies: [] } });
@@ -331,6 +339,17 @@ test('broker/consumer outage cannot roll back committed Core HTTP write; manual 
   await until(() => notification.notification.findUnique({ where: { id: pending.envelope.payload.notificationId } }), 'Core domain notification catch-up', 20000);
   await until(() => notification.notification.findUnique({ where: { id: clinicEventId } }), 'Clinic transactional notification catch-up');
   for (const row of extraEvents) await until(() => notification.notification.findUnique({ where: { id: row.envelope.payload.notificationId } }), 'hotel/payment notification catch-up');
+  // AQ-05 residual closed: the earlier password change reached Notification through the same relay;
+  // its old session is refused there directly and through the Core gateway, the new one is not.
+  assert.ok(aq05, 'AQ-05 test ran first');
+  await until(() => notification.sessionRevocation.findUnique({ where: { userId: aq05.id } }), 'session revocation catch-up');
+  // Direct (nginx split routes /api/notifications straight to Notification): Notification's own check.
+  const direct = await request('/api/notifications', { token: aq05.first, base: notificationUrl });
+  assert.equal(direct.status, 401); assert.equal(direct.body.code, 'SESSION_REVOKED');
+  // Through the Core gateway, Core's currentAccount already refuses it before proxying.
+  const gateway = await request('/api/notifications', { token: aq05.first, base: coreUrl });
+  assert.equal(gateway.status, 401); assert.match(gateway.body.error, /password was changed/i);
+  for (const base of [notificationUrl, coreUrl]) requireStatus(await request('/api/notifications', { token: aq05.second, base }), 200);
   await runtime.stop(); await waitForQueueIdle([routes.notification,routes.clinic]); await directoryConsumer.stop(); await consumer.stop();
   assert.ok(workers.every(w => !/fixture_only|postgresql:|amqp:\/\//.test(w.logs())), 'No credential URLs in worker logs');
   if (olderPending) assert.equal((await core.outboxEvent.findUnique({ where: { id: olderPending.id } })).publishedAt, null, 'rows older than the run stay unpublished');

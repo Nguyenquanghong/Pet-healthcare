@@ -43,3 +43,10 @@ model RequestDedup {
   createdAt DateTime @default(now())
   @@unique([actorId, operationType, key])
 }
+// AQ-05: latest password-change instant per user, from Core's identity.sessions-revoked.v1.
+// Tokens of that user issued (iat, whole seconds) before it are refused.
+model SessionRevocation {
+  userId String @id
+  revokedBefore DateTime
+  updatedAt DateTime @default(now())
+}
