@@ -5,13 +5,15 @@ import { parseEnvelope } from '@nipopeto/contracts';
 import { publishConfirmed, logEvent, type Topology } from '@nipopeto/messaging';
 export class OutboxRelay {
   private readonly store: OutboxStore;
-  constructor(db: PrismaClient | OutboxStore, private readonly brokerUrl: string, private readonly scopeAggregateId?: string) {
+  // createdAfter (ISO instant) is a guarded-test scope like scopeAggregateId: a
+  // run relays only its own rows from a shared trial schema.
+  constructor(db: PrismaClient | OutboxStore, private readonly brokerUrl: string, private readonly scopeAggregateId?: string, private readonly createdAfter?: string) {
     this.store = 'claim' in db ? db : new ProofOutboxStore(db);
   }
   async once(workerId: string, destination: string | Topology, afterConfirm?: () => void) {
     const started=performance.now();
     const leaseOwner = `${workerId}:${randomUUID()}`;
-    const claimed = await this.store.claim(leaseOwner, this.scopeAggregateId ?? null);
+    const claimed = await this.store.claim(leaseOwner, this.scopeAggregateId ?? null, this.createdAfter ?? null);
     if (!claimed) return false;
     let connection: amqp.ChannelModel | undefined;
     try {
@@ -32,15 +34,15 @@ export class OutboxRelay {
   }
 }
 export interface OutboxStore {
-  claim(leaseOwner: string, scope: string | null): Promise<{ id: string; envelope: unknown; attempts: number } | null>;
+  claim(leaseOwner: string, scope: string | null, createdAfter?: string | null): Promise<{ id: string; envelope: unknown; attempts: number } | null>;
   markPublished(id: string, leaseOwner: string): Promise<void>;
   retry(id: string, leaseOwner: string, nextAttemptAt: Date): Promise<void>;
 }
 class ProofOutboxStore implements OutboxStore {
   constructor(private readonly db: PrismaClient) {}
-  claim(leaseOwner: string, scope: string | null) {
+  claim(leaseOwner: string, scope: string | null, createdAfter: string | null = null) {
     return this.db.$transaction(async tx => {
-      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "OutboxEvent" WHERE "publishedAt" IS NULL AND "nextAttemptAt" <= now() AND ("leaseUntil" IS NULL OR "leaseUntil" < now()) AND (${scope}::text IS NULL OR envelope->>'aggregateId' = ${scope}) ORDER BY "createdAt",id FOR UPDATE SKIP LOCKED LIMIT 1`;
+      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "OutboxEvent" WHERE "publishedAt" IS NULL AND "nextAttemptAt" <= now() AND ("leaseUntil" IS NULL OR "leaseUntil" < now()) AND (${scope}::text IS NULL OR envelope->>'aggregateId' = ${scope}) AND (${createdAfter}::text IS NULL OR "createdAt" >= (${createdAfter}::timestamptz AT TIME ZONE 'UTC')) ORDER BY "createdAt",id FOR UPDATE SKIP LOCKED LIMIT 1`;
       if (!rows[0]) return null;
       return tx.outboxEvent.update({ where: { id: rows[0].id }, data: { leaseOwner, leaseUntil: new Date(Date.now() + 30000), attempts: { increment: 1 } } });
     });

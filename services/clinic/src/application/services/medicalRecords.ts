@@ -1,6 +1,6 @@
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
-import { calendarDate, objectInput, optionalText, positiveNumber, requiredText } from "../../domain/validation.js";
+import { calendarDate, imageContent, objectInput, optionalText, positiveNumber, requiredText } from "../../domain/validation.js";
 import type { MedicalDependencies, MedicalRecordValue, MedicalUpdate, MedicalWrite } from "../ports/medicalRecords.js";
 
 export type MedicalInput = {
@@ -113,6 +113,7 @@ export class MedicalRecordsService {
     const petId = requiredText(input.petId, "Pet", 200);
     const title = requiredText(input.title, "Title"), imageUrl = requiredText(input.imageUrl, "Image", 7_000_000);
     const mimeType = requiredText(input.mimeType, "MIME type", 200);
+    imageContent(imageUrl, mimeType);
     if (!await this.deps.records.findPet(petId)) throw new BusinessError(404, "Pet not found.");
     return this.deps.records.createImage({ petId, title, imageUrl, mimeType });
   }

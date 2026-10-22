@@ -3,7 +3,11 @@
 worker_processes 1;
 events { worker_connections 1024; }
 http {
-    log_format safe '{"status":"$status","upstream":"$upstream_status","requestId":"$http_x_request_id"}';
+    # Keep a client-supplied X-Request-Id, otherwise mint nginx $request_id (32 hex).
+    # Services accept UUID or 32-hex IDs (packages/runtime acceptRequestId) and
+    # replace anything else, so the logged gateway ID equals the service log ID.
+    map $http_x_request_id $req_id { default $http_x_request_id; "" $request_id; }
+    log_format safe '{"status":"$status","upstream":"$upstream_status","requestId":"$req_id"}';
     access_log logs/access.log safe;
     # Raw URLs may contain public rescue tokens. Avoid routine request URLs.
     error_log logs/error.log crit;
@@ -15,7 +19,7 @@ http {
     upstream notification { server 127.0.0.1:5102; }
     proxy_http_version 1.1;
     proxy_set_header Connection "";
-    proxy_set_header X-Request-Id $http_x_request_id;
+    proxy_set_header X-Request-Id $req_id;
     proxy_set_header X-Forwarded-For $remote_addr;
     proxy_connect_timeout 1s;
     proxy_read_timeout 12s;

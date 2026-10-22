@@ -14,6 +14,7 @@ jobs:
       - run: npm run phase2:build
       - run: npm run phase2:test:contracts
       - run: npm run phase2:test:architecture
+      - run: npm run arch:check
       - run: npm run phase2:test:notification-writers
       - run: npm run phase2:test:source
       - run: npx playwright install --with-deps chromium

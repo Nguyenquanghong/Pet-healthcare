@@ -40,6 +40,10 @@ const auth = { publicKey: keys.publicKey.export({ type: 'spki', format: 'pem' })
 const date = new Date(Date.now() + 7 * 3600000 + 86400000).toISOString().slice(0, 10);
 const owner = randomUUID(), other = randomUUID(), admin = randomUUID(), doctor = randomUUID(), staff = randomUUID();
 let coreServer, notificationServer, coreUrl, notificationUrl, corePort, pet, connection, channel, stoppedBroker = false;
+// The shared trial schema retains other runs' unpublished Core rows. The Core
+// worker relays only rows created after this DB-clock instant (minus 1s skew);
+// older rows are left untouched, never deleted or marked published.
+let runStartedAt, olderPending;
 const workers = [];
 const tokens = {};
 const docker = (...args) => execFileSync('docker', ['compose','-f','deploy/phase2/compose.test.yml',...args], { stdio: 'pipe', timeout: 30000 });
@@ -80,6 +84,9 @@ test.before(async () => {
     const schema = service === 'core' ? 'backend/prisma/schema.prisma' : `services/${service}/prisma/schema.prisma`;
     execFileSync(process.execPath, ['node_modules/prisma/build/index.js','migrate','deploy','--schema',schema], { env: { ...process.env, DATABASE_URL: urls[service] }, stdio: 'pipe' });
   }
+  const [{ now }] = await core.$queryRaw`SELECT clock_timestamp() AS now`;
+  runStartedAt = new Date(now.getTime() - 1000).toISOString();
+  olderPending = await core.outboxEvent.findFirst({ where: { publishedAt: null, createdAt: { lt: new Date(runStartedAt) } }, select: { id: true } });
   process.env.JWT_PRIVATE_KEY = keys.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
   process.env.JWT_PUBLIC_KEY = auth.publicKey; process.env.JWT_ISSUER = auth.issuer; process.env.JWT_AUDIENCE = auth.audience;
   const password = await hashPasswordAsync('P2-fixture-password-only!');
@@ -284,7 +291,7 @@ test('broker/consumer outage cannot roll back committed Core HTTP write; manual 
   connection = await brokerConnection(); channel = await connection.createConfirmChannel(); channel.on('error', () => {});
   await declareTopology(broker, routes);
   const env = { BROKER_URL: broker, BROKER_PREFIX: `p2.runtime.${run}` };
-  const runtime = await startWorker('backend/dist/src/phase2/notificationWorker.js', { ...env, DATABASE_URL: urls.core });
+  const runtime = await startWorker('backend/dist/src/phase2/notificationWorker.js', { ...env, DATABASE_URL: urls.core, OUTBOX_CREATED_AFTER: runStartedAt });
   // Consumer starts later: broker accepts a durable backlog without rolling back Core.
   await until(async () => (await core.outboxEvent.findUnique({ where: { id: pending.id } })).publishedAt, 'Core outbox confirm');
   assert.ok((await channel.checkQueue(routes.notification)).messageCount > 0);
@@ -296,4 +303,16 @@ test('broker/consumer outage cannot roll back committed Core HTTP write; manual 
   for (const row of extraEvents) await until(() => notification.notification.findUnique({ where: { id: row.envelope.payload.notificationId } }), 'hotel/payment notification catch-up');
   await runtime.stop(); await waitForQueueIdle([routes.notification,routes.clinic]); await directoryConsumer.stop(); await consumer.stop();
   assert.ok(workers.every(w => !/fixture_only|postgresql:|amqp:\/\//.test(w.logs())), 'No credential URLs in worker logs');
+  if (olderPending) assert.equal((await core.outboxEvent.findUnique({ where: { id: olderPending.id } })).publishedAt, null, 'rows older than the run stay unpublished');
+});
+test('Core worker refuses the created-after test scope outside the guarded project or with a malformed instant', async () => {
+  for (const env of [{ OUTBOX_CREATED_AFTER: new Date().toISOString(), PHASE2_TEST_CONFIRM: '' }, { OUTBOX_CREATED_AFTER: 'yesterday' }]) {
+    const baseEnv = { ...process.env, BROKER_URL: broker, BROKER_PREFIX: `p2.runtime.${run}`, DATABASE_URL: urls.core, ...env }; delete baseEnv.JWT_PRIVATE_KEY; delete baseEnv.JWT_SECRET;
+    const child = spawn(process.execPath, ['backend/dist/src/phase2/notificationWorker.js'], { env: baseEnv, stdio: 'pipe' });
+    let output = ''; child.stdout.on('data', b => { output += b; }); child.stderr.on('data', b => { output += b; });
+    const timer = setTimeout(() => child.kill(), 10000);
+    const [code] = await once(child, 'exit'); clearTimeout(timer);
+    // Same env with the guard and a valid instant reaches worker-ready in the catch-up test.
+    assert.notEqual(code, 0); assert.ok(!output.includes('worker-ready')); assert.ok(output.includes('WORKER_START_FAILED'), output.slice(0, 400));
+  }
 });

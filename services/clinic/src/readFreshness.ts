@@ -43,7 +43,8 @@ export class ReadFreshness{
   // requireListProjection=true keeps the list guard semantics (evidence only while
   // list servingMode=projection). Activity summary evidence uses false: the same
   // generation-bound registry<->rows audit without enabling projected lists.
-  // perAggregateLag (activity only): the list estimator carries the oldest pending
+  // perAggregateLag (activity, and list serving since list study v2 K3v2-F1;
+  // the class default stays off for direct callers): the carried estimator keeps the oldest pending
   // time across samples even when each sample sees a DIFFERENT pending change, so
   // steady writes make lag grow without bound. Per aggregate, a change still
   // pending at the same projected version keeps its first-seen time; others start

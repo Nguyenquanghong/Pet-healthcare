@@ -836,6 +836,16 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "422": {
+            "description": "Invalid input, MIME type outside the allowlist, or image content not matching its MIME type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "default": {
             "$ref": "#/components/responses/ApiError"
           }
@@ -3473,10 +3483,18 @@
             "type": "string"
           },
           "imageUrl": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 7000000,
+            "description": "Base64 data URL whose prefix equals mimeType and whose decoded bytes carry that format's signature; otherwise 422."
           },
           "mimeType": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/gif",
+              "image/webp"
+            ]
           }
         },
         "required": [

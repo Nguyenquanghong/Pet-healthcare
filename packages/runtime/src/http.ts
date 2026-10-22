@@ -13,6 +13,15 @@ import { requestActor } from './jwt.js';
 const context=new AsyncLocalStorage<{requestId:string}>();
 export const currentRequestId=()=>context.getStore()?.requestId;
 export const traceHeaders=():Record<string,string>=>context.getStore()?{'X-Request-Id':context.getStore()!.requestId}:{};
+// IDs our edges produce: canonical UUID (services, clients) and nginx $request_id
+// (32 hex). Anything else is replaced by a new UUID, never echoed or logged.
+const REQUEST_ID=/^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})$/i;
+export const acceptRequestId=(value:unknown)=>typeof value==='string'&&REQUEST_ID.test(value)?value:undefined;
+// Non-HTTP work (event consumers) runs under the event's correlationId so logs and
+// outbound service calls (traceHeaders) carry the same ID as the originating request.
+export function withRequestId<T>(requestId:unknown,work:()=>T):T{return context.run({requestId:acceptRequestId(requestId)??randomUUID()},work);}
+// correlationId of a raw event, without validating the rest (the inbox does that).
+export function eventCorrelation(raw:string):unknown{try{return (JSON.parse(raw) as {correlationId?:unknown})?.correlationId;}catch{return undefined;}}
 export type OwnSnapshot={pending:number;outboxAgeSeconds:number;outboxRetries:number;billingPending:number;billingAgeSeconds:number;dbLockWaits:number};
 export type RuntimeOptions={service:'core'|'clinic'|'notification';verify:(token:string)=>Actor;probe:()=>Promise<OwnSnapshot>;extras?:()=>Record<string,number>};
 const buckets=[.01,.05,.1,.25,.5,.75,1,1.5,2,3,5,10];
@@ -26,6 +35,8 @@ function routeTemplate(path:string){
   if(item)return `/api/${item[1]}/:id${item[2]??''}`;
   if(/^\/api\/medical-records\/images\/[^/]{1,200}$/.test(p))return '/api/medical-records/images/:id';
   if(/^\/api\/public\/rescue\/[^/]{1,200}(\/report)?$/.test(p))return '/api/public/rescue/:token';
+  const pet=p.match(/^\/api\/public\/pets\/[^/]{1,200}(\/rescue-reports)?$/);
+  if(pet)return '/api/public/pets/:token'+(pet[1]??'');
   return 'unknown';
 }
 type HttpMetric={count:number;sum:number;counts:number[]};
@@ -60,7 +71,7 @@ export class ServiceRuntime {
     // Proxy trust is explicit CIDR/address configuration, never an unbounded hop.
     app.set('trust proxy',process.env.TRUST_PROXY_CIDRS?.split(',').map(s=>s.trim()).filter(Boolean)??false);
     app.use((req,res,next)=>{
-      const incoming=req.headers['x-request-id'];const requestId=typeof incoming==='string'&&/^[0-9a-f-]{36}$/i.test(incoming)?incoming:randomUUID();
+      const requestId=acceptRequestId(req.headers['x-request-id'])??randomUUID();
       res.setHeader('X-Request-Id',requestId);res.setHeader('X-Service-Instance',this.instance);
       const started=performance.now(),route=routeTemplate(req.originalUrl),method=['GET','POST','PATCH','PUT','DELETE','HEAD','OPTIONS'].includes(req.method)?req.method:'OTHER';
       const timer=setTimeout(()=>{if(!res.headersSent)res.status(503).setHeader('Retry-After','2').json({error:'Request deadline reached. For an uncertain write, retry the same request key.'});},this.deadlineMs);
@@ -112,6 +123,11 @@ export class ServiceRuntime {
     }
     if(req.method==='POST'&&req.path==='/auth/owner/register')return{group:'auth-register',read:false,buckets:[b(ip,limit('AUTH_REGISTER_IP_LIMIT',300))]};
     if(req.method==='POST'&&req.path.startsWith('/auth/owner/activation'))return{group:'auth-activation',read:false,buckets:[b(ip,limit('AUTH_ACTIVATION_IP_LIMIT',300))]};
+    // AQ-01: unauthenticated rescue reports notify an owner. The token bucket caps
+    // a flood against one pet across IPs; the token is HMACed with the other keys.
+    const rescue=req.method==='POST'?req.path.match(/^\/public\/pets\/([^/]{1,200})\/rescue-reports$/):null;
+    if(rescue){let token=rescue[1]!;try{token=decodeURIComponent(token);}catch{}
+      return{group:'public-rescue',read:false,buckets:[b(ip,limit('RESCUE_REPORT_IP_LIMIT',20)),b('rescue-token:'+token,limit('RESCUE_REPORT_TOKEN_LIMIT',5))]};}
     let actor:Actor|undefined;
     try{actor=requestActor(req,this.options.verify);}catch{}
     const identity=actor?'actor:'+actor.sub:ip,read=['GET','HEAD'].includes(req.method);

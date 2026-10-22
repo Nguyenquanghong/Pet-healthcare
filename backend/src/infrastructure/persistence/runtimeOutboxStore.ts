@@ -5,9 +5,10 @@ import type { OutboxStore } from '../../phase2/relay.js';
 // delegates are not cast or passed between independent schemas/services.
 export class RuntimeOutboxStore implements OutboxStore {
   constructor(private readonly db: PrismaClient) {}
-  claim(leaseOwner: string, scope: string | null) {
+  claim(leaseOwner: string, scope: string | null, createdAfter: string | null = null) {
     return this.db.$transaction(async tx => {
-      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "OutboxEvent" WHERE "publishedAt" IS NULL AND "nextAttemptAt" <= now() AND ("leaseUntil" IS NULL OR "leaseUntil" < now()) AND (${scope}::text IS NULL OR envelope->>'aggregateId' = ${scope}) ORDER BY "createdAt",id FOR UPDATE SKIP LOCKED LIMIT 1`;
+      // createdAt is TIMESTAMP(3) holding UTC, so the instant is compared in UTC.
+      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "OutboxEvent" WHERE "publishedAt" IS NULL AND "nextAttemptAt" <= now() AND ("leaseUntil" IS NULL OR "leaseUntil" < now()) AND (${scope}::text IS NULL OR envelope->>'aggregateId' = ${scope}) AND (${createdAfter}::text IS NULL OR "createdAt" >= (${createdAfter}::timestamptz AT TIME ZONE 'UTC')) ORDER BY "createdAt",id FOR UPDATE SKIP LOCKED LIMIT 1`;
       if (!rows[0]) return null;
       return tx.outboxEvent.update({ where: { id: rows[0].id }, data: { leaseOwner, leaseUntil: new Date(Date.now() + 30000), attempts: { increment: 1 } } });
     });
