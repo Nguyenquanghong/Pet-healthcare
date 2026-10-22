@@ -385,7 +385,7 @@ export function PetsPage() {
             </div>
             <div className="grid gap-6 md:grid-cols-2">
               <DigitalHealthRecordCard pet={selectedPet} records={selectedPetRecords} />
-              <div><CloudImagingCard pet={selectedPet} images={selectedPetImages} /><Pagination {...images} /></div>
+              <div><CloudImagingCard pet={selectedPet} images={selectedPetImages} onExpired={images.reload} /><Pagination {...images} /></div>
             </div>
           </div>
 

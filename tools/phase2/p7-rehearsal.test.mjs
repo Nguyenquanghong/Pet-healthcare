@@ -129,7 +129,7 @@ test('read-only target gateway serves migrated records with fresh auth/scope/red
   const list=status(await request('/api/appointments?pageSize=2&page=1'),200);assert.equal(list.items.length,2);assert.equal(list.pagination.total,10);
   const records=status(await request('/api/medical-records?petId='+fixture.pet.id),200);assert.equal(records.items[0].id,fixture.medical.id);assert.equal(Object.hasOwn(records.items[0],'internalNote'),false);
   status(await request('/api/medical-records?petId='+fixture.pet.id,{token:tokens.other}),403);
-  const images=status(await request('/api/medical-records/images?petId='+fixture.pet.id),200);assert.equal(images.items[0].id,fixture.image.id);
+  const images=status(await request('/api/medical-records/images?petId='+fixture.pet.id),200);assert.equal(images.items[0].id,fixture.image.id);assert.equal(images.items[0].url,null);assert.ok(!('imageUrl'in images.items[0]));// AQ-09: migrated base64 rows list without content until the blob migration tool runs
   const invoices=status(await request('/api/invoices'),200);assert.equal(invoices.items.length,3);assert.equal(invoices.items.find(i=>i.id===fixture.invoices[0].id).paymentStatus,'paid');
   const notices=status(await request('/api/notifications'),200);assert.equal(notices.items.find(n=>n.id===fixture.notifications[1].id).status,'read');
   for(const table of ['appointments','medical_records','medical_images','notifications'])await assert.rejects(()=>db.core.$queryRawUnsafe('SELECT count(*) FROM runtime."'+table+'"'));

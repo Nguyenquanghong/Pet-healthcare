@@ -1,7 +1,9 @@
+import { createHash, randomUUID } from "node:crypto";
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
 import { calendarDate, imageContent, objectInput, optionalText, positiveNumber, requiredText } from "../../domain/validation.js";
-import type { MedicalDependencies, MedicalRecordValue, MedicalUpdate, MedicalWrite } from "../ports/medicalRecords.js";
+import type { BlobStore } from "../ports/blobs.js";
+import type { MedicalDependencies, MedicalImageValue, MedicalRecordValue, MedicalUpdate, MedicalWrite } from "../ports/medicalRecords.js";
 
 export type MedicalInput = {
   petId?: string | null; ownerId?: string | null; appointmentId?: string | null; doctorName?: string; visitDate?: string;
@@ -121,13 +123,36 @@ export class MedicalRecordsService {
     const petId = requiredText(input.petId, "Pet", 200);
     const title = requiredText(input.title, "Title"), imageUrl = requiredText(input.imageUrl, "Image", 7_000_000);
     const mimeType = requiredText(input.mimeType, "MIME type", 200);
-    imageContent(imageUrl, mimeType);
+    const bytes = imageContent(imageUrl, mimeType);
     if (!await this.deps.records.findPet(petId)) throw new BusinessError(404, "Pet not found.");
-    return this.deps.records.createImage({ petId, title, imageUrl, mimeType });
+    // Claim Check: bytes go to the bucket first; the row only commits a claim on them.
+    const id = randomUUID(), storageKey = `images/${id}`, sha256 = createHash("sha256").update(bytes).digest("hex");
+    await this.deps.blobs.put(storageKey, bytes, mimeType);
+    try {
+      const created = await this.deps.records.createImage({ id, petId, title, mimeType, storageKey, sizeBytes: bytes.length, sha256 });
+      return medicalImageDto(created, this.deps.blobs);
+    } catch (error) {
+      // A crash between the two steps leaves an orphan object, found by tools/phase2/migrate-medical-images.mjs --orphans.
+      await this.deps.blobs.remove(storageKey).catch(() => undefined);
+      throw error;
+    }
   }
 
   async deleteImage(actor: Actor, id: string) {
     staffOnly(actor);
-    await this.deps.records.deleteImage(id);
+    const { storageKey } = await this.deps.records.deleteImage(id);
+    if (!storageKey) return;
+    // The cleanup row is already committed; if the bucket is down the worker retries it.
+    try { await this.deps.blobs.remove(storageKey); await this.deps.records.completeBlobCleanup(storageKey); } catch { /* retried by drainBlobCleanup */ }
   }
+}
+
+// Valet Key: owner/staff access was already decided by the query that produced
+// the row, so signing a URL here only ever covers rows the actor may read.
+export function medicalImageDto(image: MedicalImageValue, blobs: BlobStore) {
+  const signed = image.storageKey ? blobs.signedGetUrl(image.storageKey) : null;
+  return {
+    id: image.id, petId: image.petId, title: image.title, mimeType: image.mimeType, createdAt: image.createdAt,
+    sizeBytes: image.sizeBytes, url: signed?.url ?? null, urlExpiresAt: signed ? signed.expiresAt.toISOString() : null,
+  };
 }

@@ -5,7 +5,7 @@ import {validateMigration,assertFrozenSource} from './p7-migration.mjs';
 const targetKinds=['core','clinic','notification'];
 // AppointmentQueryEpoch: read by the aggregate cache, written only by its
 // SECURITY DEFINER trigger, so runtime gets SELECT and no DML.
-function runtimeTables(kind){const names=[...targets[kind],...(kind==='clinic'?['OutboxEvent','RequestDedup','ClinicReadRevision','AppointmentReadRow','AppointmentDailySummary','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','MedicalRecordRevision','AppointmentQueryEpoch']:kind==='notification'?['RequestDedup']:[])];return [...new Set(names.map(n=>catalogs[kind][n].table))];}
+function runtimeTables(kind){const names=[...targets[kind],...(kind==='clinic'?['OutboxEvent','RequestDedup','ClinicReadRevision','AppointmentReadRow','AppointmentDailySummary','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','MedicalRecordRevision','AppointmentQueryEpoch','BlobCleanup']:kind==='notification'?['RequestDedup']:[])];return [...new Set(names.map(n=>catalogs[kind][n].table))];}
 // Exact runtime ACL statements. role/schema must already be quoted identifiers.
 // Exported so guarded trial harnesses test these grants, not a copied variant.
 export function runtimeGrantStatements(kind,role,write,schema='runtime'){

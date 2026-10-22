@@ -98,10 +98,17 @@ services:
       BROKER_URL: amqp://notification:${BROKER_PASSWORD:?Prepare phase2 configuration}@rabbitmq:5672
       BROKER_PREFIX: nipopeto.local.v1
       PORT: "5101"
+      BLOB_ENDPOINT: http://blob:8333
+      BLOB_PUBLIC_ENDPOINT: ${BLOB_PUBLIC_ENDPOINT:-http://127.0.0.1:8333}
+      BLOB_BUCKET: medical-images
+      BLOB_ACCESS_KEY: ${BLOB_ACCESS_KEY:?Prepare phase2 configuration}
+      BLOB_SECRET_KEY: ${BLOB_SECRET_KEY:?Prepare phase2 configuration}
     depends_on:
       clinic-migrate:
         condition: service_completed_successfully
       redis:
+        condition: service_healthy
+      blob:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5101/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -119,6 +126,11 @@ services:
       CORE_DIRECTORY_TOKEN: ${CORE_DIRECTORY_TOKEN:?Prepare phase2 configuration}
       BROKER_URL: amqp://notification:${BROKER_PASSWORD:?Prepare phase2 configuration}@rabbitmq:5672
       BROKER_PREFIX: nipopeto.local.v1
+      BLOB_ENDPOINT: http://blob:8333
+      BLOB_PUBLIC_ENDPOINT: ${BLOB_PUBLIC_ENDPOINT:-http://127.0.0.1:8333}
+      BLOB_BUCKET: medical-images
+      BLOB_ACCESS_KEY: ${BLOB_ACCESS_KEY:?Prepare phase2 configuration}
+      BLOB_SECRET_KEY: ${BLOB_SECRET_KEY:?Prepare phase2 configuration}
     command: ["node", "services/clinic/dist/worker.js"]
     depends_on:
       api:
@@ -148,6 +160,27 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # AQ-09 medical image bucket (S3-compatible). The browser fetches images from
+  # BLOB_PUBLIC_ENDPOINT with presigned URLs, so this port is published on loopback.
+  blob:
+    image: chrislusf/seaweedfs:3.97
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - printf '{"identities":[{"name":"clinic","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List"]}]}' "$$BLOB_ACCESS_KEY" "$$BLOB_SECRET_KEY" > /tmp/s3.json && exec weed server -dir=/data -s3 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=1024
+    environment:
+      BLOB_ACCESS_KEY: ${BLOB_ACCESS_KEY:?Prepare phase2 configuration}
+      BLOB_SECRET_KEY: ${BLOB_SECRET_KEY:?Prepare phase2 configuration}
+    ports:
+      - "127.0.0.1:${BLOB_PORT:-8333}:8333"
+    volumes:
+      - phase2_blob:/data
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8333"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
   redis:
     image: redis:7.4-alpine
     command: ["redis-server", "--appendonly", "yes"]
@@ -163,3 +196,4 @@ services:
 volumes:
   clinic_postgres:
   phase2_redis:
+  phase2_blob:

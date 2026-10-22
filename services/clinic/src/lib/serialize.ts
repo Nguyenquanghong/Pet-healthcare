@@ -1,5 +1,6 @@
 import type { AppointmentRecord } from '../application/ports/appointments.js';
 import type { MedicalRecordValue } from '../application/ports/medicalRecords.js';
+export { medicalImageDto } from '../application/services/medicalRecords.js';
 const dateOnly=(value:Date)=>value.toISOString().slice(0,10);
 export function appointmentDto(item: AppointmentRecord, owner = false) {
   const { internalNote, ...visible } = item;

@@ -2,10 +2,11 @@ import { FolderUp, ImageOff, X } from "lucide-react";
 import { useState } from "react";
 import type { MedicalImage } from "../../../types/medicalImage";
 import type { Pet } from "../../../types/pet";
+import { MedicalImageView } from "../../MedicalImageView";
 
-type CloudImagingCardProps = { pet: Pet; images: MedicalImage[] };
+type CloudImagingCardProps = { pet: Pet; images: MedicalImage[]; onExpired?: () => void };
 
-export function CloudImagingCard({ pet, images }: CloudImagingCardProps) {
+export function CloudImagingCard({ pet, images, onExpired }: CloudImagingCardProps) {
   const [activeImage, setActiveImage] = useState<MedicalImage | null>(null);
   const recentImages = [...images].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return (
@@ -24,7 +25,7 @@ export function CloudImagingCard({ pet, images }: CloudImagingCardProps) {
         <div className="grid gap-4 sm:grid-cols-2 flex-1">
           {recentImages.map((image) => (
             <button key={image.id} type="button" onClick={() => setActiveImage(image)} className="group relative min-h-32 overflow-hidden rounded-xl border border-slate-200 bg-slate-900 text-left">
-              <img src={image.imageUrl} alt={image.title} className="h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-100" />
+              <MedicalImageView image={image} onExpired={onExpired} className="h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-100" />
               <div className="absolute inset-x-0 bottom-0 bg-slate-950/75 px-3 py-2">
                 <p className="truncate text-sm font-bold text-white">{image.title}</p>
                 <p className="text-[11px] text-slate-300">{new Date(image.createdAt).toLocaleDateString()}</p>
@@ -44,7 +45,7 @@ export function CloudImagingCard({ pet, images }: CloudImagingCardProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label={activeImage.title}>
           <div className="relative w-full max-w-3xl rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
             <button type="button" onClick={() => setActiveImage(null)} className="absolute right-5 top-5 rounded-lg bg-slate-900/80 p-2 text-white hover:bg-slate-900" aria-label="Close image preview"><X size={18} /></button>
-            <img src={activeImage.imageUrl} alt={activeImage.title} className="max-h-[75vh] w-full rounded-lg object-contain" />
+            <MedicalImageView image={images.find((image) => image.id === activeImage.id) ?? activeImage} onExpired={onExpired} className="max-h-[75vh] w-full rounded-lg object-contain" />
             <p className="px-2 pb-1 pt-3 text-sm font-bold text-slate-900">{activeImage.title}</p>
           </div>
         </div>

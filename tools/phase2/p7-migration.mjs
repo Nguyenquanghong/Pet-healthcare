@@ -76,7 +76,8 @@ export function buildMigration(snapshot,ctx){
   for(const name of targets.core)out.core[name]=structuredClone(t[name]);
   out.core.BookingStatusEvent=t.BookingStatusEvent.filter(r=>r.kind==='hotel');
   for(const name of ['Appointment','MedicalRecord'])out.clinic[name]=structuredClone(t[name]);
-  out.clinic.MedicalImage=t.MedicalImage.map(row=>({...row,owner_id:pets.get(row.pet_id).owner_id}));
+  // AQ-09: imported images keep their base64 claim-less form; the blob migration tool moves them later.
+  out.clinic.MedicalImage=t.MedicalImage.map(row=>({...row,owner_id:pets.get(row.pet_id).owner_id,storage_key:null,size_bytes:null,sha256:null}));
   out.clinic.BookingStatusEvent=t.BookingStatusEvent.filter(r=>r.kind==='appointment');
   out.clinic.AppointmentReservation=[];out.clinic.AppointmentBillingTerminal=[];
   for(const invoice of out.core.Invoice.filter(i=>i.appointment_id)){

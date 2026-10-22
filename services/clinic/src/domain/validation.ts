@@ -61,7 +61,8 @@ const imageSignatures: Record<string, (bytes: Buffer) => boolean> = {
 };
 export const allowedImageTypes = Object.keys(imageSignatures);
 
-export function imageContent(imageUrl: string, mimeType: string): void {
+// Returns the decoded bytes once the data URL, MIME type and signature agree.
+export function imageContent(imageUrl: string, mimeType: string): Buffer {
   const signature = imageSignatures[mimeType];
   if (!signature) throw new BusinessError(422, `MIME type must be one of ${allowedImageTypes.join(", ")}.`);
   const prefix = `data:${mimeType};base64,`, data = imageUrl.slice(prefix.length);
@@ -69,6 +70,7 @@ export function imageContent(imageUrl: string, mimeType: string): void {
     throw new BusinessError(422, "Image must be a base64 data URL matching its MIME type.");
   if (!signature(Buffer.from(data.slice(0, 24), "base64")))
     throw new BusinessError(422, "Image content does not match its MIME type.");
+  return Buffer.from(data, "base64");
 }
 
 export function todayInVietnam(now = Date.now()): string {

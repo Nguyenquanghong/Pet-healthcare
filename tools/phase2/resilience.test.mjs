@@ -19,7 +19,9 @@ import amqp from 'amqplib';
 import {OutboxRelay as CoreRelay} from '../../backend/dist/src/phase2/relay.js';
 import {RuntimeOutboxStore} from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';
 import {OutboxRelay as ClinicRelay} from '../../services/clinic/dist/relay.js';
+import {blobTestEnv} from './blob-test.mjs';
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test');assertTestProject();
+Object.assign(process.env,blobTestEnv);// spawned Clinic processes use the dedicated test bucket
 const run=randomUUID(),short=run.slice(0,8),prefix='p6.resilience.'+run,routes=topology(prefix);
 const urls={core:'postgresql://p2_core:p2_core_fixture_only@127.0.0.1:55432/p2_core_test?schema=core_runtime_test&connection_limit=4',clinic:'postgresql://p2_clinic:p2_clinic_fixture_only@127.0.0.1:55432/p2_clinic_test?schema=p1_proof&connection_limit=4',notification:'postgresql://p2_notification:p2_notification_fixture_only@127.0.0.1:55432/p2_notification_test?schema=p1_proof&connection_limit=4'};
 const db={core:new CoreClient({datasourceUrl:urls.core}),clinic:new ClinicClient({datasourceUrl:urls.clinic}),notification:new NotificationClient({datasourceUrl:urls.notification})};
@@ -143,7 +145,9 @@ test('real nginx distributes requests to both Clinic processes; durable same-key
 });
 test('medical images saved by one Clinic replica remain readable by the other replica from shared service storage',async()=>{
   const imageUrl='data:image/png;base64,iVBORw0KGgo=',image=expectStatus(await request('/api/medical-records/images',{base:clinicApis[0].base,token:tokens.admin,method:'POST',body:{petId:pet.id,title:'P6 shared image',imageUrl,mimeType:'image/png'}}),201).image;
-  const read=expectStatus(await request('/api/medical-records/images?petId='+pet.id,{base:clinicApis[1].base}),200).items.find(i=>i.id===image.id);assert.equal(read.imageUrl,imageUrl);
+  const read=expectStatus(await request('/api/medical-records/images?petId='+pet.id,{base:clinicApis[1].base}),200).items.find(i=>i.id===image.id);assert.ok(!('imageUrl'in read));
+  // Valet key issued by replica 1 for an object written through replica 0; the bytes come straight from the bucket.
+  const bytes=Buffer.from(imageUrl.split(',')[1],'base64'),fetched=await fetch(read.url);assert.equal(fetched.status,200);assert.ok(Buffer.from(await fetched.arrayBuffer()).equals(bytes));
   const connections={};for(const [service,client]of Object.entries(db)){const [row]=await client.$queryRaw`SELECT count(*) AS count FROM pg_stat_activity WHERE usename=current_user`;connections[service]=Number(row.count);}
   assert.ok(connections.clinic<=10);assert.ok(connections.core<=8);assert.ok(connections.notification<=8);
   for(const [name,api]of [['core-0',coreApis[0]],['core-1',coreApis[1]],['clinic-0',clinicApis[0]],['clinic-1',clinicApis[1]],['notification',notificationApi]]){

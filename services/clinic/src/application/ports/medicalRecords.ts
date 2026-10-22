@@ -1,4 +1,5 @@
 import type { Actor } from "../../domain/auth.js";
+import type { BlobStore } from "./blobs.js";
 export type MedicalRecordValue = {
   id: string; petId: string; ownerId: string; appointmentId: string | null;
   doctorName: string; visitDate: Date; title: string; symptoms: string | null;
@@ -10,9 +11,13 @@ export type MedicalRecordValue = {
   createdAt: Date; updatedAt: Date;
 };
 
+// AQ-09 Claim Check: the row holds a claim on a bucket object, never the bytes.
+// storageKey is null only for legacy base64 rows not yet moved by the migration tool.
 export type MedicalImageValue = {
-  id: string; petId: string; title: string; imageUrl: string; mimeType: string; createdAt: Date;
+  id: string; petId: string; title: string; mimeType: string; createdAt: Date;
+  storageKey: string | null; sizeBytes: number | null;
 };
+export type MedicalImageWrite = { id: string; petId: string; title: string; mimeType: string; storageKey: string; sizeBytes: number; sha256: string };
 
 export type MedicalWrite = {
   petId: string; ownerId: string; appointmentId: string | null;
@@ -41,8 +46,10 @@ export interface MedicalRecordRepository {
   update(id: string, data: MedicalUpdate, actor: Actor): Promise<MedicalRecordValue>;
   delete(id: string, actor: Actor): Promise<void>;
   history(recordId: string): Promise<MedicalRevisionValue[]>;
-  createImage(data: { petId: string; title: string; imageUrl: string; mimeType: string }): Promise<MedicalImageValue>;
-  deleteImage(id: string): Promise<void>;
+  createImage(data: MedicalImageWrite): Promise<MedicalImageValue>;
+  // Deletes the row and queues its object for removal in one transaction.
+  deleteImage(id: string): Promise<{ storageKey: string | null }>;
+  completeBlobCleanup(storageKey: string): Promise<void>;
   completeAppointment(id: string, actor: Actor): Promise<void>;
 }
 
@@ -62,4 +69,5 @@ export interface MedicalUnitOfWork {
 export interface MedicalDependencies {
   records: MedicalRecordRepository;
   unitOfWork: MedicalUnitOfWork;
+  blobs: BlobStore;
 }

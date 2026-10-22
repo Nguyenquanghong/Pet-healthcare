@@ -8,6 +8,7 @@ import { appointmentSlotWrite } from './appointmentSlotConflict.js';
 import { writeNotification } from '../../notificationOutbox.js';
 import type { RequestDirectory } from '../../directory.js';
 import {trackAppointmentChange} from '../../readRevision.js';
+import type {BlobStore} from '../../blobStore.js';
 
 type Client=PrismaClient|Prisma.TransactionClient;
 const transaction=<T>(db:PrismaClient,bound:Prisma.TransactionClient|undefined,work:(tx:Prisma.TransactionClient)=>Promise<T>)=>bound?work(bound):db.$transaction(work);
@@ -51,8 +52,21 @@ class Records implements MedicalRecordRepository {
   }
   async delete(id:string,actor:Actor){const before=await this.db.medicalRecord.delete({where:{id}});await this.revise(id,'delete',before,null,actor);}
   history(recordId:string){return this.db.medicalRecordRevision.findMany({where:{recordId},orderBy:[{changedAt:'asc'},{id:'asc'}]}) as Promise<MedicalRevisionValue[]>;}
-  async createImage(data:Parameters<MedicalRecordRepository['createImage']>[0]){const pet=await this.directory.pet(data.petId);const {ownerId,...image}=await this.db.medicalImage.create({data:{...data,ownerId:pet.ownerId}});return image;}
-  async deleteImage(id:string){await this.db.medicalImage.delete({where:{id}});}
+  async createImage(data:Parameters<MedicalRecordRepository['createImage']>[0]){
+    const pet=await this.directory.pet(data.petId);
+    const {ownerId,sha256,imageUrl,...image}=await this.db.medicalImage.create({data:{...data,ownerId:pet.ownerId}});
+    return image;
+  }
+  // Row delete and cleanup claim commit together, so an object is never leaked by a crash after the delete.
+  async deleteImage(id:string){
+    const run=async(tx:Client)=>{
+      const row=await tx.medicalImage.delete({where:{id}});
+      if(row.storageKey)await tx.blobCleanup.create({data:{storageKey:row.storageKey}});
+      return{storageKey:row.storageKey};
+    };
+    return '$transaction' in this.db?this.db.$transaction(run):run(this.db);
+  }
+  async completeBlobCleanup(storageKey:string){await this.db.blobCleanup.deleteMany({where:{storageKey}});}
   async completeAppointment(id:string,actor:Actor){
     await unlocked(this.db,id);
     const before=await this.db.appointment.findUnique({where:{id}});
@@ -63,8 +77,8 @@ class Records implements MedicalRecordRepository {
     await trackAppointmentChange(this.db,id);
   }
 }
-export function medicalDependencies(db:PrismaClient,directory:RequestDirectory,bound?:Prisma.TransactionClient):MedicalDependencies{
-  return{records:new Records(bound??db,directory),unitOfWork:{run:work=>transaction(db,bound,tx=>work({records:new Records(tx,directory),notifications:writer(tx)}))}};
+export function medicalDependencies(db:PrismaClient,directory:RequestDirectory,blobs:BlobStore,bound?:Prisma.TransactionClient):MedicalDependencies{
+  return{records:new Records(bound??db,directory),blobs,unitOfWork:{run:work=>transaction(db,bound,tx=>work({records:new Records(tx,directory),notifications:writer(tx)}))}};
 }
 export class Lifecycle implements BookingLifecycleStore {
   constructor(private readonly db:PrismaClient,private readonly directory:RequestDirectory,private readonly bound?:Prisma.TransactionClient){}

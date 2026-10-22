@@ -2,7 +2,8 @@ import { Prisma, type PrismaClient, type AppointmentStatus } from '../../generat
 import type { Actor } from '../../domain/auth.js';
 import { BusinessError } from '../../domain/error.js';
 import { calendarDate } from '../../domain/validation.js';
-import { appointmentDto, medicalRecordDto } from '../../lib/serialize.js';
+import { appointmentDto, medicalRecordDto, medicalImageDto } from '../../lib/serialize.js';
+import { UnconfiguredBlobStore, type BlobStore } from '../../blobStore.js';
 import type { AppointmentListResult, AppointmentQueryDirectory } from '../../application/ports/appointmentQueries.js';
 
 export type Resource='appointments'|'medicalRecords'|'medicalImages';
@@ -18,8 +19,8 @@ export function query(resource:Resource,raw:Record<string,unknown>){
 type ListDatabase=Pick<PrismaClient,'$transaction'>;
 type ClinicListResult=Omit<AppointmentListResult,'items'>&{items:unknown[]};
 export function list(db:ListDatabase,resource:'appointments',actor:Actor,directory:AppointmentQueryDirectory,raw:Record<string,unknown>):Promise<AppointmentListResult>;
-export function list(db:ListDatabase,resource:Resource,actor:Actor,directory:AppointmentQueryDirectory,raw:Record<string,unknown>):Promise<ClinicListResult>;
-export async function list(db:ListDatabase,resource:Resource,actor:Actor,directory:AppointmentQueryDirectory,raw:Record<string,unknown>):Promise<ClinicListResult>{
+export function list(db:ListDatabase,resource:Resource,actor:Actor,directory:AppointmentQueryDirectory,raw:Record<string,unknown>,blobs?:BlobStore):Promise<ClinicListResult>;
+export async function list(db:ListDatabase,resource:Resource,actor:Actor,directory:AppointmentQueryDirectory,raw:Record<string,unknown>,blobs:BlobStore=new UnconfiguredBlobStore()):Promise<ClinicListResult>{
   const q=query(resource,raw),ownerId=actor.role==='owner'?actor.sub:q.ownerId as string|undefined;
   // Search projections are predicates, never an authorization source. Scope is
   // applied to local rows before counts/pagination; page relations use Core.
@@ -52,7 +53,7 @@ export async function list(db:ListDatabase,resource:Resource,actor:Actor,directo
   },{isolationLevel:'RepeatableRead'});
   const rows=[...result.appointments,...result.records,...result.images];
   const source=rows.length?await directory.lookup(rows.map(r=>r.petId),rows.map(r=>r.ownerId)):{pets:[],owners:[]};
-  const related={owners:source.owners,pets:source.pets,appointments:result.appointments.map(r=>appointmentDto(r,actor.role==='owner')),medicalRecords:result.records.map(r=>medicalRecordDto(r,actor.role==='owner')),medicalImages:result.images.map(({ownerId,...image})=>image),hotelBookings:[],dailyCareNotes:[],notifications:[],invoices:[]};
+  const related={owners:source.owners,pets:source.pets,appointments:result.appointments.map(r=>appointmentDto(r,actor.role==='owner')),medicalRecords:result.records.map(r=>medicalRecordDto(r,actor.role==='owner')),medicalImages:result.images.map(image=>medicalImageDto(image,blobs)),hotelBookings:[],dailyCareNotes:[],notifications:[],invoices:[]};
   const currentPet=q.petId?source.pets.find(p=>p.id===q.petId)??await directory.pet(q.petId as string):null;
   return{items:related[resource],pagination:{page:q.page,pageSize:q.pageSize,total:result.total,totalPages:Math.ceil(result.total/q.pageSize)},counts:result.counts,related:{...related,[resource]:[]},
     ...(currentPet?{directory:{petId:currentPet.id,sourceVersion:currentPet.directoryVersion,projectionVersion:result.projectionVersion,searchReady:result.projectionVersion>=currentPet.directoryVersion}}:{}),...(q.q?{searchConsistency:'eventual' as const}:{})};

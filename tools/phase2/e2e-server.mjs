@@ -18,6 +18,7 @@ import { AppointmentInvoiceBilling, ClinicBillingRemote } from '../../backend/di
 import { topology, declareTopology } from '@nipopeto/messaging';
 import amqp from 'amqplib';
 import {drainHandles} from './drain-handles.mjs';
+import {blobTestEnv} from './blob-test.mjs';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test');
 assertTestProject();
@@ -82,7 +83,7 @@ async function child(file,extra,ready){
 }
 const readTokenSecret=q4E2e?'q4-e2e-'+randomUUID():undefined;
 const activityEnv=name=>activityE2e&&name==='clinic'?{CLINIC_ACTIVITY_MODE:'control',CLINIC_ACTIVITY_SUMMARY_EVIDENCE:'1',BROKER_URL:'amqp://p2_test:p2_broker_fixture_only@127.0.0.1:5679',BROKER_PREFIX:'p5.e2e.'+run}:{};
-const apiEnv=name=>({...activityEnv(name),CLINIC_READ_MODE:q4E2e&&name==='clinic'?'projection':'authoritative',CLINIC_READ_PROJECTION:isolated&&name==='clinic'?'on':'off',CLINIC_READ_TOKEN_SECRET:name==='clinic'?readTokenSecret:'',DATABASE_URL:urls[name],PORT:String(ports[name]),CORE_SERVICE_URL:origins.core,CLINIC_SERVICE_URL:origins.clinic,NOTIFICATION_SERVICE_URL:origins.notification,...(name==='core'?{}:name==='clinic'?{JWT_PRIVATE_KEY:'',CORE_NOTIFICATION_SEND_TOKEN:''}:{JWT_PRIVATE_KEY:'',CORE_DIRECTORY_TOKEN:'',CORE_BILLING_EVIDENCE_TOKEN:'',CLINIC_BILLING_TOKEN:'',CLINIC_BOOTSTRAP_TOKEN:''}),CORS_ORIGIN:'http://127.0.0.1:5189',PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',VNPAY_TMN_CODE:'',VNPAY_HASH_SECRET:'',BANK_TRANSFER_ENABLED:'false'});
+const apiEnv=name=>({...activityEnv(name),CLINIC_READ_MODE:q4E2e&&name==='clinic'?'projection':'authoritative',CLINIC_READ_PROJECTION:isolated&&name==='clinic'?'on':'off',...(name==='clinic'?blobTestEnv:{}),CLINIC_READ_TOKEN_SECRET:name==='clinic'?readTokenSecret:'',DATABASE_URL:urls[name],PORT:String(ports[name]),CORE_SERVICE_URL:origins.core,CLINIC_SERVICE_URL:origins.clinic,NOTIFICATION_SERVICE_URL:origins.notification,...(name==='core'?{}:name==='clinic'?{JWT_PRIVATE_KEY:'',CORE_NOTIFICATION_SEND_TOKEN:''}:{JWT_PRIVATE_KEY:'',CORE_DIRECTORY_TOKEN:'',CORE_BILLING_EVIDENCE_TOKEN:'',CLINIC_BILLING_TOKEN:'',CLINIC_BOOTSTRAP_TOKEN:''}),CORS_ORIGIN:'http://127.0.0.1:5189',PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',VNPAY_TMN_CODE:'',VNPAY_HASH_SECRET:'',BANK_TRANSFER_ENABLED:'false'});
 const startApi=name=>child(name==='core'?'backend/dist/src/index.js':`services/${name}/dist/index.js`,apiEnv(name),async()=>{try{return(await fetch(origins[name]+'/health/ready')).status===200;}catch{return false;}});
 let coreApi=await startApi('core'),clinicApi=await startApi('clinic'),notificationApi=await startApi('notification');
 process.stdout.write('P6 E2E strict APIs ready\n');

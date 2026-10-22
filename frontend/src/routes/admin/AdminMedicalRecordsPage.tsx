@@ -1,4 +1,5 @@
 import type { MedicalImage } from "../../types/medicalImage";
+import { MedicalImageView } from "../../components/MedicalImageView";
 import { usePagedList } from "../../services/usePagedList";
 import { Pagination } from "../../components/ui/Pagination";
 import { PetLookup, PagedSelect } from "../../components/ui/PagedSelect";
@@ -361,7 +362,7 @@ export function AdminMedicalRecordsPage() {
                 <Pagination {...imagePage} />
                 {imageList.map((image) => (
                   <div key={image.id} className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-                    <img src={image.imageUrl} alt={image.title} className="h-24 w-full object-cover" />
+                    <MedicalImageView image={image} onExpired={imagePage.reload} className="h-24 w-full object-cover" />
                     <p className="truncate px-2 py-1.5 text-xs font-semibold text-slate-700">{image.title}</p>
                     <button type="button" onClick={() => deleteMedicalImage(image.id)} className="absolute right-1.5 top-1.5 rounded-md bg-white/95 p-1.5 text-rose-600 shadow-sm hover:bg-rose-50" aria-label={`Delete ${image.title}`}><Trash size={14} /></button>
                   </div>

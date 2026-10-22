@@ -36,6 +36,20 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+  # AQ-09 medical image bucket: S3-compatible, fixture credentials only.
+  blob:
+    image: chrislusf/seaweedfs:3.97
+    command: ["server", "-dir=/data", "-s3", "-s3.config=/etc/seaweedfs/s3.json", "-master.volumeSizeLimitMB=64", "-volume.max=8"]
+    ports: ["127.0.0.1:55333:8333"]
+    volumes:
+      - p2_blob_test:/data
+      - ./blob-test-s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8333"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
 volumes:
   p2_pg_test:
   p2_rabbit_test:
+  p2_blob_test:
