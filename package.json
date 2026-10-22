@@ -47,6 +47,7 @@
     "phase2:test:notification-ui": "playwright test --config tools/phase2/playwright.config.ts",
     "phase2:test:clinic": "node tools/phase2/run-proof.mjs --clinic",
     "phase2:test:clinic-relay": "node tools/phase2/run-proof.mjs --clinic-relay",
+    "phase2:test:core-relay": "node tools/phase2/run-proof.mjs --core-relay",
     "phase2:test:billing": "node tools/phase2/run-proof.mjs --billing",
     "phase2:test:e2e": "node --import tsx tools/phase2/run-e2e.mjs",
     "phase2:test:resilience": "node tools/phase2/run-proof.mjs --resilience",
