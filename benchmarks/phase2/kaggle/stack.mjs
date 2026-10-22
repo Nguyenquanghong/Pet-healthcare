@@ -107,7 +107,7 @@ try{
   }
   if(cqrs?.projectorEnabled)await child('clinic-read-worker','services/clinic/dist/readWorker.js',{
     JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:'',JWT_KEY_ID:'',JWT_ISSUER:'',JWT_AUDIENCE:'',REDIS_URL:'',RATE_LIMIT_KEY_SECRET:'',OBSERVABILITY_TOKEN:'',
-    DATABASE_URL:context.urls.clinic,CLINIC_READ_PROJECTOR_POOL_LIMIT:'1'});
+    DATABASE_URL:context.urls.clinic,CLINIC_READ_PROJECTOR_POOL_LIMIT:'1',CLINIC_READ_PROJECTION:'on'});
   await child('core','backend/dist/src/index.js',{...credentials,JWT_PRIVATE_KEY:privateKey,DATABASE_URL:context.urls.core,PORT:String(ports.core),SERVICE_INSTANCE_ID:'p8-core'},ports.core);
   for(let i=0;i<clinicPorts.length;i++)await child('clinic-'+i,'services/clinic/dist/index.js',{...credentials,...cqrsEnv,CORE_NOTIFICATION_SEND_TOKEN:'',DATABASE_URL:context.urls.clinic,PORT:String(clinicPorts[i]),SERVICE_INSTANCE_ID:'p8-clinic-'+i},clinicPorts[i]);
   await child('notification','services/notification/dist/index.js',{CORE_NOTIFICATION_SEND_TOKEN:credentials.CORE_NOTIFICATION_SEND_TOKEN,DATABASE_URL:context.urls.notification,PORT:String(ports.notification)},ports.notification);

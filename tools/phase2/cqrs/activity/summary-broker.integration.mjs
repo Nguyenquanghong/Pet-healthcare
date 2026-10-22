@@ -14,6 +14,7 @@ import {PrismaClient} from '../../../../services/clinic/src/generated/client/ind
 import {recordAppointmentChange} from '../../../../services/clinic/dist/readRevision.js';
 import {AppointmentProjector} from '../../../../services/clinic/dist/appointmentProjector.js';
 import {topology,declareTopology,consumeEvents,publishConfirmed} from '../../../../packages/messaging/dist/index.js';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 
 assertTestProject();
 const contextPath=resolve(process.env.ACTIVITY_D2_CONTEXT??'');

@@ -15,6 +15,7 @@ import {BusinessError} from '../../../services/clinic/dist/domain/error.js';
 import {ReadDiagnostics} from '../../../services/clinic/dist/readDiagnostics.js';
 import {ServingAppointmentQueries} from '../../../services/clinic/dist/infrastructure/queries/servingAppointments.js';
 import {topology,declareTopology,consumeEvents,publishConfirmed} from '../../../packages/messaging/dist/index.js';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 const c=context(process.env.CQRS_Q4_CONTEXT),db=client(c,6),operator=client(c),engine=new AppointmentRebuild(operator),projector=new AppointmentProjector(db),routes=topology(c.prefix);
 const secret='q4-trial-'+randomUUID(),actors={owner:{sub:randomUUID(),role:'owner'},other:{sub:randomUUID(),role:'owner'},admin:{sub:randomUUID(),role:'admin'}};
 const pets=[{id:randomUUID(),ownerId:actors.owner.sub,name:'Q4 pet A',directoryVersion:1},{id:randomUUID(),ownerId:actors.other.sub,name:'Q4 pet B',directoryVersion:1}];

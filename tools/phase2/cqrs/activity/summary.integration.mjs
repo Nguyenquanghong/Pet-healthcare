@@ -11,6 +11,7 @@ import {recordAppointmentChange,initializeAppointmentProjection} from '../../../
 import {AppointmentProjector} from '../../../../services/clinic/dist/appointmentProjector.js';
 import {reconcileProjection} from '../../../../services/clinic/dist/projectionSnapshot.js';
 import {activitySafeCount} from '../../../../services/clinic/dist/application/queries/clinicActivity.js';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 
 assertTestProject();
 const contextPath=resolve(process.env.ACTIVITY_D2_CONTEXT??'');

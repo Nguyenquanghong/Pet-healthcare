@@ -18,6 +18,7 @@ import {initializeAppointmentProjection} from '../../services/clinic/dist/readRe
 import {AppointmentProjector} from '../../services/clinic/dist/appointmentProjector.js';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test');assertTestProject();
+process.env.CLINIC_READ_PROJECTION='on';// the P7 rehearsal covers the maintained projection (default is off)
 const invocation=randomUUID(),contextFile='test-results/phase2/p7-'+invocation+'-context.json',handles=[],tokens={},ports={},origins={};
 const broker='amqp://p2_test:p2_broker_fixture_only@127.0.0.1:5679',prefix='p7.migration.'+invocation,routes=topology(prefix);
 const keys=generateKeyPairSync('rsa',{modulusLength:2048}),secretNames=['CORE_DIRECTORY_TOKEN','CORE_BILLING_EVIDENCE_TOKEN','CLINIC_BILLING_TOKEN','CLINIC_BOOTSTRAP_TOKEN','CORE_NOTIFICATION_SEND_TOKEN'];

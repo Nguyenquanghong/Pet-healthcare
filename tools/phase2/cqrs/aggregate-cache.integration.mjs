@@ -16,6 +16,7 @@ import {BusinessError} from '../../../services/clinic/dist/domain/error.js';
 import {ReadTokens} from '../../../services/clinic/dist/readToken.js';
 import {once} from 'node:events';
 import {ReadDiagnostics} from '../../../services/clinic/dist/readDiagnostics.js';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 
 export async function verifyAggregateCache(db,url,context,output,privilegedSql,options={}){
  assert.ok(options.parallelWorkers===undefined||options.parallelWorkers===1);

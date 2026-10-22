@@ -49,10 +49,10 @@ test('list guard with per-aggregate lag stays usable under steady writes, still 
 });
 test('createApp composes list serving with the per-aggregate estimator by default',async()=>{
  const {createApp}=await import('../../../services/clinic/dist/app.js');
- const saved={mode:process.env.CLINIC_READ_MODE,secret:process.env.CLINIC_READ_TOKEN_SECRET};
- process.env.CLINIC_READ_MODE='projection';process.env.CLINIC_READ_TOKEN_SECRET='read-token-fixture-'.repeat(3);
+ const saved={mode:process.env.CLINIC_READ_MODE,secret:process.env.CLINIC_READ_TOKEN_SECRET,projection:process.env.CLINIC_READ_PROJECTION};
+ process.env.CLINIC_READ_MODE='projection';process.env.CLINIC_READ_PROJECTION='on';process.env.CLINIC_READ_TOKEN_SECRET='read-token-fixture-'.repeat(3);
  try{const app=createApp({});assert.equal(app.locals.appointmentServing.freshness.options.perAggregateLag,true);}
- finally{for(const [k,v] of [['CLINIC_READ_MODE',saved.mode],['CLINIC_READ_TOKEN_SECRET',saved.secret]])v===undefined?delete process.env[k]:process.env[k]=v;}
+ finally{for(const [k,v] of [['CLINIC_READ_MODE',saved.mode],['CLINIC_READ_TOKEN_SECRET',saved.secret],['CLINIC_READ_PROJECTION',saved.projection]])v===undefined?delete process.env[k]:process.env[k]=v;}
 });
 test('service bootstrap passes the per-aggregate estimator to list serving (index.ts composition)',async()=>{
  const {readFileSync}=await import('node:fs');

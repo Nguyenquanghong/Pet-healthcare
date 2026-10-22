@@ -18,6 +18,7 @@ import {summaryDrift} from '../../../../services/clinic/dist/clinicActivitySumma
 import {ReadFreshness,probeReadQueue} from '../../../../services/clinic/dist/readFreshness.js';
 import {ActivitySummaryEvidence,AuditLane} from '../../../../services/clinic/dist/activitySummaryEvidence.js';
 import {topology,declareTopology,consumeEvents} from '../../../../packages/messaging/dist/index.js';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 
 assertTestProject();
 const contextPath=resolve(process.env.ACTIVITY_D2_CONTEXT??'');

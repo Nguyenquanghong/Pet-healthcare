@@ -10,7 +10,7 @@ export function configuration(mode){
 export function apiEnvironment(mode,secret){
   const config=configuration(mode);
   if(mode!=='O')assert.ok(typeof secret==='string'&&secret.length>=32,'Q6_TOKEN_SECRET');
-  return {CLINIC_READ_MODE:config.readMode,CLINIC_READ_TOKEN_SECRET:mode==='O'?'':secret,CLINIC_SHADOW_EVERY:'0'};
+  return {CLINIC_READ_MODE:config.readMode,CLINIC_READ_TOKEN_SECRET:mode==='O'?'':secret,CLINIC_SHADOW_EVERY:'0',CLINIC_READ_PROJECTION:mode==='O'?'off':'on'};
 }
 export function validateTarget(url,context){
   assert.match(context.run,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,'Q6_RUN');

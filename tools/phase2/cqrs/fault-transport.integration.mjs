@@ -12,6 +12,7 @@ import {createApp} from '../../../services/clinic/dist/app.js';
 import {ReadTokens} from '../../../services/clinic/dist/readToken.js';
 import {topology,declareTopology,consumeEvents,publishConfirmed,replayEvent} from '../../../packages/messaging/dist/index.js';
 import {waitForQueueIdle} from '../test-project.mjs';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 const c=context(process.env.CQRS_Q5_CONTEXT),db=client(c,3),routes=topology(c.prefix+'.transport'),projector=new AppointmentProjector(db),results=[];
 let conn,ch,base,generation;const owned=[];
 async function until(check){const end=Date.now()+15000;while(Date.now()<end){if(await check())return;await new Promise(r=>setTimeout(r,10));}throw new Error('Q5_TRANSPORT_TIMEOUT');}

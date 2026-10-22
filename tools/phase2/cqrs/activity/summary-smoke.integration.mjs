@@ -23,6 +23,7 @@ import {topology,declareTopology} from '../../../../packages/messaging/dist/inde
 import {buildActivityFixture} from './fixture.mjs';
 import {productPlan,runPlan,generatorValidity} from './bench/generator.mjs';
 import {classify} from './bench/evaluator.mjs';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 
 assertTestProject();
 const contextPath=resolve(process.env.ACTIVITY_D2_CONTEXT??'');
