@@ -24,7 +24,7 @@ import {parseActivityFilter} from './application/queries/clinicActivity.js';
 import {ClinicActivityQueries,type SummaryEligibility} from './infrastructure/queries/clinicActivity.js';
 import {mountBilling} from './billingApi.js';
 import {assertReadProjectionConfig} from './readProjection.js';
-import {S3BlobStore,blobStoreFromEnv,type BlobStore} from './blobStore.js';
+import {blobStoreFromEnv,type BlobStore} from './blobStore.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
 import { requestActor } from '@nipopeto/runtime';
 
@@ -50,7 +50,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   runtime?.install(app);
   mountBilling(app,db,verify,source);
   app.get('/health/live',(_req,res)=>res.json({service:'clinic',status:'alive'}));
-  app.get('/health/ready',async(_req,res)=>{try{await db.appointment.count();await db.medicalRecord.count();await db.medicalImage.count();await db.requestDedup.count();if(blobs instanceof S3BlobStore)await blobs.check();res.json({service:'clinic',status:'ready'});}catch{res.status(503).json({service:'clinic',status:'unavailable'});}});
+  app.get('/health/ready',async(_req,res)=>{try{await db.appointment.count();await db.medicalRecord.count();await db.medicalImage.count();await db.requestDedup.count();res.json({service:'clinic',status:'ready'});}catch{res.status(503).json({service:'clinic',status:'unavailable'});}});
   const router=express.Router();
   router.use('/dashboard/clinic/activity',(_req,res,next)=>{res.setHeader('Cache-Control','no-store');next();});
   app.use('/internal/clinic', (req,res,next)=>{if(req.path!=='/bootstrap'||req.method!=='GET'){res.status(404).json({error:'Clinic route not found.'});return;}if(!source||!source.acceptsService(req.headers['x-service-token'],'bootstrap')){res.status(401).json({error:'Service authentication required.'});return;}next();});
@@ -68,7 +68,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
     const match=req.path.match(/^\/(appointments|medical-records)\/(?:images\/)?([^/]+)(?:\/|$)/);
     if(match&&!['calendar','images'].includes(match[2]!)){
       const id=decodeURIComponent(match[2]!);
-      let row:{petId:string}|null=match[1]==='appointments'?await db.appointment.findUnique({where:{id}}):req.path.startsWith('/medical-records/images/')?await db.medicalImage.findUnique({where:{id}}):await db.medicalRecord.findUnique({where:{id}});
+      let row:{petId:string}|null=match[1]==='appointments'?await db.appointment.findUnique({where:{id}}):req.path.startsWith('/medical-records/images/')?await db.medicalImage.findUnique({where:{id},select:{petId:true}}):await db.medicalRecord.findUnique({where:{id}});
       // AQ-15: history outlives a deleted record; scope it by the pet in its last snapshot.
       if(!row&&req.method==='GET'&&req.path===`/medical-records/${match[2]}/history`){
         const last=await db.medicalRecordRevision.findFirst({where:{recordId:id},orderBy:[{changedAt:'desc'},{id:'desc'}]});

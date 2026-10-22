@@ -14,7 +14,8 @@ export async function drainBlobCleanup(db:PrismaClient,blobs:BlobStore,{limit=50
     }catch{
       // Exponential backoff, at most one hour.
       const seconds=Math.min(30*2**Math.min(row.attempts,7),3600);
-      await db.blobCleanup.update({where:{storageKey:row.storageKey},data:{attempts:{increment:1},nextAttemptAt:new Date(now.getTime()+seconds*1000)}});
+      // updateMany: another worker may have removed the row meanwhile.
+      await db.blobCleanup.updateMany({where:{storageKey:row.storageKey},data:{attempts:{increment:1},nextAttemptAt:new Date(now.getTime()+seconds*1000)}});
     }
   }
   return{due:due.length,removed};

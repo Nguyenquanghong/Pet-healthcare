@@ -8,5 +8,7 @@ export type MedicalImage = {
   // null for a legacy image that has not been moved to the bucket yet.
   url: string | null;
   urlExpiresAt: string | null;
+  // Inline data URL returned only by the single-backend (Phase 1) API.
+  imageUrl?: string;
   createdAt: string;
 };

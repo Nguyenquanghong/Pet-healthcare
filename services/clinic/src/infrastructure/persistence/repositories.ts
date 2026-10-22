@@ -60,7 +60,7 @@ class Records implements MedicalRecordRepository {
   // Row delete and cleanup claim commit together, so an object is never leaked by a crash after the delete.
   async deleteImage(id:string){
     const run=async(tx:Client)=>{
-      const row=await tx.medicalImage.delete({where:{id}});
+      const row=await tx.medicalImage.delete({where:{id},select:{storageKey:true}});
       if(row.storageKey)await tx.blobCleanup.create({data:{storageKey:row.storageKey}});
       return{storageKey:row.storageKey};
     };

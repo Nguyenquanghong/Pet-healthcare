@@ -7,7 +7,7 @@ function fakeDb(rows){
   return {rows,blobCleanup:{
     findMany:async({where,take})=>rows.filter(r=>r.nextAttemptAt<=where.nextAttemptAt.lte).slice(0,take),
     deleteMany:async({where})=>{const i=rows.findIndex(r=>r.storageKey===where.storageKey);if(i>=0)rows.splice(i,1);},
-    update:async({where,data})=>{const r=rows.find(x=>x.storageKey===where.storageKey);r.attempts+=data.attempts.increment;r.nextAttemptAt=data.nextAttemptAt;}}};
+    updateMany:async({where,data})=>{const r=rows.find(x=>x.storageKey===where.storageKey);if(r){r.attempts+=data.attempts.increment;r.nextAttemptAt=data.nextAttemptAt;}}}};
 }
 const now=new Date('2030-01-01T00:00:00Z');
 test('drain removes due objects and keeps failed ones with exponential backoff capped at one hour',async()=>{

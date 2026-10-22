@@ -53,4 +53,5 @@ try{
     server.requestTimeout=15000;server.headersTimeout=10000;server.keepAliveTimeout=5000;
     const disconnect=async()=>{await app.locals.appointmentShadow?.drain();await app.locals.activity.close();await summaryEvidence?.close();await activityRows?.close();await freshness?.close();await freshnessDb?.$disconnect();await db.$disconnect();};
     installShutdown('clinic',async()=>{if(runtime)await runtime.drain(server,disconnect);else{await new Promise<void>(resolve=>server.close(()=>resolve()));await disconnect();}});
-}catch{process.stderr.write(JSON.stringify({service:'clinic',code:'STARTUP_FAILED'})+'\n');await summaryEvidence?.close();await activityRows?.close();await freshness?.close();await freshnessDb?.$disconnect();await db.$disconnect();process.exitCode=1;}
+    // A failed startup echoes only constant error codes, never messages that may carry URLs or secrets.
+}catch(error){const reason=error instanceof Error&&/^[A-Z][A-Z0-9_]{2,80}$/.test(error.message)?error.message:undefined;process.stderr.write(JSON.stringify({service:'clinic',code:'STARTUP_FAILED',...(reason?{reason}:{})})+'\n');await summaryEvidence?.close();await activityRows?.close();await freshness?.close();await freshnessDb?.$disconnect();await db.$disconnect();process.exitCode=1;}
