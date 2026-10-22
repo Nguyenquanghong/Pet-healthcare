@@ -1,5 +1,6 @@
 // AQ-09 guarded operator tool: move legacy base64 medical images into the bucket (Claim Check).
-// Usage: node tools/phase2/migrate-medical-images.mjs --dry-run|--run|--orphans [--delete-orphans] [--min-age-seconds N]
+// Usage: node tools/phase2/migrate-medical-images.mjs --dry-run|--run|--orphans [--delete-orphans] [--min-age-seconds N]|--check-contract
+// --check-contract exits 3 while any row still holds inline base64 (deploy/phase2/medical-images-contract.sql would refuse).
 // DATABASE_URL and BLOB_* come from the environment. Refuses any database except the
 // marked pet-phase2-p1-test Clinic database. Idempotent: rows are updated with a compare-and-set.
 import assert from 'node:assert/strict';
@@ -10,7 +11,7 @@ import {imageContent} from '../../services/clinic/dist/domain/validation.js';
 
 const args=process.argv.slice(2),mode=args[0],deleteOrphans=args.includes('--delete-orphans');
 const ageAt=args.indexOf('--min-age-seconds'),minAge=ageAt>0?Number(args[ageAt+1]):3600;
-assert.ok(['--dry-run','--run','--orphans'].includes(mode)&&Number.isInteger(minAge)&&minAge>=0,'Use --dry-run, --run or --orphans');
+assert.ok(['--dry-run','--run','--orphans','--check-contract'].includes(mode)&&Number.isInteger(minAge)&&minAge>=0,'Use --dry-run, --run or --orphans');
 const db=new PrismaClient({datasourceUrl:process.env.DATABASE_URL});
 try{
   const [identity]=await db.$queryRaw`SELECT current_database() AS db,current_user AS role`;
@@ -49,6 +50,7 @@ try{
   }
   const [after]=await db.$queryRaw`SELECT count(*)::int AS legacy,pg_total_relation_size('medical_images')::bigint AS "tableBytes" FROM medical_images WHERE image_url IS NOT NULL`;
   Object.assign(report,{legacyRowsAfter:after.legacy,tableBytes:Number(after.tableBytes)});
+  if(mode==='--check-contract'){report.contractReady=after.legacy===0;if(!report.contractReady)process.exitCode=3;}
   console.log(JSON.stringify(report));
   if(report.failed.length)process.exitCode=2;
 }finally{await db.$disconnect();}
