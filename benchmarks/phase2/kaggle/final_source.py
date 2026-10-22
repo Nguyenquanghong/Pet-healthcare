@@ -1,4 +1,8 @@
-"""Pack the O/AB/harness source bundle v12 for cqrs-final-matched-kaggle-v1.
+"""Pack the O/AB/harness source bundle v13 for cqrs-final-matched-kaggle-v1.
+
+v13 replaces v12 before any measurement: v12 was packed before the Clinic->Core
+Circuit Breaker and the Notification session-revocation check (AQ-05), both on
+measured request paths, so it was not the final product.
 
 Same format, reader, E-b exclusion (list_source_v2) and shared measurement patch
 (list_source_v3: per-IP read limit 3000 -> 6000/min for O and AB alike) as v11.
@@ -23,7 +27,7 @@ import list_source_v3 as v3  # noqa: E402
 
 REPO = q6.REPO
 STUDY = 'cqrs-final-matched-kaggle-v1'
-OUTPUT = REPO / 'test-results/phase2/cqrs/final-v1/cqrs-final-source-v12.zip'
+OUTPUT = REPO / 'test-results/phase2/cqrs/final-v1/cqrs-final-source-v13.zip'
 
 
 def make_bundle(root=REPO, output=OUTPUT):
