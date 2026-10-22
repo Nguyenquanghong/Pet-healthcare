@@ -94,10 +94,10 @@ try{
       if(readyPort){try{return(await fetch('http://127.0.0.1:'+readyPort+'/health/ready')).status===200;}catch{return false;}}
       return readFileSync(resolve(dir,name+'.log'),'utf8').includes('worker-ready');},name,120000);return h;}
   const workerBase={JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:'',JWT_KEY_ID:'',JWT_ISSUER:'',JWT_AUDIENCE:'',REDIS_URL:'',RATE_LIMIT_KEY_SECRET:'',OBSERVABILITY_TOKEN:''};
-  const readWorker=await child('clinic-read-worker','services/clinic/dist/readWorker.js',{...workerBase,DATABASE_URL:c.urls.clinic.projector,CLINIC_READ_PROJECTOR_POOL_LIMIT:'1'});
+  const readWorker=await child('clinic-read-worker','services/clinic/dist/readWorker.js',{...workerBase,DATABASE_URL:c.urls.clinic.projector,CLINIC_READ_PROJECTOR_POOL_LIMIT:'1',CLINIC_READ_PROJECTION:'on'});
   const coreApi=await child('core','backend/dist/src/index.js',{...credentials,JWT_PRIVATE_KEY:privateKey,DATABASE_URL:c.urls.core.api,PORT:String(ports.core),SERVICE_INSTANCE_ID:'d5-core'},ports.core);
   const clinicApi=await child('clinic-0','services/clinic/dist/index.js',{...credentials,CORE_NOTIFICATION_SEND_TOKEN:'',DATABASE_URL:c.urls.clinic.api,PORT:String(ports.clinicApp),SERVICE_INSTANCE_ID:'d5-clinic-0',
-    CLINIC_READ_MODE:'authoritative',CLINIC_ACTIVITY_MODE:'control',CLINIC_ACTIVITY_SUMMARY_EVIDENCE:'1',CLINIC_READ_DIAGNOSTICS:'0'},ports.clinicApp);
+    CLINIC_READ_MODE:'authoritative',CLINIC_READ_PROJECTION:'on',CLINIC_ACTIVITY_MODE:'control',CLINIC_ACTIVITY_SUMMARY_EVIDENCE:'1',CLINIC_READ_DIAGNOSTICS:'0'},ports.clinicApp);
   const notificationApi=await child('notification','services/notification/dist/index.js',{CORE_NOTIFICATION_SEND_TOKEN:credentials.CORE_NOTIFICATION_SEND_TOKEN,DATABASE_URL:c.urls.notification.api,PORT:String(ports.notification)},ports.notification);
   mkdirSync(resolve(dir,'nginx-temp'));
   const hdr='proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Request-ID $request_id; proxy_connect_timeout 1s; proxy_read_timeout 15s; proxy_next_upstream error timeout http_502 http_503 http_504;';

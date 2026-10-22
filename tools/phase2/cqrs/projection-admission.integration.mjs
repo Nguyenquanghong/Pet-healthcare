@@ -7,6 +7,7 @@ import {ServingAppointmentQueries} from '../../../services/clinic/dist/infrastru
 import {ReadDiagnostics} from '../../../services/clinic/dist/readDiagnostics.js';
 import {ReadFreshness} from '../../../services/clinic/dist/readFreshness.js';
 import {reconcileProjection} from '../../../services/clinic/dist/projectionSnapshot.js';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 

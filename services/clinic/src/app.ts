@@ -23,10 +23,12 @@ import {bootstrap} from './bootstrap.js';
 import {parseActivityFilter} from './application/queries/clinicActivity.js';
 import {ClinicActivityQueries,type SummaryEligibility} from './infrastructure/queries/clinicActivity.js';
 import {mountBilling} from './billingApi.js';
+import {assertReadProjectionConfig} from './readProjection.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
 import { requestActor } from '@nipopeto/runtime';
 
 export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?:CoreDirectory,runtime?:ServiceRuntime,readFreshness?:ReadFreshness,activityEvidence?:SummaryEligibility){
+  assertReadProjectionConfig();
   const app=express();app.disable('x-powered-by');
   const authoritative=new AuthoritativeAppointmentQueries(db);
   // Activity mode is server configuration (fixed or operator control), never a

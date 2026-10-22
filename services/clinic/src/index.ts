@@ -8,9 +8,11 @@ import { CoreDirectory } from './directory.js';
 import { clinicRuntime } from './runtime.js';
 import {ActivitySummaryEvidence,AuditLane} from './activitySummaryEvidence.js';
 import {projectionCapability,capabilityReport} from './projectionVersions.js';
+import {assertReadProjectionConfig} from './readProjection.js';
 const {db}=createDependencies();
 let freshnessDb:PrismaClient|undefined,freshness:ReadFreshness|undefined,activityRows:ReadFreshness|undefined,summaryEvidence:ActivitySummaryEvidence|undefined;
 try{
+    assertReadProjectionConfig();
     await db.$connect();
     const verify=process.env.JWT_PUBLIC_KEY?actorVerifier({publicKey:process.env.JWT_PUBLIC_KEY,issuer:process.env.JWT_ISSUER??'',audience:process.env.JWT_AUDIENCE??''}):undefined;
     const strict=process.env.PHASE2_RUNTIME_REQUIRED==='1';

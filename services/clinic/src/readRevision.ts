@@ -3,6 +3,7 @@ import type {Prisma,PrismaClient} from './generated/client/index.js';
 import {parseEnvelope,type Envelope} from '@nipopeto/contracts';
 import {currentRequestId} from '@nipopeto/runtime';
 import {BusinessError} from './domain/error.js';
+import {readProjectionEnabled} from './readProjection.js';
 
 export const appointmentReadEvent='clinic.appointment-read-changed.v1' as const;
 type Client=Prisma.TransactionClient;
@@ -32,6 +33,12 @@ export async function recordAppointmentChange(tx:Client,id:string,options:Revisi
   await tx.outboxEvent.create({data:{id:eventId,envelope:event as unknown as Prisma.InputJsonValue}});
   await options.onStage?.('after-outbox');
   return {version,eventId};
+}
+
+// Write-path entry point: a no-op while CLINIC_READ_PROJECTION is off.
+export async function trackAppointmentChange(tx:Client,id:string,options:RevisionOptions={}){
+  if(!readProjectionEnabled())return undefined;
+  return recordAppointmentChange(tx,id,options);
 }
 
 // Initial adoption only, not a rebuild/cutover. Call from an environment-guarded

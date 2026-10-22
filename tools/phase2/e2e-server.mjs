@@ -82,7 +82,7 @@ async function child(file,extra,ready){
 }
 const readTokenSecret=q4E2e?'q4-e2e-'+randomUUID():undefined;
 const activityEnv=name=>activityE2e&&name==='clinic'?{CLINIC_ACTIVITY_MODE:'control',CLINIC_ACTIVITY_SUMMARY_EVIDENCE:'1',BROKER_URL:'amqp://p2_test:p2_broker_fixture_only@127.0.0.1:5679',BROKER_PREFIX:'p5.e2e.'+run}:{};
-const apiEnv=name=>({...activityEnv(name),CLINIC_READ_MODE:q4E2e&&name==='clinic'?'projection':'authoritative',CLINIC_READ_TOKEN_SECRET:name==='clinic'?readTokenSecret:'',DATABASE_URL:urls[name],PORT:String(ports[name]),CORE_SERVICE_URL:origins.core,CLINIC_SERVICE_URL:origins.clinic,NOTIFICATION_SERVICE_URL:origins.notification,...(name==='core'?{}:name==='clinic'?{JWT_PRIVATE_KEY:'',CORE_NOTIFICATION_SEND_TOKEN:''}:{JWT_PRIVATE_KEY:'',CORE_DIRECTORY_TOKEN:'',CORE_BILLING_EVIDENCE_TOKEN:'',CLINIC_BILLING_TOKEN:'',CLINIC_BOOTSTRAP_TOKEN:''}),CORS_ORIGIN:'http://127.0.0.1:5189',PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',VNPAY_TMN_CODE:'',VNPAY_HASH_SECRET:'',BANK_TRANSFER_ENABLED:'false'});
+const apiEnv=name=>({...activityEnv(name),CLINIC_READ_MODE:q4E2e&&name==='clinic'?'projection':'authoritative',CLINIC_READ_PROJECTION:isolated&&name==='clinic'?'on':'off',CLINIC_READ_TOKEN_SECRET:name==='clinic'?readTokenSecret:'',DATABASE_URL:urls[name],PORT:String(ports[name]),CORE_SERVICE_URL:origins.core,CLINIC_SERVICE_URL:origins.clinic,NOTIFICATION_SERVICE_URL:origins.notification,...(name==='core'?{}:name==='clinic'?{JWT_PRIVATE_KEY:'',CORE_NOTIFICATION_SEND_TOKEN:''}:{JWT_PRIVATE_KEY:'',CORE_DIRECTORY_TOKEN:'',CORE_BILLING_EVIDENCE_TOKEN:'',CLINIC_BILLING_TOKEN:'',CLINIC_BOOTSTRAP_TOKEN:''}),CORS_ORIGIN:'http://127.0.0.1:5189',PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',VNPAY_TMN_CODE:'',VNPAY_HASH_SECRET:'',BANK_TRANSFER_ENABLED:'false'});
 const startApi=name=>child(name==='core'?'backend/dist/src/index.js':`services/${name}/dist/index.js`,apiEnv(name),async()=>{try{return(await fetch(origins[name]+'/health/ready')).status===200;}catch{return false;}});
 let coreApi=await startApi('core'),clinicApi=await startApi('clinic'),notificationApi=await startApi('notification');
 process.stdout.write('P6 E2E strict APIs ready\n');
@@ -92,7 +92,7 @@ await declareTopology(broker,routes);
 const workerEnv={JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:'',JWT_ISSUER:'',JWT_AUDIENCE:'',JWT_KEY_ID:'',JWT_SECRET:'',CORE_DIRECTORY_TOKEN:'',CORE_BILLING_EVIDENCE_TOKEN:'',CLINIC_BILLING_TOKEN:'',CLINIC_BOOTSTRAP_TOKEN:'',CORE_NOTIFICATION_SEND_TOKEN:'',REDIS_URL:'',RATE_LIMIT_KEY_SECRET:'',OBSERVABILITY_TOKEN:''};
 await child('services/clinic/dist/worker.js',{...workerEnv,DATABASE_URL:urls.clinic,CORE_DIRECTORY_TOKEN:env.CORE_DIRECTORY_TOKEN,CORE_SERVICE_URL:origins.core,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run,OUTBOX_AGGREGATE_ID:run});
 await child('services/notification/dist/worker.js',{...workerEnv,DATABASE_URL:urls.notification,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run});
-let readWorker=isolated?await child('services/clinic/dist/readWorker.js',{...workerEnv,DATABASE_URL:urls.clinic,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run}):undefined;
+let readWorker=isolated?await child('services/clinic/dist/readWorker.js',{...workerEnv,CLINIC_READ_PROJECTION:'on',DATABASE_URL:urls.clinic,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run}):undefined;
 const fixture={run,q4E2e,activityE2e,q4Schema:isolated?q4Schema:undefined,password,admin:{id:users.admin.id,username:users.admin.username,fullName:users.admin.fullName},owner:{id:users.owner.id,email:users.owner.email,fullName:users.owner.fullName},other:{id:users.other.id,email:users.other.email,fullName:users.other.fullName},counter:{id:users.counter.id,fullName:users.counter.fullName},pets:pets.map(p=>({id:p.id,name:p.name,qrToken:p.qrToken})),counterPetId:counterPet.id,otherPetId:otherPet.id,origins};
 if(loadDataset)Object.assign(fixture,{loadAccounts:loadDataset.accounts,dataset:loadDataset.description});
 writeFileSync(resolve(fixtureDir,'p5-e2e-fixture.json'),JSON.stringify(fixture,null,2));
@@ -113,7 +113,7 @@ async function pump(){
     if(isolated&&controls.pauseRead&&readWorker){await readWorker.stop();readWorker=undefined;}
     // Operator action on the isolated schema's activity control (never a client header).
     if(activityE2e&&['source','cached','summary'].includes(controls.activityMode)&&controls.activityMode!==activityMode){await db.clinic.clinicActivityControl.update({where:{id:1},data:{servingMode:controls.activityMode}});activityMode=controls.activityMode;}
-    if(isolated&&!controls.pauseRead&&!readWorker)readWorker=await child('services/clinic/dist/readWorker.js',{...workerEnv,DATABASE_URL:urls.clinic,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run});
+    if(isolated&&!controls.pauseRead&&!readWorker)readWorker=await child('services/clinic/dist/readWorker.js',{...workerEnv,CLINIC_READ_PROJECTION:'on',DATABASE_URL:urls.clinic,BROKER_URL:broker,BROKER_PREFIX:'p5.e2e.'+run});
     for(const [name,client]of [['core',db.core],['clinic',db.clinic]]){
       const rows=await client.outboxEvent.findMany({where:{publishedAt:null,createdAt:{gte:startedAt}},select:{envelope:true},take:100});
       for(const id of new Set(rows.map(r=>r.envelope.aggregateId))){

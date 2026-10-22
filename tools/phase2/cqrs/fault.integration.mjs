@@ -13,6 +13,7 @@ import {OutboxRelay} from '../../../services/clinic/dist/relay.js';
 import {createApp} from '../../../services/clinic/dist/app.js';
 import {topology,declareTopology,consumeEvents,publishConfirmed} from '../../../packages/messaging/dist/index.js';
 import {waitForQueueIdle} from '../test-project.mjs';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 
 const policyBytes=readFileSync('phase2-plan/cqrs/acceptance.json'),policy=JSON.parse(policyBytes);
 const c=context(process.env.CQRS_Q5_CONTEXT),db=client(c,6),operator=client(c),workerDbs=[client(c,2),client(c,2)],probeDb=client(c);

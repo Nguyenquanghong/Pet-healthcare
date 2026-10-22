@@ -3,11 +3,12 @@ import type {Actor} from './domain/auth.js';
 import {roles} from './domain/auth.js';
 import {BusinessError} from './domain/error.js';
 import type {Prisma} from './generated/client/index.js';
+import {readProjectionEnabled} from './readProjection.js';
 export type ReadVersions=Record<string,number>;
 const invalid=()=>Object.assign(new BusinessError(422,'Invalid or expired Clinic read token.'),{code:'CLINIC_READ_TOKEN_INVALID'});
 function versions(value:unknown):value is ReadVersions{return !!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length<=16&&Object.entries(value).every(([id,v])=>id.length>0&&id.length<=200&&Number.isInteger(v)&&Number(v)>0&&Number(v)<=2147483647);}
 export async function committedVersions(tx:Prisma.TransactionClient,id?:string|null):Promise<ReadVersions>{
-  if(!id)return {};
+  if(!id||!readProjectionEnabled())return {};
   const r=await tx.clinicReadRevision.findUnique({where:{kind_aggregateId:{kind:'appointment',aggregateId:id}}});
   if(!r)throw new Error('READ_REVISION_MISSING');return {[id]:r.version};
 }

@@ -11,10 +11,10 @@ import {signToken,verifyToken} from '../../../../backend/dist/src/lib/token.js';
 
 test('summary metadata/headers survive Core proxy; ineligible falls back whole-response; auth/validation never fall back',{timeout:30000},async t=>{
   const keys=generateKeyPairSync('rsa',{modulusLength:2048});
-  const names=['JWT_PRIVATE_KEY','JWT_PUBLIC_KEY','JWT_ISSUER','JWT_AUDIENCE','JWT_KEY_ID','PHASE2_RUNTIME_REQUIRED','CLINIC_ACTIVITY_MODE','CLINIC_READ_MODE'];
+  const names=['JWT_PRIVATE_KEY','JWT_PUBLIC_KEY','JWT_ISSUER','JWT_AUDIENCE','JWT_KEY_ID','PHASE2_RUNTIME_REQUIRED','CLINIC_ACTIVITY_MODE','CLINIC_READ_MODE','CLINIC_READ_PROJECTION'];
   const previous=Object.fromEntries(names.map(k=>[k,process.env[k]])),servers=[];
   t.after(async()=>{for(const s of servers){s.closeAllConnections();if(s.listening)await new Promise(r=>s.close(r));}for(const k of names)if(previous[k]===undefined)delete process.env[k];else process.env[k]=previous[k];});
-  Object.assign(process.env,{JWT_PRIVATE_KEY:keys.privateKey.export({type:'pkcs8',format:'pem'}).toString(),JWT_PUBLIC_KEY:keys.publicKey.export({type:'spki',format:'pem'}).toString(),JWT_ISSUER:'activity-test',JWT_AUDIENCE:'activity-test',JWT_KEY_ID:'activity-test',CLINIC_ACTIVITY_MODE:'summary',CLINIC_READ_MODE:'authoritative'});delete process.env.PHASE2_RUNTIME_REQUIRED;
+  Object.assign(process.env,{JWT_PRIVATE_KEY:keys.privateKey.export({type:'pkcs8',format:'pem'}).toString(),JWT_PUBLIC_KEY:keys.publicKey.export({type:'spki',format:'pem'}).toString(),JWT_ISSUER:'activity-test',JWT_AUDIENCE:'activity-test',JWT_KEY_ID:'activity-test',CLINIC_ACTIVITY_MODE:'summary',CLINIC_READ_MODE:'authoritative',CLINIC_READ_PROJECTION:'on'});delete process.env.PHASE2_RUNTIME_REQUIRED;
   const accounts=new Map(['admin','owner','staff','doctor'].map(role=>[role,{id:role,role,fullName:'Fixture '+role}]));
   const g='9f1c2b5e-7a4d-4c1e-9b3f-2d6a8e0c4b71';let reason,summaryQueries=0,sourceQueries=0,hold;
   const coreDb={user:{findUnique:async({where})=>accounts.get(where.id)??null,findMany:async()=>[]},pet:{findMany:async()=>[]},$transaction:fn=>fn(coreDb)};

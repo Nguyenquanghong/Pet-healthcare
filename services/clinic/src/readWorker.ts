@@ -3,10 +3,14 @@ import {databaseUrl,integer} from '@nipopeto/runtime';
 import {declareTopology,consumeEvents,delay,reconnect,requireBrokerConfig,startWorker} from '@nipopeto/messaging';
 import {AppointmentProjector} from './appointmentProjector.js';
 import {projectionCapability,assertProjectionTargets,capabilityReport} from './projectionVersions.js';
+import {readProjectionEnabled} from './readProjection.js';
 
 // A Clinic-owned worker, not a fourth business service. Budget is explicit and
 // separate from the API. It hydrates only Clinic; no Core/JWT signing credentials.
 // Transport queue/consumer name stay clinic-read-v1: the event is unchanged.
+// Nothing writes read revisions or events while the switch is off, so a worker
+// would only idle against an unmaintained registry: refuse to start.
+if(!readProjectionEnabled()){process.stderr.write(JSON.stringify({service:'clinic-read-v1',code:'CLINIC_READ_PROJECTION_OFF'})+'\n');process.exit(1);}
 const url=new URL(databaseUrl());
 url.searchParams.set('connection_limit',String(integer('CLINIC_READ_PROJECTOR_POOL_LIMIT',1,1,2)));
 const db=new PrismaClient({datasourceUrl:url.href});

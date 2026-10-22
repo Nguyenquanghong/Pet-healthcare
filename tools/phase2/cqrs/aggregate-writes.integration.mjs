@@ -10,6 +10,7 @@ import {AppointmentAggregateCache} from '../../../services/clinic/dist/infrastru
 import {ProjectedAppointmentQueries} from '../../../services/clinic/dist/infrastructure/queries/projectedAppointments.js';
 import {snapshotDatabase} from '../../../services/clinic/dist/infrastructure/queries/shadowAppointments.js';
 import {reconcileProjection} from '../../../services/clinic/dist/projectionSnapshot.js';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 
 export async function verifyAggregateWrites(db,url,context,output){
  await guard(db,url,context);assert.equal(await db.appointment.count(),100000);

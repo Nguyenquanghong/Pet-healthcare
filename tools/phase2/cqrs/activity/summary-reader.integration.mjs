@@ -20,6 +20,7 @@ import {parseActivityFilter} from '../../../../services/clinic/dist/application/
 import {createApp} from '../../../../services/clinic/dist/app.js';
 import {topology,declareTopology,consumeEvents,publishConfirmed} from '../../../../packages/messaging/dist/index.js';
 import {buildActivityFixture} from './fixture.mjs';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 
 assertTestProject();
 const contextPath=resolve(process.env.ACTIVITY_D2_CONTEXT??'');

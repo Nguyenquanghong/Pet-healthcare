@@ -15,6 +15,7 @@ import {AppointmentProjector} from '../../../services/clinic/dist/appointmentPro
 import {OutboxRelay} from '../../../services/clinic/dist/relay.js';
 import {topology,declareTopology,consumeEvents,publishConfirmed,replayEvent} from '../../../packages/messaging/dist/index.js';
 import amqp from 'amqplib';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 
 assertTestProject();
 const contextPath=resolve(process.env.CQRS_Q2_CONTEXT??'');

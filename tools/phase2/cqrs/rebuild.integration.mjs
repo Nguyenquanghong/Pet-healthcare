@@ -15,6 +15,7 @@ import {ProjectedAppointmentQueries} from '../../../services/clinic/dist/infrast
 import {ShadowAppointmentQueries,snapshotDatabase} from '../../../services/clinic/dist/infrastructure/queries/shadowAppointments.js';
 import {createApp} from '../../../services/clinic/dist/app.js';
 import {topology,declareTopology,consumeEvents,publishConfirmed} from '../../../packages/messaging/dist/index.js';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 
 const c=context(process.env.CQRS_Q3_CONTEXT),db=client(c,6),op=client(c),engine=new AppointmentRebuild(op),routes=topology(c.prefix);
 const owners=[randomUUID(),randomUUID(),randomUUID()],actors=[{sub:owners[0],role:'owner'},{sub:owners[1],role:'owner'},{sub:randomUUID(),role:'admin'},{sub:randomUUID(),role:'doctor'}];

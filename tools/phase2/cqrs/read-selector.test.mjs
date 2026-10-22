@@ -13,12 +13,13 @@ test('selector defaults to the authoritative reader without running a query',()=
 test('shadow requires composition and projection remains unavailable',()=>{
   for(const mode of ['shadow','projection'])assert.throws(()=>selectAppointmentQueries({},mode),/CLINIC_READ_MODE_NOT_AVAILABLE/);
   for(const mode of ['',null,'Authoritative','authoritative ',{},['authoritative']])assert.throws(()=>selectAppointmentQueries({},mode),/INVALID_CLINIC_READ_MODE/);
-  const old=process.env.CLINIC_READ_MODE;
+  const old=process.env.CLINIC_READ_MODE,oldProjection=process.env.CLINIC_READ_PROJECTION;
   try{
+    process.env.CLINIC_READ_PROJECTION='on';
     process.env.CLINIC_READ_MODE='shadow';assert.ok(createApp({}).locals.appointmentShadow);
     process.env.CLINIC_READ_MODE='projection';assert.throws(()=>createApp({}),/CLINIC_READ_TOKEN_SECRET_REQUIRED/);
     process.env.CLINIC_READ_MODE='invalid';assert.throws(()=>createApp({}),/INVALID_CLINIC_READ_MODE/);
-  }finally{if(old===undefined)delete process.env.CLINIC_READ_MODE;else process.env.CLINIC_READ_MODE=old;}
+  }finally{if(old===undefined)delete process.env.CLINIC_READ_MODE;else process.env.CLINIC_READ_MODE=old;if(oldProjection===undefined)delete process.env.CLINIC_READ_PROJECTION;else process.env.CLINIC_READ_PROJECTION=oldProjection;}
 });
 
 test('selector permits composed shadow while authoritative remains the default',()=>{

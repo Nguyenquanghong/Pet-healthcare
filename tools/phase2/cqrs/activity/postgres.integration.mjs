@@ -6,6 +6,7 @@ import {PrismaClient} from '../../../../services/clinic/src/generated/client/ind
 import {parseActivityFilter,buildActivityBusiness} from '../../../../services/clinic/dist/application/queries/clinicActivity.js';
 import {activitySourceStatement} from '../../../../services/clinic/dist/infrastructure/queries/clinicActivity.js';
 import {buildActivityFixture} from './fixture.mjs';
+process.env.CLINIC_READ_PROJECTION='on';// these suites exercise the maintained projection (default is off)
 if(process.argv[2]==='--help'){
   console.log('node tools/phase2/cqrs/activity/postgres.integration.mjs --context <non-secret.json>\nRequires ACTIVITY_TRIAL_DATABASE_URL and an already seeded, UUID-marked, isolated activity schema. Context: run, database, role, schema=activity_<runhex>, marker=clinic-activity:<run>, fixtureRows=10000|100000, seed=20261020, businessDate=2030-10-20. Read-only parity/DATE timezone checks; no startup/migration/seed/reset or performance measurements.');process.exit(0);
 }
