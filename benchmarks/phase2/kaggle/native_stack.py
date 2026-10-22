@@ -44,9 +44,9 @@ class NativeStack:
             raise ValueError('deep accounts 2..40 / pcn or query-heavy accounts 2..100; Clinic replicas 1 or 2')
         if dataset_profile == 'query-heavy' and (accounts != 100 or replicas != 1):
             raise ValueError('query-heavy requires 100 accounts and exactly one Clinic')
-        if cqrs_configuration is not None and (cqrs_configuration not in ('O', 'A', 'B')
+        if cqrs_configuration is not None and (cqrs_configuration not in ('O', 'A', 'B', 'F')
                 or dataset_profile not in ('query-heavy', 'pcn') or replicas != 1):
-            raise ValueError('Q6 requires O/A/B, a benchmark fixture and one Clinic')
+            raise ValueError('Q6 requires O/A/B/F, a benchmark fixture and one Clinic')
         self.cqrs_configuration = cqrs_configuration
         self.dataset_profile = dataset_profile
         self.repo = Path(repo).resolve(strict=True)

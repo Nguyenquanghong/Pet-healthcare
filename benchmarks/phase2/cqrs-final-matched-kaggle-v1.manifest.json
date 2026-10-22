@@ -1,0 +1,320 @@
+{
+  "format": "cqrs-final-notebook-artifact-v1",
+  "study": "cqrs-final-matched-kaggle-v1",
+  "notebook": "benchmarks/phase2/cqrs-final-matched-kaggle-v1.ipynb",
+  "notebookSha256": "f8114c8ec73537b955198c4a2d127fab6c0cbaf71fa7bc5d63555b965dbce4e8",
+  "sourceArchiveSha256": "73f934eeab282e5a91208ff893ea0327b93d564e02ea9ac15f47a27b973aa7c9",
+  "sourceManifest": {
+    "format": "cqrs-final-matched-kaggle-v1-source-1",
+    "study": "cqrs-final-matched-kaggle-v1",
+    "files": [
+      {
+        "path": "benchmarks/kaggle/metrics.py",
+        "bytes": 1949,
+        "sha256": "557cb9fd8c4fa8a2876ab87fadc350b95d95cee121194c60f70c35cc54901b89"
+      },
+      {
+        "path": "benchmarks/kaggle/pcn_contract.py",
+        "bytes": 3551,
+        "sha256": "d4e61c12fb6fd60e3c3009e0f2c542454f34e0976598920f3c36dab76b8bd1e5"
+      },
+      {
+        "path": "benchmarks/kaggle/pcn_locustfile.py",
+        "bytes": 7143,
+        "sha256": "fa32bddbf4a552f19e1d9cd477797e7669d021b1ee71b4dfcf2bd29a60a775b6"
+      },
+      {
+        "path": "benchmarks/phase2/dataset.mjs",
+        "bytes": 2656,
+        "sha256": "21339330a3b58158339447a74819ccc69f74ce39e59da51b58dfd946831e9f6f"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/acceptance.json",
+        "bytes": 777,
+        "sha256": "14d06ace54b06c8eab3469cc8c4b343090ef4045e921409850008ed4d8d4f130"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/activity_d5_native.py",
+        "bytes": 18156,
+        "sha256": "05790b92637ee53ccf9322ad2f17eaa086212702dba0a3b5ddc572604e1b72b4"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/activity_native.py",
+        "bytes": 22839,
+        "sha256": "aa7c8bf1e8abf56a5df7c0e58c56d5a698ffbe9170a4f3655d2904904e311f39"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/benchmark.py",
+        "bytes": 27242,
+        "sha256": "627a7db8e1a5b4a42dc49ce8d375e54f6937e7b32652d25dc234711fed909ae7"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/cqrs_benchmark.py",
+        "bytes": 9018,
+        "sha256": "aba174fb52f463e162e1c92b42a77ee9217d19189d6881fb32c8c613dede4699"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/cqrs_diagnostics.py",
+        "bytes": 5604,
+        "sha256": "a40b9a75473c98f092417208267a403b78c265c01450b4b85adf6145654aea9b"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/cqrs_probe.py",
+        "bytes": 2099,
+        "sha256": "8c33c90a359aa3d5e4c526ea53824aa504d4ee81e9cd164b8334ab17869d5de3"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/cqrs_query_plans.mjs",
+        "bytes": 7918,
+        "sha256": "961de272c0afe7b8bb4b4600140fd1ed7bde9f979886616caf4df9270e606346"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/cqrs_runtime.mjs",
+        "bytes": 5706,
+        "sha256": "00591f97db1aa17f8a911ec1ac7e11816f40f838923a7d6e0a785da3cda13e7b"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/cqrs_source.py",
+        "bytes": 17157,
+        "sha256": "c73c40c46aa0ffe0126ae8bcdaa7d05bfbb4e4edc629083d36a205b2a7ca06b8"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/final_evaluate.py",
+        "bytes": 7540,
+        "sha256": "8d831e6f2ebf1440e17bf6addb7ba263f31370de90f3b2e059fa750103c92b37"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/final_source.py",
+        "bytes": 5730,
+        "sha256": "7940cb49acce05b179a8650081e41af159708de0e9dc6b563cf8bd000ca42c62"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/final_study.py",
+        "bytes": 2865,
+        "sha256": "1eff3cec12680ddc7f41f9aed68e769d12d38b1e075562de02e4e7914b21713b"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/final_trial.py",
+        "bytes": 1561,
+        "sha256": "999d3c8129171fd806e5d38dc44c95d2d39cfee045aaf13352ee8073d5662b4a"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/list_evaluate.py",
+        "bytes": 16954,
+        "sha256": "306e31a80cf095296bb4a5d2e9401279d7fbd0c58fcb4edcd70f481f62be9129"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/list_pcn_locust.py",
+        "bytes": 3773,
+        "sha256": "f4695ddd625161d98be0f86a9173c4f8b0e5d845abc53d283ec1835e7c814cb7"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/list_source_v2.py",
+        "bytes": 7120,
+        "sha256": "7f73434a037ef1ddd371939fab6ef414567c28ea1c746f72e5e4e531763fa480"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/list_source_v3.py",
+        "bytes": 6436,
+        "sha256": "14d26cd38ea1f8c1beeecd5ccd33820647adcba6d4e2cbf6bab272403e459030"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/list_study.py",
+        "bytes": 25986,
+        "sha256": "cd25485afda64551b84b20b933751de0418a2bb4a8577d9dc31d2de96b00422f"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/list_study_v2.py",
+        "bytes": 7598,
+        "sha256": "d24df99f1191e1a64d9c703e95271c91bf6d59a526a4f4e531893d935d75f6fa"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/list_study_v3.py",
+        "bytes": 1095,
+        "sha256": "c2548ec29b0b07c8f59e42b380f4738ed1e834487c993686d9d77812ec358cff"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/list_trial.py",
+        "bytes": 12458,
+        "sha256": "3e8f0b730fde55d5cd6e19aacd16bd065ff5b2ae8ce0972148abc6777a9cf570"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/make_final_notebook.py",
+        "bytes": 15247,
+        "sha256": "600831bfe23f243fa36711616b7638d87a66edd1142ce52301417fb3248bf780"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/make_final_policy.py",
+        "bytes": 7025,
+        "sha256": "3c047c272e9f679dcf035ac25f370897fd605c9f689b95ccd870b7e47a25c5db"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/make_list_notebook.py",
+        "bytes": 12742,
+        "sha256": "b79cbc84451ac748448ded2627a216b87125b16d6c13b3d3bdcea8d986344041"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/make_list_notebook_v2.py",
+        "bytes": 14475,
+        "sha256": "9459c5d1ae6c0efe6c54c39e7cc672cd907a606ef67aac3cf93c0e3d17fdac23"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/make_list_notebook_v3.py",
+        "bytes": 15059,
+        "sha256": "32fb0f87a0dbba0175498d5bff5981be79e22ddb9ec59d45387b81114662778c"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/make_list_policy.py",
+        "bytes": 5436,
+        "sha256": "1a4a937f673603707a156404dd2e905e080f39a692e8c1ca7c9558b8ce0bbd88"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/make_list_policy_v2.py",
+        "bytes": 5572,
+        "sha256": "884e959a3e7ba7808f9865368c73dc48b76c33e5d4b0a4756c5be3a7033d1f4c"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/make_list_policy_v3.py",
+        "bytes": 4886,
+        "sha256": "8d11711b8217dcf410fd810144ab526982feed289fd8c9003aed60ad000304be"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/native_stack.py",
+        "bytes": 11812,
+        "sha256": "a4c44f779a14ef0dab41d6c792bc50aff4ae85346007fd24d8e046738225b991"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/pcn_adapter.py",
+        "bytes": 1181,
+        "sha256": "8543cd1e70fe71868b4f087f38c3be27d7f556ba1cf29e3be2cb449a4ffa950f"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/pcn_dataset.mjs",
+        "bytes": 2429,
+        "sha256": "d935aa2199cbc1aa77a21645f21e5788f2cc467db7ef9d1e8c07c8a6bd1cd085"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/pcn_locust.py",
+        "bytes": 3290,
+        "sha256": "7501d2ccc2f662316059e9c936f6f05b4a56acb617c4f2b2fd576961b412c499"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/pcn_runner.py",
+        "bytes": 13452,
+        "sha256": "6f988ee23d457a9e6b7f6396c40bb97ab702bfc5b5987c6b6bd113409ecd3ab4"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/query_dataset.mjs",
+        "bytes": 4693,
+        "sha256": "9d88095dafe530013988dd5825f7652d5609ef4564d4e4176c9dccb81b2aed3b"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/query_heavy.py",
+        "bytes": 21296,
+        "sha256": "88687d1c471d6e60f02fcffc33a977912139b773594ab21bdc58a82020cb30aa"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/stack.mjs",
+        "bytes": 15026,
+        "sha256": "eca70877ce32ceefc1a5be6c411fbcf65ddc3cbc48ab01c60fef65ceff1f6f6f"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/test_final_study.py",
+        "bytes": 6301,
+        "sha256": "6cb0866bd066115175f6f9b657d15e2700a020f5f2cbd664a74c2674d13aad91"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/test_list_study.py",
+        "bytes": 16215,
+        "sha256": "192169fdce06a9f841f1c6ef5f84134ec86a5d2f104c9360071f3c57c368e9a1"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/test_list_study_v2.py",
+        "bytes": 10613,
+        "sha256": "f649e0011ddb2ef594fb2658caae937157837f9f9f5e63fe1ddad0e382a33603"
+      },
+      {
+        "path": "benchmarks/phase2/kaggle/test_list_study_v3.py",
+        "bytes": 5420,
+        "sha256": "1d445666f9819562af8d63ff100baf59225d858c3e36cb066455910e9c565fb3"
+      },
+      {
+        "path": "phase2-plan/cqrs/clinic-activity/evidence/benchmark-plan-20261021.json",
+        "bytes": 12963,
+        "sha256": "6b058747e66734c40e302a1da7aa712fa516608ad531c8b780fe65665d27474c"
+      },
+      {
+        "path": "phase2-plan/cqrs/clinic-activity/evidence/benchmark-plan-20261021.sha256",
+        "bytes": 96,
+        "sha256": "b551e71e82cf50fd1826fdf9b43cc33006eac38400754b8a8cda05c593b833df"
+      },
+      {
+        "path": "phase2-plan/cqrs/final/cqrs-final-matched-kaggle-v1.policy.json",
+        "bytes": 14435,
+        "sha256": "71ca0dde559524196c502387eae6cc27340e7d173e5d305392cb15f5267c13f4"
+      },
+      {
+        "path": "phase2-plan/cqrs/final/cqrs-final-matched-kaggle-v1.sha256",
+        "bytes": 107,
+        "sha256": "f9dc05a5a8cd82870a499af04e404241f17afb1b93483e885e9623736d54a052"
+      },
+      {
+        "path": "phase2-plan/cqrs/list-study/cqrs-list-matched-kaggle-v1.policy.json",
+        "bytes": 10439,
+        "sha256": "1ee0ff4474c9517ca732a7172ed17760ea084af7b17398421631afc56f4b72fd"
+      },
+      {
+        "path": "phase2-plan/cqrs/list-study/cqrs-list-matched-kaggle-v1.sha256",
+        "bytes": 106,
+        "sha256": "5aae39a086fbb0bc9e44e050c35ab8aec5081f0dc840ee034d7cb4f29cce5474"
+      },
+      {
+        "path": "phase2-plan/cqrs/list-study/cqrs-list-matched-kaggle-v2.policy.json",
+        "bytes": 13625,
+        "sha256": "e5a2279d25fe44c5867cf6ab614c975134069c18860e7af7e1983ba5b85fd646"
+      },
+      {
+        "path": "phase2-plan/cqrs/list-study/cqrs-list-matched-kaggle-v2.sha256",
+        "bytes": 106,
+        "sha256": "9d13392b09fd8a9bf8ef3f8b3462d0c394d5d8458f885bf3de8dfb093d4c54b2"
+      },
+      {
+        "path": "phase2-plan/cqrs/list-study/cqrs-list-matched-kaggle-v3.policy.json",
+        "bytes": 16280,
+        "sha256": "0c3ea454fed4f17173788e8f5cf5be00b4d968735099a04fbf42e21f3d3905eb"
+      },
+      {
+        "path": "phase2-plan/cqrs/list-study/cqrs-list-matched-kaggle-v3.sha256",
+        "bytes": 106,
+        "sha256": "45116bdb9dafe66cf819eed7cc2664dae434480b47d480d355557132a644b561"
+      },
+      {
+        "path": "test-results/phase2/cqrs/final-v1/cqrs-final-source-v12.zip",
+        "bytes": 2483202,
+        "sha256": "b09c57525749c6da529bde85e15ad33fbdd5c42699bee2183dfa8536d5fc63f2"
+      },
+      {
+        "path": "tools/phase2/cqrs/activity/bench/collector-cli.mjs",
+        "bytes": 2471,
+        "sha256": "fed5087725955654c25874d8b1430abb5088d55f153738b2f93dfaa46687c725"
+      },
+      {
+        "path": "tools/phase2/cqrs/activity/bench/collector.mjs",
+        "bytes": 5901,
+        "sha256": "33a5ac2632c0697083321178cd9f60586101d135d0f6c30537ece7629976cb4b"
+      },
+      {
+        "path": "tools/phase2/cqrs/activity/bench/profile.mjs",
+        "bytes": 2805,
+        "sha256": "c6708efa17191585f5e83553aa14774650267b4e3e3ba2655c6300e6f894b78a"
+      }
+    ],
+    "sourceTreeSha256": "02cfa653f6295f33a80957c62d6f8ac2b9a75d03975bf101e5d80e621902ef0b",
+    "head": "2b2a0689c036f25ceb9c30a2aa447139bde7a884",
+    "dirtyWorkingCopyIncluded": true,
+    "sourceBundleSha256": "b09c57525749c6da529bde85e15ad33fbdd5c42699bee2183dfa8536d5fc63f2",
+    "policySha256": "71ca0dde559524196c502387eae6cc27340e7d173e5d305392cb15f5267c13f4"
+  },
+  "notebookExecution": "NOT_RUN",
+  "performance": "NOT_RUN"
+}

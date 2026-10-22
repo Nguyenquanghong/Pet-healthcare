@@ -14,7 +14,7 @@ def read_evidence(headers, expected_generation=None):
 
 
 def correct_path(mode, evidence, *, unbilled=False):
-    if mode not in ('O', 'A', 'B'):
+    if mode not in ('O', 'A', 'B', 'F'):  # F: final product, authoritative reader
         raise ValueError('Unknown Q6 configuration')
     expected = 'absent' if mode == 'O' else 'projection' if mode == 'B' and not unbilled else 'authoritative'
     return evidence['read_source'] == expected and (expected != 'projection' or evidence['generation_matches'])
