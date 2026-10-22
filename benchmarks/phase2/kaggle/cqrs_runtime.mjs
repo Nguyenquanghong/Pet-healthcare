@@ -2,15 +2,18 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 
+// F is the final product (CQRS chốt, ADR-CQRS-06): AB source with the projection
+// maintenance switch off, authoritative reader, no projector, no read diagnostics.
 export function configuration(mode){
-  assert.ok(['O','A','B'].includes(mode),'Q6_CONFIGURATION');
-  return {configuration:mode,readMode:mode==='B'?'projection':'authoritative',projectorEnabled:mode!=='O',shadowEnabled:false,
-    apiPool:4,projectorPool:mode==='O'?0:1,freshnessPool:mode==='B'?1:0,capacityAccepted:false};
+  assert.ok(['O','A','B','F'].includes(mode),'Q6_CONFIGURATION');
+  const maintained=mode==='A'||mode==='B';
+  return {configuration:mode,readMode:mode==='B'?'projection':'authoritative',projectorEnabled:maintained,shadowEnabled:false,
+    apiPool:4,projectorPool:maintained?1:0,freshnessPool:mode==='B'?1:0,capacityAccepted:false};
 }
 export function apiEnvironment(mode,secret){
   const config=configuration(mode);
-  if(mode!=='O')assert.ok(typeof secret==='string'&&secret.length>=32,'Q6_TOKEN_SECRET');
-  return {CLINIC_READ_MODE:config.readMode,CLINIC_READ_TOKEN_SECRET:mode==='O'?'':secret,CLINIC_SHADOW_EVERY:'0',CLINIC_READ_PROJECTION:mode==='O'?'off':'on'};
+  if(config.projectorEnabled)assert.ok(typeof secret==='string'&&secret.length>=32,'Q6_TOKEN_SECRET');
+  return {CLINIC_READ_MODE:config.readMode,CLINIC_READ_TOKEN_SECRET:config.projectorEnabled?secret:'',CLINIC_SHADOW_EVERY:'0',CLINIC_READ_PROJECTION:config.projectorEnabled?'on':'off'};
 }
 export function validateTarget(url,context){
   assert.match(context.run,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,'Q6_RUN');
@@ -37,8 +40,9 @@ export async function guard(db,url,context){
 }
 export async function prepareReadModel(mode,databaseUrl,context){
   const config=configuration(mode);
-  // O must also work with the old source which has no CQRS modules or tables.
-  if(mode==='O')return {...config,generation:null,rebuild:null};
+  // O must also work with the old source which has no CQRS modules or tables;
+  // F has the tables but nothing maintains a read model, so nothing is built.
+  if(!config.projectorEnabled)return {...config,generation:null,rebuild:null};
   const url=new URL(databaseUrl);url.searchParams.set('connection_limit','1');validateTarget(url,context);
   const {PrismaClient}=await import('../../../services/clinic/src/generated/client/index.js');
   const {AppointmentRebuild}=await import('../../../services/clinic/dist/readRebuild.js');
@@ -64,7 +68,7 @@ export async function prepareReadModel(mode,databaseUrl,context){
 }
 
 export async function observeReadModel(db,mode){
-  configuration(mode);if(mode==='O')return {configuration:mode,projectorEnabled:false};
+  if(!configuration(mode).projectorEnabled)return {configuration:mode,projectorEnabled:false};
   const control=await db.readProjectionControl.findUniqueOrThrow({where:{projectionName:'appointments'},include:{activeGeneration:true}});
   const [lag]=await db.$queryRaw`SELECT count(*)::int AS pending,
     COALESCE(max(EXTRACT(EPOCH FROM (clock_timestamp()-r."changedAt"))*1000),0)::float AS "oldestLagMs"

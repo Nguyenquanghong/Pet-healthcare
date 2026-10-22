@@ -10,6 +10,14 @@ test('Q6 O works without CQRS database/client imports; A/B keep projector enable
   assert.equal(apiEnvironment('A','x'.repeat(32)).CLINIC_READ_MODE,'authoritative');
   assert.equal(apiEnvironment('B','x'.repeat(32)).CLINIC_READ_MODE,'projection');
   assert.throws(()=>configuration('shadow'));assert.throws(()=>apiEnvironment('B','short'));
+  for(const mode of ['A','B'])assert.equal(apiEnvironment(mode,'x'.repeat(32)).CLINIC_READ_PROJECTION,'on');
+});
+test('final F runs the product defaults: authoritative reader, projection off, no projector, no read model build',async()=>{
+  const f=configuration('F');
+  assert.deepEqual([f.readMode,f.projectorEnabled,f.projectorPool,f.freshnessPool],['authoritative',false,0,0]);
+  assert.deepEqual(apiEnvironment('F'),{CLINIC_READ_MODE:'authoritative',CLINIC_READ_TOKEN_SECRET:'',CLINIC_SHADOW_EVERY:'0',CLINIC_READ_PROJECTION:'off'});
+  const prepared=await prepareReadModel('F','not-a-database-url',{});
+  assert.equal(prepared.generation,null);assert.equal(prepared.rebuild,null);
 });
 test('Q6 DB targets reject wrong host database role schema and UUID before SQL',()=>{
   const run=randomUUID(),context={kind:'cqrs-q6-local-v1',run};
