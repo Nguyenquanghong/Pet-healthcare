@@ -48,6 +48,9 @@ import { createAppointmentsRouter } from "./routes/appointments.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createBootstrapRouter } from "./routes/bootstrap.js";
 import { createHotelBookingsRouter } from "./routes/hotelBookings.js";
+import { createHotelCapacityRouter } from "./routes/hotelCapacity.js";
+import { HotelCapacityService } from "./application/services/hotelCapacity.js";
+import { PrismaHotelCapacityRepository } from "./infrastructure/persistence/hotelCapacityRepository.js";
 import { createInvoicesRouter } from "./routes/invoices.js";
 import { createMedicalRecordsRouter } from "./routes/medicalRecords.js";
 import { createNotificationsRouter } from "./routes/notifications.js";
@@ -103,6 +106,7 @@ export function createApp(client: PrismaClient) {
   app.use("/api/appointments", requireAuth, createAppointmentsRouter(new AppointmentService(createAppointmentDependencies(client), lifecycle)));
   app.use("/api/medical-records", requireAuth, createMedicalRecordsRouter(new MedicalRecordsService(createMedicalDependencies(client))));
   app.use("/api/hotel-bookings", requireAuth, createHotelBookingsRouter(new HotelBookingsService(createHotelDependencies(client), lifecycle)));
+  app.use("/api/hotel-capacity", requireAuth, createHotelCapacityRouter(new HotelCapacityService(new PrismaHotelCapacityRepository(client))));
   app.use("/api/notifications", requireAuth, createNotificationsRouter(new NotificationsService(new PrismaNotificationRepository(client))));
   app.use("/api/invoices", requireAuth, createInvoicesRouter(new InvoicesService(new PrismaInvoiceRepository(client), bankTransfer, new VietQrGenerator())));
   app.use("/api/payments", createPaymentsRouter(new PaymentsService(new PrismaPaymentRepository(client), new VnpaySandboxGateway({

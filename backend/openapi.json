@@ -1771,7 +1771,7 @@
             "description": "Giữ nguyên key khi gửi lại cùng yêu cầu; cùng key và payload khác trả 409."
           }
         ],
-        "description": "Tạo một yêu cầu lưu trú chưa thanh toán. Chống gửi lặp và trùng ngày cho cùng thú cưng."
+        "description": "Tạo một yêu cầu lưu trú chưa thanh toán. Chống gửi lặp và trùng ngày cho cùng thú cưng. AQ-10: 409 when the pet already has an overlapping active stay or the room type is full on one of the nights."
       }
     },
     "/hotel-bookings/{id}/status": {
@@ -4794,6 +4794,142 @@
         ],
         "description": "409 when the retention window has ended; 404 when the image is not deleted or already purged."
       }
+    },
+    "/hotel-capacity": {
+      "get": {
+        "tags": [
+          "Hotel bookings"
+        ],
+        "summary": "Rooms per type (staff)",
+        "operationId": "get_api_hotel_capacity",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "AQ-10: the database refuses any hotel booking beyond these capacities (trigger + CHECK on hotel_room_nights).",
+        "responses": {
+          "200": {
+            "description": "Capacities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RoomCapacity"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/hotel-capacity/{roomType}": {
+      "put": {
+        "tags": [
+          "Hotel bookings"
+        ],
+        "summary": "Change rooms per type (admin)",
+        "operationId": "put_api_hotel_capacity_roomType",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Applies to today and later nights; 409 when one of them already holds more stays.",
+        "parameters": [
+          {
+            "name": "roomType",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "standard",
+                "deluxe",
+                "vip"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "capacity": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  }
+                },
+                "required": [
+                  "capacity"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "capacity": {
+                      "$ref": "#/components/schemas/RoomCapacity"
+                    }
+                  },
+                  "required": [
+                    "capacity"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "422": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5006,6 +5142,7 @@
                 "booking.manage",
                 "booking.reopen",
                 "hotel.care-note.write",
+                "hotel.capacity.manage",
                 "medical-record.write",
                 "medical-record.history",
                 "medical-record.restore",
@@ -8163,6 +8300,33 @@
           "actorId",
           "actorRole",
           "changedAt"
+        ]
+      },
+      "RoomCapacity": {
+        "type": "object",
+        "properties": {
+          "roomType": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "deluxe",
+              "vip"
+            ]
+          },
+          "capacity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "roomType",
+          "capacity",
+          "updatedAt"
         ]
       }
     }

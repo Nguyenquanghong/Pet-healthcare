@@ -275,6 +275,29 @@ model HotelBooking {
   @@map("hotel_bookings")
 }
 
+// AQ-10: rooms of each type per night held by active stays (pending, confirmed,
+// in_stay). Written only by the hotel_room_nights_sync trigger on hotel_bookings;
+// CHECK (booked <= capacity) makes overbooking impossible for every writer.
+model HotelRoomNight {
+  roomType RoomType @map("room_type")
+  night    DateTime @db.Date
+  booked   Int      @default(0)
+  capacity Int
+
+  @@id([roomType, night])
+  @@map("hotel_room_nights")
+}
+
+// AQ-10: rooms per type; an admin changes it (future nights follow, never below
+// what is already booked).
+model HotelRoomCapacity {
+  roomType  RoomType @id @map("room_type")
+  capacity  Int
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("hotel_room_capacity")
+}
+
 model HotelBookingRequest {
   actorId     String   @map("actor_id")
   requestKey  String   @map("request_key")

@@ -12,7 +12,7 @@ assert.equal(basePath, "/api", "OpenAPI must declare the shared /api base URL");
 const mounts = {
   auth: "/api/auth", public: "/api/public", bootstrap: "/api/bootstrap",
   pets: "/api/pets", owners: "/api/owners", appointments: "/api/appointments", medicalRecords: "/api/medical-records",
-  hotelBookings: "/api/hotel-bookings", notifications: "/api/notifications", invoices: "/api/invoices",
+  hotelBookings: "/api/hotel-bookings", hotelCapacity: "/api/hotel-capacity", notifications: "/api/notifications", invoices: "/api/invoices",
   payments: "/api/payments", lists: "/api",
 };
 const runtime = new Set(["GET /api/health"]);
@@ -61,5 +61,5 @@ for (const [path, methods] of Object.entries(spec.paths)) {
   }
 }
 assert.deepEqual([...documented].sort(), [...runtime].sort(), "OpenAPI routes differ from mounted runtime routes");
-assert.equal(runtime.size, 72, "P2 unread-count, P4 operations, P5 dashboard regions, D1 Clinic activity, AQ-15 medical record history and AQ-09 image restore preserve the original 65 operations");
+assert.equal(runtime.size, 74, "P2 unread-count, P4 operations, P5 dashboard regions, D1 Clinic activity, AQ-15 medical record history, AQ-09 image restore and AQ-10 hotel capacity preserve the original 65 operations");
 process.stdout.write(`OpenAPI PASS: ${runtime.size} operations match source and schemas validate.\n`);
