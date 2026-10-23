@@ -1,3 +1,10 @@
+import type { ApiSchemas } from "./generated/api";
+
+// AQ-07: generated from the OpenAPI contract (types/generated/api.ts). The API's
+// `type` is an open set; NotificationType names the ones the UI styles specially.
+export type Notification = ApiSchemas["Notification"];
+export type NotificationStatus = Notification["status"];
+export type NotificationRole = Notification["recipientRole"];
 export type NotificationType =
   | "appointment_created"
   | "appointment_reminder"
@@ -14,24 +21,3 @@ export type NotificationType =
   | "pet_rescue_report"
   | "promotion"
   | "general";
-
-export type NotificationStatus = "draft" | "sent" | "read";
-
-export type NotificationRole = "owner" | "admin";
-
-export type Notification = {
-  id: string;
-  recipientOwnerId?: string;
-  recipientRole?: NotificationRole;
-  type: NotificationType;
-  title: string;
-  message: string;
-  status: NotificationStatus;
-  actionUrl?: string;
-  relatedAppointmentId?: string;
-  relatedBookingId?: string;
-  relatedPetId?: string;
-  sentByStaffId?: string;
-  createdAt: string;
-  sentAt?: string;
-};

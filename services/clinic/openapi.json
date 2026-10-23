@@ -2131,7 +2131,8 @@
             "type": "string"
           },
           "phone": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty string when the profile has no phone."
           },
           "email": {
             "type": "string"
@@ -2163,7 +2164,8 @@
         "required": [
           "id",
           "fullName",
-          "role"
+          "role",
+          "phone"
         ]
       },
       "Pet": {
@@ -2175,17 +2177,33 @@
           "ownerId": {
             "type": "string"
           },
+          "directoryVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
           "name": {
             "type": "string"
           },
           "species": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "dog",
+              "cat",
+              "rabbit",
+              "other"
+            ]
           },
           "breed": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty string when unknown."
           },
           "gender": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "unknown"
+            ]
           },
           "ageLabel": {
             "type": "string"
@@ -2196,14 +2214,33 @@
           "microchipId": {
             "type": "string"
           },
-          "healthStatus": {
+          "avatarUrl": {
             "type": "string"
+          },
+          "healthStatus": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "stable",
+              "vaccination_due",
+              "under_treatment",
+              "critical"
+            ]
           },
           "allergies": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/String"
+              "type": "string"
             }
+          },
+          "notes": {
+            "type": "string"
+          },
+          "identifyingMarks": {
+            "type": "string"
+          },
+          "lastSeenLocation": {
+            "type": "string"
           },
           "qrToken": {
             "type": "string"
@@ -2213,11 +2250,6 @@
           },
           "publicProfile": {
             "$ref": "#/components/schemas/PublicProfile"
-          },
-          "directoryVersion": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "Core source revision. Projection search may lag; related DTOs use current Core source."
           }
         },
         "required": [
@@ -2225,7 +2257,9 @@
           "ownerId",
           "name",
           "species",
+          "breed",
           "gender",
+          "ageLabel",
           "healthStatus",
           "allergies",
           "qrEnabled",
@@ -2270,8 +2304,24 @@
           "ownerId": {
             "type": "string"
           },
+          "doctorId": {
+            "type": "string",
+            "nullable": true
+          },
           "type": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "general_checkup",
+              "vaccination",
+              "dental",
+              "dermatology",
+              "surgery",
+              "hotel_consultation",
+              "spa_bath",
+              "spa_grooming",
+              "spa_combo",
+              "other"
+            ]
           },
           "serviceName": {
             "type": "string"
@@ -2284,19 +2334,40 @@
             "format": "date"
           },
           "time": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed",
+              "checked_in",
+              "in_progress",
+              "completed",
+              "cancelled",
+              "no_show"
+            ]
           },
-          "doctorId": {
-            "type": "string"
+          "statusRevision": {
+            "type": "integer",
+            "minimum": 0
           },
           "ownerNote": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "internalNote": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "Staff only; absent for owners."
+          },
+          "createdBy": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "staff"
+            ]
           },
           "createdAt": {
             "type": "string",
@@ -2305,22 +2376,24 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "statusRevision": {
-            "type": "integer",
-            "minimum": 0,
-            "readOnly": true
           }
         },
         "required": [
           "id",
           "petId",
           "ownerId",
+          "doctorId",
           "type",
           "serviceName",
+          "clinicName",
           "date",
           "time",
-          "status"
+          "status",
+          "statusRevision",
+          "ownerNote",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "MedicalRecord": {
@@ -2336,7 +2409,8 @@
             "type": "string"
           },
           "appointmentId": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "doctorName": {
             "type": "string"
@@ -2348,11 +2422,27 @@
           "title": {
             "type": "string"
           },
+          "symptoms": {
+            "type": "string",
+            "nullable": true
+          },
           "diagnosis": {
             "type": "string"
           },
           "treatment": {
             "type": "string"
+          },
+          "medications": {
+            "type": "string",
+            "nullable": true
+          },
+          "vaccineName": {
+            "type": "string",
+            "nullable": true
+          },
+          "followUpDate": {
+            "type": "string",
+            "format": "date"
           },
           "weightKg": {
             "type": "number"
@@ -2361,9 +2451,19 @@
             "type": "number"
           },
           "heartRateBpm": {
-            "type": "integer"
+            "type": "integer",
+            "nullable": true
+          },
+          "internalNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "Staff only; absent for owners."
           },
           "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
             "type": "string",
             "format": "date-time"
           }
@@ -2372,11 +2472,18 @@
           "id",
           "petId",
           "ownerId",
+          "appointmentId",
           "doctorName",
           "visitDate",
           "title",
+          "symptoms",
           "diagnosis",
-          "treatment"
+          "treatment",
+          "medications",
+          "vaccineName",
+          "heartRateBpm",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "MedicalImage": {
@@ -2446,33 +2553,63 @@
             "format": "date"
           },
           "nights": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 1
           },
           "roomType": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "standard",
+              "deluxe",
+              "vip"
+            ]
           },
           "serviceKeys": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/String"
+              "type": "string"
             }
           },
           "totalAmount": {
             "type": "number"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed",
+              "in_stay",
+              "checked_out",
+              "cancelled",
+              "rejected"
+            ]
+          },
+          "statusRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ownerNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "internalNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "Staff only; absent for owners."
           },
           "dailyCareNoteIds": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/String"
+              "type": "string"
             }
           },
-          "statusRevision": {
-            "type": "integer",
-            "minimum": 0,
-            "readOnly": true
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -2483,8 +2620,14 @@
           "checkOut",
           "nights",
           "roomType",
+          "serviceKeys",
           "totalAmount",
-          "status"
+          "status",
+          "statusRevision",
+          "ownerNote",
+          "dailyCareNoteIds",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "CareNote": {
@@ -2500,25 +2643,39 @@
             "type": "string",
             "format": "date"
           },
-          "note": {
-            "type": "string"
-          },
           "eatingStatus": {
-            "type": "string"
+            "type": "string",
+            "description": "Free text; the UI offers good, normal and poor."
           },
           "mood": {
+            "type": "string",
+            "description": "Free text; the UI offers happy, calm, anxious and tired."
+          },
+          "note": {
             "type": "string"
           },
           "visibleToOwner": {
             "type": "boolean"
+          },
+          "createdByStaffId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
           "id",
           "bookingId",
           "date",
+          "eatingStatus",
+          "mood",
           "note",
-          "visibleToOwner"
+          "visibleToOwner",
+          "createdByStaffId",
+          "createdAt"
         ]
       },
       "Notification": {
@@ -2528,13 +2685,19 @@
             "type": "string"
           },
           "recipientOwnerId": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "recipientRole": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin"
+            ]
           },
           "type": {
-            "type": "string"
+            "type": "string",
+            "description": "Open set (appointment_reminder, booking_status_updated, pet_rescue_report, general, ...); clients show unknown types generically."
           },
           "title": {
             "type": "string"
@@ -2543,23 +2706,56 @@
             "type": "string"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "sent",
+              "read"
+            ]
           },
           "actionUrl": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
+          },
+          "relatedPetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "relatedAppointmentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "relatedBookingId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sentByStaffId": {
+            "type": "string",
+            "nullable": true
           },
           "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sentAt": {
             "type": "string",
             "format": "date-time"
           }
         },
         "required": [
           "id",
+          "recipientOwnerId",
           "recipientRole",
           "type",
           "title",
           "message",
-          "status"
+          "status",
+          "actionUrl",
+          "relatedPetId",
+          "relatedAppointmentId",
+          "relatedBookingId",
+          "sentByStaffId",
+          "createdAt",
+          "sentAt"
         ]
       },
       "Invoice": {
@@ -2590,7 +2786,12 @@
             "type": "number"
           },
           "paymentStatus": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "paid",
+              "unpaid",
+              "refunded"
+            ]
           },
           "paymentMethod": {
             "type": "string",
@@ -2631,8 +2832,8 @@
           },
           "paidAt": {
             "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "nullable": true,
+            "format": "date-time"
           },
           "notes": {
             "type": "string",
@@ -2649,26 +2850,12 @@
             ]
           },
           "bankTransferDetails": {
-            "type": "object",
-            "nullable": true,
-            "properties": {
-              "bankName": {
-                "type": "string"
-              },
-              "accountNumber": {
-                "type": "string"
-              },
-              "accountHolder": {
-                "type": "string"
-              },
-              "isDemo": {
-                "type": "boolean"
-              },
-              "bankBin": {
-                "type": "string",
-                "pattern": "^[0-9]{6}$"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BankTransferDetails"
               }
-            }
+            ],
+            "nullable": true
           },
           "transferReviewStatus": {
             "type": "string",
@@ -2682,8 +2869,8 @@
           },
           "transferReportedAt": {
             "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "nullable": true,
+            "format": "date-time"
           },
           "transferReference": {
             "type": "string",
@@ -2695,24 +2882,58 @@
           },
           "transferCode": {
             "type": "string",
-            "nullable": true,
-            "pattern": "^NIPO[0-9]{10}$",
-            "readOnly": true
+            "nullable": true
           },
           "transferContent": {
             "type": "string",
             "readOnly": true,
             "description": "Stable transfer purpose; legacy invoices retain their original instruction."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sourceSnapshot": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BillingSourceSnapshot"
+              }
+            ],
+            "nullable": true,
+            "description": "Appointment fee source frozen at issue time (Phase 2); null for hotel and legacy invoices."
           }
         },
         "required": [
           "id",
           "invoiceCode",
+          "transferCode",
+          "type",
           "ownerId",
           "petId",
+          "appointmentId",
+          "hotelBookingId",
           "subtotal",
+          "taxAmount",
+          "discountAmount",
           "totalAmount",
           "paymentStatus",
+          "paymentMethod",
+          "paymentChannel",
+          "bankTransferDetails",
+          "transferReviewStatus",
+          "transferReportedAt",
+          "transferReference",
+          "transferReviewNote",
+          "issuedAt",
+          "paidAt",
+          "notes",
+          "createdAt",
+          "updatedAt",
+          "items",
           "transferContent"
         ]
       },
@@ -2729,19 +2950,23 @@
             "type": "string"
           },
           "unitPrice": {
-            "type": "string"
+            "type": "number"
           },
           "quantity": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 1
           },
           "amount": {
-            "type": "string"
+            "type": "number"
           }
         },
         "required": [
           "id",
+          "invoiceId",
           "description",
-          "quantity"
+          "unitPrice",
+          "quantity",
+          "amount"
         ]
       },
       "String": {
@@ -2872,13 +3097,24 @@
             "type": "string"
           },
           "species": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "dog",
+              "cat",
+              "rabbit",
+              "other"
+            ]
           },
           "breed": {
             "type": "string"
           },
           "gender": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "unknown"
+            ]
           },
           "ageLabel": {
             "type": "string"
@@ -2900,7 +3136,13 @@
           },
           "healthStatus": {
             "type": "string",
-            "description": "Only when showMedicalAlerts is true"
+            "enum": [
+              "healthy",
+              "stable",
+              "vaccination_due",
+              "under_treatment",
+              "critical"
+            ]
           },
           "allergies": {
             "type": "array",
@@ -4326,22 +4568,20 @@
               "loginEnabled": {
                 "type": "boolean",
                 "description": "True only when this profile has login credentials."
+              },
+              "petCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total pet count independent of pages. petIds is empty in bounded directory/profile responses; load pet pages with ownerId."
+              },
+              "directoryVersion": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Core source revision. Projection search may lag; related DTOs use current Core source."
               }
             }
           }
-        ],
-        "properties": {
-          "petCount": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "Total pet count independent of pages. petIds is empty in bounded directory/profile responses; load pet pages with ownerId."
-          },
-          "directoryVersion": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "Core source revision. Projection search may lag; related DTOs use current Core source."
-          }
-        }
+        ]
       },
       "PublicProfileInput": {
         "type": "object",
@@ -5216,6 +5456,33 @@
           "actorId",
           "actorRole",
           "changedAt"
+        ]
+      },
+      "BankTransferDetails": {
+        "type": "object",
+        "properties": {
+          "bankName": {
+            "type": "string"
+          },
+          "bankBin": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "accountHolder": {
+            "type": "string"
+          },
+          "isDemo": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "bankName",
+          "accountNumber",
+          "accountHolder",
+          "isDemo"
         ]
       }
     }

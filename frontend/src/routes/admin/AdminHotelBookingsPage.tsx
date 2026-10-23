@@ -24,7 +24,7 @@ import { useAppStore } from "../../store/AppStoreProvider";
 import type { DailyCareNote, HotelBooking, HotelBookingStatus } from "../../types/booking";
 import type { Invoice } from "../../types/invoice";
 import { formatCurrency } from "../../utils/formatCurrency";
-import { bookingStatusLabels, eatingStatusLabels, moodLabels } from "../../utils/statusLabels";
+import { bookingStatusLabels, eatingStatusLabels, labelOf, moodLabels } from "../../utils/statusLabels";
 import { compareBookingStatus } from "../../utils/bookingOrder";
 import { AdminCreateButton } from "./AdminCreateDialog";
 
@@ -580,10 +580,10 @@ export function AdminHotelBookingsPage() {
                           <span className="font-bold text-slate-900">{note.date}</span>
                           <div className="flex gap-1.5">
                             <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700 border border-emerald-200">
-                              <HeartPulse size={10} /> {eatingStatusLabels[note.eatingStatus]}
+                              <HeartPulse size={10} /> {labelOf(eatingStatusLabels, note.eatingStatus)}
                             </span>
                             <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 font-bold text-indigo-700 border border-indigo-200">
-                              <Smile size={10} /> {moodLabels[note.mood]}
+                              <Smile size={10} /> {labelOf(moodLabels, note.mood)}
                             </span>
                           </div>
                         </div>
