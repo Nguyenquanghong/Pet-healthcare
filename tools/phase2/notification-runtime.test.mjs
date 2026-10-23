@@ -372,15 +372,20 @@ test('AQ-07: real responses through Core match the public OpenAPI contract the f
   const spec = JSON.parse(readSpec(new URL('../../backend/openapi.json', import.meta.url), 'utf8'));
   const reads = { owner: ['/api/auth/me', '/api/pets?pageSize=100', '/api/appointments?pageSize=100', '/api/hotel-bookings', '/api/medical-records?pageSize=100', '/api/invoices', '/api/notifications?pageSize=100', '/api/bootstrap'],
     admin: ['/api/auth/me', '/api/pets?pageSize=100', '/api/owners?pageSize=100', '/api/appointments?pageSize=100', '/api/hotel-bookings', '/api/medical-records?pageSize=100', '/api/invoices', '/api/notifications?pageSize=100', '/api/bootstrap?view=dashboard', '/api/hotel-care-notes', '/api/hotel-capacity'] };
-  const problems = [], checked = {};
+  // The check brings its own rows: a fresh database (CI) has no other runs' leftovers.
+  // A new pending appointment is in the owner's list and the admin dashboard preview.
+  const fixture = requireStatus(await request('/api/appointments', { method: 'POST', body: { petId: pet.id, type: 'general_checkup', date, time: '14:00', serviceName: 'AQ-07 contract fixture', ownerNote: 'Fixture note' } }), 201).appointment;
+  const problems = [], checked = {}, sawFixture = [];
   for (const [role, paths] of Object.entries(reads)) for (const path of paths) {
     const body = requireStatus(await request(path, { token: tokens[role] }), 200);
     const found = validate(spec, responseSchema(spec, 'GET', path, 200), body, role + ' GET ' + path);
     problems.push(...found);
     for (const key of ['items', 'pets', 'appointments', 'medicalRecords', 'notifications', 'invoices', 'hotelBookings']) if (Array.isArray(body[key])) checked[key] = (checked[key] ?? 0) + body[key].length;
+    if ([...(body.items ?? []), ...(body.appointments ?? [])].some(row => row?.id === fixture.id)) sawFixture.push(role + ' GET ' + path);
   }
   assert.deepEqual(problems.slice(0, 30), [], problems.length + ' contract problems');
   for (const key of ['items', 'appointments']) assert.ok(checked[key] > 0, 'the check saw real ' + key);
+  for (const read of ['owner GET /api/appointments?pageSize=100', 'admin GET /api/bootstrap?view=dashboard']) assert.ok(sawFixture.includes(read), `the fixture appointment was validated by ${read}; seen by: ${sawFixture.join(', ')}`);
 });
 test('legacy export/dry-run/import/verify preserve IDs/status/timestamps; resume and deleted/read rows never regress', async () => {
   const source = [];
