@@ -13,6 +13,12 @@ class PrismaPublicRescueRepository implements PublicRescueRepository {
   findEnabledPetForReport(token: string) {
     return this.client.pet.findFirst({ where: { qrToken: token, qrEnabled: true } });
   }
+  async lockPet(petId: string) {
+    await this.client.$queryRaw`SELECT id FROM "pets" WHERE id = ${petId} FOR UPDATE`;
+  }
+  async hasRecentReport(petId: string, finderPhone: string, since: Date) {
+    return (await this.client.rescueReport.findFirst({ where: { petId, finderPhone, createdAt: { gte: since } }, select: { id: true } })) !== null;
+  }
   async createReport(data: Parameters<PublicRescueRepository["createReport"]>[0]) {
     await this.client.rescueReport.create({ data });
   }

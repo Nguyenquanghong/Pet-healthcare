@@ -54,7 +54,7 @@ test("representative routes keep JSON, auth and method contracts", async () => {
     },
     outboxEvent: { create: async ({ data }) => { writes.push({ kind: 'outbox', data }); return data; } },
     invoice: { findMany: async () => [] },
-    rescueReport: { create: async ({ data }) => { writes.push({ kind: "report", data }); return { id: "r-1", ...data }; } },
+    rescueReport: { create: async ({ data }) => { writes.push({ kind: "report", data }); return { id: "r-1", ...data }; }, findFirst: async () => null },
     $transaction: async (work) => work(client),
     $queryRaw: async () => [{ "?column?": 1 }],
   };

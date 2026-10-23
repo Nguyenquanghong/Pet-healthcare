@@ -123,11 +123,12 @@ export class ServiceRuntime {
     }
     if(req.method==='POST'&&req.path==='/auth/owner/register')return{group:'auth-register',read:false,buckets:[b(ip,limit('AUTH_REGISTER_IP_LIMIT',300))]};
     if(req.method==='POST'&&req.path.startsWith('/auth/owner/activation'))return{group:'auth-activation',read:false,buckets:[b(ip,limit('AUTH_ACTIVATION_IP_LIMIT',300))]};
-    // AQ-01: unauthenticated rescue reports notify an owner. The token bucket caps
-    // a flood against one pet across IPs; the token is HMACed with the other keys.
+    // AQ-01: unauthenticated rescue reports notify an owner. The token buckets cap
+    // a flood against one pet across IPs (5 per 15 minutes, 20 per day); the token
+    // is HMACed with the other keys.
     const rescue=req.method==='POST'?req.path.match(/^\/public\/pets\/([^/]{1,200})\/rescue-reports$/):null;
     if(rescue){let token=rescue[1]!;try{token=decodeURIComponent(token);}catch{}
-      return{group:'public-rescue',read:false,buckets:[b(ip,limit('RESCUE_REPORT_IP_LIMIT',20)),b('rescue-token:'+token,limit('RESCUE_REPORT_TOKEN_LIMIT',5))]};}
+      return{group:'public-rescue',read:false,buckets:[b(ip,limit('RESCUE_REPORT_IP_LIMIT',20)),b('rescue-token:'+token,limit('RESCUE_REPORT_TOKEN_LIMIT',5)),b('rescue-token-day:'+token,limit('RESCUE_REPORT_TOKEN_DAILY_LIMIT',20),86400000)]};}
     let actor:Actor|undefined;
     try{actor=requestActor(req,this.options.verify);}catch{}
     const identity=actor?'actor:'+actor.sub:ip,read=['GET','HEAD'].includes(req.method);

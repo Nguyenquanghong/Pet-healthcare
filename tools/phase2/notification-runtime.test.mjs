@@ -17,6 +17,7 @@ import { createApp } from '../../services/notification/dist/app.js';
 import { actorVerifier } from '../../services/notification/dist/auth.js';
 import { CoreSendAuthorization } from '../../services/notification/dist/coreAuthorization.js';
 import { ManualSend } from '../../services/notification/dist/manualSend.js';
+import { createPublicRescueDependencies } from '../../backend/dist/src/infrastructure/persistence/publicRescueRepository.js';
 import { writeNotification as clinicNotification } from '../../services/clinic/dist/notificationOutbox.js';
 import { OutboxRelay as ClinicRelay } from '../../services/clinic/dist/relay.js';
 import { NotificationInbox } from '../../services/notification/dist/inbox.js';
@@ -210,6 +211,23 @@ test('Core appointment/Spa, lifecycle, medical, hotel, rescue, invoice and payme
   const checkOut = new Date(Date.now() + 7 * 3600000 + 3 * 86400000).toISOString().slice(0, 10);
   requireStatus(await request('/api/hotel-bookings', { method: 'POST', key: randomUUID(), body: { petId: pet.id, checkIn: date, checkOut, roomType: 'standard', services: [] } }), 201);
   requireStatus(await request(`/api/public/pets/${pet.qrToken}/rescue-reports`, { method: 'POST', token: null, body: { finderPhone: '000-fixture', location: 'Synthetic location' } }), 201);
+  // AQ-01: the same finder again (here 3 concurrent retries) is merged under the pet lock: one row, one owner notice; another finder is new.
+  const merged = await Promise.all([1, 2, 3].map(() => request(`/api/public/pets/${pet.qrToken}/rescue-reports`, { method: 'POST', token: null, body: { finderPhone: '000-fixture', location: 'Synthetic retry' } })));
+  for (const r of merged) assert.match(requireStatus(r, 201).message, /already received/);
+  requireStatus(await request(`/api/public/pets/${pet.qrToken}/rescue-reports`, { method: 'POST', token: null, body: { finderPhone: '001-fixture', location: 'Synthetic location' } }), 201);
+  assert.deepEqual((await core.rescueReport.groupBy({ by: ['finderPhone'], where: { petId: pet.id }, _count: true, orderBy: { finderPhone: 'asc' } })).map(g => [g.finderPhone, g._count]), [['000-fixture', 1], ['001-fixture', 1]]);
+  assert.equal((await core.outboxEvent.findMany({ where: { envelope: { path: ['payload','type'], equals: 'pet_rescue_report' } } })).filter(e => e.envelope.payload.relatedPetId === pet.id).length, 2);
+  // The duplicate check is atomic only because the pet row lock serializes reports: a second unit of work
+  // cannot take the lock until the first commits, and then sees its report.
+  { const rescue = createPublicRescueDependencies(core), order = []; let release; const gate = new Promise(resolve => { release = resolve; });
+    const first = rescue.unitOfWork.run(async repo => { await repo.lockPet(pet.id); order.push('first-locked'); await gate; await repo.createReport({ petId: pet.id, finderPhone: '002-fixture', location: 'Lock fixture', finderName: null, note: null }); order.push('first-inserted'); });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const second = rescue.unitOfWork.run(async repo => { await repo.lockPet(pet.id); order.push('second-locked'); return repo.hasRecentReport(pet.id, '002-fixture', new Date(Date.now() - 60000)); });
+    await new Promise(resolve => setTimeout(resolve, 400));
+    assert.deepEqual(order, ['first-locked'], 'a concurrent report waits for the pet lock');
+    release(); await first;
+    assert.equal(await second, true, 'after the lock it sees the first report');
+    assert.deepEqual(order, ['first-locked', 'first-inserted', 'second-locked']); }
   const extra = await core.invoice.create({ data: { invoiceCode: 'P2-' + randomUUID(), type: 'appointment', ownerId: owner, petId: pet.id, subtotal: 100000, totalAmount: 100000, paymentChannel: 'bank_transfer' } });
   const invoices = new PrismaInvoiceRepository(core);
   await invoices.reportTransfer(extra.id, owner, 'fixture-reference', { sub: owner, role: 'owner' });
