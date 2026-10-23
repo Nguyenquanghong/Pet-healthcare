@@ -13,6 +13,8 @@ export const permissionMatrix = {
   'hotel.care-note.write': { roles: ['doctor', 'staff', 'admin'], denied: 'Chỉ nhân viên được ghi nhật ký chăm sóc.' },
   'hotel.capacity.manage': { roles: ['admin'], denied: 'Chỉ quản trị viên được đổi sức chứa phòng.' },
   'medical-record.write': { roles: ['doctor', 'admin'], denied: 'Chỉ bác sĩ hoặc quản trị viên được ghi bệnh án và ảnh y tế.' },
+  // P11: everyone else who writes a record signs it as themself.
+  'medical-record.assign-doctor': { roles: ['admin'], denied: 'Chỉ quản trị viên được lập bệnh án đứng tên bác sĩ khác.' },
   'medical-record.history': { roles: ['doctor', 'staff', 'admin'], denied: 'Chỉ nhân viên được xem lịch sử bệnh án.' },
   'medical-record.restore': { roles: ['admin'], denied: 'Chỉ quản trị viên được khôi phục ảnh y tế đã xóa.' },
   'billing.manage': { roles: ['staff', 'admin'], denied: 'Chỉ nhân viên thu ngân hoặc quản trị viên được lập hóa đơn và xác nhận thu tiền.' },

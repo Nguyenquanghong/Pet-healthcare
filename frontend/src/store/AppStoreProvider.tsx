@@ -73,7 +73,7 @@ function useAppActions() {
     sendReminder: (id: string) => mutate(() => apiClient.post(`/appointments/${id}/reminder`), ['clinic']),
     createMedicalRecord: (input: CreateMedicalRecordInput, requestKey: string) => writeAndReload(() => apiClient.post('/medical-records', input, { 'Idempotency-Key': requestKey }), ['clinic']),
     updateMedicalRecord: (id: string, input: UpdateMedicalRecordInput) => writeAndReload(() => apiClient.patch(`/medical-records/${id}`, input), ['clinic']),
-    deleteMedicalRecord: (id: string) => writeAndReload(() => apiClient.delete(`/medical-records/${id}`), ['clinic']),
+    deleteMedicalRecord: (id: string, expectedRevision: number) => writeAndReload(() => apiClient.delete(`/medical-records/${id}?expectedRevision=${expectedRevision}`), ['clinic']),
     uploadMedicalImage: (input: { petId: string; title: string; imageUrl: string; mimeType: string }) => writeAndReload(() => apiClient.post('/medical-records/images', input), ['clinic']),
     deleteMedicalImage: (id: string) => mutate(() => apiClient.delete(`/medical-records/images/${id}`), ['clinic']),
     markNotificationRead: (id: string) => mutate(() => apiClient.patch(`/notifications/${id}/read`), ['notifications']),

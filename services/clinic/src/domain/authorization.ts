@@ -3,6 +3,7 @@ import type { Actor } from "./auth.js";
 import { BusinessError } from "./error.js";
 
 export type { Permission } from "@nipopeto/contracts";
+export { allows } from "@nipopeto/contracts";
 
 // AQ-05: role-restricted operations ask the shared matrix in @nipopeto/contracts;
 // ownership scope (owner reaches only their own rows) is checked by each service.

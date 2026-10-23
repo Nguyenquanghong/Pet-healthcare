@@ -1,7 +1,8 @@
 import express, { type ErrorRequestHandler } from 'express';
 import type { PrismaClient } from './generated/client/index.js';
 import type { Actor } from './domain/auth.js';
-import { BusinessError } from './domain/error.js';
+import { BusinessError, StaleRevision } from './domain/error.js';
+import type { MedicalRecordValue } from './application/ports/medicalRecords.js';
 import { authorize } from './domain/authorization.js';
 import { imageRetentionMs } from './blobCleanup.js';
 import { objectInput,calendarDate,requiredText } from './domain/validation.js';
@@ -118,7 +119,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   router.get('/medical-records',async(req,res)=>res.json(await list(db,'medicalRecords',res.locals.actor,res.locals.directory,req.query)));
   router.post('/medical-records',async(req,res)=>{const result=await deduplicated(db,res.locals.actor.sub,'medical-record.create',req.headers['idempotency-key'],normalizeCreate(req.body,true),async tx=>{const row=await medical(res,tx).create(res.locals.actor,req.body);return{resourceId:row.id,appointmentId:row.appointmentId,response:{record:medicalRecordDto(row)}};},true);sendMutation(res,result as {response:unknown;versions:ReadVersions},201);});
   router.patch('/medical-records/:id',async(req,res)=>res.json({record:medicalRecordDto(await medicalMutation(db,req.params.id,tx=>medical(res,tx).update(res.locals.actor,req.params.id,req.body??{})))}));
-  router.delete('/medical-records/:id',async(req,res)=>{await medicalMutation(db,req.params.id,tx=>medical(res,tx).delete(res.locals.actor,req.params.id));res.status(204).end();});
+  router.delete('/medical-records/:id',async(req,res)=>{await medicalMutation(db,req.params.id,tx=>medical(res,tx).delete(res.locals.actor,req.params.id,req.query.expectedRevision));res.status(204).end();});
   router.get('/medical-records/:id/history',async(req,res)=>res.json({items:await medical(res).history(res.locals.actor,req.params.id)}));
   router.get('/medical-records/images',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await list(db,'medicalImages',res.locals.actor,res.locals.directory,req.query,blobs));});
   router.post('/medical-records/images',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.status(201).json({image:await medical(res).createImage(res.locals.actor,req.body)});});
@@ -139,7 +140,8 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   app.use('/api/bootstrap',(_req,res)=>res.status(404).json({error:'Clinic route not found.'}));
   app.use('/api',router);
   app.use((_req,res)=>res.status(404).json({error:'Clinic route not found.'}));
-  const errors:ErrorRequestHandler=(error,_req,res,_next)=>{if(res.headersSent){res.end();return;}if(error instanceof BusinessError){if(error.status===503)res.setHeader('Retry-After','1');res.status(error.status).json({error:error.message,...('code' in error&&error.code==='CLINIC_READ_TOKEN_INVALID'?{code:error.code}:{})});}else if(error?.type==='entity.parse.failed')res.status(400).json({error:'Invalid JSON.'});else if(error?.type==='entity.too.large')res.status(413).json({error:'Request too large.'});else if(error?.code==='P2025')res.status(404).json({error:'Clinic resource not found.'});else res.status(503).json({error:'Clinic unavailable. Retry the same request key.'});};app.use(errors);return app;
+  // A stale medical record edit returns the stored record, so the editor can keep its draft and show what changed.
+  const errors:ErrorRequestHandler=(error,_req,res,_next)=>{if(res.headersSent){res.end();return;}if(error instanceof BusinessError){if(error.status===503)res.setHeader('Retry-After','1');res.status(error.status).json({error:error.message,...(error.code?{code:error.code}:{}),...(error instanceof StaleRevision?{current:medicalRecordDto(error.current as MedicalRecordValue)}:{})});}else if(error?.type==='entity.parse.failed')res.status(400).json({error:'Invalid JSON.'});else if(error?.type==='entity.too.large')res.status(413).json({error:'Request too large.'});else if(error?.code==='P2025')res.status(404).json({error:'Clinic resource not found.'});else res.status(503).json({error:'Clinic unavailable. Retry the same request key.'});};app.use(errors);return app;
 }
 // Hash only fields the use case consumes, with its defaults/trim semantics.
 function normalizeCreate(input:Record<string,unknown>,record:boolean){

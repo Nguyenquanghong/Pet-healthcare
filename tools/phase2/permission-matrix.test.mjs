@@ -18,6 +18,7 @@ const {BookingLifecycleService:CoreLifecycle}=await import('../../backend/dist/s
 const {BookingLifecycleService:ClinicLifecycle}=await import('../../services/clinic/dist/application/services/bookingLifecycle.js');
 const {AppointmentInvoiceBilling}=await import('../../backend/dist/src/phase2/appointmentBilling.js');
 const {ManualSend}=await import('../../services/notification/dist/manualSend.js');
+const {MedicalRecordsService}=await import('../../services/clinic/dist/application/services/medicalRecords.js');
 
 class Reached extends Error{constructor(){super('REACHED_DATA_LAYER');}}
 // Any property chain is allowed; calling or constructing anything is a data access.
@@ -53,6 +54,7 @@ const core=[ // [permission, method, path, body?]
   ['owner.manage','POST','/api/owners',{fullName:'Fixture',phone:'0900000000'}],
   ['owner.manage','POST',`/api/owners/${id}/activation`,{email:'fixture@example.com',customerVerified:true}],
   ['directory.read','GET','/api/owners'],
+  ['directory.read','GET','/api/doctors'],
   ['notification.send','POST','/api/notifications/send',{recipientOwnerId:id,title:'t',message:'m'}],
 ];
 const clinic=[
@@ -78,6 +80,8 @@ const service=[
   ['booking.reopen','Clinic reopen a completed service',actor=>new ClinicLifecycle(lifecycleStore()).undo(actor,'appointment',id,{expectedRevision:3,reason:'fixture'}),['booking.manage']],
   ['billing.manage','Core appointment invoice (Phase 2 billing operation)',actor=>new AppointmentInvoiceBilling(withFakes({user:{findUnique:async()=>({role:actor.role})}}),tripwire()).begin(actor,{appointmentId:id},'key-1',false)],
   ['billing.self-service','Core appointment self checkout (Phase 2 billing operation)',actor=>new AppointmentInvoiceBilling(withFakes({user:{findUnique:async()=>({role:actor.role})}}),tripwire()).begin(actor,{appointmentId:id},'key-1',true)],
+  // P11: the pet is loaded before the author is decided; naming another doctor is the admin's call.
+  ['medical-record.assign-doctor','Clinic record signed for another doctor',actor=>new MedicalRecordsService(withFakes({records:withFakes({findPet:async()=>({id:'pet-1',ownerId:'owner-1',name:'Pet'})})})).create(actor,{petId:'pet-1',title:'t',visitDate:'2030-01-01',diagnosis:'d',treatment:'t',doctorId:'doctor-2'}),['medical-record.write']],
   ['notification.send','Notification manual send',actor=>new ManualSend(tripwire(),tripwire()).send(actor,'token',{recipientOwnerId:'owner-1',title:'t',message:'m'},'key-1')],
 ];
 

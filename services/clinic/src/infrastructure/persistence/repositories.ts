@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient } from '../../generated/client/index.js';
 import type { Actor } from '../../domain/auth.js';
-import { BusinessError } from '../../domain/error.js';
+import { BusinessError, StaleRevision } from '../../domain/error.js';
 import type { AppointmentRepository,AppointmentDependencies } from '../../application/ports/appointments.js';
 import type { MedicalRecordRepository,MedicalDependencies,MedicalRevisionValue } from '../../application/ports/medicalRecords.js';
 import type { BookingLifecycleStore,LifecycleTransaction,BookingKind } from '../../application/ports/bookingLifecycle.js';
@@ -40,21 +40,33 @@ class Records implements MedicalRecordRepository {
   list(ownerId?:string,petId?:string){return this.db.medicalRecord.findMany({where:{ownerId,petId},orderBy:{visitDate:'desc'}});}
   findPet(id:string){return this.directory.pet(id);}
   async findAppointment(id:string){await this.db.$queryRaw`SELECT id FROM appointments WHERE id=${id} FOR UPDATE`;await unlocked(this.db,id);return this.db.appointment.findUnique({where:{id},select:{id:true,petId:true,ownerId:true}});}
+  async appointmentDoctor(id:string){return (await this.db.appointment.findUnique({where:{id},select:{doctorId:true}}))?.doctorId??null;}
+  findDoctor(id:string){return this.directory.doctor(id);}
+  signer(){return this.directory.signer();}
   find(id:string){return this.db.medicalRecord.findUnique({where:{id}});}
   // AQ-15: callers run these inside the record's transaction (unit of work or
   // medicalMutation), so the revision commits or rolls back with the change.
-  private revise(recordId:string,action:'create'|'update'|'delete',before:unknown,after:unknown,actor:Actor){
+  private revise(recordId:string,action:'create'|'update'|'delete',before:{revision:number}|null,after:{revision:number}|null,actor:Actor){
     // An omitted nullable Json column is SQL NULL; the DbNull sentinel is not
     // portable across separately generated clients.
     const snapshot=(v:unknown)=>v==null?undefined:JSON.parse(JSON.stringify(v));
-    return this.db.medicalRecordRevision.create({data:{recordId,action,before:snapshot(before),after:snapshot(after),actorId:actor.sub,actorRole:actor.role}});
+    return this.db.medicalRecordRevision.create({data:{recordId,action,before:snapshot(before),after:snapshot(after),actorId:actor.sub,actorRole:actor.role,recordRevision:(after??before)!.revision}});
+  }
+  // Optimistic lock: the row lock serializes two saves of one record; the second
+  // then sees the first one's revision and is refused instead of overwriting it.
+  private async current(id:string,expectedRevision:number){
+    await this.db.$queryRaw`SELECT id FROM medical_records WHERE id=${id} FOR UPDATE`;
+    const row=await this.db.medicalRecord.findUnique({where:{id}});
+    if(!row)throw new BusinessError(404,'Medical record not found.');
+    if(row.revision!==expectedRevision)throw new StaleRevision('Bệnh án vừa được người khác cập nhật. Hãy xem bản mới trước khi lưu.','MEDICAL_RECORD_STALE',row);
+    return row;
   }
   async create(data:Parameters<MedicalRecordRepository['create']>[0],actor:Actor){const created=await this.db.medicalRecord.create({data});await this.revise(created.id,'create',null,created,actor);return created;}
-  async update(id:string,data:Parameters<MedicalRecordRepository['update']>[1],actor:Actor){
-    const before=await this.db.medicalRecord.findUniqueOrThrow({where:{id}}),after=await this.db.medicalRecord.update({where:{id},data});
+  async update(id:string,data:Parameters<MedicalRecordRepository['update']>[1],actor:Actor,expectedRevision:number){
+    const before=await this.current(id,expectedRevision),after=await this.db.medicalRecord.update({where:{id},data:{...data,revision:{increment:1}}});
     await this.revise(id,'update',before,after,actor);return after;
   }
-  async delete(id:string,actor:Actor){const before=await this.db.medicalRecord.delete({where:{id}});await this.revise(id,'delete',before,null,actor);}
+  async delete(id:string,actor:Actor,expectedRevision:number){const before=await this.current(id,expectedRevision);await this.db.medicalRecord.delete({where:{id}});await this.revise(id,'delete',before,null,actor);}
   history(recordId:string){return this.db.medicalRecordRevision.findMany({where:{recordId},orderBy:[{changedAt:'asc'},{id:'asc'}]}) as Promise<MedicalRevisionValue[]>;}
   async createImage(data:Parameters<MedicalRecordRepository['createImage']>[0]){
     const pet=await this.directory.pet(data.petId);

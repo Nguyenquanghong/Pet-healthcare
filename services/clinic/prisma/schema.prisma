@@ -116,7 +116,9 @@ model MedicalRecord {
   petId         String    @map("pet_id")
   ownerId       String    @map("owner_id")
   appointmentId String?   @map("appointment_id")
+  doctorId      String?   @map("doctor_id")
   doctorName    String    @map("doctor_name")
+  revision      Int       @default(0)
   visitDate     DateTime  @map("visit_date") @db.Date
   title         String
   symptoms      String?
@@ -207,6 +209,7 @@ model MedicalRecordRevision {
   actorId   String   @map("actor_id")
   actorRole String   @map("actor_role")
   changedAt DateTime @default(now()) @map("changed_at")
+  recordRevision Int? @map("record_revision")
 
   @@index([recordId, changedAt, id], map: "medical_record_revisions_record_idx")
   @@map("medical_record_revisions")

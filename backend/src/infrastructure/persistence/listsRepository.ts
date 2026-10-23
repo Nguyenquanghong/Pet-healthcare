@@ -90,6 +90,9 @@ export class PrismaListsRepository implements ListsRepository {
       return { data, total, counts };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
+  doctors() {
+    return this.client.user.findMany({ where: { role: "doctor" }, select: { id: true, fullName: true }, orderBy: [{ fullName: "asc" }, { id: "asc" }] });
+  }
   async billingFigures(month?: string) {
     let range: { gte: Date; lt: Date } | undefined;
     if (month) {

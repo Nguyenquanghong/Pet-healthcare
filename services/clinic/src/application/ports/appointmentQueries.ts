@@ -9,7 +9,8 @@ export interface AppointmentCalendarQueries {
   calendar(actor: Actor, query: AppointmentCalendarQuery): Promise<AppointmentCalendarResult>;
 }
 
-export type AppointmentQueryDirectory = DirectoryLookup;
+// Lists resolve pets and owners only; doctor lookup belongs to record authorship.
+export type AppointmentQueryDirectory = Pick<DirectoryLookup, 'pet' | 'lookup'>;
 export type AppointmentListItem = Omit<AppointmentRecord, 'appointmentDate' | 'appointmentTime' | 'internalNote'> & {
   date: string;
   time: string;

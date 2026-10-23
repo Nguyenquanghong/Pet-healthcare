@@ -75,7 +75,9 @@ export function buildMigration(snapshot,ctx){
   for(const e of t.OutboxEvent){fail(e.leaseOwner===null&&e.leaseUntil===null,'DRAIN_OUTBOX_LEASES');const envelope=parseEnvelope(JSON.stringify(e.envelope.value));fail(envelope.eventId===e.id,'OUTBOX_EVENT_ID');}
   for(const name of targets.core)out.core[name]=structuredClone(t[name]);
   out.core.BookingStatusEvent=t.BookingStatusEvent.filter(r=>r.kind==='hotel');
-  for(const name of ['Appointment','MedicalRecord'])out.clinic[name]=structuredClone(t[name]);
+  out.clinic.Appointment=structuredClone(t.Appointment);
+  // P02/P11: imported records start at revision 0; no trustworthy doctor name -> id mapping, so doctor_id stays NULL.
+  out.clinic.MedicalRecord=t.MedicalRecord.map(row=>({...structuredClone(row),doctor_id:null,revision:0}));
   // AQ-09: imported images keep their base64 claim-less form; the blob migration tool moves them later.
   out.clinic.MedicalImage=t.MedicalImage.map(row=>({...row,owner_id:pets.get(row.pet_id).owner_id,storage_key:null,size_bytes:null,sha256:null,deleted_at:null,deleted_by:null}));
   out.clinic.BookingStatusEvent=t.BookingStatusEvent.filter(r=>r.kind==='appointment');
