@@ -33,7 +33,7 @@ test('per-token bucket rejects a flood against one pet with 429 before the handl
   assert.equal((await post('/api/public/pets/tok-b/rescue-reports')).status,201,'another pet keeps its own budget');
   assert.equal((await post('/api/public/pets/%74ok-a/rescue-reports')).status,429,'percent-encoded token shares the decoded bucket');
   const policy=spent.at(-1);assert.equal(policy.group,'public-rescue');
-  assert.deepEqual(policy.buckets.map(b=>[b.identity.split(':')[0],b.limit,b.windowMs]),[['ip',20,900000],['rescue-token',5,900000]]);
+  assert.deepEqual(policy.buckets.map(b=>[b.identity.split(':')[0],b.limit,b.windowMs]),[['ip',20,900000],['rescue-token',5,900000],['rescue-token-day',20,86400000]]);
 });
 
 test('IP bucket caps one client across many tokens; thresholds come from env',async t=>{
@@ -46,4 +46,12 @@ test('IP bucket caps one client across many tokens; thresholds come from env',as
 test('invalid threshold configuration fails closed instead of disabling the limiter',async t=>{
   const {post,count}=await harness(t,{RESCUE_REPORT_TOKEN_LIMIT:'0'});
   assert.equal((await post('/api/public/pets/tok-a/rescue-reports')).status,503);assert.equal(count(),0);
+});
+
+test('daily per-token bucket caps a slow flood that stays under the 15-minute bucket',async t=>{
+  const {post,count}=await harness(t,{RESCUE_REPORT_TOKEN_LIMIT:'50',RESCUE_REPORT_IP_LIMIT:'50',RESCUE_REPORT_TOKEN_DAILY_LIMIT:'3'});
+  for(let i=0;i<3;i++)assert.equal((await post('/api/public/pets/tok-day/rescue-reports')).status,201);
+  const denied=await post('/api/public/pets/tok-day/rescue-reports');
+  assert.equal(denied.status,429);assert.ok(Number(denied.headers.get('retry-after'))>0);assert.equal(count(),3);
+  assert.equal((await post('/api/public/pets/tok-other/rescue-reports')).status,201,'another pet keeps its own daily budget');
 });

@@ -2561,7 +2561,7 @@
             }
           },
           "429": {
-            "description": "Rescue report rate limit exceeded (Phase 2 runtime: RESCUE_REPORT_IP_LIMIT per IP, default 20, and RESCUE_REPORT_TOKEN_LIMIT per pet token, default 5, per 15 minutes)",
+            "description": "Rescue report rate limit exceeded (Phase 2 runtime: RESCUE_REPORT_IP_LIMIT per IP, default 20, and RESCUE_REPORT_TOKEN_LIMIT per pet token, default 5, per 15 minutes; RESCUE_REPORT_TOKEN_DAILY_LIMIT per pet token, default 20, per 24 hours)",
             "headers": {
               "Retry-After": {
                 "schema": {
