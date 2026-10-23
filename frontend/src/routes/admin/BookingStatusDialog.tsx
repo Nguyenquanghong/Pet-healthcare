@@ -6,6 +6,7 @@ import type { Appointment } from "../../types/appointment";
 import type { HotelBooking } from "../../types/booking";
 import type { Pet } from "../../types/pet";
 import type { Owner } from "../../types/owner";
+import { formatDateTime } from "../../utils/date";
 
 const labels: Record<string, string> = { pending: "Chờ xác nhận", confirmed: "Đã xác nhận", checked_in: "Đã nhận thú cưng",
   in_progress: "Đang thực hiện", completed: "Hoàn thành dịch vụ", in_stay: "Đang lưu trú", checked_out: "Đã trả thú cưng",
@@ -71,7 +72,7 @@ export function BookingStatusDialog({ kind, selection, onClose, onSaved }: {
         <ol className="space-y-3">{events.map(event => <li key={event.id} className="rounded-lg border p-3 text-sm">
           <p className="font-semibold">{actionLabels[event.action] || event.action}</p>
           <p>{labels[event.fromStatus] || event.fromStatus} → {labels[event.toStatus] || event.toStatus}</p>
-          <p>{event.actorName} · {new Date(event.createdAt).toLocaleString("vi-VN")}</p>
+          <p>{event.actorName} · {formatDateTime(event.createdAt)}</p>
           {event.reason && <p className="break-words">Lý do: {event.reason}</p>}
           {event.reversesId && <p>Đảo thao tác trước đó; bản ghi gốc được giữ lại.</p>}
           {events.some(e => e.reversesId === event.id) && <p className="text-amber-700">Thao tác này đã được hoàn tác.</p>}

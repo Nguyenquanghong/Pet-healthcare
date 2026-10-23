@@ -4,9 +4,10 @@ import { apiClient } from "../../services/apiClient";
 import type { Invoice } from "../../types/invoice";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { useApiQuery } from '../../services/useApiQuery';
+import { vietnamIsoDate } from "../../utils/date";
 
 type Range = "all" | "this_month" | "last_month";
-const vietnamMonth = (date: Date) => new Date(date.getTime() + 7 * 3_600_000).toISOString().slice(0, 7);
+const vietnamMonth = (date: Date) => vietnamIsoDate(date.getTime()).slice(0, 7);
 
 export function AdminAnalyticsPage() {
   const [range, setRange] = useState<Range>("all");

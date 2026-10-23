@@ -12,6 +12,7 @@ import { formatCurrency } from "../../utils/formatCurrency";
 import { isSpaAppointmentType } from "../../types/appointment";
 import {useInvoiceOperation} from '../../services/useInvoiceOperation';
 import { useApiQuery } from '../../services/useApiQuery';
+import { formatDate, formatDateTime } from '../../utils/date';
 
 const statusLabel = { unpaid: "Chờ thanh toán", paid: "Đã thanh toán", refunded: "Đã hoàn tiền" };
 export function OwnerBillingPage() {
@@ -76,7 +77,7 @@ export function OwnerBillingPage() {
       <div className="space-y-5">
         {invoices.map(invoice => <article key={invoice.id} aria-label={invoice.invoiceCode} className="rounded-xl border bg-white p-5 shadow-sm">
           <div className="flex flex-wrap justify-between gap-2">
-            <div><h2 className="break-all text-sm font-bold">{invoice.invoiceCode}</h2><p className="text-sm text-slate-500">{pets.find(p => p.id === invoice.petId)?.name} · {new Date(invoice.issuedAt).toLocaleDateString("vi-VN")}</p></div>
+            <div><h2 className="break-all text-sm font-bold">{invoice.invoiceCode}</h2><p className="text-sm text-slate-500">{pets.find(p => p.id === invoice.petId)?.name} · {formatDate(invoice.issuedAt)}</p></div>
             <strong className={invoice.paymentStatus === "paid" ? "text-emerald-700" : "text-amber-700"}>{statusLabel[invoice.paymentStatus]}</strong>
           </div>
           <ul className="my-4 divide-y">
@@ -86,7 +87,7 @@ export function OwnerBillingPage() {
           <p className="my-2 text-lg font-bold">Tổng thanh toán: {formatCurrency(invoice.totalAmount)}</p>
           {invoice.notes && <p className="mb-3 text-sm">Ghi chú: {invoice.notes}</p>}
           {invoice.paymentChannel && <p className="mb-3 text-sm">Hình thức: {invoice.paymentChannel === "onsite" ? "Thanh toán tại cửa hàng" : invoice.paymentChannel === "bank_transfer" ? "Chuyển khoản ngân hàng" : "VNPay (Sandbox)"}</p>}
-          {invoice.paidAt && <p className="text-sm text-slate-600">Đã xác nhận lúc {new Date(invoice.paidAt).toLocaleString("vi-VN")}</p>}
+          {invoice.paidAt && <p className="text-sm text-slate-600">Đã xác nhận lúc {formatDateTime(invoice.paidAt)}</p>}
           {invoice.paymentStatus !== "unpaid" && invoice.paymentChannel === "bank_transfer" && invoice.bankTransferDetails?.isDemo && <p className="mt-2 text-sm text-amber-800">Dữ liệu thanh toán minh họa.</p>}
           {invoice.paymentStatus === "unpaid" && <div className="mt-3 space-y-3">
             {invoice.paymentChannel === "bank_transfer" && <BankTransferPanel invoice={invoice} busy={busy} onReport={reference => void act(async () => {

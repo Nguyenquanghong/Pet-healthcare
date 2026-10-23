@@ -6,6 +6,7 @@ import { useNotificationCount } from '../../store/NotificationCountContext';
 import { QueryStatus } from '../../components/ui/QueryStatus';
 import { appointmentStatusLabels, bookingStatusLabels } from "../../utils/statusLabels";
 import { formatCurrency } from "../../utils/formatCurrency";
+import { todayIso } from "../../utils/date";
 import { ClinicActivitySection } from '../../components/admin/ClinicActivitySection';
 
 function StatCard({ label, value, icon: Icon, subtitle }: { label: string; value: number | string; icon: React.ElementType; subtitle?: string }) {
@@ -28,7 +29,7 @@ export function AdminDashboardPage() {
   const { core, clinic, appointments, hotelBookings, pets, owners, medicalRecords, summary } = useDashboard(5000);
   const unread = useNotificationCount();
 
-  const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+  const today = todayIso();
   const todayAppointments = appointments.filter(a => a.date === today);
   const pendingAppointments = appointments.filter(a => a.status === "pending").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const pendingBookings = hotelBookings.filter(b => b.status === "pending");

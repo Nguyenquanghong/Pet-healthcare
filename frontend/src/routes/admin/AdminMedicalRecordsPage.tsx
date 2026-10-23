@@ -31,6 +31,7 @@ import {
 import { useAppStore } from "../../store/AppStoreProvider";
 import type { MedicalRecord } from "../../types/medicalRecord";
 import { useRequestIntent } from '../../services/useRequestIntent';
+import { todayIso } from '../../utils/date';
 
 export function AdminMedicalRecordsPage() {
   const canWrite = useSession().can("medical-record.write");
@@ -132,7 +133,7 @@ export function AdminMedicalRecordsPage() {
           petId,
           appointmentId: appointmentId || undefined,
           doctorName,
-          visitDate: new Date(Date.now()+7*3600000).toISOString().slice(0, 10),
+          visitDate: todayIso(),
           title,
           symptoms,
           diagnosis,

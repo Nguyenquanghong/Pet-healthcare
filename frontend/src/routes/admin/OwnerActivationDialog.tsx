@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { apiClient } from "../../services/apiClient";
 import type { Owner } from "../../types/owner";
+import { formatDateTime } from "../../utils/date";
 
 type Invitation = { token: string; email: string; expiresAt: string };
 
@@ -50,7 +51,7 @@ export function OwnerActivationDialog({ owner, onClose }: { owner: Owner; onClos
     {invitation && !reissuing ? <div className="space-y-4">
       <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">Đã cấp liên kết cho {invitation.email}. Khách tự đặt mật khẩu; hồ sơ cũ được giữ nguyên.</p>
       <Input label="Liên kết kích hoạt" value={link} readOnly onFocus={event => event.target.select()} />
-      <p className="text-sm">Hết hạn: {new Date(invitation.expiresAt).toLocaleString("vi-VN")} (30 phút kể từ lúc cấp). Chỉ dùng một lần.</p>
+      <p className="text-sm">Hết hạn: {formatDateTime(invitation.expiresAt)} (30 phút kể từ lúc cấp). Chỉ dùng một lần.</p>
       <p className="text-sm text-slate-600">Sao chép và giao riêng cho đúng khách sau khi xác minh. Hệ thống chưa gửi email tự động. Khách mở liên kết trên thiết bị của mình rồi đăng nhập bằng email và mật khẩu vừa đặt.</p>
       {copyFeedback && <p role="status" className="text-sm text-slate-600">{copyFeedback}</p>}
       <div className="flex flex-wrap justify-end gap-2">

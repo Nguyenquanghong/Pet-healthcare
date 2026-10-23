@@ -19,6 +19,7 @@ import { apiClient } from "../../services/apiClient";
 import { InvoiceIssueForm } from "./InvoiceIssueForm";
 import { useSession } from "../../store/SessionContext";
 import { useSearchParams } from "react-router-dom";
+import { formatDate, formatDateTime } from "../../utils/date";
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { cash: "Tiền mặt", bank_transfer: "Chuyển khoản", credit_card: "Thẻ", qr_code: "QR", vnpay: "VNPay" };
 
@@ -256,7 +257,7 @@ export function AdminBillingPage() {
                     </td>
 
                     <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-600">
-                      {new Date(inv.issuedAt).toLocaleDateString("vi-VN")}
+                      {formatDate(inv.issuedAt)}
                     </td>
 
                     <td className="px-5 py-4 whitespace-nowrap font-black text-primary">
@@ -368,7 +369,7 @@ export function AdminBillingPage() {
                     HÓA ĐƠN DỊCH VỤ
                   </span>
                   <p className="break-words text-xs font-bold text-slate-900">{selectedInvoice.invoiceCode}</p>
-                  <p className="text-xs text-slate-500">Ngày phát hành: {new Date(selectedInvoice.issuedAt).toLocaleDateString("vi-VN")}</p>
+                  <p className="text-xs text-slate-500">Ngày phát hành: {formatDate(selectedInvoice.issuedAt)}</p>
                 </div>
               </div>
 
@@ -454,7 +455,7 @@ export function AdminBillingPage() {
                 {selectedInvoice.paymentChannel === "bank_transfer" && <p>Nội dung chuyển: {selectedInvoice.transferContent}</p>}
                 {selectedInvoice.paymentChannel === "bank_transfer" && selectedInvoice.bankTransferDetails?.isDemo && <p>Dữ liệu thanh toán minh họa.</p>}
                 {selectedInvoice.transferReference && <p>Mã giao dịch khách báo: {selectedInvoice.transferReference}</p>}
-                {selectedInvoice.paidAt && <p>Thời điểm thu tiền: {new Date(selectedInvoice.paidAt).toLocaleString("vi-VN")}</p>}
+                {selectedInvoice.paidAt && <p>Thời điểm thu tiền: {formatDateTime(selectedInvoice.paidAt)}</p>}
                 {selectedInvoice.notes && <p>Ghi chú: {selectedInvoice.notes}</p>}
               </div>
               <section className="rounded-lg border p-3 print:hidden">
@@ -463,7 +464,7 @@ export function AdminBillingPage() {
                 {!historyError && paymentEvents.length === 0 && <p className="text-sm text-slate-500">Chưa có sự kiện được ghi nhận. Hóa đơn cũ có thể không có lịch sử người xác nhận.</p>}
                 <ol className="mt-2 space-y-2">{paymentEvents.map(event => <li key={event.id} className="border-t pt-2 text-sm">
                   <strong>{event.action === "payment_confirmed" ? "Đã xác nhận thu tiền" : event.action === "transfer_reported" ? "Khách báo đã chuyển khoản" : "Nhân viên yêu cầu kiểm tra lại"}</strong>
-                  <p>{event.actorName} ({event.actorRole}) · {new Date(event.createdAt).toLocaleString("vi-VN")}</p>
+                  <p>{event.actorName} ({event.actorRole}) · {formatDateTime(event.createdAt)}</p>
                   {event.reference && <p>Mã khách báo: {event.reference}</p>}
                   {event.reason && <p>Lý do: {event.reason}</p>}
                 </li>)}</ol>
