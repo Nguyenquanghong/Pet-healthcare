@@ -1,12 +1,12 @@
 import amqp, { type ConfirmChannel, type Options } from 'amqplib';
-import { parseEnvelope, type Envelope } from '@nipopeto/contracts';
+import { consumes, parseEnvelope, type Envelope, type EventConsumer } from '@nipopeto/contracts';
 // Transport metadata only. Untrusted non-UUID identifiers are never logged.
 export function logEvent(service:string,event:Envelope,status:string,started=performance.now()){
   if(process.env.PHASE2_RUNTIME_REQUIRED!=='1')return;
   const id=(v:string)=>/^[0-9a-f-]{36}$/i.test(v)?v:'unknown';
   try{process.stdout.write(JSON.stringify({service,eventId:id(event.eventId),correlationId:id(event.correlationId),eventType:event.eventType,status,latencyMs:Math.round(performance.now()-started)})+'\n');}catch{}
 }
-export type ConsumerName = 'notification' | 'clinic' | 'clinic-read-v1';
+export type ConsumerName = EventConsumer;
 export const topology = (prefix = 'nipopeto.v1') => ({ exchange: `${prefix}.events`, notification: `${prefix}.notification`, clinic: `${prefix}.clinic`, clinicRead: `${prefix}.clinic-read-v1` });
 export type Topology = ReturnType<typeof topology>;
 export async function declareTopology(brokerUrl: string, t: Topology) {
@@ -123,7 +123,7 @@ export async function consumeEvents(brokerUrl: string, queue: string, consumerNa
     try {
       const event = parseEnvelope(message.content.toString('utf8'));
       observed=event;
-      valid = consumerName === 'notification' ? ['notification.requested.v1', 'identity.sessions-revoked.v1'].includes(event.eventType) : consumerName === 'clinic-read-v1' ? event.eventType === 'clinic.appointment-read-changed.v1' : event.eventType.startsWith('billing.') || event.eventType.startsWith('directory.');
+      valid = consumes(consumerName, event.eventType);
       if (!valid) reason = 'UNSUPPORTED_EVENT';
     } catch {}
     if (valid) {

@@ -166,6 +166,36 @@ const permissionCheck=(existsSync(built)?import(pathToFileURL(built).href):Promi
     return scanned.length+' files, '+permissions.length+' permissions checked';
   }),error=>rule('permissions-from-matrix',()=>{throw error;}));
 
+// ---- 5b. Consumers name the events they apply (F7) ------------------------------
+// Each consumer's list in contracts is bound to its queue, every declared type has a
+// consumer, and every billing type Clinic consumes has an explicit outcome, so a new
+// billing event cannot be read as an abort by default.
+const clinicBilling=resolve(root,'services/clinic/dist/billingEvents.js');
+const consumerQueues={notification:'notification',clinic:'clinic','clinic-read-v1':'clinicRead'};
+export function consumerGaps({eventTypes,consumedEvents},bound,outcomes){
+  const gaps=[];
+  for(const t of eventTypes)if(!Object.values(consumedEvents).some(list=>list.includes(t)))gaps.push('no consumer for '+t);
+  for(const [consumer,list] of Object.entries(consumedEvents))for(const t of list){
+    if(!eventTypes.includes(t))gaps.push(consumer+' consumes undeclared '+t);
+    if(!bound.some(b=>b.queue===consumerQueues[consumer]&&topicMatches(b.key,t)))gaps.push(consumer+' queue not bound to '+t);
+  }
+  const billing=consumedEvents.clinic.filter(t=>t.startsWith('billing.'));
+  for(const t of billing)if(!Object.hasOwn(outcomes,t))gaps.push('clinic has no billing outcome for '+t);
+  for(const t of Object.keys(outcomes))if(!billing.includes(t))gaps.push('billing outcome for unconsumed '+t);
+  return gaps;
+}
+const consumerCheck=(existsSync(built)&&existsSync(clinicBilling)?Promise.all([import(pathToFileURL(built).href),import(pathToFileURL(clinicBilling).href)]):Promise.reject(new Error('build packages/contracts and services/clinic first (npm run phase2:build)')))
+  .then(([contracts,{billingOutcomes}])=>rule('event-consumers-explicit',()=>{
+    const bound=bindings(read('packages/messaging/src/index.ts'));
+    assert.deepEqual(consumerGaps(contracts,bound,billingOutcomes),[]);
+    // negative fixtures
+    const voided={eventTypes:[...contracts.eventTypes,'billing.invoice-voided.v1'],consumedEvents:{...contracts.consumedEvents,clinic:[...contracts.consumedEvents.clinic,'billing.invoice-voided.v1']}};
+    assert.deepEqual(consumerGaps(voided,bound,billingOutcomes),['clinic has no billing outcome for billing.invoice-voided.v1']);
+    assert.ok(consumerGaps({...contracts,eventTypes:[...contracts.eventTypes,'audit.thing-happened.v1']},bound,billingOutcomes).includes('no consumer for audit.thing-happened.v1'));
+    assert.ok(consumerGaps(contracts,bound.filter(b=>b.queue!=='notification'),billingOutcomes).some(g=>g.startsWith('notification queue not bound')));
+    return Object.keys(contracts.consumedEvents).length+' consumers, '+Object.keys(billingOutcomes).length+' billing outcomes';
+  }),error=>rule('event-consumers-explicit',()=>{throw error;}));
+
 // ---- 6. Shared OpenAPI schemas agree (AQ-07) -----------------------------------
 // The frontend types are generated from the gateway spec; Clinic's spec is the
 // service's own contract. A schema both declare must not drift apart silently.
@@ -218,6 +248,7 @@ const categoryCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise
 await envelopeCheck;
 await grantsCheck;
 await permissionCheck;
+await consumerCheck;
 await categoryCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
