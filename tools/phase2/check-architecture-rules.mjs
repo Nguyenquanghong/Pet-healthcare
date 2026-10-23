@@ -103,6 +103,18 @@ rule('gateway-hides-internal-routes',()=>{
   assert.equal(blocksInternal('location /api/ { proxy_pass http://core; }'),false);
   return GATEWAYS.length+' gateway configs';
 });
+// P08 part A: the Core gateway forwards through serviceProxy (one Circuit Breaker
+// per downstream), never a hand-written fetch in the composition root.
+export const directFetches=source=>source.split(/\r?\n/).flatMap((line,index)=>/(^|[^\w.])fetch\s*\(/.test(line)?['line '+(index+1)]:[]);
+rule('gateway-uses-service-proxy',()=>{
+  const source=read('backend/src/phase2/coreApp.ts');
+  assert.deepEqual(directFetches(source),[],'coreApp.ts calls fetch directly; route it through serviceProxy');
+  assert.ok(/serviceProxy\(\{\s*name:\s*'clinic'/.test(source)&&/serviceProxy\(\{\s*name:\s*'notification'/.test(source),'both downstreams use serviceProxy');
+  // negative fixtures
+  assert.deepEqual(directFetches("app.use(x,async(req,res)=>{const r=await fetch(url,{method:req.method});})"),['line 1']);
+  assert.deepEqual(directFetches("const r=await breaker.run(()=>send(target,req,url));\n// prefetch(1) and res.fetchLater are not fetch"),[]);
+  return 'clinic and notification through serviceProxy';
+});
 
 // ---- 4. Runtime grants cover every model ---------------------------------------
 // The P7 runtime role is least-privilege, so a model added after P7 without a
