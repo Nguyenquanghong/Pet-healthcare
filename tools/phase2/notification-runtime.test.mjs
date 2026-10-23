@@ -304,7 +304,7 @@ test('AQ-10 capacity: the database refuses the booking beyond rooms per type and
   const base = 3650 + Math.floor(Math.random() * 3000), day = n => new Date(Date.now() + 7 * 3600000 + (base + n) * 86400000).toISOString().slice(0, 10);
   const pets = await Promise.all([1, 2, 3, 4, 5, 6].map(i => core.pet.create({ data: { ownerId: owner, name: 'AQ-10 capacity pet ' + i, species: 'cat', allergies: [] } })));
   const body = (p, from, to) => ({ petId: p.id, checkIn: day(from), checkOut: day(to), roomType: 'vip', services: [] });
-  const nights = async () => Object.fromEntries((await core.hotelRoomNight.findMany({ where: { roomType: 'vip', night: { gte: new Date(day(0)), lt: new Date(day(6)) } }, orderBy: { night: 'asc' } })).map(n => [n.night.toISOString().slice(0, 10), n.booked]));
+  const nights = async () => Object.fromEntries((await core.hotelRoomNight.findMany({ where: { roomType: 'vip', night: { gte: new Date(day(0)), lt: new Date(day(5)) } }, orderBy: { night: 'asc' } })).map(n => [n.night.toISOString().slice(0, 10), n.booked]));
   const created = [];
   try {
     for (const role of ['staff', 'doctor']) assert.match(requireStatus(await request('/api/hotel-capacity/vip', { method: 'PUT', token: tokens[role], body: { capacity: 1 } }), 403).error, /quản trị viên/);
