@@ -1,3 +1,4 @@
+import type { ApiSchemas } from "./generated/api";
 import type { Owner } from "./owner";
 import type { Pet } from "./pet";
 import type { Appointment } from "./appointment";
@@ -7,7 +8,7 @@ import type { MedicalImage } from "./medicalImage";
 import type { Notification } from "./notification";
 import type { Invoice } from "./invoice";
 
-export type PaginationInfo = { page: number; pageSize: number; total: number; totalPages: number };
+export type PaginationInfo = ApiSchemas["Pagination"];
 export type RelatedData = { owners: Owner[]; pets: Pet[]; appointments: Appointment[]; hotelBookings: HotelBooking[];
   medicalRecords: MedicalRecord[]; medicalImages: MedicalImage[]; dailyCareNotes: DailyCareNote[]; notifications: Notification[]; invoices: Invoice[] };
 export type DirectoryStatus = { petId: string; sourceVersion: number; projectionVersion: number; searchReady: boolean };

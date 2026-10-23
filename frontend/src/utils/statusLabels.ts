@@ -34,6 +34,10 @@ export const moodLabels: Record<"happy" | "calm" | "anxious" | "tired", string> 
   tired: "Mệt mỏi, cần nghỉ ngơi",
 };
 
+// AQ-07: eatingStatus and mood are free text in the API contract; show values the
+// UI does not know as they are instead of an empty label.
+export const labelOf = (labels: Record<string, string>, value: string) => labels[value] ?? value;
+
 export const petHealthLabels: Record<PetHealthStatus, string> = {
   healthy: "Khỏe mạnh",
   vaccination_due: "Cần tiêm phòng",

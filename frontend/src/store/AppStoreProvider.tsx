@@ -1,9 +1,9 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { AppointmentType } from '../types/appointment';
 import type { HotelBooking } from '../types/booking';
-import type { MedicalRecord } from '../types/medicalRecord';
 import type { Owner } from '../types/owner';
 import type { Pet } from '../types/pet';
+import type { ApiSchemas } from '../types/generated/api';
 import { apiClient, authToken } from '../services/apiClient';
 import { SessionProvider, useSession, type SessionUser } from './SessionContext';
 import { DataRefreshProvider, useDataRefresh, type DataScope } from './DataRefreshContext';
@@ -13,10 +13,12 @@ export type AppSummary = { totals: Record<string, number>; species: Record<strin
 type CreateHotelBookingInput = { petId: string; checkIn: string; checkOut: string; roomType: HotelBooking['roomType']; serviceKeys: HotelBooking['serviceKeys']; ownerNote?: string };
 type CreateAppointmentInput = { petId: string; type: AppointmentType; serviceName: string; date: string; time: string; doctorId?: string; ownerNote?: string };
 type RescheduleAppointmentInput = { date: string; time: string; ownerNote?: string; expectedRevision?: number };
-type CreateMedicalRecordInput = Omit<MedicalRecord, 'id' | 'ownerId' | 'createdAt' | 'updatedAt'>;
-type UpdateMedicalRecordInput = Partial<Omit<MedicalRecord, 'id' | 'petId' | 'ownerId' | 'appointmentId' | 'createdAt'>>;
-type UpdatePetInput = Partial<Omit<Pet, 'id' | 'ownerId' | 'qrToken' | 'publicProfile'>> & { publicProfile?: Partial<NonNullable<Pet['publicProfile']>> };
-const fallbackOwner: Owner = { id: '', fullName: '', phone: '', petIds: [] };
+// AQ-07: request bodies are the contract's input schemas, not edited copies of the response DTOs.
+type CreateMedicalRecordInput = ApiSchemas['MedicalRecordInput'];
+type UpdateMedicalRecordInput = ApiSchemas['MedicalRecordUpdateInput'];
+type CreatePetInput = ApiSchemas['PetInput'];
+type UpdatePetInput = ApiSchemas['PetUpdateInput'];
+const fallbackOwner: Owner = { id: '', fullName: '', phone: '', role: 'owner', petIds: [], loginEnabled: false };
 
 // Compatibility action facade. Pages own all business reads; session owns auth.
 function useAppActions() {
@@ -56,7 +58,7 @@ function useAppActions() {
       session.logout();
       return saved;
     },
-    createPet: (input: Omit<Pet, 'id' | 'ownerId' | 'qrToken'>) => writeAndReload(async () => { const { pet } = await apiClient.post<{ pet: Pet }>('/pets', input); rememberPet(pet); }, ['pets']),
+    createPet: (input: CreatePetInput) => writeAndReload(async () => { const { pet } = await apiClient.post<{ pet: Pet }>('/pets', input); rememberPet(pet); }, ['pets']),
     updatePet: (id: string, input: UpdatePetInput) => writeAndReload(async () => { const { pet } = await apiClient.patch<{ pet: Pet }>(`/pets/${id}`, input); rememberPet(pet); }, ['pets', 'clinic']),
     rotatePetQrToken: (id: string) => writeAndReload(async () => { const { pet } = await apiClient.post<{ pet: Pet }>(`/pets/${id}/qr-token`, {}); rememberPet(pet); }, ['pets']),
     createHotelBooking: async (input: CreateHotelBookingInput, requestKey: string) => {

@@ -18,6 +18,8 @@ import { actorVerifier } from '../../services/notification/dist/auth.js';
 import { CoreSendAuthorization } from '../../services/notification/dist/coreAuthorization.js';
 import { ManualSend } from '../../services/notification/dist/manualSend.js';
 import { createPublicRescueDependencies } from '../../backend/dist/src/infrastructure/persistence/publicRescueRepository.js';
+import { validate, responseSchema } from './openapi-validate.mjs';
+import { readFileSync as readSpec } from 'node:fs';
 import { writeNotification as clinicNotification } from '../../services/clinic/dist/notificationOutbox.js';
 import { OutboxRelay as ClinicRelay } from '../../services/clinic/dist/relay.js';
 import { NotificationInbox } from '../../services/notification/dist/inbox.js';
@@ -329,6 +331,20 @@ test('AQ-10 capacity: the database refuses the booking beyond rooms per type and
     await core.hotelBooking.deleteMany({ where: { petId: { in: pets.map(p => p.id) } } });
     await core.$executeRaw`UPDATE hotel_room_capacity SET capacity = 1000`; await core.$executeRaw`UPDATE hotel_room_nights SET capacity = 1000`;
   }
+});
+test('AQ-07: real responses through Core match the public OpenAPI contract the frontend types are generated from', async () => {
+  const spec = JSON.parse(readSpec(new URL('../../backend/openapi.json', import.meta.url), 'utf8'));
+  const reads = { owner: ['/api/auth/me', '/api/pets?pageSize=100', '/api/appointments?pageSize=100', '/api/hotel-bookings', '/api/medical-records?pageSize=100', '/api/invoices', '/api/notifications?pageSize=100', '/api/bootstrap'],
+    admin: ['/api/auth/me', '/api/pets?pageSize=100', '/api/owners?pageSize=100', '/api/appointments?pageSize=100', '/api/hotel-bookings', '/api/medical-records?pageSize=100', '/api/invoices', '/api/notifications?pageSize=100', '/api/bootstrap?view=dashboard', '/api/hotel-care-notes', '/api/hotel-capacity'] };
+  const problems = [], checked = {};
+  for (const [role, paths] of Object.entries(reads)) for (const path of paths) {
+    const body = requireStatus(await request(path, { token: tokens[role] }), 200);
+    const found = validate(spec, responseSchema(spec, 'GET', path, 200), body, role + ' GET ' + path);
+    problems.push(...found);
+    for (const key of ['items', 'pets', 'appointments', 'medicalRecords', 'notifications', 'invoices', 'hotelBookings']) if (Array.isArray(body[key])) checked[key] = (checked[key] ?? 0) + body[key].length;
+  }
+  assert.deepEqual(problems.slice(0, 30), [], problems.length + ' contract problems');
+  for (const key of ['items', 'appointments']) assert.ok(checked[key] > 0, 'the check saw real ' + key);
 });
 test('legacy export/dry-run/import/verify preserve IDs/status/timestamps; resume and deleted/read rows never regress', async () => {
   const source = [];

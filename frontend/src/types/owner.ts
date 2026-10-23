@@ -1,10 +1,4 @@
-export type Owner = {
-  id: string;
-  fullName: string;
-  phone: string;
-  email?: string;
-  address?: string;
-  petIds: string[];
-  petCount?: number;
-  loginEnabled?: boolean;
-};
+import type { ApiSchemas } from "./generated/api";
+
+// AQ-07: generated from the OpenAPI contract (types/generated/api.ts).
+export type Owner = ApiSchemas["Owner"];

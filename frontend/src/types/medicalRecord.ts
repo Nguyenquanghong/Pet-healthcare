@@ -1,21 +1,4 @@
-export type MedicalRecord = {
-  id: string;
-  petId: string;
-  ownerId: string;
-  appointmentId?: string;
-  doctorName: string;
-  visitDate: string;
-  title: string;
-  symptoms?: string;
-  diagnosis: string;
-  treatment: string;
-  medications?: string;
-  vaccineName?: string;
-  followUpDate?: string;
-  weightKg?: number;
-  temperatureC?: number;
-  heartRateBpm?: number;
-  internalNote?: string;
-  createdAt: string;
-  updatedAt: string;
-};
+import type { ApiSchemas } from "./generated/api";
+
+// AQ-07: generated from the OpenAPI contract (types/generated/api.ts).
+export type MedicalRecord = ApiSchemas["MedicalRecord"];

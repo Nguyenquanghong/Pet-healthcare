@@ -1,14 +1,6 @@
-export type MedicalImage = {
-  id: string;
-  petId: string;
-  title: string;
-  mimeType: string;
-  sizeBytes: number | null;
-  // Valet key: short-lived presigned URL for the bytes in the image bucket;
-  // null for a legacy image that has not been moved to the bucket yet.
-  url: string | null;
-  urlExpiresAt: string | null;
-  // Inline data URL returned only by the single-backend (Phase 1) API.
-  imageUrl?: string;
-  createdAt: string;
-};
+import type { ApiSchemas } from "./generated/api";
+
+// AQ-07: generated from the OpenAPI contract (types/generated/api.ts). `url` is the
+// short-lived Valet Key; null for a legacy image not yet moved to the bucket.
+// `imageUrl` (inline data URL) is sent only by the single-backend Phase 1 API.
+export type MedicalImage = ApiSchemas["MedicalImage"] & { imageUrl?: string };

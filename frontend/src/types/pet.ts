@@ -1,37 +1,11 @@
-export type PetSpecies = "dog" | "cat" | "rabbit" | "other";
-export type PetGender = "male" | "female" | "unknown";
-export type PetHealthStatus = "healthy" | "vaccination_due" | "under_treatment" | "critical" | "stable";
+import type { ApiSchemas } from "./generated/api";
 
-export type PetPublicProfile = {
-  showOwnerPhone: boolean;
-  showOwnerEmail: boolean;
-  showOwnerAddress: boolean;
-  showMedicalAlerts: boolean;
-  rescueNote?: string;
-};
-
-export type Pet = {
-  id: string;
-  ownerId: string;
-  directoryVersion?: number;
-  name: string;
-  species: PetSpecies;
-  breed: string;
-  gender: PetGender;
-  ageLabel: string;
-  weightKg?: number;
-  microchipId?: string;
-  avatarUrl?: string;
-  healthStatus: PetHealthStatus;
-  allergies?: string[];
-  notes?: string;
-  identifyingMarks?: string;
-  lastSeenLocation?: string;
-  qrToken?: string;
-  qrEnabled?: boolean;
-  publicProfile?: PetPublicProfile;
-};
-
+// AQ-07: API shapes are generated from backend/openapi.json (types/generated/api.ts);
+// this file only names them for the UI.
+export type Pet = ApiSchemas["Pet"];
+export type PetSpecies = Pet["species"];
+export type PetGender = Pet["gender"];
+export type PetHealthStatus = Pet["healthStatus"];
+export type PetPublicProfile = ApiSchemas["PublicProfile"];
 // The QR endpoint intentionally returns only a public subset of the private Pet DTO.
-export type PublicPet = Pick<Pet, "id" | "name" | "species" | "breed" | "gender" | "ageLabel" | "microchipId" | "avatarUrl" | "identifyingMarks" | "lastSeenLocation" | "qrEnabled" | "publicProfile"> &
-  Partial<Pick<Pet, "healthStatus" | "allergies">>;
+export type PublicPet = ApiSchemas["PublicPetProfile"];

@@ -1,34 +1,9 @@
-export type HotelRoomType = "standard" | "deluxe" | "vip";
-export type HotelBookingStatus = "pending" | "confirmed" | "in_stay" | "checked_out" | "rejected" | "cancelled";
+import type { ApiSchemas } from "./generated/api";
+
+// AQ-07: generated from the OpenAPI contract (types/generated/api.ts).
+export type HotelBooking = ApiSchemas["HotelBooking"];
+export type HotelRoomType = HotelBooking["roomType"];
+export type HotelBookingStatus = HotelBooking["status"];
+export type DailyCareNote = ApiSchemas["CareNote"];
+// UI choices; the API accepts any service key it prices and returns string[].
 export type HotelServiceKey = "grooming_spa" | "special_diet" | "video_call" | "daily_walk" | "medicine_support";
-
-export type HotelBooking = {
-  id: string;
-  petId: string;
-  ownerId: string;
-  checkIn: string;
-  checkOut: string;
-  nights: number;
-  roomType: HotelRoomType;
-  serviceKeys: HotelServiceKey[];
-  totalAmount: number;
-  status: HotelBookingStatus;
-  statusRevision: number;
-  ownerNote?: string;
-  internalNote?: string;
-  dailyCareNoteIds: string[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type DailyCareNote = {
-  id: string;
-  bookingId: string;
-  date: string;
-  eatingStatus: "good" | "normal" | "poor";
-  mood: "happy" | "calm" | "anxious" | "tired";
-  note: string;
-  visibleToOwner: boolean;
-  createdByStaffId: string;
-  createdAt: string;
-};
