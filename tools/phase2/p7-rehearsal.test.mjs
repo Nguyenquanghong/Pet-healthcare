@@ -36,14 +36,17 @@ async function child(file,extra,name,ready){
   await until(async()=>{if(ended)throw new Error('P7_CHILD_STARTUP_'+name);return ready?ready(h):logs.includes('worker-ready');},'ready_'+name);return h;
 }
 async function request(path,{base=gateway,token=tokens.owner,method='GET',body,key}={}){const r=await fetch(base+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(body!==undefined?{'Content-Type':'application/json'}:{}),...(key?{'Idempotency-Key':key}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(16000)});return{status:r.status,body:r.status===204?null:await r.json(),headers:r.headers};}
-const status=(r,n)=>{assert.equal(r.status,n,'P7 HTTP result');return r.body;};
+// The gateway marker and the error text tell which config and which service answered.
+const status=(r,n)=>{assert.equal(r.status,n,'P7 HTTP result via '+r.headers.get('x-p7-gateway')+': '+(r.body?.error??''));return r.body;};
 async function configureGateway(nextMode,paused){
   mode=nextMode;maintenance=paused;const upstream=mode==='legacy'?origins.legacy:origins.core,marker=mode+(paused?'-maintenance':'-open');
   const config=`worker_processes 1;\npid logs/nginx.pid;error_log logs/error.log crit;events {worker_connections 256;}http {access_log off;client_max_body_size 8m;keepalive_timeout 0;proxy_connect_timeout 1s;proxy_read_timeout 15s;proxy_send_timeout 15s;server {listen 127.0.0.1:${ports.gateway};add_header X-P7-Gateway '${marker}' always;default_type application/json;location ~ ^/(internal|metrics|health) {return 404 '{"error":"Private route"}';}location /api/ {${paused?'if ($request_method !~ ^(GET|HEAD|OPTIONS)$) {return 503 \'{"error":"Migration maintenance; retry later."}\';}':''}proxy_pass ${upstream};}location / {return 404 '{}';}}}`;
   writeFileSync(resolve(artifacts,'nginx.conf'),config);const args=['-p',artifacts.replaceAll('\\','/')+'/','-c','nginx.conf'];execFileSync(binary,['-t',...args],{stdio:'pipe'});
   if(!nginx){nginx=spawn(binary,[...args,'-g','daemon off;'],{stdio:'pipe'});nginx.stdout.resume();nginx.stderr.resume();}
   else execFileSync(binary,[...args,'-s','reload'],{stdio:'pipe'});
-  await until(async()=>{try{return (await fetch(gateway+'/api/openapi.json')).headers.get('x-p7-gateway')===marker;}catch{return false;}},'gateway_'+marker);
+  // After a reload the old worker can still accept a connection or two with the previous
+  // config (a write would get its maintenance 503), so require a run of fresh markers.
+  let fresh=0;await until(async()=>{try{fresh=(await fetch(gateway+'/api/openapi.json')).headers.get('x-p7-gateway')===marker?fresh+1:0;}catch{fresh=0;}return fresh>=5;},'gateway_'+marker);
 }
 async function startTargets(){
   coreApi=await child('backend/dist/src/index.js',{...secrets,JWT_PRIVATE_KEY:keys.privateKey.export({type:'pkcs8',format:'pem'}).toString(),DATABASE_URL:url(ctx,'core'),PORT:String(ports.core),SERVICE_INSTANCE_ID:'p7-core',CLINIC_SERVICE_URL:origins.clinic,NOTIFICATION_SERVICE_URL:origins.notification},'core-api',h=>fetch(h.base+'/health/ready').then(r=>r.status===200).catch(()=>false));
