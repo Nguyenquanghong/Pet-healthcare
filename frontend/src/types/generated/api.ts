@@ -408,7 +408,7 @@ export interface ApiSchemas {
     title: string;
     /** Base64 data URL whose prefix equals mimeType and whose decoded bytes carry that format's signature; otherwise 422. Clinic decodes it, stores the bytes in the image bucket and keeps only a claim (key, size, sha256, MIME); the content is never returned inline. */
     imageUrl: string;
-    mimeType: string;
+    mimeType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
   };
   HotelBookingInput: {
     petId: string;

@@ -11,6 +11,8 @@
 //  5. AQ-05 permissions come from the matrix in @nipopeto/contracts: no role list
 //     or staff-role comparison in Core/Clinic/Notification, no 403 decided by the
 //     owner role without an ownership check, and no matrix entry left unchecked.
+//  6. The gateway OpenAPI (backend) and Clinic's own OpenAPI describe every shared
+//     schema identically, except listed differences with a reason (stale ones fail).
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -161,10 +163,36 @@ const permissionCheck=(existsSync(built)?import(pathToFileURL(built).href):Promi
     return scanned.length+' files, '+permissions.length+' permissions checked';
   }),error=>rule('permissions-from-matrix',()=>{throw error;}));
 
+// ---- 6. Shared OpenAPI schemas agree (AQ-07) -----------------------------------
+// The frontend types are generated from the gateway spec; Clinic's spec is the
+// service's own contract. A schema both declare must not drift apart silently.
+const SPEC_DIFFERENCES={
+  Bootstrap:'gateway composes Core and Clinic regions; Clinic returns only its own part',
+  CreateInvoiceInput:'expectedRevision belongs to Core split billing (P4), Clinic never receives it',
+  User:'permissions is only in Core session responses (AQ-05)',
+};
+const canonicalJson=value=>JSON.stringify(value,(key,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
+export function specDrift(gateway,clinic,allowed){
+  const shared=Object.keys(gateway).filter(name=>name in clinic);
+  return {drift:shared.filter(name=>!(name in allowed)&&canonicalJson(gateway[name])!==canonicalJson(clinic[name])),
+    stale:Object.keys(allowed).filter(name=>!shared.includes(name)||canonicalJson(gateway[name])===canonicalJson(clinic[name]))};
+}
+rule('shared-openapi-schemas-agree',()=>{
+  const gateway=JSON.parse(read('backend/openapi.json')).components.schemas,clinic=JSON.parse(read('services/clinic/openapi.json')).components.schemas;
+  const {drift,stale}=specDrift(gateway,clinic,SPEC_DIFFERENCES);
+  assert.deepEqual(drift,[],'schemas that differ between backend/openapi.json and services/clinic/openapi.json: '+drift.join(', '));
+  assert.deepEqual(stale,[],'listed differences that no longer differ or no longer exist: '+stale.join(', '));
+  // negative fixtures
+  assert.deepEqual(specDrift({A:{type:'string'}},{A:{type:'integer'}},{}).drift,['A']);
+  assert.deepEqual(specDrift({A:{type:'string',description:'x'}},{A:{description:'x',type:'string'}},{}).drift,[]);
+  assert.deepEqual(specDrift({A:{type:'string'}},{A:{type:'string'}},{A:'reason'}).stale,['A']);
+  return Object.keys(gateway).filter(n=>n in clinic).length+' shared schemas, '+Object.keys(SPEC_DIFFERENCES).length+' listed differences';
+});
+
 await envelopeCheck;
 await grantsCheck;
 await permissionCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, negative fixtures.\n');
+else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, negative fixtures.\n');

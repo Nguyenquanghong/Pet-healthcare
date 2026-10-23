@@ -3,6 +3,7 @@ import type { AppointmentRecord } from "../application/ports/appointments.js";
 import type { MedicalRecordValue } from "../application/ports/medicalRecords.js";
 import type { CareNoteValue, HotelBookingValue } from "../application/ports/hotelBookings.js";
 import type { PetValue } from "../application/ports/pets.js";
+import type { InvoiceValue } from "../application/ports/invoices.js";
 import { permissionsFor } from "@nipopeto/contracts";
 
 export const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
@@ -110,6 +111,14 @@ export function hotelBookingDto(item: HotelBookingValue, owner = false) {
     dailyCareNoteIds: item.dailyCareNotes?.map((note) => note.id) ?? [],
     dailyCareNotes: undefined,
   };
+}
+
+// One invoice wire shape for every route (lists, invoice actions, Phase 2 billing
+// operations): Decimal amounts become numbers, line items always present.
+export function invoiceDto(item: InvoiceValue & { sourceSnapshot?: unknown }) {
+  return { ...item, transferContent: item.transferCode || item.invoiceCode.replaceAll("-", ""), subtotal: Number(item.subtotal), taxAmount: Number(item.taxAmount),
+    discountAmount: Number(item.discountAmount), totalAmount: Number(item.totalAmount),
+    items: item.items?.map(line => ({ ...line, unitPrice: Number(line.unitPrice), amount: Number(line.amount) })) ?? [] };
 }
 
 export function careNoteDto(item: CareNoteValue) {

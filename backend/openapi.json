@@ -6933,10 +6933,17 @@
           },
           "imageUrl": {
             "type": "string",
+            "maxLength": 7000000,
             "description": "Base64 data URL whose prefix equals mimeType and whose decoded bytes carry that format's signature; otherwise 422. Clinic decodes it, stores the bytes in the image bucket and keeps only a claim (key, size, sha256, MIME); the content is never returned inline."
           },
           "mimeType": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/gif",
+              "image/webp"
+            ]
           }
         },
         "required": [

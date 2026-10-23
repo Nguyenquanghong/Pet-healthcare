@@ -1,10 +1,8 @@
 import { Router, type Response } from "express";
 import { InvoicesService } from "../application/services/invoices.js";
 import { BusinessError } from "../domain/error.js";
-import type { InvoiceValue } from "../application/ports/invoices.js";
+import { invoiceDto } from "../lib/serialize.js";
 
-const invoiceDto = (item: InvoiceValue) => ({ ...item, transferContent: item.transferCode || item.invoiceCode.replaceAll("-", ""), subtotal: Number(item.subtotal), taxAmount: Number(item.taxAmount), discountAmount: Number(item.discountAmount), totalAmount: Number(item.totalAmount),
-  items: item.items?.map((line) => ({ ...line, unitPrice: Number(line.unitPrice), amount: Number(line.amount) })) ?? [] });
 
 export function createInvoicesRouter(service: InvoicesService) {
   const router = Router();
