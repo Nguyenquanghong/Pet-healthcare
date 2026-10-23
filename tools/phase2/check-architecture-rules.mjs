@@ -161,12 +161,14 @@ export function permissionViolations(source){
 }
 const checked=(source,permission)=>new RegExp(`\\b(authorize|requirePermission|allows|deniedMessage)\\([^)]*['"]${permission.replaceAll('.','\\.')}['"]`).test(source);
 const permissionCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.reject(new Error('build packages/contracts first (npm run build -w @nipopeto/contracts)')))
-  .then(({permissions})=>rule('permissions-from-matrix',()=>{
+  .then(({permissions,bookingLifecycles})=>rule('permissions-from-matrix',()=>{
     const scanned=SERVICE_SOURCES.flatMap(d=>files(resolve(root,d))).filter(f=>f.endsWith('.ts')&&!AUTHORIZATION.has(relative(root,f).split(sep).join('/')));
     const bad=scanned.flatMap(f=>permissionViolations(readFileSync(f,'utf8')).map(v=>relative(root,f)+' '+v));
     assert.deepEqual(bad,[],'role decisions outside the permission matrix: '+bad.join('; '));
     const all=scanned.map(f=>readFileSync(f,'utf8')).join('\n');
-    const unused=permissions.filter(p=>!checked(all,p));
+    // P01: lifecycle rules name their permission in the table; the services check it as rule.permission.
+    const viaLifecycle=/\bauthorize\(actor,\s*rule\.permission\)/.test(all)?new Set(Object.values(bookingLifecycles).flatMap(l=>[...Object.values(l.manual).flat(),...Object.values(l.undo)]).map(r=>r.permission)):new Set();
+    const unused=permissions.filter(p=>!checked(all,p)&&!viaLifecycle.has(p));
     assert.deepEqual(unused,[],'matrix permissions never checked: '+unused.join(', '));
     // negative fixtures
     for(const sample of ["if (actor.role === 'admin') x();","if(!['admin','staff'].includes(actor.role))throw e;","if (actor.role === 'owner') throw new BusinessError(403, 'x');","router.use(requireRole('admin'))","if(actor.role==='owner'){res.status(403);return;}"])
@@ -257,7 +259,60 @@ const categoryCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise
     return sent.size+' sent types, '+notificationCategoryNames.length+' tabs';
   }),error=>rule('notification-tabs-cover-sent-types',()=>{throw error;}));
 
+// ---- 8. Booking lifecycle from one table (P01) ----------------------------------
+// The transition rules live in @nipopeto/contracts. The services that enforce them
+// hold no status lists of their own, every status has a label, and every SQL object
+// that decides which bookings still hold a slot or a room names exactly the table's
+// occupying set (or, for NOT IN, exactly the other statuses).
+const LIFECYCLE_SERVICES=['backend/src/application/services/bookingLifecycle.ts','services/clinic/src/application/services/bookingLifecycle.ts'];
+const OCCUPANCY_OBJECTS={appointment:['appointments_active_pet_slot_key'],hotel:['hotel_bookings_pet_active_stay_excl','hotel_room_nights_sync']};
+const STATUS_LITERAL=/['"](pending|confirmed|checked_in|in_progress|completed|cancelled|no_show|in_stay|checked_out|rejected)['"]/;
+// A status event's action name (transition, undo, cancelled...) is not a status.
+export const statusLiterals=source=>source.split(/\r?\n/).flatMap((line,index)=>STATUS_LITERAL.test(line.replace(/\.event\(\s*actor\s*,\s*['"][a-z_]+['"]/g,''))?['line '+(index+1)]:[]);
+// The SQL statement (or plpgsql function body) that defines a named object.
+export function sqlBlocks(sql,name){
+  const lines=sql.split(/\r?\n/),blocks=[];
+  lines.forEach((line,index)=>{
+    if(!line.includes(name)||line.trimStart().startsWith('--')||/EXECUTE FUNCTION/.test(line)&&!/CREATE (OR REPLACE )?FUNCTION/.test(line))return;
+    const fn=/CREATE (OR REPLACE )?FUNCTION/i.test(line),end=lines.findIndex((l,i)=>i>=index&&(fn?/\$\$\s*;/.test(l):/;\s*$/.test(l)));
+    blocks.push(lines.slice(index,end<0?lines.length:end+1).join('\n'));
+  });
+  return blocks;
+}
+export const statusPredicates=sql=>[...sql.replaceAll("''","'").matchAll(/"?status"?\s+(NOT\s+)?IN\s*\(([^)]*)\)/gi)].map(m=>({negated:Boolean(m[1]),set:[...m[2].matchAll(/'([a-z_]+)'/g)].map(x=>x[1]).sort()}));
+export function occupancyDrift(predicates,{statuses,occupying}){
+  const want=JSON.stringify([...occupying].sort()),rest=JSON.stringify(statuses.filter(s=>!occupying.includes(s)).sort());
+  return predicates.filter(p=>JSON.stringify(p.set)!==(p.negated?rest:want));
+}
+const migrationSql=['backend/prisma/migrations','services/clinic/prisma/migrations'].flatMap(d=>files(resolve(root,d))).filter(f=>f.endsWith('migration.sql')).map(f=>({file:relative(root,f),sql:readFileSync(f,'utf8')}));
+const lifecycleCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.reject(new Error('build packages/contracts first (npm run build -w @nipopeto/contracts)')))
+  .then(({bookingLifecycles,bookingStatusLabels})=>rule('lifecycle-from-table',()=>{
+    const written=LIFECYCLE_SERVICES.flatMap(f=>statusLiterals(read(f)).map(v=>f+' '+v));
+    assert.deepEqual(written,[],'status literals in lifecycle services (use the table in @nipopeto/contracts): '+written.join('; '));
+    const unlabelled=Object.values(bookingLifecycles).flatMap(l=>l.statuses).filter(s=>!Object.hasOwn(bookingStatusLabels,s));
+    assert.deepEqual(unlabelled,[],'statuses without a label');
+    let checked=0;const drift=[];
+    for(const [kind,names] of Object.entries(OCCUPANCY_OBJECTS))for(const name of names)for(const {file,sql} of migrationSql)for(const block of sqlBlocks(sql,name)){
+      const predicates=statusPredicates(block);checked+=predicates.length;
+      for(const p of occupancyDrift(predicates,bookingLifecycles[kind]))drift.push(`${file} ${name}: ${p.negated?'NOT IN':'IN'} (${p.set.join(',')})`);
+    }
+    assert.deepEqual(drift,[],'SQL occupying sets differ from the lifecycle table');
+    assert.ok(checked>=5,'found the occupying predicates ('+checked+')');
+    // negative fixtures
+    assert.deepEqual(statusLiterals("const transitions={pending:['confirmed','cancelled']};"),['line 1']);
+    assert.deepEqual(statusLiterals('const rule = manualTransition(kind, from, to);'),[]);
+    assert.deepEqual(statusLiterals('await tx.event(actor, "cancelled", from, rule.to, 1);'),[]);
+    assert.deepEqual(statusLiterals('await tx.save("cancelled");'),['line 1']);
+    const appointment=bookingLifecycles.appointment,hotel=bookingLifecycles.hotel;
+    assert.equal(occupancyDrift(statusPredicates("CREATE UNIQUE INDEX x ON appointments(pet_id) WHERE status NOT IN ('cancelled');"),appointment).length,1);
+    assert.equal(occupancyDrift(statusPredicates("EXECUTE 'CREATE INDEX x WHERE \"status\" NOT IN (''cancelled'', ''no_show'')';"),appointment).length,0);
+    assert.equal(occupancyDrift(statusPredicates("WHERE (\"status\" IN ('pending', 'confirmed'))"),hotel).length,1);
+    assert.equal(sqlBlocks("CREATE FUNCTION f() RETURNS trigger AS $$\nBEGIN\n  x := NEW.status IN ('pending');\nEND $$;\nSELECT 1 WHERE status IN ('a');",'f').map(statusPredicates).flat().length,1);
+    return LIFECYCLE_SERVICES.length+' services, '+checked+' SQL predicates';
+  }),error=>rule('lifecycle-from-table',()=>{throw error;}));
+
 await envelopeCheck;
+await lifecycleCheck;
 await grantsCheck;
 await permissionCheck;
 await consumerCheck;

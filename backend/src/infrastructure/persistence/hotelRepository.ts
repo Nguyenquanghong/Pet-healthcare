@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { bookingLifecycles } from "@nipopeto/contracts";
 import { BusinessError } from "../../domain/error.js";
 import { writeNotification } from './notificationOutbox.js';
 import type { HotelBookingRepository, HotelDependencies, HotelNotificationWriter, HotelTransaction, HotelUnitOfWork } from "../../application/ports/hotelBookings.js";
@@ -36,7 +37,7 @@ class PrismaHotelBookingRepository implements HotelBookingRepository {
     await this.client.hotelBookingRequest.create({ data: { actorId, requestKey: key, fingerprint, bookingId } });
   }
   async hasOverlappingStay(petId: string, checkIn: Date, checkOut: Date) {
-    return await this.client.hotelBooking.count({ where: { petId, status: { in: ["pending", "confirmed", "in_stay"] },
+    return await this.client.hotelBooking.count({ where: { petId, status: { in: [...bookingLifecycles.hotel.occupying] },
       checkIn: { lt: checkOut }, checkOut: { gt: checkIn } } }) > 0;
   }
   create(data: Parameters<HotelBookingRepository["create"]>[0]) {

@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from '../../generated/client/index.js';
+import { bookingLifecycles } from '@nipopeto/contracts';
 import type { Actor } from '../../domain/auth.js';
 import { BusinessError, StaleRevision } from '../../domain/error.js';
 import type { AppointmentRepository,AppointmentDependencies } from '../../application/ports/appointments.js';
@@ -28,7 +29,7 @@ class Appointments implements AppointmentRepository {
   findPet(id:string){return this.directory.pet(id);}
   find(id:string){return this.db.appointment.findUnique({where:{id}});}
   async findWithPet(id:string){const appointment=await this.find(id);return appointment?{appointment,pet:await this.directory.pet(appointment.petId)}:null;}
-  async hasSlot(petId:string,date:Date,time:string,exceptId?:string){return !!await this.db.appointment.findFirst({where:{petId,appointmentDate:date,appointmentTime:time,...(exceptId?{id:{not:exceptId}}:{}),status:{notIn:['cancelled','no_show']}}});}
+  async hasSlot(petId:string,date:Date,time:string,exceptId?:string){return !!await this.db.appointment.findFirst({where:{petId,appointmentDate:date,appointmentTime:time,...(exceptId?{id:{not:exceptId}}:{}),status:{in:[...bookingLifecycles.appointment.occupying]}}});}
   async create(data:Parameters<AppointmentRepository['create']>[0]){const row=await appointmentSlotWrite(this.db.appointment.create({data}));await trackAppointmentChange(this.db,row.id,{created:true});return row;}
 }
 const writer=(db:Client)=>({create:async(draft:{recipientOwnerId?:string;recipientRole:string;title:string;message:string;type:string;actionUrl:string;relatedPetId:string;relatedAppointmentId:string|null})=>{await writeNotification(db,{...draft,recipientOwnerId:draft.recipientOwnerId??null,recipientRole:draft.recipientRole as 'owner'|'admin'});}});
@@ -102,10 +103,12 @@ class Records implements MedicalRecordRepository {
   }
   async completeAppointment(id:string,actor:Actor){
     await unlocked(this.db,id);
+    // P01: saving a medical record is a system move of the lifecycle table.
+    const medical=bookingLifecycles.appointment.system['medical-completed'];
     const before=await this.db.appointment.findUnique({where:{id}});
-    if(!before||!['checked_in','in_progress','completed'].includes(before.status))throw new BusinessError(409,'Appointment must be checked in before medical completion.');
-    if(before.status==='completed')return;
-    const saved=await appointmentSlotWrite(this.db.appointment.update({where:{id},data:{status:'completed',statusRevision:{increment:1}}}));
+    if(!before||before.status!==medical.to&&!(medical.from as readonly string[]).includes(before.status))throw new BusinessError(409,'Appointment must be checked in before medical completion.');
+    if(before.status===medical.to)return;
+    const saved=await appointmentSlotWrite(this.db.appointment.update({where:{id},data:{status:medical.to,statusRevision:{increment:1}}}));
     await appendStatusEvent(this.db,this.directory,id,actor,'medical_completed',before.status,'completed',saved.statusRevision);
     await trackAppointmentChange(this.db,id);
   }
