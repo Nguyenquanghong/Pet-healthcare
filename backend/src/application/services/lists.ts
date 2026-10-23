@@ -2,6 +2,7 @@ import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
 import { authorize } from "../../domain/authorization.js";
 import { calendarDate } from "../../domain/validation.js";
+import { notificationCategoryNames } from "@nipopeto/contracts";
 import type { ListsRepository, ListQuery, ListResource } from "../ports/lists.js";
 
 const statuses: Partial<Record<ListResource, readonly string[]>> = {
@@ -36,7 +37,7 @@ export function parseListQuery(resource: ListResource, raw: Record<string, unkno
     const value = (raw[key] as string).trim();
     if (!value || (value === "all" && key !== "q" && key !== "id")) continue;
     const options = key === "status" ? statuses[resource] : key === "category"
-      ? resource === "appointments" ? ["medical", "spa"] : ["appointments", "hotel", "medical", "promo"] : choices[key];
+      ? resource === "appointments" ? ["medical", "spa"] : notificationCategoryNames as readonly string[] : choices[key];
     if (options && !options.includes(value)) throw new BusinessError(422, `Invalid ${key}.`);
     if (key === "date") calendarDate(value, "date");
     Object.assign(result, { [key]: value });

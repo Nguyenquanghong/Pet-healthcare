@@ -1,13 +1,9 @@
 import { Prisma, type PrismaClient, type AppointmentStatus, type PetSpecies, type PetHealthStatus, type HotelBookingStatus, type RoomType, type PaymentStatus } from "@prisma/client";
 import type { ListsRepository, ListData, ListQuery, ListResource, ListScope } from "../../application/ports/lists.js";
+import { hotelStatusUpdates, notificationCategoryCounts, notificationCategoryWhere, type NotificationCategory } from "@nipopeto/contracts";
 
 export const emptyListData = (): ListData => ({ owners: [], pets: [], appointments: [], hotelBookings: [], medicalRecords: [], medicalImages: [], dailyCareNotes: [], notifications: [], invoices: [] });
 const spaTypes = ["spa_bath", "spa_grooming", "spa_combo"] as const;
-const notificationTypes: Record<string, string[]> = {
-  appointments: ["appointment_created", "appointment_confirmed", "appointment_reminder", "appointment_cancelled", "appointment_rescheduled"],
-  hotel: ["hotel_booking_created", "hotel_booking_confirmed", "hotel_booking_cancelled", "hotel_daily_update", "hotel_checked_out"],
-  medical: ["medical_record_updated", "vaccination_reminder"], promo: ["promotion", "general"],
-};
 
 export class PrismaListsRepository implements ListsRepository {
   constructor(private readonly client: PrismaClient) {}
@@ -63,13 +59,16 @@ export class PrismaListsRepository implements ListsRepository {
         const where: Prisma.DailyCareNoteWhereInput = { ...identity, ...(scope.ownerId ? { booking: { ownerId: scope.ownerId }, visibleToOwner: true } : {}), ...(query.bookingId ? { bookingId: query.bookingId } : {}) };
         [total, data.dailyCareNotes] = await Promise.all([tx.dailyCareNote.count({ where }), tx.dailyCareNote.findMany({ where, ...bounds, orderBy: [{ noteDate: "desc" }, { id: "desc" }] })]);
       } else if (resource === "notifications") {
-        const base: Prisma.NotificationWhereInput = { ...identity, ...(scope.ownerId ? { recipientOwnerId: scope.ownerId } : { recipientRole: scope.recipientRole ?? "admin" }),
-          ...(query.category ? { type: { in: notificationTypes[query.category] } } : {}), ...(query.q ? { OR: [text("title"), text("message")] } : {}) };
+        // Tab counts ignore the selected tab; status counts and the page respect it.
+        const tabs: Prisma.NotificationWhereInput = { ...identity, ...(scope.ownerId ? { recipientOwnerId: scope.ownerId } : { recipientRole: scope.recipientRole ?? "admin" }),
+          ...(query.q ? { OR: [text("title"), text("message")] } : {}) };
+        const base: Prisma.NotificationWhereInput = query.category ? { AND: [tabs, notificationCategoryWhere(query.category as NotificationCategory)] } : tabs;
         const where = { ...base, ...(query.status ? { status: query.status } : {}) };
         const groups = await tx.notification.groupBy({ by: ["status"], where: base, _count: true });
         counts = Object.fromEntries(groups.map(group => [group.status, group._count]));
-        const types = await tx.notification.groupBy({ by: ["type"], where: { ...base, type: undefined }, _count: true });
-        for (const type of types) { const category = Object.entries(notificationTypes).find(([, values]) => values.includes(type.type))?.[0]; if (category) counts[`category:${category}`] = (counts[`category:${category}`] ?? 0) + type._count; }
+        const types = await tx.notification.groupBy({ by: ["type"], where: tabs, _count: true });
+        const hotelUpdates = await tx.notification.count({ where: { AND: [tabs, hotelStatusUpdates] } });
+        for (const [category, n] of Object.entries(notificationCategoryCounts(types.map(row => ({ type: row.type, count: row._count })), hotelUpdates))) counts[`category:${category}`] = n;
         counts["category:all"] = types.reduce((sum, row) => sum + row._count, 0);
         [total, data.notifications] = await Promise.all([tx.notification.count({ where }), tx.notification.findMany({ where, ...bounds, orderBy: [{ createdAt: "desc" }, { id: "desc" }] })]);
       } else if (resource === "invoices") {

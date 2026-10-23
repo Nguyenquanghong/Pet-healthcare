@@ -1992,10 +1992,19 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "maxLength": 128
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "all"
+                  ]
+                },
+                {
+                  "$ref": "#/components/schemas/NotificationCategory"
+                }
+              ]
             },
-            "description": "Appointments: medical or spa. Notifications: appointments, hotel, medical or promo."
+            "description": "Inbox tab; omitted or all lists every notification. counts has category:<tab> for each non-empty tab and category:all."
           }
         ]
       }
@@ -5755,6 +5764,18 @@
           "createdAt",
           "sentAt"
         ]
+      },
+      "NotificationCategory": {
+        "type": "string",
+        "enum": [
+          "appointments",
+          "hotel",
+          "medical",
+          "billing",
+          "rescue",
+          "promo"
+        ],
+        "description": "Inbox tab (@nipopeto/contracts notificationCategories). booking_status_updated is in hotel when it carries relatedBookingId, otherwise in appointments."
       },
       "Invoice": {
         "type": "object",

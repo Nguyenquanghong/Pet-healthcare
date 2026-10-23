@@ -6,52 +6,20 @@ import { useNavigate } from "react-router-dom";
 import { Bell, CheckCheck, Clock, Trash2, ArrowRight, X } from "lucide-react";
 import { OwnerLayout } from "../../components/layout/owner/OwnerLayout";
 import { useAppStore } from "../../store/AppStoreProvider";
-import type { Notification, NotificationType } from "../../types/notification";
+import type { Notification, NotificationCategory } from "../../types/notification";
+import { notificationIcon } from "../../utils/notificationIcon";
 
-const TYPE_ICON: Record<string, string> = {
-  appointment_created: "📅",
-  appointment_confirmed: "✅",
-  appointment_reminder: "🔔",
-  appointment_cancelled: "❌",
-  appointment_rescheduled: "🗓️",
-  vaccination_reminder: "💉",
-  hotel_booking_created: "🏨",
-  hotel_booking_confirmed: "🏨",
-  hotel_booking_cancelled: "🚫",
-  hotel_daily_update: "🐾",
-  hotel_checked_out: "🏠",
-  medical_record_updated: "📋",
-  promotion: "🎁",
-  general: "📢",
+// Every tab of the contract (NotificationCategory, generated from OpenAPI) needs a label.
+const TAB_LABELS: Record<"all" | NotificationCategory, string> = {
+  all: "Tất cả",
+  appointments: "Lịch khám",
+  hotel: "Khách sạn",
+  medical: "Bệnh án",
+  billing: "Thanh toán",
+  rescue: "Cứu hộ",
+  promo: "Khuyến mãi & Khác",
 };
-
-const CATEGORY_MAP: Record<string, NotificationType[]> = {
-  all: [],
-  appointments: [
-    "appointment_created",
-    "appointment_confirmed",
-    "appointment_reminder",
-    "appointment_cancelled",
-    "appointment_rescheduled",
-  ],
-  hotel: [
-    "hotel_booking_created",
-    "hotel_booking_confirmed",
-    "hotel_booking_cancelled",
-    "hotel_daily_update",
-    "hotel_checked_out",
-  ],
-  medical: ["medical_record_updated", "vaccination_reminder"],
-  promo: ["promotion", "general"],
-};
-
-const TABS = [
-  { key: "all", label: "Tất cả" },
-  { key: "appointments", label: "Lịch khám" },
-  { key: "hotel", label: "Khách sạn" },
-  { key: "medical", label: "Bệnh án" },
-  { key: "promo", label: "Khuyến mãi & Khác" },
-];
+const TABS = Object.entries(TAB_LABELS).map(([key, label]) => ({ key, label }));
 
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -167,7 +135,7 @@ export function NotificationsPage() {
                     isUnread ? "bg-primary/10 shadow-xs" : "bg-slate-100"
                   }`}
                 >
-                  {TYPE_ICON[n.type] ?? "📨"}
+                  {notificationIcon(n.type)}
                 </div>
 
                 <div

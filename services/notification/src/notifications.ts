@@ -1,14 +1,10 @@
 import { Prisma, type PrismaClient } from './generated/client/index.js';
+import { hotelStatusUpdates, isNotificationCategory, notificationCategoryCounts, notificationCategoryWhere, type NotificationCategory } from '@nipopeto/contracts';
 
 export interface Actor { sub: string; role: 'owner' | 'doctor' | 'staff' | 'admin' }
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
-export const categories: Record<string, string[]> = {
-  appointments: ['appointment_created', 'appointment_confirmed', 'appointment_reminder', 'appointment_cancelled', 'appointment_rescheduled'],
-  hotel: ['hotel_booking_created', 'hotel_booking_confirmed', 'hotel_booking_cancelled', 'hotel_daily_update', 'hotel_checked_out'],
-  medical: ['medical_record_updated', 'vaccination_reminder'], promo: ['promotion', 'general'],
-};
 export function parseQuery(raw: Record<string, unknown>) {
   const integer = (key: string, fallback: number, max: number) => {
     if (raw[key] === undefined) return fallback;
@@ -17,7 +13,7 @@ export function parseQuery(raw: Record<string, unknown>) {
     if (!Number.isSafeInteger(n) || n > max) throw new ApiError(422, `${key} exceeds ${max}.`);
     return n;
   };
-  const query: { page: number; pageSize: number; q?: string; id?: string; status?: string; category?: string } = {
+  const query: { page: number; pageSize: number; q?: string; id?: string; status?: string; category?: NotificationCategory } = {
     page: integer('page', 1, 1_000_000), pageSize: integer('pageSize', 20, 100),
   };
   for (const key of ['q', 'id', 'status', 'category'] as const) {
@@ -25,8 +21,8 @@ export function parseQuery(raw: Record<string, unknown>) {
     if (typeof raw[key] !== 'string' || (raw[key] as string).length > (key === 'q' ? 100 : 128)) throw new ApiError(422, `Invalid ${key}.`);
     const value = (raw[key] as string).trim();
     if (!value || (value === 'all' && key !== 'q' && key !== 'id')) continue;
-    if ((key === 'status' && !['sent', 'read'].includes(value)) || (key === 'category' && !Object.hasOwn(categories, value))) throw new ApiError(422, `Invalid ${key}.`);
-    query[key] = value;
+    if ((key === 'status' && !['sent', 'read'].includes(value)) || (key === 'category' && !isNotificationCategory(value))) throw new ApiError(422, `Invalid ${key}.`);
+    if (key === 'category') query.category = value as NotificationCategory; else query[key] = value;
   }
   return query;
 }
@@ -39,19 +35,18 @@ export class Notifications {
   async list(actor: Actor, raw: Record<string, unknown>) {
     const query = parseQuery(raw);
     return this.db.$transaction(async tx => {
-      const base: Prisma.NotificationWhereInput = {
+      // Tab counts ignore the selected tab; status counts and the page respect it.
+      const tabs: Prisma.NotificationWhereInput = {
         ...scope(actor), ...(query.id ? { id: query.id } : {}),
-        ...(query.category ? { type: { in: categories[query.category] } } : {}),
         ...(query.q ? { OR: [{ title: { contains: query.q, mode: 'insensitive' } }, { message: { contains: query.q, mode: 'insensitive' } }] } : {}),
       };
+      const base: Prisma.NotificationWhereInput = query.category ? { AND: [tabs, notificationCategoryWhere(query.category)] } : tabs;
       const where = { ...base, ...(query.status ? { status: query.status } : {}) };
       const groups = await tx.notification.groupBy({ by: ['status'], where: base, _count: true });
       const counts: Record<string, number> = Object.fromEntries(groups.map(g => [g.status, g._count]));
-      const types = await tx.notification.groupBy({ by: ['type'], where: { ...base, type: undefined }, _count: true });
-      for (const row of types) {
-        const category = Object.entries(categories).find(([, values]) => values.includes(row.type))?.[0];
-        if (category) counts[`category:${category}`] = (counts[`category:${category}`] ?? 0) + row._count;
-      }
+      const types = await tx.notification.groupBy({ by: ['type'], where: tabs, _count: true });
+      const hotelUpdates = await tx.notification.count({ where: { AND: [tabs, hotelStatusUpdates] } });
+      for (const [category, n] of Object.entries(notificationCategoryCounts(types.map(row => ({ type: row.type, count: row._count })), hotelUpdates))) counts[`category:${category}`] = n;
       counts['category:all'] = types.reduce((n, row) => n + row._count, 0);
       const [total, items] = await Promise.all([
         tx.notification.count({ where }),

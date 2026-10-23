@@ -3,6 +3,7 @@ import { useNotificationCount } from '../../store/NotificationCountContext';
 import { Pagination } from "../../components/ui/Pagination";
 import { PagedSelect } from "../../components/ui/PagedSelect";
 import type { Owner } from "../../types/owner";
+import { notificationIcon } from "../../utils/notificationIcon";
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -42,15 +43,6 @@ const TEMPLATES = [
   },
   { id: "custom", label: "Tùy chỉnh", body: "" },
 ];
-
-const TYPE_ICON: Record<string, string> = {
-  appointment_created: "📅",
-  appointment_rescheduled: "🗓️",
-  appointment_cancelled: "❌",
-  hotel_booking_created: "🏨",
-  hotel_booking_cancelled: "🚫",
-  general: "📢",
-};
 
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -199,7 +191,7 @@ export function AdminNotificationsPage() {
                     isUnread ? "bg-primary/10 shadow-xs" : "bg-slate-100"
                   }`}
                 >
-                  {TYPE_ICON[n.type] ?? "📢"}
+                  {notificationIcon(n.type)}
                 </div>
 
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleNotificationClick(n)}>

@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { BootstrapRepository, BootstrapSummary } from "../../application/ports/bootstrap.js";
 import { emptyListData } from "./listsRepository.js";
+import { hotelStatusUpdates, notificationCategoryCounts } from "@nipopeto/contracts";
 import { todayInVietnam } from "../../domain/validation.js";
 
 export class PrismaBootstrapRepository implements BootstrapRepository {
@@ -19,19 +20,20 @@ export class PrismaBootstrapRepository implements BootstrapRepository {
       }
       if (view === "dashboard") {
         const today = new Date(`${todayInVietnam()}T00:00:00Z`);
-        const [owners, pets, appointments, hotels, medical, images, notes, notifications, species, appointmentStatus, hotelStatus, types, todayCount] = await Promise.all([
+        const [owners, pets, appointments, hotels, medical, images, notes, notifications, species, appointmentStatus, hotelStatus, types, hotelUpdates, todayCount] = await Promise.all([
           tx.user.count({ where: isAdmin ? { role: "owner" } : { id: ownerId } }), tx.pet.count({ where: own }),
           this.skipClinic?Promise.resolve(0):tx.appointment.count({ where: own }), tx.hotelBooking.count({ where: own }), this.skipClinic?Promise.resolve(0):tx.medicalRecord.count({ where: own }),
           this.skipClinic?Promise.resolve(0):tx.medicalImage.count({ where: ownerId ? { pet: own } : {} }), tx.dailyCareNote.count({ where: ownerId ? { booking: own, visibleToOwner: true } : {} }),
           this.skipNotification?Promise.resolve(0):tx.notification.count({ where: notificationsWhere }), tx.pet.groupBy({ by: ["species"], where: own, _count: true }),
           this.skipClinic?Promise.resolve([]):tx.appointment.groupBy({ by: ["status"], where: own, _count: true }), tx.hotelBooking.groupBy({ by: ["status"], where: own, _count: true }),
-          this.skipNotification?Promise.resolve([]):tx.notification.groupBy({ by: ["type"], where: notificationsWhere, _count: true }), this.skipClinic?Promise.resolve(0):tx.appointment.count({ where: { ...own, appointmentDate: today } }),
+          this.skipNotification?Promise.resolve([]):tx.notification.groupBy({ by: ["type"], where: notificationsWhere, _count: true }),
+          this.skipNotification?Promise.resolve(0):tx.notification.count({ where: { AND: [notificationsWhere, hotelStatusUpdates] } }), this.skipClinic?Promise.resolve(0):tx.appointment.count({ where: { ...own, appointmentDate: today } }),
         ]);
         summary.totals = { owners, pets, appointments, hotelBookings: hotels, medicalRecords: medical, medicalImages: images, dailyCareNotes: notes, notifications };
         summary.species = Object.fromEntries(species.map(row => [row.species, row._count]));
         summary.appointmentStatus = Object.fromEntries(appointmentStatus.map(row => [row.status, row._count]));
         summary.hotelStatus = Object.fromEntries(hotelStatus.map(row => [row.status, row._count]));
-        for (const row of types) { const category = row.type.startsWith("appointment_") ? "appointments" : row.type.startsWith("hotel_") ? "hotel" : ["medical_record_updated", "vaccination_reminder"].includes(row.type) ? "medical" : "promo"; summary.notificationCategory[category] = (summary.notificationCategory[category] ?? 0) + row._count; }
+        summary.notificationCategory = notificationCategoryCounts(types.map(row => ({ type: row.type, count: row._count })), hotelUpdates);
         summary.todayAppointments = todayCount;
         if (isAdmin) {
           const [todayRows, pendingRows] = this.skipClinic?[[],[]]:await Promise.all([
