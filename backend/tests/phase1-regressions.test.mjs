@@ -14,7 +14,7 @@ import { hashPassword, verifyPassword, hashPasswordAsync, verifyPasswordAsync } 
 import { drainServer } from "../dist/src/lib/shutdown.js";
 import { todayInVietnam } from "../dist/src/domain/validation.js";
 
-const owner = { sub: "owner", role: "owner" }, staff = { sub: "staff", role: "staff" };
+const owner = { sub: "owner", role: "owner" }, staff = { sub: "staff", role: "staff" }, doctor = { sub: "doctor", role: "doctor" };
 
 test("pet validation rejects invalid booleans, enums, blank names and numbers without writes", async () => {
   let writes = 0;
@@ -72,14 +72,14 @@ test("medical create and patch validate actual dates, required text and optional
   const valid = { petId: "pet", title: "Visit", doctorName: "Doctor", diagnosis: "Healthy", treatment: "Observe", visitDate: "2028-02-29" };
   for (const change of [{ visitDate: "2026-02-30" }, { followUpDate: "2026-02-29" }, { title: " " },
     { weightKg: -2 }, { weightKg: false }, { weightKg: 0.001 }, { temperatureC: 38.55 }, { temperatureC: "NaN" }, { heartRateBpm: 1.5 }, { appointmentId: {} }])
-    await assert.rejects(service.create(staff, { ...valid, ...change }), { status: 422 });
+    await assert.rejects(service.create(doctor, { ...valid, ...change }), { status: 422 });
   for (const change of [{ visitDate: "" }, { visitDate: "0000-01-01" }, { followUpDate: false },
     { title: " " }, { diagnosis: null }, { treatment: "" }, { weightKg: -1 }, { heartRateBpm: 0 }])
-    await assert.rejects(service.update(staff, "record", change), { status: 422 });
+    await assert.rejects(service.update(doctor, "record", change), { status: 422 });
   assert.equal(writes, 0);
-  const created = await service.create(staff, { ...valid, weightKg: "4.2", temperatureC: 38.5, heartRateBpm: 80 });
+  const created = await service.create(doctor, { ...valid, weightKg: "4.2", temperatureC: 38.5, heartRateBpm: 80 });
   assert.equal(created.visitDate.toISOString(), "2028-02-29T00:00:00.000Z");
-  const cleared = await service.update(staff, "record", { weightKg: null, temperatureC: "", followUpDate: null });
+  const cleared = await service.update(doctor, "record", { weightKg: null, temperatureC: "", followUpDate: null });
   assert.deepEqual(cleared, { weightKg: null, temperatureC: null, followUpDate: null });
 });
 

@@ -45,7 +45,7 @@ import { databaseHealthCheck } from "../infrastructure/persistence/healthReposit
 import { passwordAdapter, tokenAdapter } from "../infrastructure/security/authAdapters.js";
 import { qrTokenAdapter } from "../infrastructure/security/qrToken.js";
 import { BusinessError } from "../domain/error.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAuth, requirePermission } from "../middleware/auth.js";
 import { createAppointmentsRouter } from "../routes/appointments.js";
 import { createAuthRouter } from "../routes/auth.js";
 import { createBootstrapRouter } from "../routes/bootstrap.js";
@@ -99,7 +99,7 @@ export function createCoreDomains(client: PrismaClient) {
   app.use("/api", createListsRouter(new ListsService(new PrismaListsRepository(client))));
   app.use("/api/bootstrap", requireAuth, createBootstrapRouter(new BootstrapService(new PrismaBootstrapRepository(client))));
   app.use("/api/pets", requireAuth, createPetsRouter(new PetsService(new PrismaPetRepository(client), qrTokenAdapter)));
-  app.use("/api/owners", requireAuth, requireRole("admin", "staff"), createOwnersRouter(new OwnersService(new PrismaOwnerRepository(client)), activation));
+  app.use("/api/owners", requireAuth, requirePermission("owner.manage"), createOwnersRouter(new OwnersService(new PrismaOwnerRepository(client)), activation));
   const lifecycle = new BookingLifecycleService(new PrismaBookingLifecycleStore(client));
   app.use("/api/appointments", requireAuth, createAppointmentsRouter(new AppointmentService(createAppointmentDependencies(client), lifecycle)));
   app.use("/api/medical-records", requireAuth, createMedicalRecordsRouter(new MedicalRecordsService(createMedicalDependencies(client))));

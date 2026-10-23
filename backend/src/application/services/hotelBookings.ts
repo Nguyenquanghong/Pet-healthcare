@@ -1,6 +1,7 @@
 import { BookingLifecycleService, type LifecycleInput, type UndoInput } from "./bookingLifecycle.js";
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { authorize } from "../../domain/authorization.js";
 import { todayInVietnam as vietnamDate } from "../../domain/validation.js";
 import { createHash } from "node:crypto";
 import pricing from "../../domain/pricing.json" with { type: "json" };
@@ -13,9 +14,6 @@ export type CareNoteInput = { note?: string; eatingStatus?: string; mood?: strin
 const roomRates: Record<string, number> = pricing.roomRates;
 const serviceRates: Record<string, number> = pricing.hotelServiceRates;
 const statuses = ["pending", "confirmed", "in_stay", "checked_out", "cancelled", "rejected"];
-const staffOnly = (actor: Actor) => {
-  if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
-};
 
 export class HotelBookingsService {
   constructor(private readonly deps: HotelDependencies, private readonly lifecycle: BookingLifecycleService) {}
@@ -94,7 +92,7 @@ export class HotelBookingsService {
   }
 
   async changeStatus(actor: Actor, id: string, input: HotelStatusInput): Promise<HotelBookingValue> {
-    staffOnly(actor);
+    authorize(actor, "booking.manage");
     if (!statuses.includes(String(input.status))) throw new BusinessError(422, "Select a valid hotel booking status.");
     return await this.lifecycle.change(actor, "hotel", id, input) as HotelBookingValue;
   }
@@ -107,7 +105,7 @@ export class HotelBookingsService {
   }
 
   async addCareNote(actor: Actor, id: string, input: CareNoteInput): Promise<CareNoteValue> {
-    staffOnly(actor);
+    authorize(actor, "hotel.care-note.write");
     const existing = await this.deps.bookings.findWithPet(id);
     if (!existing) throw new BusinessError(404, "Hotel booking not found.");
     if (!input.note?.trim()) throw new BusinessError(422, "Care note is required.");

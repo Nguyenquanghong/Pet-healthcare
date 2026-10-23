@@ -4,7 +4,8 @@ import {createHash} from 'node:crypto';
 import {MedicalRecordsService} from '../../../services/clinic/dist/application/services/medicalRecords.js';
 
 // AQ-09 / E-a: server-side image allowlist; direct API clients bypass the browser picker.
-const staff={sub:'staff-a',role:'staff'};
+// AQ-05: a doctor (or admin) writes medical images; staff only reads them.
+const doctor={sub:'doctor-a',role:'doctor'};
 const b64=bytes=>Buffer.from(bytes).toString('base64');
 const png=b64([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0,0,0,13]);
 const jpeg=b64([0xff,0xd8,0xff,0xe0,0,16]);
@@ -34,13 +35,13 @@ async function rejected(promise,pattern){await assert.rejects(promise,error=>err
 test('allowed image types with matching data URL and signature are stored',async()=>{
   const {service:s,created}=service();
   for(const [mime,data] of [['image/png',png],['image/jpeg',jpeg],['image/gif',gif],['image/webp',webp]])
-    assert.equal((await s.createImage(staff,input(mime,`data:${mime};base64,${data}`))).mimeType,mime);
+    assert.equal((await s.createImage(doctor,input(mime,`data:${mime};base64,${data}`))).mimeType,mime);
   assert.equal(created.length,4);
 });
 
 test('Claim Check: bytes go to the bucket first, the row keeps key, size and sha256, the response carries a valet key and no content',async()=>{
   const {service:s,created,blobs}=service();
-  const image=await s.createImage(staff,input('image/png',`data:image/png;base64,${png}`));
+  const image=await s.createImage(doctor,input('image/png',`data:image/png;base64,${png}`));
   const bytes=Buffer.from(png,'base64');
   assert.equal(blobs.calls[0][0],'put');assert.equal(created.length,1);
   assert.deepEqual(created[0],{id:created[0].id,petId:'pet-a',title:'Scan',mimeType:'image/png',storageKey:'images/'+created[0].id,sizeBytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});
@@ -51,45 +52,46 @@ test('Claim Check: bytes go to the bucket first, the row keeps key, size and sha
 
 test('a failed bucket write stores no row; a failed row insert removes the object again',async()=>{
   const down=service({blobs:memoryBlobs({failPut:true})});
-  await assert.rejects(down.service.createImage(staff,input('image/png',`data:image/png;base64,${png}`)),/BLOB_PUT_FAILED/);assert.equal(down.created.length,0);
+  await assert.rejects(down.service.createImage(doctor,input('image/png',`data:image/png;base64,${png}`)),/BLOB_PUT_FAILED/);assert.equal(down.created.length,0);
   const failing=service({failCreate:true});
-  await assert.rejects(failing.service.createImage(staff,input('image/png',`data:image/png;base64,${png}`)),/DB_DOWN/);
+  await assert.rejects(failing.service.createImage(doctor,input('image/png',`data:image/png;base64,${png}`)),/DB_DOWN/);
   assert.deepEqual(failing.blobs.calls.map(c=>c[0]),['put','remove']);assert.equal(failing.blobs.objects.size,0);
 });
 
 test('delete removes the row first, then the object; a bucket outage leaves the cleanup claim for the worker',async()=>{
-  const ok=service();await ok.service.deleteImage(staff,'img-1');
+  const ok=service();await ok.service.deleteImage(doctor,'img-1');
   assert.deepEqual(ok.cleanup,['img-1','done:images/img-1']);assert.deepEqual(ok.blobs.calls,[['remove','images/img-1']]);
-  const outage=service({blobs:memoryBlobs({failRemove:true})});await outage.service.deleteImage(staff,'img-2');
+  const outage=service({blobs:memoryBlobs({failRemove:true})});await outage.service.deleteImage(doctor,'img-2');
   assert.deepEqual(outage.cleanup,['img-2']);// no completion: the claim stays queued
-  const legacy=service();await legacy.service.deleteImage(staff,'legacy');assert.deepEqual(legacy.blobs.calls,[]);
+  const legacy=service();await legacy.service.deleteImage(doctor,'legacy');assert.deepEqual(legacy.blobs.calls,[]);
   await assert.rejects(service().service.deleteImage({sub:'owner-a',role:'owner'},'img-1'),error=>error.status===403);
 });
 
 test('MIME outside the allowlist is rejected before persistence',async()=>{
   const {service:s,created}=service();
   for(const mime of ['image/svg+xml','text/html','application/pdf','IMAGE/PNG','image/png ;'])
-    await rejected(s.createImage(staff,input(mime,`data:${mime};base64,${png}`)),/MIME type must be one of/);
+    await rejected(s.createImage(doctor,input(mime,`data:${mime};base64,${png}`)),/MIME type must be one of/);
   assert.equal(created.length,0);
 });
 
 test('data URL prefix, base64 and content signature must match the declared MIME',async()=>{
   const {service:s,created}=service();
-  await rejected(s.createImage(staff,input('image/png','https://example.test/a.png')),/base64 data URL/);
-  await rejected(s.createImage(staff,input('image/png',`data:image/jpeg;base64,${png}`)),/base64 data URL/);
-  await rejected(s.createImage(staff,input('image/png','data:image/png,'+png)),/base64 data URL/);
-  await rejected(s.createImage(staff,input('image/png','data:image/png;base64,')),/must be a non-empty|base64 data URL/);
-  await rejected(s.createImage(staff,input('image/png','data:image/png;base64,iVBO*w0KGgo=')),/base64 data URL/);
-  await rejected(s.createImage(staff,input('image/png','data:image/png;base64,iVBORw0KGgo')),/base64 data URL/);
-  await rejected(s.createImage(staff,input('image/png','data:image/png;base64,AA==')),/does not match/);
-  await rejected(s.createImage(staff,input('image/png',`data:image/png;base64,${jpeg}`)),/does not match/);
-  await rejected(s.createImage(staff,input('image/webp',`data:image/webp;base64,${b64([...Buffer.from('RIFF'),0,0,0,0,...Buffer.from('AVI ')])}`)),/does not match/);
-  await rejected(s.createImage(staff,input('image/gif',`data:image/gif;base64,${b64(Buffer.from('<svg onload=1>'))}`)),/does not match/);
+  await rejected(s.createImage(doctor,input('image/png','https://example.test/a.png')),/base64 data URL/);
+  await rejected(s.createImage(doctor,input('image/png',`data:image/jpeg;base64,${png}`)),/base64 data URL/);
+  await rejected(s.createImage(doctor,input('image/png','data:image/png,'+png)),/base64 data URL/);
+  await rejected(s.createImage(doctor,input('image/png','data:image/png;base64,')),/must be a non-empty|base64 data URL/);
+  await rejected(s.createImage(doctor,input('image/png','data:image/png;base64,iVBO*w0KGgo=')),/base64 data URL/);
+  await rejected(s.createImage(doctor,input('image/png','data:image/png;base64,iVBORw0KGgo')),/base64 data URL/);
+  await rejected(s.createImage(doctor,input('image/png','data:image/png;base64,AA==')),/does not match/);
+  await rejected(s.createImage(doctor,input('image/png',`data:image/png;base64,${jpeg}`)),/does not match/);
+  await rejected(s.createImage(doctor,input('image/webp',`data:image/webp;base64,${b64([...Buffer.from('RIFF'),0,0,0,0,...Buffer.from('AVI ')])}`)),/does not match/);
+  await rejected(s.createImage(doctor,input('image/gif',`data:image/gif;base64,${b64(Buffer.from('<svg onload=1>'))}`)),/does not match/);
   assert.equal(created.length,0);
 });
 
 test('owner role and unknown pet keep their existing responses',async()=>{
   const {service:s}=service();
   await assert.rejects(s.createImage({sub:'owner-a',role:'owner'},input('image/png',`data:image/png;base64,${png}`)),error=>error.status===403);
-  await assert.rejects(s.createImage(staff,{...input('image/png',`data:image/png;base64,${png}`),petId:'pet-x'}),error=>error.status===404);
+  await assert.rejects(s.createImage({sub:'staff-a',role:'staff'},input('image/png',`data:image/png;base64,${png}`)),error=>error.status===403);
+  await assert.rejects(s.createImage(doctor,{...input('image/png',`data:image/png;base64,${png}`),petId:'pet-x'}),error=>error.status===404);
 });

@@ -1,5 +1,6 @@
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { authorize } from "../../domain/authorization.js";
 import type { PaymentGateway, PaymentRepository, IpnReply } from "../ports/payments.js";
 import type { BankTransferDetails } from "../ports/invoices.js";
 
@@ -7,7 +8,7 @@ export class PaymentsService {
   constructor(private readonly repository: PaymentRepository, private readonly gateway: PaymentGateway, private readonly bankTransfer: BankTransferDetails | null = null) {}
   options() { return { vnpayEnabled: this.gateway.enabled(), environment: "sandbox", bankTransfer: this.bankTransfer }; }
   async start(actor: Actor, invoiceId: string, ip: string) {
-    if (actor.role !== "owner") throw new BusinessError(403, "Chỉ chủ nuôi được thanh toán hóa đơn của mình.");
+    authorize(actor, "billing.self-service");
     if (!this.gateway.enabled()) throw new BusinessError(409, "VNPay Sandbox chưa được cấu hình. Bạn có thể chọn thanh toán tại cửa hàng.");
     const attempt = await this.repository.prepare(invoiceId, actor.sub);
     return { paymentUrl: this.gateway.url(attempt, ip), reference: attempt.id };

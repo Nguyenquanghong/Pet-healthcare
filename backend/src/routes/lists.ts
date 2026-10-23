@@ -1,12 +1,12 @@
 import { Router } from "express";
 import type { ListsService } from "../application/services/lists.js";
 import { listResultDto } from "../lib/listSerialize.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAuth, requirePermission } from "../middleware/auth.js";
 
 // Mounted before the write routers; only these GET handlers run authentication here.
 export function createListsRouter(service: ListsService) {
   const router = Router();
-  router.get("/owners", requireAuth, requireRole("admin", "staff", "doctor"), async (req, res) => res.json(listResultDto("owners", await service.load("owners", req.auth!, req.query), false)));
+  router.get("/owners", requireAuth, requirePermission("directory.read"), async (req, res) => res.json(listResultDto("owners", await service.load("owners", req.auth!, req.query), false)));
   router.get("/pets", requireAuth, async (req, res) => res.json(listResultDto("pets", await service.load("pets", req.auth!, req.query), req.auth!.role === "owner")));
   router.get("/appointments", requireAuth, async (req, res) => res.json(listResultDto("appointments", await service.load("appointments", req.auth!, req.query), req.auth!.role === "owner")));
   router.get("/appointments/calendar", requireAuth, async (req, res) => res.json(await service.calendar(req.auth!, req.query.month, req.query.category)));

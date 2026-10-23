@@ -158,7 +158,9 @@ test('manual send commits once under concurrent HTTP replicas/retries; key misma
   assert.equal(recovered.notification.id, committed.resourceId);
   assert.equal(await notification.notification.count({ where: { id: committed.resourceId } }), 1);
   requireStatus(await request('/api/notifications/send', { method: 'POST', token: tokens.admin, key, body: { ...body, message: 'Changed fixture' } }), 409);
-  const otherActor = requireStatus(await request('/api/notifications/send', { method: 'POST', token: tokens.doctor, key, body }), 201);
+  // AQ-05: doctors do not send manual notifications; the same key under another permitted actor is a new operation.
+  assert.match(requireStatus(await request('/api/notifications/send', { method: 'POST', token: tokens.doctor, key, body }), 403).error, /nhân viên hoặc quản trị viên/);
+  const otherActor = requireStatus(await request('/api/notifications/send', { method: 'POST', token: tokens.staff, key, body }), 201);
   assert.notEqual(otherActor.notification.id, sent[0].notification.id);
   requireStatus(await request(`/api/notifications/${sent[0].notification.id}`, { method: 'DELETE' }), 204);
   assert.deepEqual(requireStatus(await request('/api/notifications/send', { method: 'POST', token: tokens.admin, key, body }), 201), sent[0]);

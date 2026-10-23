@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { MedicalRecordsService } from "../dist/src/application/services/medicalRecords.js";
 
+const doctor = { sub: "doctor-1", role: "doctor" };
 const staff = { sub: "staff-1", role: "staff" };
 const owner = { sub: "owner-1", role: "owner" };
 const input = { petId: "pet-1", appointmentId: "appt-1", doctorName: "Dr A", visitDate: "2099-01-01", title: "Check", diagnosis: "Healthy", treatment: "None" };
@@ -40,7 +41,7 @@ function fixture(failNotification = false) {
 
 test("medical creation completes linked appointment and writes notification atomically", async () => {
   const deps = fixture();
-  const result = await deps.service.create(staff, input);
+  const result = await deps.service.create(doctor, input);
   assert.equal(result.appointmentId, "appt-1");
   assert.equal(deps.committed.length, 1);
   assert.deepEqual(deps.completed, ["appt-1"]);
@@ -48,7 +49,7 @@ test("medical creation completes linked appointment and writes notification atom
 
 test("medical notification failure rolls back record and linked appointment", async () => {
   const deps = fixture(true);
-  await assert.rejects(deps.service.create(staff, input), /notification failed/);
+  await assert.rejects(deps.service.create(doctor, input), /notification failed/);
   assert.equal(deps.committed.length, 0);
   assert.equal(deps.completed.length, 0);
 });
@@ -68,12 +69,21 @@ test("medical update rejects reassignment or unlinking and accepts editable deta
   } });
   for (const change of [{ petId: "pet-2" }, { petId: null }, { ownerId: "owner-2" },
     { appointmentId: null }, { appointmentId: "appt-2" }]) {
-    await assert.rejects(service.update(staff, current.id, change), { status: 422 });
+    await assert.rejects(service.update(doctor, current.id, change), { status: 422 });
   }
   assert.equal(writes.length, 0);
-  const saved = await service.update(staff, current.id, { title: "Revised", petId: current.petId,
+  const saved = await service.update(doctor, current.id, { title: "Revised", petId: current.petId,
     ownerId: current.ownerId, appointmentId: current.appointmentId });
   assert.equal(saved.title, "Revised");
   assert.deepEqual(writes, [{ title: "Revised" }]);
   await assert.rejects(service.update(owner, current.id, { title: "Invalid" }), { status: 403 });
+});
+
+test("AQ-05: staff reads medical records but cannot write them or their images", async () => {
+  const { service, committed } = fixture();
+  for (const write of [() => service.create(staff, input), () => service.update(staff, "record-1", { title: "x" }), () => service.delete(staff, "record-1"),
+    () => service.createImage(staff, { petId: "pet-1" }), () => service.deleteImage(staff, "image-1")])
+    await assert.rejects(write(), { status: 403, message: /bác sĩ hoặc quản trị viên/ });
+  assert.equal(committed.length, 0);
+  assert.deepEqual(await service.list(staff, undefined, "pet-1"), []);
 });

@@ -5,6 +5,7 @@ import * as serializers from "../dist/src/lib/serialize.js";
 import { appointmentSlotWrite } from "../dist/src/infrastructure/persistence/appointmentSlotConflict.js";
 
 const staff = { sub: "staff-1", role: "staff" };
+const doctor = { sub: "doctor-1", role: "doctor" };
 const medicalInput = { petId: "pet-a", appointmentId: "appointment-b", doctorName: "Doctor", visitDate: "2099-01-01", title: "Check", diagnosis: "Healthy", treatment: "Observe" };
 
 function medicalFixture(linkedAppointment) {
@@ -24,21 +25,21 @@ function medicalFixture(linkedAppointment) {
 
 test("medical link rejects another pet of the same owner before any write", async () => {
   const { service, effects } = medicalFixture({ id: "appointment-b", petId: "pet-b", ownerId: "owner-a" });
-  await assert.rejects(service.create(staff, medicalInput), { status: 422 });
+  await assert.rejects(service.create(doctor, medicalInput), { status: 422 });
   assert.deepEqual(effects, { record: 0, completion: 0, notification: 0 });
 });
 
 test("medical link rejects another owner's appointment before any write", async () => {
   const { service, effects } = medicalFixture({ id: "appointment-b", petId: "pet-b", ownerId: "owner-b" });
-  await assert.rejects(service.create(staff, medicalInput), { status: 422 });
+  await assert.rejects(service.create(doctor, medicalInput), { status: 422 });
   assert.deepEqual(effects, { record: 0, completion: 0, notification: 0 });
 });
 
 test("medical link returns 404 for an absent appointment and permits standalone records", async () => {
   const { service, effects } = medicalFixture(null);
-  await assert.rejects(service.create(staff, medicalInput), { status: 404 });
+  await assert.rejects(service.create(doctor, medicalInput), { status: 404 });
   assert.deepEqual(effects, { record: 0, completion: 0, notification: 0 });
-  await service.create(staff, { ...medicalInput, appointmentId: undefined });
+  await service.create(doctor, { ...medicalInput, appointmentId: undefined });
   assert.deepEqual(effects, { record: 1, completion: 0, notification: 1 });
 });
 

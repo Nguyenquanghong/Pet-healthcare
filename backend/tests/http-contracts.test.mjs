@@ -112,7 +112,10 @@ test("representative routes keep JSON, auth and method contracts", async () => {
     assert.equal(writes.at(-1).data.envelope.eventType, 'notification.requested.v1');
     assert.equal(writes.at(-1).data.envelope.payload.recipientOwnerId, owner.id);
 
-    const deleted = await request("/api/medical-records/images/img-1", "DELETE", staffToken);
+    // AQ-05: staff reads medical records; only a doctor or admin deletes images.
+    const refused = await request("/api/medical-records/images/img-1", "DELETE", staffToken);
+    assert.equal(refused.status, 403);
+    const deleted = await request("/api/medical-records/images/img-1", "DELETE", signToken("doctor-1", "doctor"));
     assert.equal(deleted.status, 204);
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import type { Role } from "../domain/auth.js";
+import { allows, deniedMessage, type Permission } from "@nipopeto/contracts";
 import { verifyToken, type AuthPayload } from "../lib/token.js";
 import { requestActor } from '@nipopeto/runtime';
 
@@ -22,9 +22,10 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-export function requireRole(...roles: Role[]) {
+// AQ-05: route-level guard over the shared permission matrix (@nipopeto/contracts).
+export function requirePermission(permission: Permission) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.auth || !roles.includes(req.auth.role)) return res.status(403).json({ error: "You do not have permission to perform this action." });
+    if (!req.auth || !allows(req.auth.role, permission)) return res.status(403).json({ error: deniedMessage(permission) });
     next();
   };
 }

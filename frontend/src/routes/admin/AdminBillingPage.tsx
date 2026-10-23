@@ -17,6 +17,7 @@ import { formatInvoiceCurrency as formatCurrency } from "../../utils/formatCurre
 
 import { apiClient } from "../../services/apiClient";
 import { InvoiceIssueForm } from "./InvoiceIssueForm";
+import { useSession } from "../../store/SessionContext";
 import { useSearchParams } from "react-router-dom";
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { cash: "Tiền mặt", bank_transfer: "Chuyển khoản", credit_card: "Thẻ", qr_code: "QR", vnpay: "VNPay" };
@@ -37,6 +38,7 @@ type PaymentEvent = { id: string; action: string; fromStatus: string; toStatus: 
   actorName: string; actorRole: string; reason: string | null; reference: string | null; createdAt: string };
 
 export function AdminBillingPage() {
+  const canCollect = useSession().can("billing.manage");
   const [searchParams] = useSearchParams();
   const initialHotelBookingId = searchParams.get("hotelBookingId");
 
@@ -117,7 +119,7 @@ export function AdminBillingPage() {
         <p className="text-sm text-slate-600">Ghi nhận tiền đã thu cho hóa đơn dịch vụ.</p>
         <div className="flex gap-2">
           <button disabled={loading || paying} onClick={() => void loadInvoices()} className="rounded-lg border px-4 py-2 disabled:opacity-50">Tải lại</button>
-          <button disabled={loading || !!loadError} onClick={() => setIssuing(true)} className="rounded-lg bg-primary px-4 py-2 text-white disabled:opacity-50">Lập hóa đơn</button>
+          {canCollect && <button disabled={loading || !!loadError} onClick={() => setIssuing(true)} className="rounded-lg bg-primary px-4 py-2 text-white disabled:opacity-50">Lập hóa đơn</button>}
         </div>
       </div>
       {loadError && <p role="alert" className="mb-4 text-rose-700">{loadError}</p>}
@@ -276,7 +278,7 @@ export function AdminBillingPage() {
 
                     <td className="px-5 py-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
-                        {currentStatus === "unpaid" && inv.transferReviewStatus === "pending" && <button className="rounded-lg border px-2.5 py-1.5 text-xs" disabled={paying} onClick={() => { setRejectInvoice(inv); setRejectReason(""); setPaymentError(""); }}>Chưa nhận được tiền</button>}
+                        {canCollect && currentStatus === "unpaid" && inv.transferReviewStatus === "pending" && <button className="rounded-lg border px-2.5 py-1.5 text-xs" disabled={paying} onClick={() => { setRejectInvoice(inv); setRejectReason(""); setPaymentError(""); }}>Chưa nhận được tiền</button>}
                         {currentStatus === "unpaid" && inv.paymentChannel === "online" && <button disabled={paying} className="rounded-lg border px-2.5 py-1.5 text-xs" onClick={async () => {
                           setPaying(true);
                           try {
@@ -293,7 +295,7 @@ export function AdminBillingPage() {
                           <Printer size={14} className="text-primary" /> Xem / In
                         </button>
 
-                        {currentStatus === "unpaid" && inv.paymentChannel !== "online" && (
+                        {canCollect && currentStatus === "unpaid" && inv.paymentChannel !== "online" && (
                           <button
                             disabled={loading || !!loadError}
                             onClick={() => { setPaymentInvoice(inv); setPaymentMethod(inv.paymentChannel === "bank_transfer" ? "bank_transfer" : "cash"); setPaymentError(""); }}
