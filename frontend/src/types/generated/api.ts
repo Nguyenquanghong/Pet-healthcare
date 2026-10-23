@@ -3,6 +3,23 @@
 // arch:check fails when this file is stale (AQ-07).
 /* eslint-disable */
 export interface ApiSchemas {
+  AppointmentAvailability: {
+    type: string;
+    date: string;
+    /** Capacity is shared by the types of a group (exam, spa). */
+    resourceGroup: string;
+    durationMinutes: number;
+    slots: {
+      time: string;
+      remaining: number;
+      /** The slot has already started (Vietnam time). */
+      past: boolean;
+      /** remaining > 0, not past and, with doctorId, the doctor is free. */
+      available: boolean;
+      /** Only with doctorId. */
+      doctorBusy?: boolean;
+    }[];
+  };
   Error: {
     error: string;
     /** Machine-readable reason when the client should react to it, for example MEDICAL_RECORD_STALE. */

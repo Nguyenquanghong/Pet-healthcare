@@ -6,12 +6,12 @@ test('Q4 real projection: owner create/reschedule with paused worker, admin two 
   const f=fixture();expect((f as any).q4E2e).toBe(true);
   await login(page);await page.goto('/owner/appointments');const pet=await pickPet(page,0);
   await controls({pauseRead:true});await expect.poll(()=>observed().readPaused).toBe(true);
-  await page.getByLabel('Ngày khám',{exact:true}).fill('2040-04-01');await page.getByLabel('Giờ khám',{exact:true}).fill('09:00');
+  await page.getByLabel('Ngày khám',{exact:true}).fill('2040-04-01');await page.getByLabel('Giờ khám',{exact:true}).selectOption('09:00');
   const saved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/appointments'&&r.request().method()==='POST');
   const after=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/appointments'&&r.request().method()==='GET'&&Boolean(r.request().headers()['x-clinic-min-version']));
   await page.getByRole('button',{name:'Gửi yêu cầu đặt lịch',exact:true}).click();const write=await saved;expect(write.status()).toBe(201);expect(Boolean(write.headers()['x-clinic-read-token'])).toBe(true);const a=(await write.json()).appointment;
   const read=await after;expect(read.headers()['x-clinic-read-source']).toBe('authoritative');expect((await read.json()).items.some((x:any)=>x.id===a.id)).toBe(true);
-  await page.getByRole('button',{name:'Đổi lịch',exact:true}).click();await page.getByLabel('Ngày mới',{exact:true}).fill('2040-04-02');await page.getByLabel('Giờ mới',{exact:true}).fill('10:00');
+  await page.getByRole('button',{name:'Đổi lịch',exact:true}).click();await page.getByLabel('Ngày mới',{exact:true}).fill('2040-04-02');await page.getByLabel('Giờ mới',{exact:true}).selectOption('10:00');
   const moved=page.waitForResponse(r=>r.url().endsWith('/reschedule')&&r.request().method()==='PATCH');await page.getByRole('button',{name:'Xác nhận đổi',exact:true}).click();expect((await moved).status()).toBe(200);
   await controls({});await expect.poll(()=>observed().readPaused).toBe(false);
   // Real Core proxy must forward tokens, source metadata and cache isolation.
@@ -41,7 +41,7 @@ test('Q4 delayed pre-mutation GET cannot replace the newer successful list',asyn
   });
   try{
     await page.goto('/owner/appointments');await captured;const pet=await pickPet(page,2);
-    await page.getByLabel('Ngày khám',{exact:true}).fill('2040-04-04');await page.getByLabel('Giờ khám',{exact:true}).fill('12:00');
+    await page.getByLabel('Ngày khám',{exact:true}).fill('2040-04-04');await page.getByLabel('Giờ khám',{exact:true}).selectOption('12:00');
     const refreshed=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/appointments'&&r.request().method()==='GET'&&Boolean(r.request().headers()['x-clinic-min-version']));
     await page.getByRole('button',{name:'Gửi yêu cầu đặt lịch',exact:true}).click();expect((await refreshed).status()).toBe(200);
     await expect(page.getByText(pet.name,{exact:true}).last()).toBeVisible();release();await finished;
@@ -50,7 +50,7 @@ test('Q4 delayed pre-mutation GET cannot replace the newer successful list',asyn
 });
 
 test('Q4 real commit remains visible when refresh fails; expired token retries only GET authoritative',async({page})=>{
-  await login(page);await page.goto('/owner/appointments');await pickPet(page,1);await page.getByLabel('Ngày khám',{exact:true}).fill('2040-04-03');await page.getByLabel('Giờ khám',{exact:true}).fill('11:00');
+  await login(page);await page.goto('/owner/appointments');await pickPet(page,1);await page.getByLabel('Ngày khám',{exact:true}).fill('2040-04-03');await page.getByLabel('Giờ khám',{exact:true}).selectOption('11:00');
   let committed=false,expired=false,posts=0;const reads:{token:boolean;source:boolean}[]=[];
   await page.route('**/api/appointments?**',async route=>{
     if(!committed)return route.fallback();const h=route.request().headers();reads.push({token:Boolean(h['x-clinic-min-version']),source:h['x-clinic-read-consistency']==='authoritative'});

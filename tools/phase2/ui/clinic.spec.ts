@@ -6,7 +6,7 @@ async function fixture(page:Page,role:'owner'|'admin'='owner'){
   const owner={id:'p3-ui-owner',fullName:'Fixture owner',phone:'000-fixture',petIds:['p3-ui-pet']};
   const pet={id:'p3-ui-pet',ownerId:owner.id,name:'Fixture pet',species:'dog',breed:'Fixture breed',healthStatus:'healthy',allergies:[],gender:'male',createdAt:new Date().toISOString()};
   const state={currentOwnerId:role==='owner'?owner.id:'',owners:[owner],pets:[pet],appointments:[],medicalRecords:[],medicalImages:[],hotelBookings:[],dailyCareNotes:[],notifications:[],summary:{totals:{},species:{},appointmentStatus:{},hotelStatus:{},notificationCategory:{},unread:0,todayAppointments:0}};
-  const control={lose:true,failRefresh:false,hold:false,release:()=>{},sends:[] as {key:string|undefined;body:Record<string,unknown>}[],records:[] as Record<string,unknown>[],patches:[] as Record<string,unknown>[],patchReplies:[] as {status:number;body:unknown}[]};
+  const control={lose:true,failRefresh:false,hold:false,release:()=>{},sends:[] as {key:string|undefined;body:Record<string,unknown>}[],records:[] as Record<string,unknown>[],full:[] as string[],patches:[] as Record<string,unknown>[],patchReplies:[] as {status:number;body:unknown}[]};
   const doctor={id:'p3-ui-doctor',fullName:'Fixture doctor'};
   await page.addInitScript(()=>sessionStorage.setItem('nipopeto_access_token','p3-ui-fixture-token'));
   await page.route('**/*',async route=>{
@@ -17,6 +17,7 @@ async function fixture(page:Page,role:'owner'|'admin'='owner'){
     if(url.pathname==='/api/bootstrap')return control.failRefresh?json({error:'Refresh fixture unavailable'},503):json(state);
     if(url.pathname==='/api/notifications/unread-count')return json({unread:0,asOf:new Date().toISOString()});
     if(url.pathname==='/api/doctors')return json({items:[doctor]});
+    if(url.pathname==='/api/appointments/availability'){const type=url.searchParams.get('type')??'',spa=type.startsWith('spa_');return json({type,date:url.searchParams.get('date'),resourceGroup:spa?'spa':'exam',durationMinutes:spa?90:30,slots:(spa?['09:00','10:30']:['09:00','09:30']).map(time=>({time,remaining:control.full.includes(time)?0:2,past:false,available:!control.full.includes(time)}))});}
     if(req.method()==='GET'){if(control.failRefresh&&url.pathname.startsWith('/api/medical-records'))return json({error:'Refresh fixture unavailable'},503);const items=url.pathname==='/api/pets'?[pet]:url.pathname==='/api/owners'?[owner]:url.pathname==='/api/medical-records'?control.records:[];return json({items,pagination:{page:1,pageSize:20,total:items.length,totalPages:1},counts:{},related:{pets:[pet],owners:[owner],appointments:[]}});}
     if(req.method()==='POST'&&['/api/appointments','/api/medical-records'].includes(url.pathname)){
       control.sends.push({key:req.headers()['idempotency-key'],body:req.postDataJSON()});if(control.hold)await new Promise<void>(r=>control.release=r);
@@ -70,4 +71,13 @@ test('a stale medical edit can also be dropped for the newer record',async({page
   await panel.getByRole('button',{name:'Dùng bản mới',exact:true}).click();
   await expect(page.getByLabel('Chẩn đoán',{exact:true})).toHaveValue('Colleague diagnosis');await expect(panel).toHaveCount(0);
   expect(api.patches).toHaveLength(1);
+});
+test('P10 booking form offers the server slots: a full slot cannot be chosen, the chosen one is sent',async({page})=>{
+  const api=await fixture(page);api.lose=false;api.full.push('09:00');await page.goto('/owner/appointments');
+  const time=page.getByLabel('Giờ khám',{exact:true});
+  await expect(time.locator('option',{hasText:'09:00 · hết chỗ'})).toBeDisabled();
+  await expect(time.locator('option',{hasText:'09:30 · còn 2 chỗ'})).toBeEnabled();
+  await expect(page.getByText('Mỗi lượt giữ chỗ 30 phút.',{exact:true})).toBeVisible();
+  await time.selectOption('09:30');await page.getByRole('button',{name:'Gửi yêu cầu đặt lịch',exact:true}).click();
+  await expect.poll(()=>api.sends.length).toBe(1);expect(api.sends[0].body.time).toBe('09:30');
 });

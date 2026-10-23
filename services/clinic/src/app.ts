@@ -70,7 +70,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
     const add=(v:unknown)=>{if(v!==undefined&&v!==null&&v!==''){if(typeof v!=='string'||v.length>200)throw new BusinessError(422,'Invalid pet ID.');petIds.push(v);}};
     if(req.method==='GET'){if(req.path!=='/dashboard/clinic/activity'){const id=typeof req.query.petId==='string'?req.query.petId.trim():req.query.petId;if(id!=='all')add(id);}}else add(req.path==='/medical-records'&&typeof req.body?.petId==='string'?req.body.petId.trim():req.body?.petId);
     const match=req.path.match(/^\/(appointments|medical-records)\/(?:images\/)?([^/]+)(?:\/|$)/);
-    if(match&&!['calendar','images'].includes(match[2]!)){
+    if(match&&!['calendar','images','availability'].includes(match[2]!)){
       const id=decodeURIComponent(match[2]!);
       let row:{petId:string}|null=match[1]==='appointments'?await db.appointment.findUnique({where:{id}}):req.path.startsWith('/medical-records/images/')?await db.medicalImage.findUnique({where:{id},select:{petId:true}}):await db.medicalRecord.findUnique({where:{id}});
       // AQ-15: history outlives a deleted record; scope it by the pet in its last snapshot.
@@ -104,6 +104,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   };
   router.get('/appointments',async(req,res)=>read(req,res,reader=>reader.list(res.locals.actor,res.locals.directory,req.query)));
   router.get('/appointments/calendar',async(req,res)=>read(req,res,reader=>reader.calendar(res.locals.actor,{month:req.query.month,category:req.query.category})));
+  router.get('/appointments/availability',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await appointment(res).availability(res.locals.actor,req.query));});
   router.post('/appointments',async(req,res)=>{
     const result=await deduplicated(db,res.locals.actor.sub,'appointment.create',req.headers['idempotency-key'],normalizeCreate(req.body,false),async tx=>{const row=await appointment(res,tx).create(res.locals.actor,req.body);return{resourceId:row.id,appointmentId:row.id,response:{appointment:appointmentDto(row,res.locals.actor.role==='owner')}};},true);sendMutation(res,result as {response:unknown;versions:ReadVersions},201);
   });

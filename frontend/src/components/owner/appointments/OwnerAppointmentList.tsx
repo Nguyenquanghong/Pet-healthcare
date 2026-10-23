@@ -11,6 +11,7 @@ import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { Textarea } from "../../ui/Textarea";
+import { SlotPicker } from "../../ui/SlotPicker";
 
 type StatusTab = "all" | "pending" | "completed" | "cancelled";
 
@@ -240,7 +241,7 @@ export function OwnerAppointmentList({ mode = "medical", selectedDate, onClearDa
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <Input type="date" label="Ngày mới" value={rescheduleDate} onChange={(event) => setRescheduleDate(event.target.value)} />
-                <Input type="time" label="Giờ mới" value={rescheduleTime} onChange={(event) => setRescheduleTime(event.target.value)} />
+                <SlotPicker label="Giờ mới" type={rescheduleItem.type} date={rescheduleDate} value={rescheduleTime} onChange={setRescheduleTime} />
               </div>
 
               <Textarea

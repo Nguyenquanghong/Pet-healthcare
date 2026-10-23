@@ -156,8 +156,16 @@ async function importMigrationLocked(ctx,snapshot,fault){
     if(kind==='core')await tx.$executeRawUnsafe('DELETE FROM runtime.hotel_room_capacity');
     const before=await compareComponent(tx,kind,expected[kind],{emptyAllowed:true});fail(before.empty,'TARGET_NOT_EMPTY');
     if(kind==='core'){for(const [table,prefix]of [['users','users'],['pets','pets']])for(const suffix of ['directory_revision','directory_event'])await tx.$executeRawUnsafe(`ALTER TABLE runtime.${ident(table)} DISABLE TRIGGER ${ident(prefix+'_'+suffix)}`);await tx.$executeRawUnsafe('ALTER TABLE runtime.hotel_bookings DISABLE TRIGGER hotel_room_nights_sync');}
+    // P10: imported appointments are history: counted in slot usage, never checked for
+    // overlap (older data may overlap). The slot tables are recounted once after the rows.
+    if(kind==='clinic')await tx.$executeRawUnsafe('ALTER TABLE runtime.appointments DISABLE TRIGGER appointment_schedule_sync');
     for(const name of targets[kind]){await insertRows(tx,catalogs[kind][name],expected[kind][name]);await fault?.(kind,name);}
-    if(kind==='clinic')await registerFrozenClinicReadRevisions(tx);
+    if(kind==='clinic'){
+      await tx.$executeRawUnsafe('UPDATE runtime.appointments SET schedule_checked=false');
+      await tx.$queryRawUnsafe('SELECT runtime.appointment_schedule_rebuild()::text');
+      await tx.$executeRawUnsafe('ALTER TABLE runtime.appointments ENABLE TRIGGER appointment_schedule_sync');
+      await registerFrozenClinicReadRevisions(tx);
+    }
     if(kind==='core'){
       for(const [table,prefix]of [['users','users'],['pets','pets']])for(const suffix of ['directory_revision','directory_event'])await tx.$executeRawUnsafe(`ALTER TABLE runtime.${ident(table)} ENABLE TRIGGER ${ident(prefix+'_'+suffix)}`);
       await tx.$executeRawUnsafe('ALTER TABLE runtime.hotel_bookings ENABLE TRIGGER hotel_room_nights_sync');

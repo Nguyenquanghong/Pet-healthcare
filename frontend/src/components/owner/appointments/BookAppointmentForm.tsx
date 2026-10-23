@@ -6,6 +6,7 @@ import { Button } from "../../ui/Button";
 import { Select } from "../../ui/Select";
 import { Input } from "../../ui/Input";
 import { Textarea } from "../../ui/Textarea";
+import { SlotPicker } from "../../ui/SlotPicker";
 
 export const OWNER_APPOINTMENT_SERVICES: { type: AppointmentType; label: string }[] = [
   { type: "general_checkup", label: "Khám tổng quát" },
@@ -73,7 +74,7 @@ export function BookAppointmentForm({
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Input type="date" label="Ngày khám" value={date} onChange={(event) => onDateChange(event.target.value)} />
-          <Input type="time" label="Giờ khám" value={time} onChange={(event) => onTimeChange(event.target.value)} />
+          <SlotPicker label="Giờ khám" type={serviceType} date={date} value={time} onChange={onTimeChange} />
         </div>
         <Textarea
           label="Ghi chú cho bác sĩ"

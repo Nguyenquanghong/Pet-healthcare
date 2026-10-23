@@ -1,4 +1,5 @@
 import type { Actor } from "../../domain/auth.js";
+import type { SlotPolicy } from "../../domain/scheduling.js";
 
 export const appointmentTypes = ["general_checkup", "vaccination", "dental", "dermatology", "surgery", "hotel_consultation", "spa_bath", "spa_grooming", "spa_combo", "other"] as const;
 export const appointmentStatuses = ["pending", "confirmed", "checked_in", "in_progress", "completed", "cancelled", "no_show"] as const;
@@ -41,7 +42,10 @@ export interface AppointmentRepository {
   findPet(id: string): Promise<PetForAppointment | null>;
   find(id: string): Promise<AppointmentRecord | null>;
   findWithPet(id: string): Promise<{ appointment: AppointmentRecord; pet: PetForAppointment } | null>;
-  hasSlot(petId: string, date: Date, time: string, exceptId?: string): Promise<boolean>;
+  // P10: the scheduling policy of a type, and what the database has counted in a time window.
+  slotPolicy(type: AppointmentType): Promise<SlotPolicy>;
+  slotUsage(resourceGroup: string, from: Date, to: Date): Promise<{ slotStart: Date; booked: number; capacity: number }[]>;
+  doctorSlots(doctorId: string, from: Date, to: Date): Promise<Date[]>;
   create(data: {
     petId: string; ownerId: string; doctorId: string | null; type: AppointmentType;
     serviceName: string; clinicName: string; appointmentDate: Date; appointmentTime: string;

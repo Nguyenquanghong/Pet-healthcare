@@ -265,7 +265,7 @@ const categoryCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise
 // that decides which bookings still hold a slot or a room names exactly the table's
 // occupying set (or, for NOT IN, exactly the other statuses).
 const LIFECYCLE_SERVICES=['backend/src/application/services/bookingLifecycle.ts','services/clinic/src/application/services/bookingLifecycle.ts'];
-const OCCUPANCY_OBJECTS={appointment:['appointments_active_pet_slot_key'],hotel:['hotel_bookings_pet_active_stay_excl','hotel_room_nights_sync']};
+const OCCUPANCY_OBJECTS={appointment:['appointments_active_pet_slot_key','appointment_schedule_sync','appointment_schedule_rebuild'],hotel:['hotel_bookings_pet_active_stay_excl','hotel_room_nights_sync']};
 const STATUS_LITERAL=/['"](pending|confirmed|checked_in|in_progress|completed|cancelled|no_show|in_stay|checked_out|rejected)['"]/;
 // A status event's action name (transition, undo, cancelled...) is not a status.
 export const statusLiterals=source=>source.split(/\r?\n/).flatMap((line,index)=>STATUS_LITERAL.test(line.replace(/\.event\(\s*actor\s*,\s*['"][a-z_]+['"]/g,''))?['line '+(index+1)]:[]);

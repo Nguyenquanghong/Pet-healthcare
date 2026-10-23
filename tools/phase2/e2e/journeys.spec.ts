@@ -9,7 +9,7 @@ test('registration keeps server validation and success feedback across the new s
 
 test('owner books exam; staff checks in and atomically completes it with a medical record; owner reads redacted data',async({page})=>{
   const f=fixture();await login(page);await page.goto('/owner/appointments');const pet=await pickPet(page,0);
-  await page.getByLabel('Ngày khám',{exact:true}).fill('2040-01-01');await page.getByLabel('Giờ khám',{exact:true}).fill('09:00');
+  await page.getByLabel('Ngày khám',{exact:true}).fill('2040-01-01');await page.getByLabel('Giờ khám',{exact:true}).selectOption('09:00');
   const saved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/appointments'&&r.request().method()==='POST');await page.getByRole('button',{name:'Gửi yêu cầu đặt lịch',exact:true}).click();const r=await saved;expect(r.status()).toBe(201);const a=(await r.json()).appointment;
   await expect(page.getByText('Đã gửi yêu cầu đặt lịch! Admin sẽ xác nhận sớm.',{exact:true})).toBeVisible();
   await login(page,'admin');await page.goto('/admin/appointments');await page.getByPlaceholder('Tìm theo tên thú cưng, chủ nuôi, sđt, dịch vụ...').fill(pet.name);

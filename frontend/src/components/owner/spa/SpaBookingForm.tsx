@@ -8,8 +8,8 @@ import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { Select } from "../../ui/Select";
 import { Textarea } from "../../ui/Textarea";
+import { SlotPicker } from "../../ui/SlotPicker";
 
-const SPA_TIME_SLOTS = ["09:00", "10:30", "13:30", "15:00", "16:30"];
 const formatPrice = (value: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(value);
 
 type SpaBookingFormProps = {
@@ -101,12 +101,7 @@ export function SpaBookingForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Input type="date" min={today} label="Ngày Spa *" value={date} onChange={(event) => onDateChange(event.target.value)} />
-          <Select
-            label="Khung giờ *"
-            value={time}
-            options={[{ value: "", label: "Chọn giờ" }, ...SPA_TIME_SLOTS.map((slot) => ({ value: slot, label: slot }))]}
-            onChange={(event) => onTimeChange(event.target.value)}
-          />
+          <SlotPicker label="Khung giờ *" type={serviceType} date={date} value={time} onChange={onTimeChange} />
         </div>
 
         <Textarea

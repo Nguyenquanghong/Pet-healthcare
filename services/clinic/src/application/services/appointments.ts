@@ -2,6 +2,7 @@ import { BookingLifecycleService, type LifecycleInput, type UndoInput } from "./
 import { BusinessError } from "../../domain/error.js";
 import { authorize } from "../../domain/authorization.js";
 import { todayInVietnam } from "../../domain/validation.js";
+import { checkSlot, slotRange, slotTimes, vietnamInstant } from "../../domain/scheduling.js";
 import type { Actor } from "../../domain/auth.js";
 import {
   appointmentStatuses, appointmentTypes,
@@ -15,6 +16,7 @@ export type CreateAppointmentInput = {
 export type RescheduleInput = { date?: string; time?: string; ownerNote?: string | null; expectedRevision?: unknown };
 export type StatusInput = LifecycleInput;
 export type CancelInput = { ownerNote?: string; expectedRevision?: unknown };
+export type AvailabilityQuery = { type?: unknown; date?: unknown; doctorId?: unknown };
 
 const spaTypes = new Set<string>(["spa_bath", "spa_grooming", "spa_combo"]);
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -50,7 +52,8 @@ export class AppointmentService {
     if (!validDate(date)) throw new BusinessError(422, "Enter a valid appointment date.");
     if (!timePattern.test(time)) throw new BusinessError(422, "Enter a valid appointment time.");
     if (date < todayInVietnam()) throw new BusinessError(422, "The appointment date cannot be in the past.");
-    if (await this.deps.appointments.hasSlot(pet.id, appointmentDate(date), time)) throw new BusinessError(409, "This pet already has an appointment at the selected time.");
+    // P10: opening hours and slot grid here; overlap and capacity in the database.
+    checkSlot(await this.deps.appointments.slotPolicy(type as AppointmentType), time);
 
     return this.deps.unitOfWork.run(async ({ appointments, notifications }) => {
       const created = await appointments.create({
@@ -91,11 +94,36 @@ export class AppointmentService {
     if (!validDate(date)) throw new BusinessError(422, "Enter a valid appointment date.");
     if (!timePattern.test(time)) throw new BusinessError(422, "Enter a valid appointment time.");
     if (date < todayInVietnam()) throw new BusinessError(422, "The appointment date cannot be in the past.");
-    if (await this.deps.appointments.hasSlot(existing.petId, appointmentDate(date), time, existing.id)) throw new BusinessError(409, "This pet already has an appointment at the selected time.");
+    checkSlot(await this.deps.appointments.slotPolicy(existing.type), time);
     return await this.lifecycle.reschedule(actor, id, input.expectedRevision, {
       appointmentDate: appointmentDate(date), appointmentTime: time,
       ownerNote: input.ownerNote ?? existing.ownerNote,
     }) as AppointmentRecord;
+  }
+
+  // P10 Query Object: the slots of a day with the places left, as the database
+  // counts them. Advisory only: the booking itself is checked again on create.
+  async availability(actor: Actor, query: AvailabilityQuery) {
+    const type = String(query.type ?? ""), date = String(query.date ?? "");
+    if (!appointmentTypes.includes(type as AppointmentType)) throw new BusinessError(422, "Select a valid appointment service.");
+    if (!validDate(date)) throw new BusinessError(422, "Enter a valid appointment date.");
+    // A doctor's busy times are staff information.
+    const doctorId = query.doctorId === undefined || query.doctorId === "" ? null : String(query.doctorId);
+    if (doctorId) authorize(actor, "booking.manage");
+    const policy = await this.deps.appointments.slotPolicy(type as AppointmentType);
+    const from = vietnamInstant(date, "00:00"), to = new Date(from.getTime() + 86_400_000);
+    const usage = new Map((await this.deps.appointments.slotUsage(policy.resourceGroup, from, to)).map(u => [u.slotStart.getTime(), u]));
+    const busy = new Set(doctorId ? (await this.deps.appointments.doctorSlots(doctorId, from, to)).map(s => s.getTime()) : []);
+    const now = Date.now();
+    return {
+      type, date, resourceGroup: policy.resourceGroup, durationMinutes: policy.durationMinutes,
+      slots: slotTimes(policy).map(time => {
+        const range = slotRange(policy, date, time), slots = range.slots();
+        const remaining = Math.max(0, Math.min(...slots.map(s => { const u = usage.get(s.getTime()); return (u?.capacity ?? policy.capacity) - (u?.booked ?? 0); })));
+        const doctorBusy = slots.some(s => busy.has(s.getTime())), past = range.start.getTime() <= now;
+        return { time, remaining, past, available: remaining > 0 && !past && !doctorBusy, ...(doctorId ? { doctorBusy } : {}) };
+      }),
+    };
   }
 
   async cancel(actor: Actor, id: string, input: CancelInput): Promise<AppointmentRecord> {

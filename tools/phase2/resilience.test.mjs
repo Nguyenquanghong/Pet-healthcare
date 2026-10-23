@@ -20,6 +20,7 @@ import {OutboxRelay as CoreRelay} from '../../backend/dist/src/phase2/relay.js';
 import {RuntimeOutboxStore} from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';
 import {OutboxRelay as ClinicRelay} from '../../services/clinic/dist/relay.js';
 import {blobTestEnv} from './blob-test.mjs';
+import {liftAppointmentCapacity} from './appointment-capacity.mjs';
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test');assertTestProject();
 Object.assign(process.env,blobTestEnv);// spawned Clinic processes use the dedicated test bucket
 const run=randomUUID(),short=run.slice(0,8),prefix='p6.resilience.'+run,routes=topology(prefix);
@@ -49,7 +50,7 @@ async function request(path,{base=proxy,token=tokens.owner,method='GET',body,key
 }
 const expectStatus=(r,n,label='HTTP status')=>{assert.equal(r.status,n,label);return r.body;};
 const login=(index=0,extra={})=>request('/api/auth/owner/login',{base:coreApis[index%2].base,method:'POST',token:null,body:{email:users[index].email,password},...extra});
-const appointment=(time='10:00',extra={})=>({petId:pet.id,date:'2044-01-02',time,type:'spa_bath',serviceName:'P6 '+run,...extra});
+const appointment=(time='10:00',extra={})=>({petId:pet.id,date:'2044-01-02',time,type:'general_checkup',serviceName:'P6 '+run,...extra});
 async function create(time,extra={},options={}){return expectStatus(await request('/api/appointments',{method:'POST',body:appointment(time,extra),key:randomUUID(),...options}),201).appointment;}
 const health=async h=>{try{return(await fetch(h.base+'/health/ready')).status===200;}catch{return false;}};
 async function scopedCoreRelay(){
@@ -65,6 +66,7 @@ test.before(async()=>{
     const [marker]=await client.$queryRaw`SELECT marker FROM public.p2_test_marker`;assert.equal(marker.marker,`pet-phase2-p1-test:${service}:v1`);
     execFileSync(process.execPath,['node_modules/prisma/build/index.js','migrate','deploy','--schema',service==='core'?'backend/prisma/schema.prisma':`services/${service}/prisma/schema.prisma`],{env:{...process.env,DATABASE_URL:urls[service]},stdio:'pipe'});
   }
+  await liftAppointmentCapacity(db.clinic);
   [{stamp:startedAt}]=await db.core.$queryRaw`SELECT transaction_timestamp() AS stamp`;
   const hash=await hashPasswordAsync(password),legacy=hashPassword(password);
   for(let i=0;i<64;i++)users.push(await db.core.user.create({data:{id:randomUUID(),role:'owner',email:`p6_${short}_${i}@example.test`,fullName:'P6 fixture '+i,...(i===0?legacy:hash)}}));
@@ -141,7 +143,7 @@ test('service credentials have separate endpoint permissions; public nginx never
 test('real nginx distributes requests to both Clinic processes; durable same-key dedup and slot unique survive replicas',async()=>{
   const instances=new Set();for(let i=0;i<12;i++){const r=await request('/api/appointments?petId='+pet.id);expectStatus(r,200);instances.add(r.headers.get('x-service-instance'));}assert.deepEqual(instances,new Set(['p6-clinic-0','p6-clinic-1']));
   const key=randomUUID(),input=appointment('11:00'),ids=new Set(),writers=new Set();for(let i=0;i<4;i++){const r=await request('/api/appointments',{method:'POST',body:input,key});expectStatus(r,201);ids.add(r.body.appointment.id);writers.add(r.headers.get('x-service-instance'));}assert.equal(ids.size,1);assert.equal(writers.size,2);assert.equal(await db.clinic.appointment.count({where:{petId:pet.id,appointmentTime:'11:00'}}),1);
-  const races=await Promise.all([request('/api/appointments',{method:'POST',body:appointment('11:30'),key:randomUUID()}),request('/api/appointments',{method:'POST',body:appointment('11:30',{type:'general_checkup'}),key:randomUUID()})]);assert.deepEqual(races.map(r=>r.status).sort(),[201,409]);assert.equal(await db.clinic.appointment.count({where:{petId:pet.id,appointmentTime:'11:30'}}),1);
+  const races=await Promise.all([request('/api/appointments',{method:'POST',body:appointment('11:30'),key:randomUUID()}),request('/api/appointments',{method:'POST',body:appointment('11:30',{type:'vaccination'}),key:randomUUID()})]);assert.deepEqual(races.map(r=>r.status).sort(),[201,409]);assert.equal(await db.clinic.appointment.count({where:{petId:pet.id,appointmentTime:'11:30'}}),1);
 });
 test('medical images saved by one Clinic replica remain readable by the other replica from shared service storage',async()=>{
   const imageUrl='data:image/png;base64,iVBORw0KGgo=',image=expectStatus(await request('/api/medical-records/images',{base:clinicApis[0].base,token:tokens.admin,method:'POST',body:{petId:pet.id,title:'P6 shared image',imageUrl,mimeType:'image/png'}}),201).image;
