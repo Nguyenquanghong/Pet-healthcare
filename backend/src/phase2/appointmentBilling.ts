@@ -9,6 +9,7 @@ import {money,lines} from '../application/services/invoices.js';
 import type {InvoiceLine,InvoiceValue} from '../application/ports/invoices.js';
 import pricing from '../domain/pricing.json' with {type:'json'};
 import {signToken} from '../lib/token.js';
+import {invoiceDto} from '../lib/serialize.js';
 import {writeNotification} from '../infrastructure/persistence/notificationOutbox.js';
 
 type Fees={relatedId:string;items?:InvoiceLine[];subtotal?:number;taxAmount:number;discountAmount:number;notes:string|null;expectedRevision?:number};
@@ -30,7 +31,6 @@ function charges(input:Fees,s:BillingSourceSnapshot,self:boolean){
   if(totalAmount<=0)throw new BusinessError(422,'Invoice total must be positive.');
   return{items,subtotal,taxAmount:input.taxAmount,discountAmount:input.discountAmount,totalAmount,notes:input.notes};
 }
-export function invoiceDto(item:InvoiceValue&{sourceSnapshot?:unknown}){return{...item,transferContent:item.transferCode||item.invoiceCode.replaceAll('-',''),subtotal:Number(item.subtotal),taxAmount:Number(item.taxAmount),discountAmount:Number(item.discountAmount),totalAmount:Number(item.totalAmount),items:item.items?.map(l=>({...l,unitPrice:Number(l.unitPrice),amount:Number(l.amount)}))??[]};}
 export type BillingRemote={source:(id:string,actor:Actor)=>Promise<BillingSourceSnapshot>;prepare:(operation:AppointmentBillingOperation,actor:Actor)=>Promise<BillingSourceSnapshot>;finalize:(operation:AppointmentBillingOperation)=>Promise<void>};
 export class ClinicBillingRemote implements BillingRemote{
   constructor(private readonly origin:URL,private readonly credential:string,private readonly timeout=1800){if(!['http:','https:'].includes(origin.protocol)||origin.username||origin.password||origin.pathname!=='/'||origin.search||origin.hash||credential.length<32||credential.length>512||!Number.isInteger(timeout)||timeout<100||timeout>5000)throw new Error('INVALID_BILLING_REMOTE_CONFIGURATION');}
