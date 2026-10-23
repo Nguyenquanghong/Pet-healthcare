@@ -25,7 +25,7 @@ const mark=name=>results.push({name,status:'PASS'});
 const source={acceptsService:()=>true,request:async(actor,_token,ids)=>{
  if(coreDown)throw new BusinessError(503,'Core unavailable');
  if(actor.role==='owner'&&(ids.petIds??[]).some(id=>pets.find(p=>p.id===id)?.ownerId!==actor.sub))throw new BusinessError(403,'Denied');
- const found=pets.filter(p=>(ids.petIds??[]).includes(p.id));return {actor:{...actor,fullName:'Q4 actor'},pets:found,owners:[...new Set([...(ids.ownerIds??[]),...found.map(p=>p.ownerId)])].map(id=>({id,fullName:'Q4 owner',directoryVersion:1}))};
+ const found=pets.filter(p=>(ids.petIds??[]).includes(p.id));return {actor:{...actor,fullName:'Q4 actor'},pets:found,owners:[...new Set([...(ids.ownerIds??[]),...found.map(p=>p.ownerId)])].map(id=>({id,fullName:'Q4 owner',directoryVersion:1})),...(ids.doctorId?{doctor:{id:ids.doctorId,fullName:'Q4 doctor'}}:{})};
 }};
 async function http(path,{method='GET',body,actor='owner',token,key,replica=0,headers={}}={}){
  const r=await fetch('http://127.0.0.1:'+servers[replica].address().port+'/api'+path,{method,headers:{Authorization:'Bearer '+actor,'Content-Type':'application/json',...(token?{'X-Clinic-Min-Version':token}:{}),...(key?{'Idempotency-Key':key}:{}),...headers},body:body===undefined?undefined:JSON.stringify(body)});
@@ -93,7 +93,7 @@ test('reschedule status undo medical completion issue exact committed versions a
  await change('/status',{status:'checked_in',expectedRevision:a.statusRevision});
  await change('/undo-status',{reason:'Trial correction',expectedRevision:a.statusRevision},'POST');
  await change('/status',{status:'checked_in',expectedRevision:a.statusRevision});
- const m=await http('/medical-records',{method:'POST',actor:'admin',key:randomUUID(),body:{petId:pets[0].id,appointmentId:a.id,doctorName:'Trial',visitDate:'2040-04-02',title:'Q4 medical',diagnosis:'Trial',treatment:'Trial'}});assert.equal(m.status,201);assert.equal(codec.verify(m.token,actors.admin)[a.id],7);
+ const m=await http('/medical-records',{method:'POST',actor:'admin',key:randomUUID(),body:{petId:pets[0].id,appointmentId:a.id,doctorId:'q4-doctor',visitDate:'2040-04-02',title:'Q4 medical',diagnosis:'Trial',treatment:'Trial'}});assert.equal(m.status,201);assert.equal(codec.verify(m.token,actors.admin)[a.id],7);
  const replay=await http('/appointments',{method:'POST',body:createBody,key:createKey});assert.equal(codec.verify(replay.token,actors.owner)[a.id],1);assert.equal(replay.body.appointment.status,'pending');
  await catchUp();const r=await http('/appointments',{token:m.token,actor:'admin'});assert.equal(r.source,'projection');assert.equal(r.body.items[0].status,'completed');assert.equal(r.body.items[0].internalNote,'Q4_PRIVATE');
  assert.ok(!(await http('/appointments')).body.items.some(x=>'internalNote'in x));mark('mutation-lifecycle-medical-dedup');

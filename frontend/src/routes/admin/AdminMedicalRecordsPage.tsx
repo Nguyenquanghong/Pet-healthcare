@@ -32,9 +32,42 @@ import { useAppStore } from "../../store/AppStoreProvider";
 import type { MedicalRecord } from "../../types/medicalRecord";
 import { useRequestIntent } from '../../services/useRequestIntent';
 import { todayIso } from '../../utils/date';
+import { ApiError } from "../../utils/apiError";
+import { DoctorField, useSignsAsSelf } from "./DoctorField";
+
+// P02: the editable fields, normalized the way the server stores them, so an
+// edit sends only what changed and a stale save can show what differs.
+type EditableFields = {
+  title: string; symptoms: string | null; diagnosis: string; treatment: string; medications: string | null;
+  vaccineName: string | null; followUpDate: string | null; weightKg: number | null; temperatureC: number | null; heartRateBpm: number | null;
+};
+const fieldLabels: Record<keyof EditableFields, string> = {
+  title: "Tiêu đề", symptoms: "Triệu chứng", diagnosis: "Chẩn đoán", treatment: "Hướng điều trị", medications: "Thuốc kê đơn",
+  vaccineName: "Tên vaccine", followUpDate: "Ngày tái khám", weightKg: "Cân nặng (kg)", temperatureC: "Nhiệt độ (°C)", heartRateBpm: "Nhịp tim (bpm)",
+};
+const fieldKeys = Object.keys(fieldLabels) as (keyof EditableFields)[];
+const storedFields = (r: MedicalRecord): EditableFields => ({
+  title: r.title, symptoms: r.symptoms ?? null, diagnosis: r.diagnosis, treatment: r.treatment, medications: r.medications ?? null,
+  vaccineName: r.vaccineName ?? null, followUpDate: r.followUpDate ?? null, weightKg: r.weightKg ?? null, temperatureC: r.temperatureC ?? null, heartRateBpm: r.heartRateBpm ?? null,
+});
+const changedFields = (from: EditableFields, to: EditableFields) => fieldKeys.filter((key) => from[key] !== to[key]);
+const overlay = (target: EditableFields, source: EditableFields, keys: (keyof EditableFields)[]) =>
+  ({ ...target, ...Object.fromEntries(keys.map((key) => [key, source[key]])) }) as EditableFields;
+const shown = (value: string | number | null) => (value === null ? "(trống)" : String(value));
+// A cleared optional field is null, so the server clears it instead of keeping it.
+const optionalText = (value: string) => value.trim() || null;
+const optionalNumber = (value: string) => (value.trim() === "" ? null : Number(value));
+// A 409 MEDICAL_RECORD_STALE carries the stored record.
+function staleRecord(error: unknown): MedicalRecord | null {
+  if (!(error instanceof ApiError) || error.httpStatus !== 409) return null;
+  const body = error.details as { code?: string; current?: MedicalRecord } | undefined;
+  return body?.code === "MEDICAL_RECORD_STALE" && body.current ? body.current : null;
+}
 
 export function AdminMedicalRecordsPage() {
-  const canWrite = useSession().can("medical-record.write");
+  const session = useSession();
+  const canWrite = session.can("medical-record.write");
+  const selfSigned = useSignsAsSelf();
   const intent=useRequestIntent(),recordSending=useRef(false);
   const {
     createMedicalRecord: createMedicalRecordInStore,
@@ -69,7 +102,9 @@ export function AdminMedicalRecordsPage() {
   const [weightKg, setWeightKg] = useState("");
   const [temperatureC, setTemperatureC] = useState("");
   const [heartRateBpm, setHeartRateBpm] = useState("");
-  const [doctorName, setDoctorName] = useState("Bs. Mai Nguyễn");
+  const [doctorId, setDoctorId] = useState("");
+  const [conflict, setConflict] = useState<MedicalRecord | null>(null);
+  const [editNotice, setEditNotice] = useState("");
   const [imagePetId, setImagePetId] = useState("");
   const [imageTitle, setImageTitle] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState("");
@@ -98,32 +133,62 @@ export function AdminMedicalRecordsPage() {
     setTemperatureC("");
     setHeartRateBpm("");
     setAppointmentId("");
-    setDoctorName("Bs. Mai Nguyễn");
+    setDoctorId("");
+    setConflict(null);
+    setEditNotice("");
     setFormError("");
     setShowCreateForm(false);
     setEditRecord(null);
   };
 
+  const fillForm = (fields: EditableFields) => {
+    setTitle(fields.title);
+    setSymptoms(fields.symptoms ?? "");
+    setDiagnosis(fields.diagnosis);
+    setTreatment(fields.treatment);
+    setMedications(fields.medications ?? "");
+    setVaccineName(fields.vaccineName ?? "");
+    setFollowUpDate(fields.followUpDate ?? "");
+    setWeightKg(fields.weightKg === null ? "" : String(fields.weightKg));
+    setTemperatureC(fields.temperatureC === null ? "" : String(fields.temperatureC));
+    setHeartRateBpm(fields.heartRateBpm === null ? "" : String(fields.heartRateBpm));
+  };
+
+  const draftFields = (): EditableFields => ({
+    title: title.trim(), symptoms: optionalText(symptoms), diagnosis: diagnosis.trim(), treatment: treatment.trim(),
+    medications: optionalText(medications), vaccineName: optionalText(vaccineName), followUpDate: followUpDate || null,
+    weightKg: optionalNumber(weightKg), temperatureC: optionalNumber(temperatureC), heartRateBpm: optionalNumber(heartRateBpm),
+  });
+
   const openEdit = (r: MedicalRecord) => {
     setEditRecord(r);
     setPetId(r.petId);
     setAppointmentId(r.appointmentId ?? "");
-    setTitle(r.title);
-    setSymptoms(r.symptoms ?? "");
-    setDiagnosis(r.diagnosis);
-    setTreatment(r.treatment);
-    setMedications(r.medications ?? "");
-    setVaccineName(r.vaccineName ?? "");
-    setFollowUpDate(r.followUpDate ?? "");
-    setWeightKg(r.weightKg ? String(r.weightKg) : "");
-    setTemperatureC(r.temperatureC ? String(r.temperatureC) : "");
-    setHeartRateBpm(r.heartRateBpm ? String(r.heartRateBpm) : "");
-    setDoctorName(r.doctorName ?? "Bs. Mai Nguyễn");
+    fillForm(storedFields(r));
+    setConflict(null);
+    setEditNotice("");
     setFormError("");
+  };
+
+  // Keep the newer record and the user's own edits; fields the user did not touch take the newer values.
+  const applyMineOnLatest = () => {
+    if (!editRecord || !conflict) return;
+    fillForm(overlay(storedFields(conflict), draftFields(), changedFields(storedFields(editRecord), draftFields())));
+    setEditRecord(conflict);
+    setConflict(null);
+    setFormError("");
+    setEditNotice("Đã áp thay đổi của bạn lên bản mới. Kiểm tra lại rồi bấm Cập nhật hồ sơ.");
   };
 
   const handleCreateSubmit = async () => {
     if (isSubmitting||recordSending.current) return;
+    // P11: an admin names the responsible doctor; with a linked appointment the server can use its doctor.
+    const linkedDoctor = appointments.find((a) => a.id === appointmentId)?.doctorId ?? undefined;
+    const chosenDoctor = selfSigned ? undefined : doctorId || linkedDoctor;
+    if (!selfSigned && !chosenDoctor && !appointmentId) {
+      setFormError("Chọn bác sĩ chịu trách nhiệm cho bệnh án.");
+      return;
+    }
     recordSending.current=true;
     setFormError("");
     setIsSubmitting(true);
@@ -132,7 +197,7 @@ export function AdminMedicalRecordsPage() {
         {
           petId,
           appointmentId: appointmentId || undefined,
-          doctorName,
+          doctorId: chosenDoctor,
           visitDate: todayIso(),
           title,
           symptoms,
@@ -160,30 +225,31 @@ export function AdminMedicalRecordsPage() {
 
   const handleEditSubmit = async () => {
     if (!editRecord || isSubmitting) return;
+    const draft = draftFields(), changed = changedFields(storedFields(editRecord), draft);
+    if ([draft.weightKg, draft.temperatureC, draft.heartRateBpm].some((value) => value !== null && !Number.isFinite(value))) {
+      setFormError("Sinh hiệu phải là số.");
+      return;
+    }
+    if (!changed.length) {
+      toast("Không có thay đổi nào để lưu.");
+      resetForm();
+      return;
+    }
     setFormError("");
+    setEditNotice("");
     setIsSubmitting(true);
     try {
       const refreshed = await updateMedicalRecordRequest(
         editRecord.id,
-        {
-          doctorName,
-          title,
-          symptoms,
-          diagnosis,
-          treatment,
-          medications,
-          vaccineName: vaccineName || undefined,
-          followUpDate: followUpDate || undefined,
-          weightKg: Number(weightKg) || undefined,
-          temperatureC: Number(temperatureC) || undefined,
-          heartRateBpm: Number(heartRateBpm) || undefined,
-        },
+        { expectedRevision: editRecord.revision, ...Object.fromEntries(changed.map((key) => [key, draft[key]])) },
         updateMedicalRecordInStore,
       );
       toast(refreshed ? "Đã cập nhật hồ sơ y tế thành công." : "Đã lưu bệnh án nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu.", !refreshed);
       resetForm();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Không thể cập nhật hồ sơ y tế.");
+      const current = staleRecord(error);
+      setConflict(current);
+      setFormError(current ? "Bệnh án vừa được người khác cập nhật. Bản nháp của bạn vẫn còn; hãy chọn cách xử lý bên dưới." : error instanceof Error ? error.message : "Không thể cập nhật hồ sơ y tế.");
     } finally {
       setIsSubmitting(false);
     }
@@ -194,11 +260,14 @@ export function AdminMedicalRecordsPage() {
     setFormError("");
     setIsSubmitting(true);
     try {
-      const refreshed = await deleteMedicalRecordRequest(deleteConfirmRecord.id, deleteMedicalRecordInStore);
+      const refreshed = await deleteMedicalRecordRequest(deleteConfirmRecord.id, deleteConfirmRecord.revision, deleteMedicalRecordInStore);
       setDeleteConfirmRecord(null);
       toast(refreshed ? "Đã xóa hồ sơ y tế." : "Đã xóa bệnh án nhưng chưa tải lại được dữ liệu. Hãy tải lại để đối chiếu.", !refreshed);
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Không thể xóa hồ sơ y tế.");
+      // A stale delete shows the newer record; deleting it takes a second, informed confirmation.
+      const current = staleRecord(error);
+      if (current) setDeleteConfirmRecord(current);
+      setFormError(current ? "Bệnh án vừa được người khác cập nhật. Xem lại bản mới trước khi xác nhận xóa." : error instanceof Error ? error.message : "Không thể xóa hồ sơ y tế.");
     } finally {
       setIsSubmitting(false);
     }
@@ -391,7 +460,7 @@ export function AdminMedicalRecordsPage() {
 
             <div>
               <label className={labelCls}>Liên kết lịch khám</label>
-              <PagedSelect<Appointment> label="Lịch hẹn" endpoint="/appointments" filters={{ petId }} value={appointmentId} onChange={setAppointmentId} itemLabel={item => `${item.date} ${item.time} - ${item.serviceName}`} emptyLabel="Không liên kết lịch hẹn" />
+              <PagedSelect<Appointment> label="Lịch hẹn" endpoint="/appointments" filters={{ petId }} value={appointmentId} onChange={id => { setAppointmentId(id); const linked = appointments.find(a => a.id === id)?.doctorId; if (linked && !doctorId) setDoctorId(linked); }} itemLabel={item => `${item.date} ${item.time} - ${item.serviceName}`} emptyLabel="Không liên kết lịch hẹn" />
             </div>
 
             <div>
@@ -405,13 +474,9 @@ export function AdminMedicalRecordsPage() {
             </div>
 
             <div>
-              <label className={labelCls}>Bác sĩ khám *</label>
-              <input
-                className={fieldCls}
-                value={doctorName}
-                onChange={(e) => setDoctorName(e.target.value)}
-                placeholder="Bs. Mai Nguyễn"
-              />
+              <label className={labelCls}>Bác sĩ phụ trách *</label>
+              <DoctorField value={doctorId} onChange={setDoctorId} className={fieldCls} />
+              {!selfSigned && !doctorId && appointmentId && <p className="mt-1 text-xs text-slate-500">Không chọn thì dùng bác sĩ của lịch hẹn.</p>}
             </div>
 
             <div>
@@ -633,6 +698,30 @@ export function AdminMedicalRecordsPage() {
               </button>
             </div>
             {formError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{formError}</p>}
+            {editNotice && <p role="status" className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{editNotice}</p>}
+            {conflict && (() => {
+              const base = storedFields(editRecord), latest = storedFields(conflict), draft = draftFields();
+              const theirs = changedFields(base, latest), mine = changedFields(base, draft);
+              return (
+                <section aria-label="Bản mới của bệnh án" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  <p className="font-bold">Bản mới (phiên bản {conflict.revision}) khác bản bạn đã mở ở:</p>
+                  {theirs.length ? (
+                    <ul className="mt-2 space-y-1">
+                      {theirs.map((key) => (
+                        <li key={key}>
+                          <strong>{fieldLabels[key]}:</strong> {shown(base[key])} → {shown(latest[key])}
+                          {mine.includes(key) && <span className="ml-1 font-semibold text-rose-700">(bạn sửa thành: {shown(draft[key])})</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p className="mt-2">Không trường nào khác (chỉ phiên bản đã tăng).</p>}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" disabled={isSubmitting} onClick={() => openEdit(conflict)} className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100">Dùng bản mới</button>
+                    <button type="button" disabled={isSubmitting} onClick={applyMineOnLatest} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700">Áp thay đổi của tôi lên bản mới</button>
+                  </div>
+                </section>
+              );
+            })()}
 
             <div className="my-4 grid gap-4 md:grid-cols-2">
               <div>
@@ -648,16 +737,13 @@ export function AdminMedicalRecordsPage() {
 
               <div>
                 <label className={labelCls}>Bác sĩ phụ trách</label>
-                <input
-                  className={fieldCls}
-                  value={doctorName}
-                  onChange={(e) => setDoctorName(e.target.value)}
-                />
+                <p className={`${fieldCls} bg-slate-50`}>{editRecord.doctorName}</p>
+                <p className="mt-1 text-xs text-slate-500">Người lập bệnh án được cố định khi tạo.</p>
               </div>
 
               <div className="md:col-span-2">
                 <label className={labelCls}>Tiêu đề hồ sơ *</label>
-                <input className={fieldCls} value={title} onChange={(e) => setTitle(e.target.value)} />
+                <input className={fieldCls} value={title} onChange={(e) => setTitle(e.target.value)} aria-label={fieldLabels.title} />
               </div>
 
               <div>
@@ -665,7 +751,7 @@ export function AdminMedicalRecordsPage() {
                 <textarea
                   className={`${fieldCls} min-h-20`}
                   value={symptoms}
-                  onChange={(e) => setSymptoms(e.target.value)}
+                  onChange={(e) => setSymptoms(e.target.value)} aria-label={fieldLabels.symptoms}
                 />
               </div>
 
@@ -674,7 +760,7 @@ export function AdminMedicalRecordsPage() {
                 <textarea
                   className={`${fieldCls} min-h-20`}
                   value={diagnosis}
-                  onChange={(e) => setDiagnosis(e.target.value)}
+                  onChange={(e) => setDiagnosis(e.target.value)} aria-label={fieldLabels.diagnosis}
                 />
               </div>
 
@@ -683,7 +769,7 @@ export function AdminMedicalRecordsPage() {
                 <textarea
                   className={`${fieldCls} min-h-20`}
                   value={treatment}
-                  onChange={(e) => setTreatment(e.target.value)}
+                  onChange={(e) => setTreatment(e.target.value)} aria-label={fieldLabels.treatment}
                 />
               </div>
 
@@ -692,7 +778,7 @@ export function AdminMedicalRecordsPage() {
                 <textarea
                   className={`${fieldCls} min-h-20`}
                   value={medications}
-                  onChange={(e) => setMedications(e.target.value)}
+                  onChange={(e) => setMedications(e.target.value)} aria-label={fieldLabels.medications}
                 />
               </div>
 
@@ -701,7 +787,7 @@ export function AdminMedicalRecordsPage() {
                 <input
                   className={fieldCls}
                   value={vaccineName}
-                  onChange={(e) => setVaccineName(e.target.value)}
+                  onChange={(e) => setVaccineName(e.target.value)} aria-label={fieldLabels.vaccineName}
                 />
               </div>
 
@@ -711,7 +797,7 @@ export function AdminMedicalRecordsPage() {
                   type="date"
                   className={fieldCls}
                   value={followUpDate}
-                  onChange={(e) => setFollowUpDate(e.target.value)}
+                  onChange={(e) => setFollowUpDate(e.target.value)} aria-label={fieldLabels.followUpDate}
                 />
               </div>
 
@@ -723,7 +809,7 @@ export function AdminMedicalRecordsPage() {
                     step="0.1"
                     className={fieldCls}
                     value={weightKg}
-                    onChange={(e) => setWeightKg(e.target.value)}
+                    onChange={(e) => setWeightKg(e.target.value)} aria-label={fieldLabels.weightKg}
                   />
                 </div>
                 <div>
@@ -733,7 +819,7 @@ export function AdminMedicalRecordsPage() {
                     step="0.1"
                     className={fieldCls}
                     value={temperatureC}
-                    onChange={(e) => setTemperatureC(e.target.value)}
+                    onChange={(e) => setTemperatureC(e.target.value)} aria-label={fieldLabels.temperatureC}
                   />
                 </div>
                 <div>
@@ -742,7 +828,7 @@ export function AdminMedicalRecordsPage() {
                     type="number"
                     className={fieldCls}
                     value={heartRateBpm}
-                    onChange={(e) => setHeartRateBpm(e.target.value)}
+                    onChange={(e) => setHeartRateBpm(e.target.value)} aria-label={fieldLabels.heartRateBpm}
                   />
                 </div>
               </div>

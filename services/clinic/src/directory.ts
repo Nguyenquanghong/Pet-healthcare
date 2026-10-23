@@ -31,6 +31,7 @@ export class CoreDirectory {
       const value=await res.json() as DirectorySnapshot;
       if(value.actor?.sub!==actor.sub||value.actor?.role!==actor.role||typeof value.actor?.fullName!=='string'||!Array.isArray(value.pets)||!Array.isArray(value.owners)||value.pets.length>100||value.owners.length>200||value.pets.some(p=>typeof p.id!=='string'||typeof p.ownerId!=='string'||typeof p.name!=='string'||!Number.isSafeInteger(p.directoryVersion)||p.directoryVersion<1)||value.owners.some(o=>typeof o.id!=='string'||typeof o.fullName!=='string'||!Number.isSafeInteger(o.directoryVersion)||o.directoryVersion<1))throw new Error();
       if((ids.petIds??[]).some(id=>!value.pets.some(p=>p.id===id))||(ids.ownerIds??[]).some(id=>!value.owners.some(o=>o.id===id))||actor.role==='owner'&&(value.pets.some(p=>p.ownerId!==actor.sub)||value.owners.some(o=>o.id!==actor.sub)))throw new Error();
+      if(ids.doctorId&&(value.doctor?.id!==ids.doctorId||typeof value.doctor.fullName!=='string'))throw new Error();
       return value;
     },coreFailure);}catch(error){if(error instanceof BusinessError)throw error;throw new BusinessError(503,'Core directory unavailable. Retry the same request key.');}
   }
@@ -44,6 +45,14 @@ export class RequestDirectory implements DirectoryLookup {
     for(const owner of snapshot.owners)this.owners.set(owner.id,owner);
   }
   async pet(id:string){const p=this.snapshot.pets.find(p=>p.id===id);if(!p)throw new BusinessError(404,'Authorized pet not found.');return p;}
+  signer(){const {sub,fullName}=this.snapshot.actor;return{id:sub,fullName};}
+  // The snapshot already covers a doctorId named in the request body. Any other
+  // doctor (an appointment's) is checked with Core on demand.
+  async doctor(id:string){
+    const {doctor}=this.snapshot;
+    if(doctor?.id===id)return doctor;
+    return (await this.source.request(this.actor,this.token,{doctorId:id},true)).doctor!;
+  }
   async lookup(petIds:string[],ownerIds:string[]):Promise<DirectorySnapshot>{
     const wantedPets=[...new Set(petIds)],wantedOwners=[...new Set(ownerIds)];
     if(wantedPets.length>100||wantedOwners.length>100)throw new BusinessError(422,'Invalid directory IDs.');

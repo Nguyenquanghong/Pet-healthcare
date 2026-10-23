@@ -5,6 +5,8 @@
 export interface ApiSchemas {
   Error: {
     error: string;
+    /** Machine-readable reason when the client should react to it, for example MEDICAL_RECORD_STALE. */
+    code?: string;
   };
   Message: {
     message: string;
@@ -22,7 +24,7 @@ export interface ApiSchemas {
     /** Core source revision. Projection search may lag; related DTOs use current Core source. */
     directoryVersion?: number;
     /** AQ-05: only in session responses (login, register, /auth/me). What the shared permission matrix lets this role do; a UI hint, every request is still authorized by the server. */
-    permissions?: ("booking.manage" | "booking.reopen" | "hotel.care-note.write" | "hotel.capacity.manage" | "medical-record.write" | "medical-record.history" | "medical-record.restore" | "billing.manage" | "billing.audit" | "billing.self-service" | "owner.manage" | "directory.read" | "notification.send" | "clinic-activity.read")[];
+    permissions?: ("booking.manage" | "booking.reopen" | "hotel.care-note.write" | "hotel.capacity.manage" | "medical-record.write" | "medical-record.assign-doctor" | "medical-record.history" | "medical-record.restore" | "billing.manage" | "billing.audit" | "billing.self-service" | "owner.manage" | "directory.read" | "notification.send" | "clinic-activity.read")[];
   };
   Pet: {
     id: string;
@@ -77,7 +79,12 @@ export interface ApiSchemas {
     petId: string;
     ownerId: string;
     appointmentId: string | null;
+    /** Responsible doctor, decided by the server: the signing doctor, or for an admin the chosen doctor or else the appointment's. Null on records created before authorship was recorded. */
+    doctorId: string | null;
+    /** Name of the responsible doctor when the record was created; later renames do not change it. */
     doctorName: string;
+    /** Increases by one on every edit. Send it back as expectedRevision to update or delete the record. */
+    revision: number;
     visitDate: string;
     title: string;
     symptoms: string | null;
@@ -328,6 +335,12 @@ export interface ApiSchemas {
     email?: string;
     address?: string;
   };
+  DoctorList: {
+    items: {
+      id: string;
+      fullName: string;
+    }[];
+  };
   OwnerEnvelope: {
     owner: ApiSchemas["Owner"];
   };
@@ -379,6 +392,11 @@ export interface ApiSchemas {
     /** statusRevision from the booking displayed to the user; stale values return 409. */
     expectedRevision: number;
   };
+  StaleMedicalRecord: {
+    error: string;
+    code: "MEDICAL_RECORD_STALE";
+    current: ApiSchemas["MedicalRecord"];
+  };
   MedicalRecordInput: {
     petId: string;
     appointmentId?: string | null;
@@ -386,8 +404,10 @@ export interface ApiSchemas {
     title: string;
     /** Real calendar date; dates such as February 30 are rejected. */
     visitDate: string;
-    /** Trimmed; whitespace-only values are rejected. */
-    doctorName: string;
+    /** Who signs is decided by the server. A doctor always signs as themself (naming another doctor is 403: only medical-record.assign-doctor, an admin, records for someone else). An admin names the responsible doctor here; without it the appointment's doctor is used, otherwise 422 MEDICAL_RECORD_DOCTOR_REQUIRED. The id must hold the doctor role. */
+    doctorId?: string;
+    /** Ignored: the server signs the record with the responsible doctor's name. */
+    doctorName?: string;
     /** Trimmed; whitespace-only values are rejected. */
     diagnosis: string;
     /** Trimmed; whitespace-only values are rejected. */
@@ -465,11 +485,13 @@ export interface ApiSchemas {
     lastSeenLocation?: string | null;
   };
   MedicalRecordUpdateInput: {
+    /** The revision of the record the editor loaded. Missing: 422. */
+    expectedRevision: number;
     /** Trimmed; whitespace-only values are rejected. */
     title?: string;
     /** Real calendar date; dates such as February 30 are rejected. */
     visitDate?: string;
-    /** Trimmed; whitespace-only values are rejected. */
+    /** Ignored: the server signs the record with the responsible doctor's name. */
     doctorName?: string;
     /** Trimmed; whitespace-only values are rejected. */
     diagnosis?: string;
@@ -731,6 +753,8 @@ export interface ApiSchemas {
     actorId: string;
     actorRole: string;
     changedAt: string;
+    /** P02: the record revision after this change (before it, for a delete). Null on entries written before revisions were recorded. */
+    recordRevision: number | null;
   };
   RoomCapacity: {
     roomType: "standard" | "deluxe" | "vip";

@@ -110,7 +110,8 @@ export type DailyCareNoteDTO = {
 export type CreateMedicalRecordDTO = {
   petId: string;
   appointmentId?: string;
-  doctorName: string;
+  // P11: admins name the responsible doctor; a doctor always signs as themself.
+  doctorId?: string;
   visitDate: string; // YYYY-MM-DD
   title: string;
   symptoms?: string;
@@ -124,7 +125,21 @@ export type CreateMedicalRecordDTO = {
   heartRateBpm?: number;
 };
 
-export type UpdateMedicalRecordDTO = Partial<Omit<CreateMedicalRecordDTO, "petId" | "appointmentId">>;
+// P02: an edit names the revision it was based on. Only changed fields are sent;
+// null clears an optional field (omitting it keeps the stored value).
+export type UpdateMedicalRecordDTO = {
+  expectedRevision: number;
+  title?: string;
+  symptoms?: string | null;
+  diagnosis?: string;
+  treatment?: string;
+  medications?: string | null;
+  vaccineName?: string | null;
+  followUpDate?: string | null;
+  weightKg?: number | null;
+  temperatureC?: number | null;
+  heartRateBpm?: number | null;
+};
 
 // ---------------------------------------------------------------------------
 // Notification DTOs

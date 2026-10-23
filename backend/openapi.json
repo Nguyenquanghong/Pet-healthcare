@@ -514,6 +514,36 @@
         }
       }
     },
+    "/doctors": {
+      "get": {
+        "tags": [
+          "Owners"
+        ],
+        "summary": "List doctors a medical record can be signed for",
+        "operationId": "listDoctors",
+        "description": "Admin/staff/doctor (directory.read). Every user in the doctor role, ordered by name then id. Admins pick the responsible doctor of a medical record from this list; Clinic still verifies the chosen doctor with Core.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Doctors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorList"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
     "/pets": {
       "get": {
         "tags": [
@@ -1405,6 +1435,16 @@
               }
             }
           },
+          "409": {
+            "description": "Stale expectedRevision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaleMedicalRecord"
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
@@ -1443,6 +1483,16 @@
           "204": {
             "description": "No content"
           },
+          "409": {
+            "description": "Stale expectedRevision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaleMedicalRecord"
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
@@ -1458,6 +1508,16 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ResourceId"
+          },
+          {
+            "name": "expectedRevision",
+            "in": "query",
+            "required": true,
+            "description": "The revision of the record the editor loaded; a stale one is 409 StaleMedicalRecord.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         ]
       }
@@ -5088,6 +5148,10 @@
         "properties": {
           "error": {
             "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable reason when the client should react to it, for example MEDICAL_RECORD_STALE."
           }
         },
         "required": [
@@ -5154,6 +5218,7 @@
                 "hotel.care-note.write",
                 "hotel.capacity.manage",
                 "medical-record.write",
+                "medical-record.assign-doctor",
                 "medical-record.history",
                 "medical-record.restore",
                 "billing.manage",
@@ -5419,8 +5484,19 @@
             "type": "string",
             "nullable": true
           },
+          "doctorId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Responsible doctor, decided by the server: the signing doctor, or for an admin the chosen doctor or else the appointment's. Null on records created before authorship was recorded."
+          },
           "doctorName": {
-            "type": "string"
+            "type": "string",
+            "description": "Name of the responsible doctor when the record was created; later renames do not change it."
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Increases by one on every edit. Send it back as expectedRevision to update or delete the record."
           },
           "visitDate": {
             "type": "string",
@@ -5480,7 +5556,9 @@
           "petId",
           "ownerId",
           "appointmentId",
+          "doctorId",
           "doctorName",
+          "revision",
           "visitDate",
           "title",
           "symptoms",
@@ -6567,6 +6645,32 @@
           }
         }
       },
+      "DoctorList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "fullName"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "fullName": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
       "OwnerEnvelope": {
         "type": "object",
         "required": [
@@ -6797,6 +6901,29 @@
           "expectedRevision"
         ]
       },
+      "StaleMedicalRecord": {
+        "type": "object",
+        "description": "The record changed after the editor loaded it. current is the stored record: keep the draft, show what differs and save again with current.revision.",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "MEDICAL_RECORD_STALE"
+            ]
+          },
+          "current": {
+            "$ref": "#/components/schemas/MedicalRecord"
+          }
+        },
+        "required": [
+          "error",
+          "code",
+          "current"
+        ]
+      },
       "MedicalRecordInput": {
         "type": "object",
         "properties": {
@@ -6818,11 +6945,15 @@
             "format": "date",
             "description": "Real calendar date; dates such as February 30 are rejected."
           },
+          "doctorId": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Who signs is decided by the server. A doctor always signs as themself (naming another doctor is 403: only medical-record.assign-doctor, an admin, records for someone else). An admin names the responsible doctor here; without it the appointment's doctor is used, otherwise 422 MEDICAL_RECORD_DOCTOR_REQUIRED. The id must hold the doctor role."
+          },
           "doctorName": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 10000,
-            "description": "Trimmed; whitespace-only values are rejected."
+            "deprecated": true,
+            "description": "Ignored: the server signs the record with the responsible doctor's name."
           },
           "diagnosis": {
             "type": "string",
@@ -6938,7 +7069,6 @@
           "petId",
           "title",
           "visitDate",
-          "doctorName",
           "diagnosis",
           "treatment"
         ]
@@ -7228,8 +7358,16 @@
       },
       "MedicalRecordUpdateInput": {
         "type": "object",
-        "description": "Staff may edit medical details only. petId, ownerId and appointmentId are fixed after creation; attempts to change or clear them return 422. Older clients may send unchanged values.",
+        "required": [
+          "expectedRevision"
+        ],
+        "description": "Staff may edit medical details only. petId, ownerId and appointmentId are fixed after creation; attempts to change or clear them return 422. Older clients may send unchanged values. The author (doctorId/doctorName) never changes on edit. Optimistic lock: a stale expectedRevision is refused with 409 StaleMedicalRecord.",
         "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The revision of the record the editor loaded. Missing: 422."
+          },
           "title": {
             "type": "string",
             "minLength": 1,
@@ -7243,9 +7381,8 @@
           },
           "doctorName": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 10000,
-            "description": "Trimmed; whitespace-only values are rejected."
+            "deprecated": true,
+            "description": "Ignored: the server signs the record with the responsible doctor's name."
           },
           "diagnosis": {
             "type": "string",
@@ -8553,6 +8690,12 @@
           "changedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "recordRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "description": "P02: the record revision after this change (before it, for a delete). Null on entries written before revisions were recorded."
           }
         },
         "required": [
@@ -8563,7 +8706,8 @@
           "after",
           "actorId",
           "actorRole",
-          "changedAt"
+          "changedAt",
+          "recordRevision"
         ]
       },
       "RoomCapacity": {

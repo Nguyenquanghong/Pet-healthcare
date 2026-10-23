@@ -1,29 +1,36 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
-import { authorize } from "../../domain/authorization.js";
+import { allows, authorize } from "../../domain/authorization.js";
 import { calendarDate, imageContent, objectInput, optionalText, positiveNumber, requiredText } from "../../domain/validation.js";
 import type { BlobStore } from "../ports/blobs.js";
 import type { MedicalDependencies, MedicalImageValue, MedicalRecordValue, MedicalUpdate, MedicalWrite } from "../ports/medicalRecords.js";
 
+// doctorName is no longer read: the server decides who signs the record.
 export type MedicalInput = {
-  petId?: string | null; ownerId?: string | null; appointmentId?: string | null; doctorName?: string; visitDate?: string;
+  petId?: string | null; ownerId?: string | null; appointmentId?: string | null; doctorId?: string | null; visitDate?: string;
   title?: string; symptoms?: string | null; diagnosis?: string; treatment?: string;
   medications?: string | null; vaccineName?: string | null; followUpDate?: string | null;
   weightKg?: unknown; temperatureC?: unknown; heartRateBpm?: unknown;
-  internalNote?: string | null;
+  internalNote?: string | null; expectedRevision?: unknown;
 };
 export type ImageInput = { petId?: string; title?: string; imageUrl?: string; mimeType?: string };
 
 const date = (value: unknown) => calendarDate(value, "Medical date");
 const optionalDate = (value: unknown) => value === undefined || value === null || value === "" ? null : date(value);
 const canWrite = (actor: Actor) => authorize(actor, "medical-record.write");
+// The revision the client edited: a JSON integer, or a query-string integer for DELETE.
+function revisionOf(value: unknown) {
+  const revision = typeof value === "string" && /^\d{1,10}$/.test(value) ? Number(value) : value;
+  if (!Number.isSafeInteger(revision) || (revision as number) < 0) throw new BusinessError(422, "Thiếu phiên bản bệnh án. Hãy tải lại trang.");
+  return revision as number;
+}
 
 export function medicalFields(input:MedicalInput){
   objectInput(input);
   return{
     appointmentId:optionalText(input.appointmentId,'Appointment',200),
-    doctorName:requiredText(input.doctorName,'Doctor'),visitDate:date(input.visitDate),title:requiredText(input.title,'Title'),
+    doctorId:optionalText(input.doctorId,'Doctor',200),visitDate:date(input.visitDate),title:requiredText(input.title,'Title'),
     symptoms:optionalText(input.symptoms,'Symptoms'),diagnosis:requiredText(input.diagnosis,'Diagnosis'),treatment:requiredText(input.treatment,'Treatment'),
     medications:optionalText(input.medications,'Medications'),vaccineName:optionalText(input.vaccineName,'Vaccine'),followUpDate:optionalDate(input.followUpDate),
     weightKg:positiveNumber(input.weightKg,'weightKg',999.99,false,2),temperatureC:positiveNumber(input.temperatureC,'temperatureC',999.9,false,1),heartRateBpm:positiveNumber(input.heartRateBpm,'heartRateBpm',2147483647,true),internalNote:optionalText(input.internalNote,'Internal note'),
@@ -42,12 +49,14 @@ export class MedicalRecordsService {
     objectInput(input);
     const pet = await this.deps.records.findPet(requiredText(input.petId, "Pet", 200));
     if (!pet) throw new BusinessError(404, "Pet not found.");
-    if (!input.title || !input.visitDate || !input.doctorName || !input.diagnosis || !input.treatment) {
-      throw new BusinessError(422, "Pet, title, visit date, doctor, diagnosis, and treatment are required.");
+    if (!input.title || !input.visitDate || !input.diagnosis || !input.treatment) {
+      throw new BusinessError(422, "Pet, title, visit date, diagnosis, and treatment are required.");
     }
+    const appointmentId = optionalText(input.appointmentId, "Appointment", 200);
+    const author = await this.author(actor, optionalText(input.doctorId, "Doctor", 200), appointmentId);
     const data: MedicalWrite = {
-      petId: pet.id, ownerId: pet.ownerId, appointmentId: optionalText(input.appointmentId, "Appointment", 200),
-      doctorName: requiredText(input.doctorName, "Doctor"), visitDate: date(input.visitDate), title: requiredText(input.title, "Title"),
+      petId: pet.id, ownerId: pet.ownerId, appointmentId,
+      doctorId: author.id, doctorName: author.fullName, visitDate: date(input.visitDate), title: requiredText(input.title, "Title"),
       symptoms: optionalText(input.symptoms, "Symptoms"), diagnosis: requiredText(input.diagnosis, "Diagnosis"), treatment: requiredText(input.treatment, "Treatment"),
       medications: optionalText(input.medications, "Medications"), vaccineName: optionalText(input.vaccineName, "Vaccine"),
       followUpDate: optionalDate(input.followUpDate),
@@ -73,9 +82,24 @@ export class MedicalRecordsService {
     });
   }
 
+  // Information Expert: who signs comes from the session, never from the form. An
+  // admin records for the doctor they choose, or else the appointment's doctor;
+  // any other writer (a doctor) signs as themself. The name is a snapshot taken
+  // now and kept as signed.
+  private async author(actor: Actor, requested: string | null, appointmentId: string | null) {
+    if (!allows(actor.role, "medical-record.assign-doctor")) {
+      if (requested && requested !== actor.sub) authorize(actor, "medical-record.assign-doctor");
+      return this.deps.records.signer();
+    }
+    const doctorId = requested ?? (appointmentId ? await this.deps.records.appointmentDoctor(appointmentId) : null);
+    if (!doctorId) throw new BusinessError(422, "Chọn bác sĩ chịu trách nhiệm cho bệnh án.", "MEDICAL_RECORD_DOCTOR_REQUIRED");
+    return this.deps.records.findDoctor(doctorId);
+  }
+
   async update(actor: Actor, id: string, input: MedicalInput): Promise<MedicalRecordValue> {
     canWrite(actor);
     objectInput(input);
+    const expectedRevision = revisionOf(input.expectedRevision);
     const existing = await this.deps.records.find(id);
     if (!existing) throw new BusinessError(404, "Medical record not found.");
     // Existing records keep their pet, owner and appointment association. Accept unchanged
@@ -87,7 +111,6 @@ export class MedicalRecordsService {
     }
     const data: MedicalUpdate = {
       ...(input.title !== undefined ? { title: requiredText(input.title, "Title") } : {}),
-      ...(input.doctorName !== undefined ? { doctorName: requiredText(input.doctorName, "Doctor") } : {}),
       ...(input.visitDate !== undefined ? { visitDate: date(input.visitDate) } : {}),
       ...(input.symptoms !== undefined ? { symptoms: optionalText(input.symptoms, "Symptoms") } : {}),
       ...(input.diagnosis !== undefined ? { diagnosis: requiredText(input.diagnosis, "Diagnosis") } : {}),
@@ -100,12 +123,12 @@ export class MedicalRecordsService {
       ...(input.heartRateBpm !== undefined ? { heartRateBpm: positiveNumber(input.heartRateBpm, "heartRateBpm", 2_147_483_647, true) } : {}),
       ...(input.internalNote !== undefined ? { internalNote: optionalText(input.internalNote, "Internal note") } : {}),
     };
-    return this.deps.records.update(existing.id, data, actor);
+    return this.deps.records.update(existing.id, data, actor, expectedRevision);
   }
 
-  async delete(actor: Actor, id: string) {
+  async delete(actor: Actor, id: string, expectedRevision: unknown) {
     canWrite(actor);
-    await this.deps.records.delete(id, actor);
+    await this.deps.records.delete(id, actor, revisionOf(expectedRevision));
   }
 
   // AQ-15: staff-only audit history; still readable after the record is deleted.

@@ -31,11 +31,13 @@ export function mountDirectory(app: Express, db: PrismaClient, credential?: stri
         const pets=await tx.pet.findMany({where:{id:{in:petIds}}});
         if(pets.length!==petIds.length)return {status:404,error:'Pet not found.'};
         if(actor.role==='owner'&&(pets.some(p=>p.ownerId!==actor.sub)||ownerIds.some(id=>id!==actor.sub)))return {status:403,error:'Owner scope required.'};
-        if(data.doctorId&&!await tx.user.findFirst({where:{id:data.doctorId,role:'doctor'}}))return {status:422,error:'Doctor not found.'};
+        // A named doctor comes back with the name Clinic signs medical records with.
+        const doctor=data.doctorId?await tx.user.findFirst({where:{id:data.doctorId,role:'doctor'},select:{id:true,fullName:true}}):null;
+        if(data.doctorId&&!doctor)return {status:422,error:'Doctor not found.'};
         const allOwnerIds=[...new Set([...ownerIds,...pets.map(p=>p.ownerId)])];
         const owners=await tx.user.findMany({where:{id:{in:allOwnerIds},role:'owner'},select:personSelect});
         if(owners.length!==allOwnerIds.length)return {status:404,error:'Owner not found.'};
-        return {status:200,actor:{sub:sender.id,role:sender.role,fullName:sender.fullName},pets:pets.map(p=>({...petDto(p),directoryVersion:p.directoryRevision})),owners:owners.map(u=>({...ownerDto(u),directoryVersion:u.directoryRevision}))};
+        return {status:200,actor:{sub:sender.id,role:sender.role,fullName:sender.fullName},pets:pets.map(p=>({...petDto(p),directoryVersion:p.directoryRevision})),owners:owners.map(u=>({...ownerDto(u),directoryVersion:u.directoryRevision})),...(doctor?{doctor}:{})};
       },{isolationLevel:'RepeatableRead'});
       const {status,...body}=result; res.status(status).json(body);
     } catch {res.status(503).json({error:'Core directory unavailable.'});}

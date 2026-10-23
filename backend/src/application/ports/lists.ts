@@ -16,4 +16,5 @@ export interface ListsRepository {
   page(resource: ListResource, scope: ListScope, query: ListQuery): Promise<ListResult>;
   billingFigures(month?: string): Promise<BillingFigures>;
   calendar(scope: ListScope, month: string, category?: string): Promise<Record<string, number>>;
+  doctors(): Promise<{ id: string; fullName: string }[]>;
 }

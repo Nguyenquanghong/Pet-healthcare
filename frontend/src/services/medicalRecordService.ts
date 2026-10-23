@@ -38,18 +38,17 @@ export async function createMedicalRecord(
   dto: CreateMedicalRecordDTO,
   storeFn: (input: CreateMedicalRecordDTO) => Promise<boolean>,
 ): Promise<boolean> {
-  if (!dto.petId || !dto.title.trim() || !dto.visitDate || !dto.doctorName.trim() || !dto.diagnosis?.trim() || !dto.treatment?.trim()) {
+  if (!dto.petId || !dto.title.trim() || !dto.visitDate || !dto.diagnosis?.trim() || !dto.treatment?.trim()) {
     throw new ApiError(
       ApiErrorCode.VALIDATION_ERROR,
       422,
-      "Please complete the pet, title, visit date, doctor, diagnosis, and treatment fields.",
+      "Please complete the pet, title, visit date, diagnosis, and treatment fields.",
     );
   }
 
   return storeFn({
     ...dto,
     title: dto.title.trim(),
-    doctorName: dto.doctorName.trim(),
     symptoms: dto.symptoms?.trim(),
     diagnosis: dto.diagnosis.trim(),
     treatment: dto.treatment.trim(),
@@ -66,9 +65,6 @@ export async function updateMedicalRecord(
   if (dto.title !== undefined && !dto.title.trim()) {
     throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 422, "Title is required.");
   }
-  if (dto.doctorName !== undefined && !dto.doctorName.trim()) {
-    throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 422, "Doctor name is required.");
-  }
   if (dto.diagnosis !== undefined && !dto.diagnosis.trim()) {
     throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 422, "Diagnosis is required.");
   }
@@ -76,24 +72,26 @@ export async function updateMedicalRecord(
     throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 422, "Treatment is required.");
   }
 
+  // Keep null: it is how a cleared optional field reaches the server.
+  const trim = (value: string | null | undefined) => (typeof value === "string" ? value.trim() : value);
   return storeFn(recordId, {
     ...dto,
     title: dto.title?.trim(),
-    doctorName: dto.doctorName?.trim(),
-    symptoms: dto.symptoms?.trim(),
+    symptoms: trim(dto.symptoms),
     diagnosis: dto.diagnosis?.trim(),
     treatment: dto.treatment?.trim(),
-    medications: dto.medications?.trim(),
-    vaccineName: dto.vaccineName?.trim(),
+    medications: trim(dto.medications),
+    vaccineName: trim(dto.vaccineName),
   });
 }
 
 export async function deleteMedicalRecord(
   recordId: string,
-  storeFn: (id: string) => Promise<boolean>,
+  expectedRevision: number,
+  storeFn: (id: string, expectedRevision: number) => Promise<boolean>,
 ): Promise<boolean> {
   if (!recordId) {
     throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 422, "Medical record ID is required.");
   }
-  return storeFn(recordId);
+  return storeFn(recordId, expectedRevision);
 }

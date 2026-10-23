@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { expect, type Page } from '@playwright/test';
-export type Fixture = { run: string; password: string; admin:{id:string;username:string;fullName:string}; owner:{id:string;email:string;fullName:string}; other:{id:string;email:string;fullName:string};counter:{id:string;fullName:string}; pets:{id:string;name:string;qrToken:string}[];counterPetId:string;otherPetId:string;origins:Record<string,string> };
+export type Fixture = { run: string; password: string; admin:{id:string;username:string;fullName:string}; doctor:{id:string;fullName:string}; owner:{id:string;email:string;fullName:string}; other:{id:string;email:string;fullName:string};counter:{id:string;fullName:string}; pets:{id:string;name:string;qrToken:string}[];counterPetId:string;otherPetId:string;origins:Record<string,string> };
 export function fixture():Fixture {const f=JSON.parse(readFileSync(resolve('test-results/phase2/p5-e2e-fixture.json'),'utf8'));expect(f.run).toMatch(/^[0-9a-f-]{36}$/);return f;}
 export async function controls(values:Record<string,unknown>={}){
   const f=fixture(),file=resolve('test-results/phase2/p5-e2e-controls.json'),tmp=file+'.'+randomUUID();writeFileSync(tmp,JSON.stringify({...values,run:f.run}));

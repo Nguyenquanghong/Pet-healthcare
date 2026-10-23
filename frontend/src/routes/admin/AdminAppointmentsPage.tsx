@@ -30,6 +30,7 @@ import { appointmentStatusLabels } from "../../utils/statusLabels";
 import { compareBookingStatus } from "../../utils/bookingOrder";
 import { todayIso } from "../../utils/date";
 import { AdminCreateButton } from "./AdminCreateDialog";
+import { DoctorField, useSignsAsSelf } from "./DoctorField";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
@@ -83,6 +84,7 @@ export function AdminAppointmentsPage() {
   const [recordWeight, setRecordWeight] = useState("");
   const [recordTemp, setRecordTemp] = useState("");
   const [recordHeartRate, setRecordHeartRate] = useState("");
+  const [recordDoctorId, setRecordDoctorId] = useState("");
 
   const [toastMsg, setToastMsg] = useState("");
   const [statusDialog, setStatusDialog] = useState<StatusDialogSelection | null>(null);
@@ -132,15 +134,18 @@ export function AdminAppointmentsPage() {
     setRecordWeight(pet?.weightKg ? String(pet.weightKg) : "");
     setRecordTemp("38.5");
     setRecordHeartRate("90");
+    // P11: the appointment's doctor signs unless the admin picks another one.
+    setRecordDoctorId(a.doctorId ?? "");
   };
 
+  const selfSigned = useSignsAsSelf();
   const handleSaveMedicalRecord = () => {
-    if (!createRecordModal || !recordTitle || !recordDiagnosis || !recordTreatment) return;
+    if (!createRecordModal || !recordTitle || !recordDiagnosis || !recordTreatment || (!selfSigned && !recordDoctorId)) return;
 
     const input = {
       petId: createRecordModal.petId,
       appointmentId: createRecordModal.id,
-      doctorName: "Bs. Mai Nguyễn",
+      ...(selfSigned ? {} : { doctorId: recordDoctorId }),
       visitDate: createRecordModal.date,
       title: recordTitle.trim(),
       symptoms: recordSymptoms.trim(),
@@ -589,6 +594,13 @@ export function AdminAppointmentsPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Bác sĩ phụ trách *
+                </label>
+                <DoctorField value={recordDoctorId} onChange={setRecordDoctorId} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary focus:outline-none" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
                   Tiêu đề hồ sơ *
                 </label>
                 <input
@@ -707,7 +719,7 @@ export function AdminAppointmentsPage() {
               </button>
               <button
                 onClick={handleSaveMedicalRecord}
-                disabled={!recordTitle || !recordDiagnosis || !recordTreatment}
+                disabled={!recordTitle || !recordDiagnosis || !recordTreatment || (!selfSigned && !recordDoctorId)}
                 className="rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-50 transition-colors shadow-soft"
               >
                 Lưu bệnh án & Hoàn thành lịch

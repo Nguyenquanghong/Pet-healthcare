@@ -54,6 +54,11 @@ export class ListsService {
     const result = await this.repository.page(resource, scope, query);
     return { ...result, pagination: { page: query.page, pageSize: query.pageSize, total: result.total, totalPages: Math.ceil(result.total / query.pageSize) } };
   }
+  // Admins choose the responsible doctor of a medical record from this list.
+  doctors(actor: Actor) {
+    authorize(actor, "directory.read");
+    return this.repository.doctors();
+  }
   async billingFigures(actor: Actor, rawMonth: unknown) {
     authorize(actor, "billing.audit");
     if (rawMonth !== undefined && (typeof rawMonth !== "string" || !/^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(rawMonth))) throw new BusinessError(422, "Invalid month.");

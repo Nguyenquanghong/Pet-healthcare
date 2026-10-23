@@ -2,7 +2,7 @@ import type { Actor } from "../../domain/auth.js";
 import type { BlobStore } from "./blobs.js";
 export type MedicalRecordValue = {
   id: string; petId: string; ownerId: string; appointmentId: string | null;
-  doctorName: string; visitDate: Date; title: string; symptoms: string | null;
+  doctorId: string | null; doctorName: string; revision: number; visitDate: Date; title: string; symptoms: string | null;
   diagnosis: string; treatment: string; medications: string | null;
   vaccineName: string | null; followUpDate: Date | null;
   weightKg: number | { toString(): string } | null;
@@ -21,30 +21,38 @@ export type MedicalImageWrite = { id: string; petId: string; title: string; mime
 
 export type MedicalWrite = {
   petId: string; ownerId: string; appointmentId: string | null;
-  doctorName: string; visitDate: Date; title: string; symptoms: string | null;
+  doctorId: string; doctorName: string; visitDate: Date; title: string; symptoms: string | null;
   diagnosis: string; treatment: string; medications: string | null;
   vaccineName: string | null; followUpDate: Date | null;
   weightKg?: number | null; temperatureC?: number | null; heartRateBpm?: number | null;
   internalNote: string | null;
 };
 
-export type MedicalUpdate = Partial<Omit<MedicalWrite, "petId" | "ownerId" | "appointmentId">>;
+// The author (doctorId/doctorName) is fixed at creation; edits never reassign it.
+export type MedicalUpdate = Partial<Omit<MedicalWrite, "petId" | "ownerId" | "appointmentId" | "doctorId" | "doctorName">>;
 
 // AQ-15 audit entry; before/after are full record snapshots (staff-only).
 export type MedicalRevisionValue = {
   id: string; recordId: string; action: "create" | "update" | "delete";
   before: unknown; after: unknown; actorId: string; actorRole: string; changedAt: Date;
+  recordRevision: number | null;
 };
 
 export interface MedicalRecordRepository {
   list(ownerId?: string, petId?: string): Promise<MedicalRecordValue[]>;
   findPet(id: string): Promise<{ id: string; ownerId: string; name: string } | null>;
   findAppointment(id: string): Promise<{ id: string; petId: string; ownerId: string } | null>;
+  // Unlocked read, so the doctor lookup can run before the record's transaction.
+  appointmentDoctor(id: string): Promise<string | null>;
+  findDoctor(id: string): Promise<{ id: string; fullName: string }>;
+  // The acting user, for a record they sign as themself.
+  signer(): { id: string; fullName: string };
   find(id: string): Promise<MedicalRecordValue | null>;
   // Writes record a revision in the same transaction as the change.
   create(data: MedicalWrite, actor: Actor): Promise<MedicalRecordValue>;
-  update(id: string, data: MedicalUpdate, actor: Actor): Promise<MedicalRecordValue>;
-  delete(id: string, actor: Actor): Promise<void>;
+  // Compare-and-set on `revision`: a stale expectedRevision throws StaleRevision.
+  update(id: string, data: MedicalUpdate, actor: Actor, expectedRevision: number): Promise<MedicalRecordValue>;
+  delete(id: string, actor: Actor, expectedRevision: number): Promise<void>;
   history(recordId: string): Promise<MedicalRevisionValue[]>;
   createImage(data: MedicalImageWrite): Promise<MedicalImageValue>;
   // AQ-09 retention: tombstone + deletion log + cleanup claim due after the window, in one transaction.

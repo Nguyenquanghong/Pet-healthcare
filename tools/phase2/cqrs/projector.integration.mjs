@@ -46,7 +46,7 @@ async function create(extra={},key=randomUUID()){
 }
 async function change(a,status,extra={}){const r=await request('/api/appointments/'+a.id+'/status',{method:'PATCH',payload:{status,expectedRevision:a.statusRevision,...extra}});assert.equal(r.status,200,JSON.stringify(r.body));return r.body.appointment;}
 async function readyMedical(){let {a}=await create();a=await change(a,'confirmed');a=await change(a,'checked_in');return a;}
-async function complete(){const a=await readyMedical();const payload={petId:pet,appointmentId:a.id,doctorName:'Synthetic doctor',visitDate:day,title:'Q2 medical',diagnosis:'Fixture',treatment:'Fixture',internalNote:'Q2_PRIVATE'};
+async function complete(){const a=await readyMedical();const payload={petId:pet,appointmentId:a.id,doctorId:'q2-doctor',visitDate:day,title:'Q2 medical',diagnosis:'Fixture',treatment:'Fixture',internalNote:'Q2_PRIVATE'};
   const key=randomUUID(),r=await request('/api/medical-records',{method:'POST',payload,key});assert.equal(r.status,201,JSON.stringify(r.body));return {a:await db.appointment.findUniqueOrThrow({where:{id:a.id}}),payload,key,r};}
 const billing=new AppointmentBilling(db);
 const send=event=>publishConfirmed(channel,routes.exchange,event.eventType,Buffer.from(JSON.stringify(event)),{messageId:event.eventId,contentType:'application/json'});
@@ -60,7 +60,7 @@ test.before(async()=>{
   assert.deepEqual(await db.$queryRaw`SELECT marker FROM public.p2_test_marker`,[{marker:'pet-phase2-p1-test:clinic:v1'}]);
   assert.deepEqual(await db.$queryRaw`SELECT obj_description(oid,'pg_namespace') AS marker FROM pg_namespace WHERE nspname=${c.schema}`,[{marker:c.marker}]);
   await freshConnection();await declareTopology(broker,routes);
-  const source={acceptsService:()=>true,request:async actor=>({actor:{...actor,fullName:'Synthetic Q2'},pets:[{id:pet,ownerId:owner,name:'Synthetic pet',directoryVersion:1}],owners:[{id:owner,fullName:'Synthetic owner',directoryVersion:1}]})};
+  const source={acceptsService:()=>true,request:async(actor,_token,ids)=>({actor:{...actor,fullName:'Synthetic Q2'},pets:[{id:pet,ownerId:owner,name:'Synthetic pet',directoryVersion:1}],owners:[{id:owner,fullName:'Synthetic owner',directoryVersion:1}],...(ids?.doctorId?{doctor:{id:ids.doctorId,fullName:'Synthetic doctor'}}:{})})};
   server=createApp(db,token=>{if(!actors[token])throw new Error('invalid');return actors[token];},source).listen(0,'127.0.0.1');await once(server,'listening');base='http://127.0.0.1:'+server.address().port;
 });
 test.after(async()=>{
@@ -139,7 +139,7 @@ test('real outbox INSERT failure rolls back create, lifecycle, medical completio
     assert.equal((await db.appointment.findUniqueOrThrow({where:{id:a.id}})).status,'pending');assert.equal((await revision(a.id)).version,1);
     assert.equal(await db.bookingStatusEvent.count({where:{bookingId:a.id}}),0);
   }finally{await remove();}
-  const checked=await readyMedical(),payload={petId:pet,appointmentId:checked.id,doctorName:'Fixture',visitDate:day,title:'Rollback fixture',diagnosis:'Fixture',treatment:'Fixture'};await install();
+  const checked=await readyMedical(),payload={petId:pet,appointmentId:checked.id,doctorId:'q2-doctor',visitDate:day,title:'Rollback fixture',diagnosis:'Fixture',treatment:'Fixture'};await install();
   try{
     const r=await request('/api/medical-records',{method:'POST',payload,key:randomUUID()});assert.ok([500,503].includes(r.status));
     assert.equal(await db.medicalRecord.count({where:{appointmentId:checked.id}}),0);assert.equal((await revision(checked.id)).version,3);
