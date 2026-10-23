@@ -64,6 +64,8 @@ const clinic=[
   ['medical-record.write','POST','/api/medical-records/images',{petId:'pet-1'}],
   ['medical-record.write','DELETE',`/api/medical-records/images/${id}`],
   ['medical-record.history','GET',`/api/medical-records/${id}/history`],
+  // The Clinic router's medical-record.write guard runs first for every non-GET medical route.
+  ['medical-record.restore','POST',`/api/medical-records/images/${id}/restore`,undefined,['medical-record.write']],
   ['clinic-activity.read','GET','/api/dashboard/clinic/activity?from=2030-09-21&to=2030-10-20'],
 ];
 // Operations whose role check needs loaded data first: [permission, name, run(actor), alsoRequires]
@@ -115,7 +117,7 @@ test('Clinic HTTP: every role-restricted route answers by the matrix',{timeout:6
   const source={acceptsService:()=>false,request:async actor=>({actor:{...actor,fullName:'Fixture'},pets:[{id:'pet-1',ownerId:'owner-1',name:'Pet',directoryVersion:1}],owners:[{id:'owner-1',fullName:'Owner',directoryVersion:1}]})};
   const {server,base}=await serve(createClinic(db,verifyToken,source));
   try{
-    for(const probe of clinic)for(const role of roles){const {status,message}=await call(base,role,probe);verdict(probe[0],role,status,message);}
+    for(const probe of clinic)for(const role of roles){const {status,message}=await call(base,role,probe);verdict(probe[0],role,status,message,probe[4]);}
   }finally{server.closeAllConnections();await new Promise(r=>server.close(r));}
 });
 

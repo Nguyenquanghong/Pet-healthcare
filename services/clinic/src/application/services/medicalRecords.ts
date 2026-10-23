@@ -137,12 +137,15 @@ export class MedicalRecordsService {
     }
   }
 
+  // AQ-09 retention: the image disappears from every list at once, but row and
+  // object stay restorable until the window ends; drainBlobCleanup then purges both.
   async deleteImage(actor: Actor, id: string) {
     canWrite(actor);
-    const { storageKey } = await this.deps.records.deleteImage(id);
-    if (!storageKey) return;
-    // The cleanup row is already committed; if the bucket is down the worker retries it.
-    try { await this.deps.blobs.remove(storageKey); await this.deps.records.completeBlobCleanup(storageKey); } catch { /* retried by drainBlobCleanup */ }
+    await this.deps.records.deleteImage(id, actor);
+  }
+  async restoreImage(actor: Actor, id: string) {
+    authorize(actor, "medical-record.restore");
+    await this.deps.records.restoreImage(id, actor);
   }
 }
 

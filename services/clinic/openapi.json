@@ -964,6 +964,9 @@
           },
           "default": {
             "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
           }
         },
         "security": [
@@ -975,7 +978,8 @@
           {
             "$ref": "#/components/parameters/ResourceId"
           }
-        ]
+        ],
+        "description": "AQ-09 retention: the image leaves every list at once and stays restorable for MEDICAL_IMAGE_RETENTION_DAYS (default 30); then the worker removes the row and its bucket object. Every delete, restore and purge is logged append-only."
       }
     },
     "/api/medical-records/{id}/history": {
@@ -1880,6 +1884,46 @@
             }
           }
         }
+      }
+    },
+    "/api/medical-records/images/{id}/restore": {
+      "post": {
+        "tags": [
+          "Medical records"
+        ],
+        "summary": "Restore a deleted medical image (admin, within the retention window)",
+        "operationId": "post_api_medical_records_images_id_restore",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "description": "409 when the retention window has ended; 404 when the image is not deleted or already purged."
       }
     }
   },

@@ -33,11 +33,15 @@ test('internal OpenAPI validates actual billing and Core directory/send contract
   assert.ok(spec.paths['/internal/billing-reservations/{operationId}'].put.security[0].ActorBearer);
   assert.equal(spec.paths['/internal/billing-reservations/{operationId}/release'].post.requestBody.content['application/json'].schema.additionalProperties,false);
 });
-test('Clinic OpenAPI covers 19 public operations, bootstrap and 5 private billing operations',async()=>{
+test('Clinic OpenAPI covers 20 public operations, bootstrap and 5 private billing operations',async()=>{
   const spec=await SwaggerParser.validate(fileURLToPath(new URL('../../../services/clinic/openapi.json',import.meta.url)));
   // 19 public = the 17 of P3-P5 + GET /api/dashboard/clinic/activity (clinic-activity D1, admin-only)
-  // + GET /api/medical-records/{id}/history (AQ-15 audit, staff-only).
-  assert.equal(Object.values(spec.paths).flatMap(p=>Object.keys(p).filter(k=>['get','post','patch','put','delete'].includes(k))).length,25);
+  // + GET /api/medical-records/{id}/history (AQ-15 audit, staff-only)
+  // + POST /api/medical-records/images/{id}/restore (AQ-09 retention, admin-only).
+  assert.equal(Object.values(spec.paths).flatMap(p=>Object.keys(p).filter(k=>['get','post','patch','put','delete'].includes(k))).length,26);
+  const restore=spec.paths['/api/medical-records/images/{id}/restore'].post;
+  assert.ok(restore.security[0].BearerAuth);
+  for(const status of ['204','401','403','404','409'])assert.ok(restore.responses[status],status);
   const history=spec.paths['/api/medical-records/{id}/history'].get;
   assert.ok(history.security[0].BearerAuth);
   for(const status of ['200','401','403','404'])assert.ok(history.responses[status],status);

@@ -13,6 +13,7 @@ export const permissionMatrix = {
   'hotel.care-note.write': { roles: ['doctor', 'staff', 'admin'], denied: 'Chỉ nhân viên được ghi nhật ký chăm sóc.' },
   'medical-record.write': { roles: ['doctor', 'admin'], denied: 'Chỉ bác sĩ hoặc quản trị viên được ghi bệnh án và ảnh y tế.' },
   'medical-record.history': { roles: ['doctor', 'staff', 'admin'], denied: 'Chỉ nhân viên được xem lịch sử bệnh án.' },
+  'medical-record.restore': { roles: ['admin'], denied: 'Chỉ quản trị viên được khôi phục ảnh y tế đã xóa.' },
   'billing.manage': { roles: ['staff', 'admin'], denied: 'Chỉ nhân viên thu ngân hoặc quản trị viên được lập hóa đơn và xác nhận thu tiền.' },
   'billing.audit': { roles: ['doctor', 'staff', 'admin'], denied: 'Chỉ nhân viên được xem thống kê và lịch sử thu tiền.' },
   'billing.self-service': { roles: ['owner'], denied: 'Chỉ chủ nuôi được tự thanh toán hóa đơn của mình.' },

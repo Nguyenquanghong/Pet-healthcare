@@ -3,6 +3,7 @@ import type { PrismaClient } from './generated/client/index.js';
 import type { Actor } from './domain/auth.js';
 import { BusinessError } from './domain/error.js';
 import { authorize } from './domain/authorization.js';
+import { imageRetentionMs } from './blobCleanup.js';
 import { objectInput,calendarDate,requiredText } from './domain/validation.js';
 import { CoreDirectory, RequestDirectory } from './directory.js';
 import { AppointmentService } from './application/services/appointments.js';
@@ -31,6 +32,7 @@ import { requestActor } from '@nipopeto/runtime';
 
 export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?:CoreDirectory,runtime?:ServiceRuntime,readFreshness?:ReadFreshness,activityEvidence?:SummaryEligibility,blobs:BlobStore=blobStoreFromEnv()){
   assertReadProjectionConfig();
+  imageRetentionMs(); // AQ-09: an invalid MEDICAL_IMAGE_RETENTION_DAYS fails at startup, not at the first delete
   const app=express();app.disable('x-powered-by');
   const authoritative=new AuthoritativeAppointmentQueries(db);
   // Activity mode is server configuration (fixed or operator control), never a
@@ -121,6 +123,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   router.get('/medical-records/images',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await list(db,'medicalImages',res.locals.actor,res.locals.directory,req.query,blobs));});
   router.post('/medical-records/images',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.status(201).json({image:await medical(res).createImage(res.locals.actor,req.body)});});
   router.delete('/medical-records/images/:id',async(req,res)=>{await medical(res).deleteImage(res.locals.actor,req.params.id);res.status(204).end();});
+  router.post('/medical-records/images/:id/restore',async(req,res)=>{await medical(res).restoreImage(res.locals.actor,req.params.id);res.status(204).end();});
   router.get('/bootstrap',async(req,res)=>res.json(await bootstrap(db,res.locals.actor,res.locals.directory,req.query.view)));
   router.get('/dashboard/clinic',async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({...await bootstrap(db,res.locals.actor,res.locals.directory,'dashboard'),asOf:new Date().toISOString()});});
   router.get('/dashboard/clinic/activity',async(req,res)=>{

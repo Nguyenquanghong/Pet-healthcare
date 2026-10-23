@@ -9,8 +9,12 @@ import { writeNotification } from '../../notificationOutbox.js';
 import type { RequestDirectory } from '../../directory.js';
 import {trackAppointmentChange} from '../../readRevision.js';
 import type {BlobStore} from '../../blobStore.js';
+import {imageRetentionMs} from '../../blobCleanup.js';
 
 type Client=PrismaClient|Prisma.TransactionClient;
+type ImageRow={id:string;petId:string;ownerId:string;storageKey:string|null;sha256:string|null;sizeBytes:number|null;deletedAt:Date|null};
+const lockedImage=async(tx:Client,id:string)=>(await tx.$queryRaw<ImageRow[]>`SELECT id,pet_id AS "petId",owner_id AS "ownerId",storage_key AS "storageKey",sha256,size_bytes AS "sizeBytes",deleted_at AS "deletedAt" FROM medical_images WHERE id=${id} FOR UPDATE`)[0];
+const imageLog=(image:ImageRow,action:'delete'|'restore',actor:Actor)=>({imageId:image.id,action,petId:image.petId,ownerId:image.ownerId,storageKey:image.storageKey,sha256:image.sha256,sizeBytes:image.sizeBytes,actorId:actor.sub,actorRole:actor.role});
 const transaction=<T>(db:PrismaClient,bound:Prisma.TransactionClient|undefined,work:(tx:Prisma.TransactionClient)=>Promise<T>)=>bound?work(bound):db.$transaction(work);
 async function unlocked(tx:Client,id:string){
   if(await tx.appointmentReservation.count({where:{appointmentId:id,state:{in:['HELD','INVOICED']}}}))throw new BusinessError(409,'Appointment is reserved or already invoiced.');
@@ -57,16 +61,33 @@ class Records implements MedicalRecordRepository {
     const {ownerId,sha256,imageUrl,...image}=await this.db.medicalImage.create({data:{...data,ownerId:pet.ownerId}});
     return image;
   }
-  // Row delete and cleanup claim commit together, so an object is never leaked by a crash after the delete.
-  async deleteImage(id:string){
+  // AQ-09 retention: delete leaves a tombstone; the log row and the object's cleanup
+  // claim (due when the retention window ends) commit with it, so a crash never
+  // leaks the object and the worker purges row and object together later.
+  async deleteImage(id:string,actor:Actor){
     const run=async(tx:Client)=>{
-      const row=await tx.medicalImage.delete({where:{id},select:{storageKey:true}});
-      if(row.storageKey)await tx.blobCleanup.create({data:{storageKey:row.storageKey}});
-      return{storageKey:row.storageKey};
+      const image=await lockedImage(tx,id);
+      if(!image||image.deletedAt)throw new BusinessError(404,'Medical image not found.');
+      const deletedAt=new Date();
+      await tx.medicalImage.update({where:{id},data:{deletedAt,deletedBy:actor.sub}});
+      if(image.storageKey){const claim={nextAttemptAt:new Date(deletedAt.getTime()+imageRetentionMs()),attempts:0};await tx.blobCleanup.upsert({where:{storageKey:image.storageKey},create:{storageKey:image.storageKey,...claim},update:claim});}
+      await tx.medicalImageDeletion.create({data:imageLog(image,'delete',actor)});
     };
-    return '$transaction' in this.db?this.db.$transaction(run):run(this.db);
+    await('$transaction' in this.db?this.db.$transaction(run):run(this.db));
   }
-  async completeBlobCleanup(storageKey:string){await this.db.blobCleanup.deleteMany({where:{storageKey}});}
+  // Within the window an admin restore cancels the cleanup claim under the same row
+  // lock the purge takes, so either the restore or the purge wins, never both.
+  async restoreImage(id:string,actor:Actor){
+    const run=async(tx:Client)=>{
+      const image=await lockedImage(tx,id);
+      if(!image?.deletedAt)throw new BusinessError(404,'Deleted medical image not found.');
+      if(image.deletedAt.getTime()<=Date.now()-imageRetentionMs())throw new BusinessError(409,'The retention window has ended; this image is being removed.');
+      await tx.medicalImage.update({where:{id},data:{deletedAt:null,deletedBy:null}});
+      if(image.storageKey)await tx.blobCleanup.deleteMany({where:{storageKey:image.storageKey}});
+      await tx.medicalImageDeletion.create({data:imageLog(image,'restore',actor)});
+    };
+    await('$transaction' in this.db?this.db.$transaction(run):run(this.db));
+  }
   async completeAppointment(id:string,actor:Actor){
     await unlocked(this.db,id);
     const before=await this.db.appointment.findUnique({where:{id}});

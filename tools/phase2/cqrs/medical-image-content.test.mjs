@@ -25,8 +25,8 @@ function service({blobs=memoryBlobs(),failCreate=false}={}){
   const created=[],cleanup=[];
   const records={findPet:async id=>id==='pet-a'?{id,ownerId:'owner-a',name:'Fixture'}:null,
     createImage:async data=>{if(failCreate)throw new Error('DB_DOWN');created.push(data);const {sha256,...row}=data;return {...row,createdAt:new Date()};},
-    deleteImage:async id=>{if(id==='missing')throw Object.assign(new Error('P2025'),{code:'P2025'});cleanup.push(id);return {storageKey:id==='legacy'?null:'images/'+id};},
-    completeBlobCleanup:async key=>{cleanup.push('done:'+key);}};
+    deleteImage:async(id,actor)=>{cleanup.push(['delete',id,actor.role]);},
+    restoreImage:async(id,actor)=>{cleanup.push(['restore',id,actor.role]);}};
   return {created,cleanup,blobs,service:new MedicalRecordsService({records,blobs})};
 }
 const input=(mimeType,imageUrl)=>({petId:'pet-a',title:'Scan',mimeType,imageUrl});
@@ -58,13 +58,13 @@ test('a failed bucket write stores no row; a failed row insert removes the objec
   assert.deepEqual(failing.blobs.calls.map(c=>c[0]),['put','remove']);assert.equal(failing.blobs.objects.size,0);
 });
 
-test('delete removes the row first, then the object; a bucket outage leaves the cleanup claim for the worker',async()=>{
-  const ok=service();await ok.service.deleteImage(doctor,'img-1');
-  assert.deepEqual(ok.cleanup,['img-1','done:images/img-1']);assert.deepEqual(ok.blobs.calls,[['remove','images/img-1']]);
-  const outage=service({blobs:memoryBlobs({failRemove:true})});await outage.service.deleteImage(doctor,'img-2');
-  assert.deepEqual(outage.cleanup,['img-2']);// no completion: the claim stays queued
-  const legacy=service();await legacy.service.deleteImage(doctor,'legacy');assert.deepEqual(legacy.blobs.calls,[]);
-  await assert.rejects(service().service.deleteImage({sub:'owner-a',role:'owner'},'img-1'),error=>error.status===403);
+test('AQ-09 retention: delete is a tombstone with no bucket call; only an admin restores',async()=>{
+  const s=service();await s.service.deleteImage(doctor,'img-1');
+  assert.deepEqual(s.cleanup,[['delete','img-1','doctor']]);assert.deepEqual(s.blobs.calls,[],'the object stays for the retention window');
+  await s.service.restoreImage({sub:'admin-a',role:'admin'},'img-1');assert.deepEqual(s.cleanup.at(-1),['restore','img-1','admin']);
+  await assert.rejects(s.service.restoreImage(doctor,'img-1'),error=>error.status===403&&/khôi phục/.test(error.message));
+  for(const role of ['owner','staff'])await assert.rejects(s.service.deleteImage({sub:role+'-a',role},'img-1'),error=>error.status===403);
+  assert.equal(s.cleanup.length,2);
 });
 
 test('MIME outside the allowlist is rejected before persistence',async()=>{
