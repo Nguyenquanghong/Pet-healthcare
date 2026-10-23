@@ -11,7 +11,8 @@ import { mountAppointmentBilling } from './billingApi.js';
 import { mountDashboards } from './dashboardApi.js';
 import { coreRuntime } from './runtime.js';
 import { createCoreDomains } from './coreDomains.js';
-import { credential, traceHeaders } from '@nipopeto/runtime';
+import { credential } from '@nipopeto/runtime';
+import { serviceProxy } from './serviceProxy.js';
 import { allows, deniedMessage } from '@nipopeto/contracts';
 import { createAuthRouter } from '../routes/auth.js';
 import { AuthService } from '../application/services/auth.js';
@@ -21,6 +22,9 @@ import { PrismaOwnerActivationRepository } from '../infrastructure/persistence/o
 import { activationTokenAdapter } from '../infrastructure/security/activationToken.js';
 import { passwordAdapter, tokenAdapter } from '../infrastructure/security/authAdapters.js';
 import { currentAccount } from './currentAccount.js';
+
+// Paths the gateway forwards to Clinic; the proxy checks them again after resolving the URL.
+export const clinicPrefixes = ['/api/appointments', '/api/medical-records', '/api/dashboard/clinic'] as const;
 
 // Keep the user's app.ts intact. This composition owns the split service route
 // and the private Core authorization endpoint before mounting existing domains.
@@ -53,9 +57,10 @@ export function createCoreApp(db: PrismaClient, config: {notificationUrl?:string
   mountDashboards(app,db,Boolean(clinic));
   if(clinic){
     mountSplitBootstrap(app,db,clinic,config.clinicBootstrapToken??config.clinicToken!,config.notificationUrl);
-    app.use(['/api/appointments','/api/medical-records','/api/dashboard/clinic'],express.json({limit:'8mb'}),async(req,res)=>{
-      try{const url=new URL(req.originalUrl,clinic);if(!['/api/appointments','/api/medical-records','/api/dashboard/clinic'].some(p=>url.pathname===p||url.pathname.startsWith(p+'/'))){res.status(404).json({error:'Clinic route not found.'});return;}const headers:Record<string,string>={...traceHeaders()};for(const name of ['authorization','idempotency-key','x-clinic-min-version','x-clinic-read-consistency']){const value=req.headers[name];if(typeof value==='string')headers[name]=value;}const body=['POST','PATCH','PUT'].includes(req.method)?JSON.stringify(req.body??{}):undefined;if(body!==undefined)headers['content-type']='application/json';const response=await fetch(url,{method:req.method,headers,body,redirect:'error',signal:AbortSignal.timeout(6000)});for(const name of ['x-service-instance','x-service-degraded','retry-after','x-clinic-read-token','x-clinic-read-source','x-clinic-projection-generation','cache-control']){const value=response.headers.get(name);if(value)res.setHeader(name,name==='x-service-instance'?'clinic:'+value:value);}if(res.writableEnded)return;if(response.status===204){res.status(204).end();return;}res.status(response.status).json(await response.json());}catch{if(!res.headersSent)res.status(503).json({error:'Clinic service unavailable. Retry the same request key.'});}
-    });
+    app.use([...clinicPrefixes],express.json({limit:'8mb'}),serviceProxy({name:'clinic',origin:clinic,prefixes:clinicPrefixes,
+      forwardRequestHeaders:['authorization','idempotency-key','x-clinic-min-version','x-clinic-read-consistency'],
+      forwardResponseHeaders:['x-service-instance','x-service-degraded','retry-after','x-clinic-read-token','x-clinic-read-source','x-clinic-projection-generation','cache-control'],
+      timeoutMs:6000,unavailableMessage:'Clinic service unavailable. Retry the same request key.',notFoundMessage:'Clinic route not found.'}));
     mountAppointmentBilling(app,db,clinic,config.clinicToken!,config.evidenceToken);
   }
   if (config.notificationUrl && (!jwt?.privateKey || !config.notificationToken || config.notificationToken.length < 32 || config.notificationToken.length > 512)) throw new Error('SPLIT_NOTIFICATION_CONFIGURATION_REQUIRED');
@@ -83,24 +88,12 @@ export function createCoreApp(db: PrismaClient, config: {notificationUrl?:string
     } catch { res.status(503).json({ error: 'Core authorization unavailable.' }); }
   });
 
-  app.use('/api/notifications', express.json({ limit: '96kb' }), async (req, res) => {
-    if (!target) { res.status(503).json({ error: 'Notification service is not configured.' }); return; }
-    try {
-      const url=new URL(req.originalUrl,target);if(url.pathname!=='/api/notifications'&&!url.pathname.startsWith('/api/notifications/')){res.status(404).json({error:'Notification route not found.'});return;}
-      const headers: Record<string, string> = {...traceHeaders()};
-      for (const name of ['authorization', 'idempotency-key']) { const value = req.headers[name]; if (typeof value === 'string') headers[name] = value; }
-      const body = ['POST', 'PATCH', 'PUT'].includes(req.method) ? JSON.stringify(req.body ?? {}) : undefined;
-      if (body !== undefined) headers['content-type'] = 'application/json';
-      const response = await fetch(url, { method: req.method, headers, body, redirect: 'error', signal: AbortSignal.timeout(4000) });
-      // Never expose the downstream URL, internal credentials or transport error.
-      if(res.writableEnded)return;
-      for (const name of ['retry-after', 'x-service-degraded', 'x-service-instance']) {
-        const value = response.headers.get(name);
-        if (value) res.setHeader(name, name === 'x-service-instance' ? 'notification:' + value : value);
-      }
-      if (response.status === 204) { res.status(204).end(); return; }
-      res.status(response.status).json(await response.json());
-    } catch { if(!res.headersSent)res.status(503).json({ error: 'Notification service unavailable. Retry the same request key.' }); }
+  const notificationProxy = target ? serviceProxy({ name: 'notification', origin: target, prefixes: ['/api/notifications'],
+    forwardRequestHeaders: ['authorization', 'idempotency-key'], forwardResponseHeaders: ['retry-after', 'x-service-degraded', 'x-service-instance'],
+    timeoutMs: 4000, unavailableMessage: 'Notification service unavailable. Retry the same request key.', notFoundMessage: 'Notification route not found.' }) : null;
+  app.use('/api/notifications', express.json({ limit: '96kb' }), (req, res, next) => {
+    if (!notificationProxy) { res.status(503).json({ error: 'Notification service is not configured.' }); return; }
+    return notificationProxy(req, res, next);
   });
   app.use(runtime?createCoreDomains(db):createApp(db));
   app.use((error: { type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
