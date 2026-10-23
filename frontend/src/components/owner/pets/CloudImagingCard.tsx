@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { MedicalImage } from "../../../types/medicalImage";
 import type { Pet } from "../../../types/pet";
 import { MedicalImageView } from "../../MedicalImageView";
+import { formatDate } from "../../../utils/date";
 
 type CloudImagingCardProps = { pet: Pet; images: MedicalImage[]; onExpired?: () => void };
 
@@ -28,7 +29,7 @@ export function CloudImagingCard({ pet, images, onExpired }: CloudImagingCardPro
               <MedicalImageView image={image} onExpired={onExpired} className="h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-100" />
               <div className="absolute inset-x-0 bottom-0 bg-slate-950/75 px-3 py-2">
                 <p className="truncate text-sm font-bold text-white">{image.title}</p>
-                <p className="text-[11px] text-slate-300">{new Date(image.createdAt).toLocaleDateString()}</p>
+                <p className="text-[11px] text-slate-300">{formatDate(image.createdAt)}</p>
               </div>
             </button>
           ))}

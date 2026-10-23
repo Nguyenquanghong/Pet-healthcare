@@ -28,6 +28,7 @@ import { useAppStore } from "../../store/AppStoreProvider";
 import { isSpaAppointmentType, type Appointment, type AppointmentStatus } from "../../types/appointment";
 import { appointmentStatusLabels } from "../../utils/statusLabels";
 import { compareBookingStatus } from "../../utils/bookingOrder";
+import { todayIso } from "../../utils/date";
 import { AdminCreateButton } from "./AdminCreateDialog";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -88,7 +89,7 @@ export function AdminAppointmentsPage() {
   const { run: runAction, error: actionError } = useBookingAction("clinic");
   const medicalIntent = useRequestIntent();
 
-  const todayStr = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+  const todayStr = todayIso();
 
   const toast = (msg: string) => {
     setToastMsg(msg);

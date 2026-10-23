@@ -17,6 +17,7 @@ import type { Owner } from "../../types/owner";
 import { calculateBookingTotal, calculateNights, ROOM_PRICES } from "../../utils/bookingCalculator";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { ApiError } from "../../utils/apiError";
+import { todayIso as todayVietnam } from "../../utils/date";
 import { emptyPetDraft, genderLabels, healthLabels, PetDraftFields, speciesLabels } from "./PetDraftFields";
 import { emptyOwnerDraft, OwnerDraftFields } from "./OwnerDraftFields";
 import { useRequestIntent } from '../../services/useRequestIntent';
@@ -25,7 +26,6 @@ type Kind = "pet" | "appointment" | "hotel";
 const titles: Record<Kind, string> = { pet: "Thêm thú cưng", appointment: "Tạo lịch khám / Spa", hotel: "Tạo đặt phòng" };
 const services = [...appointmentServiceOptions, ...spaServiceOptions];
 const roomLabels: Record<HotelRoomType, string> = { standard: "Phòng tiêu chuẩn", deluxe: "Phòng cao cấp", vip: "Phòng VIP" };
-const todayVietnam = () => new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
 const phoneKey = (value: string) => {
   const digits = value.replace(/[\s.()-]/g, "");
   return /^\+?84\d{9}$/.test(digits) ? `0${digits.slice(-9)}` : digits;

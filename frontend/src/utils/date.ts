@@ -1,19 +1,15 @@
-export const toLocalIsoDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
+// The clinic keeps Vietnam's calendar (UTC+7, no daylight saving), like the backend's
+// todayInVietnam: a device set to another time zone must not move default or minimum dates.
+export const vietnamIsoDate = (instant = Date.now()) => new Date(instant + 7 * 3_600_000).toISOString().slice(0, 10);
 
-export const todayIso = () => toLocalIsoDate(new Date());
+export const todayIso = () => vietnamIsoDate();
 
-export const addDaysIso = (days: number) => {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return toLocalIsoDate(date);
-};
+export const addDaysIso = (days: number) => vietnamIsoDate(Date.now() + days * 86_400_000);
 
-export const formatDate = (value: string) => new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(value));
+// Instants (issuedAt, paidAt, createdAt…) are shown on the clinic's clock too.
+const VIETNAM_TIME = { timeZone: "Asia/Ho_Chi_Minh" } as const;
+export const formatDate = (value: string) => new Date(value).toLocaleDateString("vi-VN", VIETNAM_TIME);
+export const formatDateTime = (value: string) => new Date(value).toLocaleString("vi-VN", VIETNAM_TIME);
 
 export const daysBetween = (start: string, end: string) => {
   const startDate = new Date(`${start}T00:00:00`);

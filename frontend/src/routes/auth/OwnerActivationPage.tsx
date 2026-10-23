@@ -5,6 +5,7 @@ import { Input } from "../../components/ui/Input";
 import { apiClient } from "../../services/apiClient";
 import { ApiError } from "../../utils/apiError";
 import { AuthShell } from "./AuthShell";
+import { formatDateTime } from "../../utils/date";
 
 export function OwnerActivationPage() {
   const location = useLocation();
@@ -65,7 +66,7 @@ export function OwnerActivationPage() {
       {!loading && !details && !invalid && <Button type="button" variant="outline" onClick={() => setAttempt(value => value + 1)}>Thử kiểm tra lại</Button>}
       {!loading && details && !invalid && <form onSubmit={event => void activate(event)} className="space-y-4">
         <p>Email đăng nhập: <strong className="break-all">{details.email}</strong></p>
-        <p className="text-sm text-slate-600">Hết hạn: {new Date(details.expiresAt).toLocaleString("vi-VN")}. Đặt mật khẩu riêng để sử dụng hồ sơ hiện có.</p>
+        <p className="text-sm text-slate-600">Hết hạn: {formatDateTime(details.expiresAt)}. Đặt mật khẩu riêng để sử dụng hồ sơ hiện có.</p>
         <fieldset disabled={busy} className="space-y-4">
           <Input label="Mật khẩu mới" type="password" autoComplete="new-password" required minLength={8} maxLength={128} value={password} onChange={event => setPassword(event.target.value)} />
           <Input label="Xác nhận mật khẩu" type="password" autoComplete="new-password" required minLength={8} maxLength={128} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} />

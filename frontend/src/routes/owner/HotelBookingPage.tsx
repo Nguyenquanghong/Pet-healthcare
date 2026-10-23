@@ -19,6 +19,7 @@ import { calculateBookingTotal, calculateNights } from "../../utils/bookingCalcu
 import { formatCurrency } from "../../utils/formatCurrency";
 import { bookingStatusLabels, eatingStatusLabels, moodLabels } from "../../utils/statusLabels";
 import { compareBookingStatus } from "../../utils/bookingOrder";
+import { todayIso as today } from "../../utils/date";
 
 const BOOKING_STATUS_STYLES: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border border-amber-200",
@@ -40,7 +41,6 @@ export function HotelBookingPage() {
   const petQuery = useApiQuery<ListPage<Pet>>('/pets?pageSize=1', { refreshOnTick: true });
   const ownerPets = petQuery.data?.items ?? [];
   const [petId, setPetId] = useState(ownerPets[0]?.id ?? "");
-  const today = () => new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
   const nextDay = () => new Date(new Date(`${today()}T00:00:00.000Z`).getTime() + 86_400_000).toISOString().slice(0, 10);
   const [checkIn, setCheckIn] = useState(today);
   const [checkOut, setCheckOut] = useState(nextDay);
