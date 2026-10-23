@@ -119,6 +119,22 @@ test('list/query/counts/pagination match legacy contract and never accept caller
   assert.equal(filtered.body.counts['category:promo'], 18);
   for (const query of ['page=0', 'pageSize=101', 'page=1&page=2', 'status=pending', 'category=unknown', 'q=' + 'x'.repeat(101)]) assert.equal((await request(`?${query}`)).status, 422);
 });
+test('inbox tabs place a status update by the booking it names and cover billing and rescue', async () => {
+  const c = randomUUID(), token = sign(c, 'owner');
+  const sent = [['booking_status_updated', { relatedAppointmentId: randomUUID() }, 'appointments'], ['booking_status_updated', { relatedBookingId: randomUUID() }, 'hotel'],
+    ['hotel_daily_update', {}, 'hotel'], ['invoice_paid', {}, 'billing'], ['transfer_rejected', {}, 'billing'], ['pet_rescue_report', {}, 'rescue'], ['general', {}, 'promo']];
+  for (const [type, related] of sent) await inbox.apply(JSON.stringify(fixture({ recipientOwnerId: c, type, ...related })));
+  const all = await request('', { token });
+  assert.deepEqual(all.body.counts, { sent: 7, 'category:appointments': 1, 'category:hotel': 2, 'category:billing': 2, 'category:rescue': 1, 'category:promo': 1, 'category:all': 7 });
+  for (const tab of ['appointments', 'hotel', 'medical', 'billing', 'rescue', 'promo']) {
+    const page = await request(`?category=${tab}`, { token });
+    assert.equal(page.status, 200, tab);
+    assert.deepEqual(page.body.items.map(x => x.type).sort(), sent.filter(s => s[2] === tab).map(s => s[0]).sort(), tab);
+    assert.equal(page.body.counts['category:all'], 7, 'tab counts ignore the selected tab');
+  }
+  const hotel = await request('?category=hotel&q=Synthetic', { token });
+  assert.equal(hotel.body.pagination.total, 2, 'a search inside a tab keeps both filters');
+});
 test('read, read-all, delete and unread-count enforce owner/staff visibility', async () => {
   const other = (await request(`?q=${run}&status=sent`, { token: tokens.b })).body.items[0];
   assert.equal((await request(`/${other.id}/read`, { method: 'PATCH' })).status, 404);

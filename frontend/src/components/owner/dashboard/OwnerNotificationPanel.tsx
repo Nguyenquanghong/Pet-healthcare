@@ -5,20 +5,7 @@ import { useApiQuery } from '../../../services/useApiQuery';
 import type { ListPage } from '../../../types/list';
 import type { Notification } from '../../../types/notification';
 import { QueryStatus } from '../../ui/QueryStatus';
-
-const TYPE_ICON: Record<string, string> = {
-  appointment_confirmed: "✅",
-  appointment_reminder: "🔔",
-  appointment_cancelled: "❌",
-  vaccination_reminder: "💉",
-  hotel_booking_confirmed: "🏨",
-  hotel_booking_created: "🏨",
-  hotel_daily_update: "🐾",
-  hotel_checked_out: "🎉",
-  medical_record_updated: "📋",
-  promotion: "🏷️",
-  general: "📢",
-};
+import { notificationIcon } from '../../../utils/notificationIcon';
 
 function timeAgo(iso: string): string {
   try {
@@ -63,7 +50,7 @@ export function OwnerNotificationPanel() {
             }`}
           >
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-slate-100 text-base">
-              {TYPE_ICON[notif.type] ?? "📢"}
+              {notificationIcon(notif.type)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">

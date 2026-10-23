@@ -25,7 +25,9 @@ try {
   const booking = await db.hotelBooking.create({ data: { petId, ownerId: owner.id, checkIn: new Date("2097-06-01"), checkOut: new Date("2097-06-02"), nights: 1, roomType: "standard", totalAmount: 350000, status: "in_stay", serviceKeys: [], internalNote: "STAFF_ONLY" } });
   for (let index = 0; index < 23; index++) await db.dailyCareNote.create({ data: { bookingId: booking.id, noteDate: new Date("2097-06-01"), note: marker, visibleToOwner: index !== 22 } });
   await db.medicalImage.createMany({ data: Array.from({ length: 21 }, () => ({ petId, title: marker, imageUrl: "data:image/png;base64,AAAA", mimeType: "image/png" })) });
-  for (let index = 0; index < 25; index++) notificationIds.push((await db.notification.create({ data: { recipientOwnerId: owner.id, title: marker, message: marker, type: "general" } })).id);
+  // Three of them belong to other inbox tabs: a status update names its booking (hotel) or appointment.
+  const tabbed = [{ type: "booking_status_updated", relatedBookingId: booking.id }, { type: "booking_status_updated", relatedAppointmentId: appointments[0].id }, { type: "invoice_paid" }];
+  for (let index = 0; index < 25; index++) notificationIds.push((await db.notification.create({ data: { recipientOwnerId: owner.id, title: marker, message: marker, type: "general", ...tabbed[index] } })).id);
   notificationIds.push((await db.notification.create({ data: { recipientRole: "admin", title: marker, message: marker, type: "general" } })).id);
   await db.invoice.create({ data: { invoiceCode: marker, type: "hotel_booking", hotelBookingId: booking.id, ownerId: owner.id, petId, subtotal: 350000, totalAmount: 350000, paymentStatus: "paid", paidAt: new Date("2097-05-31T17:00:00Z"), issuedAt: new Date("2097-05-01") } });
   server = createApp(db).listen(0,"127.0.0.1"); await new Promise(resolve => server.once("listening",resolve));
@@ -57,6 +59,11 @@ try {
   const session=await get("/bootstrap");assert.equal(session.pets.length,20);assert.equal(session.appointments.length,0);assert.equal(session.medicalImages.length,0);assert.equal(session.summary.totals.pets,45);assert.equal(session.summary.unread,25);
   const adminSession=await get("/bootstrap",staffToken);assert.equal(adminSession.owners.length,0);assert.equal(adminSession.pets.length,0);
   const dashboard=await get("/bootstrap?view=dashboard");assert.equal(dashboard.summary.totals.appointments,31);assert.ok(dashboard.pets.length<=20);assert.ok(dashboard.appointments.length<=5);assert.ok(dashboard.notifications.length<=5);
+  assert.deepEqual(dashboard.summary.notificationCategory,{hotel:1,appointments:1,billing:1,promo:22});
+  const hotelTab=await get("/notifications?category=hotel");assert.deepEqual(hotelTab.items.map(row=>row.relatedBookingId),[booking.id]);
+  assert.deepEqual(Object.fromEntries(Object.entries(hotelTab.counts).filter(([key])=>key.startsWith("category:"))),{"category:hotel":1,"category:appointments":1,"category:billing":1,"category:promo":22,"category:all":25});
+  assert.equal((await get(`/notifications?category=appointments&q=${marker}`)).pagination.total,1,"a search inside a tab keeps both filters");
+  await get("/notifications?category=promotion",ownerToken,422);
   await get("/bootstrap?view=all",ownerToken,422);
   const figures=await get("/invoices/summary?month=2097-06",staffToken);assert.equal(figures.received,350000);assert.equal(figures.paidCount,1);assert.equal(figures.hotel,350000);
   const notes=await get(`/hotel-care-notes?bookingId=${booking.id}&page=2`);assert.equal(notes.pagination.total,22);assert.equal(notes.items.length,2);

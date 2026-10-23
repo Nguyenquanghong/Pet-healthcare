@@ -155,6 +155,7 @@ export interface ApiSchemas {
     createdAt: string;
     sentAt: string;
   };
+  NotificationCategory: "appointments" | "hotel" | "medical" | "billing" | "rescue" | "promo";
   Invoice: {
     id: string;
     invoiceCode: string;

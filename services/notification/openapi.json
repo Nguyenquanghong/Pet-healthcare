@@ -115,6 +115,8 @@
                 "appointments",
                 "hotel",
                 "medical",
+                "billing",
+                "rescue",
                 "promo"
               ]
             }
