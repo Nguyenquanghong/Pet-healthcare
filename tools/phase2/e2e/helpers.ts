@@ -40,7 +40,7 @@ export async function pickPet(page:Page,index:number,label='Thú cưng'){
   await expect(page.getByRole('combobox',{name:label,exact:true}).locator('option',{hasText:pet.name})).toHaveCount(1);
   await page.getByRole('combobox',{name:label,exact:true}).selectOption(pet.id);return pet;
 }
-export async function appointment(page:Page,index:number,type='spa_bath',date='2040-01-02',time='10:00'){
+export async function appointment(page:Page,index:number,type='spa_bath',date='2040-01-02',time='10:30'){
   const r=await api(page,'/appointments',{method:'POST',role:'owner',key:randomUUID(),body:{petId:fixture().pets[index].id,type,serviceName:'P5 '+randomUUID().slice(0,8),date,time}});expect(r.status).toBe(201);return r.body.appointment;
 }
 export async function transition(page:Page,source:any,status:string,collection='appointments'){

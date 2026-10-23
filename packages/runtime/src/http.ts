@@ -29,7 +29,7 @@ function routeTemplate(path:string){
   const p=path.split('?')[0]!;
   if(p==='/health/live'||p==='/health/ready'||p==='/api/health'||p==='/metrics')return p;
   if(p.startsWith('/internal/'))return '/internal/:scope';
-  const fixed=/^\/api\/(auth\/(owner\/(login|register|activation(\/inspect)?)|admin\/login|me(\/password)?)|dashboard\/(core|clinic)|appointments\/calendar|medical-records\/images|notifications\/(unread-count|send|read-all)|invoices\/checkout|bootstrap|analytics\/summary|openapi.json|docs|pets|owners|doctors|appointments|medical-records|hotel-bookings|notifications|invoices|operations|payments)$/;
+  const fixed=/^\/api\/(auth\/(owner\/(login|register|activation(\/inspect)?)|admin\/login|me(\/password)?)|dashboard\/(core|clinic)|appointments\/(calendar|availability)|medical-records\/images|notifications\/(unread-count|send|read-all)|invoices\/checkout|bootstrap|analytics\/summary|openapi.json|docs|pets|owners|doctors|appointments|medical-records|hotel-bookings|notifications|invoices|operations|payments)$/;
   if(fixed.test(p))return p;
   const item=p.match(/^\/api\/(pets|owners|appointments|medical-records|hotel-bookings|notifications|invoices|operations)\/[^/]{1,200}(\/(status|reschedule|cancel|status-history|history|undo-status|reminder|read|pay|daily-care|activation))?$/);
   if(item)return `/api/${item[1]}/:id${item[2]??''}`;

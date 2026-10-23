@@ -21,6 +21,7 @@ import {PrismaInvoiceRepository} from '../../backend/dist/src/infrastructure/per
 import {PrismaPaymentRepository} from '../../backend/dist/src/infrastructure/persistence/paymentRepository.js';
 import {topology,declareTopology,publishConfirmed} from '@nipopeto/messaging';
 import amqp from 'amqplib';
+import {liftAppointmentCapacity} from './appointment-capacity.mjs';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test');
 const urls={core:'postgresql://p2_core:p2_core_fixture_only@127.0.0.1:55432/p2_core_test?schema=core_runtime_test',clinic:'postgresql://p2_clinic:p2_clinic_fixture_only@127.0.0.1:55432/p2_clinic_test?schema=p1_proof',notification:'postgresql://p2_notification:p2_notification_fixture_only@127.0.0.1:55432/p2_notification_test?schema=p1_proof'};
@@ -58,6 +59,7 @@ test.before(async()=>{
   for(const [service,db] of Object.entries({core,clinic,notification})){const [i]=await db.$queryRaw`SELECT current_database() AS db,current_user AS role`;assert.equal(i.db,'p2_'+service+'_test');assert.equal(i.role,'p2_'+service);const [m]=await db.$queryRaw`SELECT marker FROM public.p2_test_marker`;assert.equal(m.marker,'pet-phase2-p1-test:'+service+':v1');execFileSync(process.execPath,['node_modules/prisma/build/index.js','migrate','deploy','--schema',service==='core'?'backend/prisma/schema.prisma':`services/${service}/prisma/schema.prisma`],{env:{...process.env,DATABASE_URL:urls[service]},stdio:'pipe'});}
   process.env.JWT_PRIVATE_KEY=keys.privateKey.export({type:'pkcs8',format:'pem'}).toString();process.env.JWT_PUBLIC_KEY=keys.publicKey.export({type:'spki',format:'pem'}).toString();process.env.JWT_ISSUER='p4-core';process.env.JWT_AUDIENCE='pet-healthcare';
   for(const [name,id,role] of [['owner',owner,'owner'],['other',other,'owner'],['admin',admin,'admin']]){await core.user.create({data:{id,role,fullName:'P4 '+name+' '+run,passwordHash:'fixture',passwordSalt:'fixture'}});tokens[name]=signToken(id,role);}
+  await liftAppointmentCapacity(clinic);
   sourcePort=await port();sourceUrl='http://127.0.0.1:'+sourcePort;
   for(let n=0;n<2;n++){const p=await port(),base='http://127.0.0.1:'+p;clinicBases.push(base);await child('services/clinic/dist/index.js',{...env(),JWT_PRIVATE_KEY:'',DATABASE_URL:urls.clinic,PORT:String(p),CORE_SERVICE_URL:sourceUrl},async()=>{try{return(await fetch(base+'/health/ready')).status===200;}catch{return false;}});}
   await startSource();

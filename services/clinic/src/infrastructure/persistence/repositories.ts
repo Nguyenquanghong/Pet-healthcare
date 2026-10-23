@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from '../../generated/client/index.js';
 import { bookingLifecycles } from '@nipopeto/contracts';
 import type { Actor } from '../../domain/auth.js';
 import { BusinessError, StaleRevision } from '../../domain/error.js';
-import type { AppointmentRepository,AppointmentDependencies } from '../../application/ports/appointments.js';
+import type { AppointmentRepository,AppointmentDependencies,AppointmentType } from '../../application/ports/appointments.js';
 import type { MedicalRecordRepository,MedicalDependencies,MedicalRevisionValue } from '../../application/ports/medicalRecords.js';
 import type { BookingLifecycleStore,LifecycleTransaction,BookingKind } from '../../application/ports/bookingLifecycle.js';
 import { appointmentSlotWrite } from './appointmentSlotConflict.js';
@@ -29,7 +29,12 @@ class Appointments implements AppointmentRepository {
   findPet(id:string){return this.directory.pet(id);}
   find(id:string){return this.db.appointment.findUnique({where:{id}});}
   async findWithPet(id:string){const appointment=await this.find(id);return appointment?{appointment,pet:await this.directory.pet(appointment.petId)}:null;}
-  async hasSlot(petId:string,date:Date,time:string,exceptId?:string){return !!await this.db.appointment.findFirst({where:{petId,appointmentDate:date,appointmentTime:time,...(exceptId?{id:{not:exceptId}}:{}),status:{in:[...bookingLifecycles.appointment.occupying]}}});}
+  async slotPolicy(type:AppointmentType){
+    const policy=await this.db.appointmentTypePolicy.findUniqueOrThrow({where:{type}}),group=await this.db.appointmentResourceGroup.findUniqueOrThrow({where:{resourceGroup:policy.resourceGroup}});
+    return{type,resourceGroup:group.resourceGroup,durationMinutes:policy.durationMinutes,capacity:group.capacity,openTime:group.openTime,closeTime:group.closeTime,stepMinutes:group.stepMinutes,fixedSlots:group.fixedSlots};
+  }
+  slotUsage(resourceGroup:string,from:Date,to:Date){return this.db.appointmentSlotUsage.findMany({where:{resourceGroup,slotStart:{gte:from,lt:to}},select:{slotStart:true,booked:true,capacity:true}});}
+  async doctorSlots(doctorId:string,from:Date,to:Date){return (await this.db.appointmentDoctorSlot.findMany({where:{doctorId,slotStart:{gte:from,lt:to}},select:{slotStart:true}})).map(s=>s.slotStart);}
   async create(data:Parameters<AppointmentRepository['create']>[0]){const row=await appointmentSlotWrite(this.db.appointment.create({data}));await trackAppointmentChange(this.db,row.id,{created:true});return row;}
 }
 const writer=(db:Client)=>({create:async(draft:{recipientOwnerId?:string;recipientRole:string;title:string;message:string;type:string;actionUrl:string;relatedPetId:string;relatedAppointmentId:string|null})=>{await writeNotification(db,{...draft,recipientOwnerId:draft.recipientOwnerId??null,recipientRole:draft.recipientRole as 'owner'|'admin'});}});

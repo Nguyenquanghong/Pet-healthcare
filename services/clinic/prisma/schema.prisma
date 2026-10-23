@@ -84,6 +84,8 @@ enum AppointmentType {
 model Appointment {
   // SQL migration 20261019000100 adds a non-unique INCLUDE index for read ACL
   // ranges; Prisma schema cannot express its covering columns.
+  // P10: migration 20261024000100 adds starts_at, ends_at and schedule_checked,
+  // written only by the appointment_schedule_times trigger (never by the app).
   id              String            @id @default(uuid())
   petId           String            @map("pet_id")
   ownerId         String            @map("owner_id")
@@ -383,4 +385,55 @@ model ReadRebuildRun {
  copied Int @default(0)
  createdAt DateTime @default(now())
  updatedAt DateTime @updatedAt
+}
+
+// P10 scheduling policy (data) and the slot tables the appointment_schedule_sync
+// trigger keeps exact; the runtime role only reads them.
+model AppointmentResourceGroup {
+  resourceGroup String   @id @map("resource_group")
+  capacity      Int
+  openTime      String?  @map("open_time")
+  closeTime     String?  @map("close_time")
+  stepMinutes   Int?     @map("step_minutes")
+  fixedSlots    String[] @default([]) @map("fixed_slots")
+
+  @@map("appointment_resource_groups")
+}
+
+model AppointmentTypePolicy {
+  type            AppointmentType @id
+  resourceGroup   String          @map("resource_group")
+  durationMinutes Int             @map("duration_minutes")
+
+  @@map("appointment_type_policies")
+}
+
+model AppointmentSlotUsage {
+  resourceGroup String   @map("resource_group")
+  slotStart     DateTime @map("slot_start") @db.Timestamptz(6)
+  booked        Int      @default(0)
+  capacity      Int
+
+  @@id([resourceGroup, slotStart])
+  @@map("appointment_slot_usage")
+}
+
+model AppointmentPetSlot {
+  petId         String   @map("pet_id")
+  slotStart     DateTime @map("slot_start") @db.Timestamptz(6)
+  appointmentId String   @map("appointment_id")
+
+  @@id([petId, slotStart])
+  @@index([appointmentId], map: "appointment_pet_slots_appointment_idx")
+  @@map("appointment_pet_slots")
+}
+
+model AppointmentDoctorSlot {
+  doctorId      String   @map("doctor_id")
+  slotStart     DateTime @map("slot_start") @db.Timestamptz(6)
+  appointmentId String   @map("appointment_id")
+
+  @@id([doctorId, slotStart])
+  @@index([appointmentId], map: "appointment_doctor_slots_appointment_idx")
+  @@map("appointment_doctor_slots")
 }

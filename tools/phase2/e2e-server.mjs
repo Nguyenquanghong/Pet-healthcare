@@ -19,6 +19,7 @@ import { topology, declareTopology } from '@nipopeto/messaging';
 import amqp from 'amqplib';
 import {drainHandles} from './drain-handles.mjs';
 import {blobTestEnv} from './blob-test.mjs';
+import {liftAppointmentCapacity} from './appointment-capacity.mjs';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test');
 assertTestProject();
@@ -37,6 +38,7 @@ for(const [name,client] of Object.entries(db)){
   if(isolated&&name==='clinic'){await client.$executeRawUnsafe(`CREATE SCHEMA "${q4Schema}"`);await client.$executeRawUnsafe(`COMMENT ON SCHEMA "${q4Schema}" IS '${activityE2e?'clinic-activity-d4-e2e':'cqrs-q4-e2e'}:${q4Run}'`);}
   execFileSync(process.execPath,['node_modules/prisma/build/index.js','migrate','deploy','--schema',name==='core'?'backend/prisma/schema.prisma':`services/${name}/prisma/schema.prisma`],{env:{...process.env,DATABASE_URL:urls[name]},stdio:'pipe'});
 }
+await liftAppointmentCapacity(db.clinic);
 if(q4E2e){
   const {AppointmentRebuild}=await import('../../services/clinic/dist/readRebuild.js');
   const u=new URL(urls.clinic);u.searchParams.set('connection_limit','1');const operator=new Clinic({datasourceUrl:u.href}),rebuild=new AppointmentRebuild(operator),id=randomUUID();

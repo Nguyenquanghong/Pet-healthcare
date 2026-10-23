@@ -282,7 +282,7 @@
             }
           },
           "409": {
-            "description": "Slot, revision or request key conflict",
+            "description": "Slot, revision or request key conflict. P10 codes: APPOINTMENT_SLOT_FULL (no place left in a 30-minute slot of the visit), APPOINTMENT_PET_OVERLAP (the pet has another visit in that time), APPOINTMENT_DOCTOR_BUSY.",
             "content": {
               "application/json": {
                 "schema": {
@@ -292,7 +292,7 @@
             }
           },
           "422": {
-            "description": "Invalid input or missing key",
+            "description": "Invalid input or missing key. P10 codes: APPOINTMENT_OUTSIDE_HOURS, APPOINTMENT_SLOT_MISALIGNED (not one of the slots of GET /appointments/availability).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1186,6 +1186,81 @@
           },
           "default": {
             "$ref": "#/components/responses/RequestFailed"
+          }
+        }
+      }
+    },
+    "/api/appointments/availability": {
+      "get": {
+        "operationId": "appointmentAvailability",
+        "summary": "Bookable slots of a day with places left",
+        "description": "P10. Slots come from the scheduling policy of the type: exams every 30 minutes from 08:00 with the visit ending by 17:30; Spa at the fixed times 09:00, 10:30, 13:30, 15:00, 16:30. `remaining` is the smallest number of free places over the 30-minute slots the visit covers, as the database counts them. Advisory only: POST /appointments is checked again and may answer 409 APPOINTMENT_SLOT_FULL. `doctorId` (staff only, booking.manage) adds the doctor's busy slots.",
+        "tags": [
+          "Appointments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "general_checkup",
+                "vaccination",
+                "dental",
+                "dermatology",
+                "surgery",
+                "hotel_consultation",
+                "spa_bath",
+                "spa_grooming",
+                "spa_combo",
+                "other"
+              ]
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Calendar date in Vietnam, YYYY-MM-DD."
+          },
+          {
+            "name": "doctorId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Staff only."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Slots of the day",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentAvailability"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ApiError"
           }
         }
       }
@@ -2129,6 +2204,67 @@
       }
     },
     "schemas": {
+      "AppointmentAvailability": {
+        "type": "object",
+        "required": [
+          "type",
+          "date",
+          "resourceGroup",
+          "durationMinutes",
+          "slots"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "resourceGroup": {
+            "type": "string",
+            "description": "Capacity is shared by the types of a group (exam, spa)."
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "minimum": 30
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "time",
+                "remaining",
+                "past",
+                "available"
+              ],
+              "properties": {
+                "time": {
+                  "type": "string",
+                  "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                },
+                "remaining": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "past": {
+                  "type": "boolean",
+                  "description": "The slot has already started (Vietnam time)."
+                },
+                "available": {
+                  "type": "boolean",
+                  "description": "remaining > 0, not past and, with doctorId, the doctor is free."
+                },
+                "doctorBusy": {
+                  "type": "boolean",
+                  "description": "Only with doctorId."
+                }
+              }
+            }
+          }
+        }
+      },
       "Error": {
         "type": "object",
         "required": [

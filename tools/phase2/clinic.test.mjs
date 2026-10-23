@@ -23,6 +23,7 @@ import {readFileSync} from 'node:fs';
 import {blobTestEnv} from './blob-test.mjs';
 import {blobStoreFromEnv} from '../../services/clinic/dist/blobStore.js';
 import {drainBlobCleanup,imageRetentionMs} from '../../services/clinic/dist/blobCleanup.js';
+import {liftAppointmentCapacity} from './appointment-capacity.mjs';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test','Use guarded phase2:test:clinic');
 Object.assign(process.env,blobTestEnv);// spawned Clinic processes use the dedicated test bucket
@@ -54,6 +55,7 @@ test.before(async()=>{
   for(const [service,db] of Object.entries({core,clinic,notification})){const [identity]=await db.$queryRaw`SELECT current_database() AS db,current_user AS role`;assert.equal(identity.db,`p2_${service}_test`);assert.equal(identity.role,`p2_${service}`);const [marker]=await db.$queryRaw`SELECT marker FROM public.p2_test_marker`;assert.equal(marker.marker,`pet-phase2-p1-test:${service}:v1`);execFileSync(process.execPath,['node_modules/prisma/build/index.js','migrate','deploy','--schema',service==='core'?'backend/prisma/schema.prisma':`services/${service}/prisma/schema.prisma`],{env:{...process.env,DATABASE_URL:urls[service]},stdio:'pipe'});}
   process.env.JWT_PRIVATE_KEY=keys.privateKey.export({type:'pkcs8',format:'pem'}).toString();process.env.JWT_PUBLIC_KEY=keys.publicKey.export({type:'spki',format:'pem'}).toString();process.env.JWT_ISSUER='p3-core';process.env.JWT_AUDIENCE='pet-healthcare';
   for(const [name,id,role] of [['owner',owner,'owner'],['other',other,'owner'],['admin',admin,'admin'],['doctor',doctor,'doctor'],['staff',staff,'staff']]){await core.user.create({data:{id,role,fullName:`P3 ${name} ${run}`,passwordHash:'fixture',passwordSalt:'fixture',email:id+'@example.invalid',phone:'p3-phone-'+id}});tokens[name]=signToken(id,role);}
+  await liftAppointmentCapacity(clinic);
   pet=await core.pet.create({data:{ownerId:owner,name:'P3 pet '+run,species:'dog',breed:'P3 breed '+run,microchipId:'P3 chip '+run,allergies:[]}});otherPet=await core.pet.create({data:{ownerId:other,name:'Other P3 '+run,species:'cat',allergies:[]}});
   corePort=await freePort();coreUrl=`http://127.0.0.1:${corePort}`;
   for(let i=0;i<2;i++){const port=await freePort(),base=`http://127.0.0.1:${port}`;bases.push(base);await processHandle('services/clinic/dist/index.js',{DATABASE_URL:urls.clinic,PORT:String(port),CORE_SERVICE_URL:coreUrl,CLINIC_SERVICE_TOKEN:credential},async()=>{try{return(await fetch(base+'/health/ready',{signal:AbortSignal.timeout(500)})).ok;}catch{return false;}});}
@@ -80,8 +82,8 @@ test('exam/Spa slot unique across replicas; cancelled slot frees; status/revisio
   await clinic.appointmentReservation.updateMany({where:{appointmentId:a.id},data:{state:'RELEASED'}});
   a=status(await request(`/api/appointments/${a.id}/undo-status`,{method:'POST',token:tokens.admin,body:{expectedRevision:a.statusRevision,reason:'Fixture undo'}}),200).appointment;assert.equal(a.status,'confirmed');
   const history=status(await request(`/api/appointments/${a.id}/status-history`,{token:tokens.staff}),200);assert.equal(history.length,3);assert.equal(history[0].action,'undo');assert.ok(history[0].reversesId);status(await request(`/api/appointments/${a.id}/status-history`),403);
-  a=status(await request(`/api/appointments/${a.id}/reschedule`,{method:'PATCH',body:{date,time:'09:15',expectedRevision:a.statusRevision}}),200).appointment;
-  a=status(await request(`/api/appointments/${a.id}/cancel`,{method:'PATCH',body:{expectedRevision:a.statusRevision}}),200).appointment;assert.equal(a.status,'cancelled');await create('09:15',{type:'spa_combo'});
+  a=status(await request(`/api/appointments/${a.id}/reschedule`,{method:'PATCH',body:{date,time:'15:00',expectedRevision:a.statusRevision}}),200).appointment;
+  a=status(await request(`/api/appointments/${a.id}/cancel`,{method:'PATCH',body:{expectedRevision:a.statusRevision}}),200).appointment;assert.equal(a.status,'cancelled');await create('15:00',{type:'spa_combo'});
 });
 test('medical creation and appointment completion/history/outbox/dedup atomic; two-process replay and real SQL fault rollback',async()=>{
   let a=await create('10:00');a=await change(a,'confirmed');a=await change(a,'checked_in');const key=randomUUID(),body=record(a);
@@ -219,6 +221,54 @@ test('P02 medical record optimistic lock: stale saves and deletes are refused wi
   status(await request(path+'?expectedRevision=3',{method:'DELETE',token:tokens.admin}),204);
   const history=status(await request(path+'/history',{token:tokens.admin}),200).items;
   assert.deepEqual(history.map(r=>[r.action,r.recordRevision]),[['create',0],['update',1],['update',2],['update',3],['delete',3]]);
+});
+test('P10 scheduling: hours and slot grid, slot capacity under concurrency, pet and doctor overlap, cancel frees a place, availability',async()=>{
+  // A date of this run only, so the capacity set below applies to fresh slots.
+  const day=new Date(Date.UTC(2040,0,1)+(parseInt(run.slice(0,6),16)%7000)*86400000).toISOString().slice(0,10);
+  const pets=[];for(let i=0;i<11;i++)pets.push(await core.pet.create({data:{ownerId:owner,name:`P10 pet ${i} ${run}`,species:'dog',allergies:[]}}));
+  const book=(petId,time,extras={},options={})=>request('/api/appointments',{method:'POST',key:randomUUID(),body:{petId,type:'general_checkup',date:day,time,serviceName:'P10 '+run,...extras},...options});
+  for(const [time,extras,code] of [['03:00',{},'APPOINTMENT_OUTSIDE_HOURS'],['17:30',{},'APPOINTMENT_OUTSIDE_HOURS'],['16:00',{type:'surgery'},'APPOINTMENT_OUTSIDE_HOURS'],['09:10',{},'APPOINTMENT_SLOT_MISALIGNED'],['11:00',{type:'spa_bath'},'APPOINTMENT_SLOT_MISALIGNED']])
+    assert.equal(status(await book(pets[0].id,time,extras),422).code,code,time);
+  // Ten bookings of one exam slot race on two Clinic processes for three places.
+  await clinic.appointmentResourceGroup.update({where:{resourceGroup:'exam'},data:{capacity:3}});
+  let raced;try{raced=await Promise.all(pets.slice(0,10).map((p,i)=>book(p.id,'09:00',{},{base:bases[i%2]})));}
+  finally{await clinic.appointmentResourceGroup.update({where:{resourceGroup:'exam'},data:{capacity:1000}});}
+  assert.deepEqual(raced.map(r=>r.status).sort(),[201,201,201,409,409,409,409,409,409,409]);
+  assert.ok(raced.filter(r=>r.status===409).every(r=>r.body.code==='APPOINTMENT_SLOT_FULL'),JSON.stringify(raced.map(r=>r.body)));
+  const nine=new Date(day+'T09:00:00+07:00'),slot=await clinic.appointmentSlotUsage.findUniqueOrThrow({where:{resourceGroup_slotStart:{resourceGroup:'exam',slotStart:nine}}});
+  assert.deepEqual([slot.booked,slot.capacity],[3,3]);
+  // A writer that bypasses the service is refused by the same database rule.
+  await assert.rejects(clinic.appointment.create({data:{petId:pets[10].id,ownerId:owner,type:'vaccination',serviceName:'P10 bypass',clinicName:'Fixture',appointmentDate:new Date(day+'T00:00:00Z'),appointmentTime:'09:00'}}),/APPOINTMENT_SLOT_FULL/);
+  // Availability reports the full slot; cancelling one booking frees its place for another pet.
+  const slotsOf=async(query,token)=>status(await request('/api/appointments/availability?'+query,token?{token}:{}),200);
+  let view=await slotsOf(`type=vaccination&date=${day}`);
+  assert.deepEqual([view.slots[0].time,view.slots.at(-1).time,view.durationMinutes,view.resourceGroup],['08:00','17:00',30,'exam']);
+  assert.deepEqual(view.slots.find(s=>s.time==='09:00'),{time:'09:00',remaining:0,past:false,available:false});
+  const won=raced.flatMap((r,i)=>r.status===201?[r.body.appointment]:[]),refused=pets[raced.findIndex(r=>r.status===409)];
+  status(await request(`/api/appointments/${won[0].id}/cancel`,{method:'PATCH',body:{expectedRevision:won[0].statusRevision}}),200);
+  assert.equal((await slotsOf(`type=vaccination&date=${day}`)).slots.find(s=>s.time==='09:00').remaining,1);
+  status(await book(refused.id,'09:00'),201);
+  // Moving a booking into a full slot is refused and the booking keeps its time.
+  const moved=status(await book(pets[10].id,'10:00'),201).appointment;
+  assert.equal(status(await request(`/api/appointments/${moved.id}/reschedule`,{method:'PATCH',body:{date:day,time:'09:00',expectedRevision:moved.statusRevision}}),409).code,'APPOINTMENT_SLOT_FULL');
+  assert.equal((await clinic.appointment.findUniqueOrThrow({where:{id:moved.id}})).appointmentTime,'10:00');
+  // A pet is never in two visits at once; the visit right after is fine (half-open ranges).
+  status(await book(pets[1].id,'10:30',{type:'spa_bath'}),201);
+  assert.equal(status(await book(pets[1].id,'11:00'),409).code,'APPOINTMENT_PET_OVERLAP');
+  status(await book(pets[1].id,'12:00'),201);
+  // A doctor sees one pet at a time; only staff may ask for a doctor's busy slots.
+  const vet=randomUUID();await core.user.create({data:{id:vet,role:'doctor',fullName:'P10 doctor '+run,passwordHash:'fixture',passwordSalt:'fixture'}});
+  status(await book(pets[2].id,'14:00',{doctorId:vet}),201);
+  assert.equal(status(await book(pets[3].id,'14:00',{doctorId:vet}),409).code,'APPOINTMENT_DOCTOR_BUSY');
+  status(await book(pets[3].id,'14:30',{doctorId:vet}),201);
+  status(await request(`/api/appointments/availability?type=general_checkup&date=${day}&doctorId=${vet}`),403);
+  view=await slotsOf(`type=general_checkup&date=${day}&doctorId=${vet}`,tokens.staff);
+  assert.deepEqual(view.slots.filter(s=>s.doctorBusy).map(s=>s.time),['14:00','14:30']);
+  // Spa offers its five fixed slots of 90 minutes and shares places across the Spa types.
+  view=await slotsOf(`type=spa_combo&date=${day}`);
+  assert.deepEqual(view.slots.map(s=>s.time),['09:00','10:30','13:30','15:00','16:30']);
+  assert.deepEqual([view.durationMinutes,view.resourceGroup,view.slots[1].remaining],[90,'spa',999]);
+  status(await request('/api/appointments/availability?type=haircut&date='+day),422);
 });
 test('AQ-09 guarded tool moves legacy base64 images into the bucket; list payload carries claims, not content; orphans reported',{timeout:60000},async()=>{
   const tool=(...args)=>JSON.parse(execFileSync(process.execPath,['tools/phase2/migrate-medical-images.mjs',...args],{env:{...process.env,DATABASE_URL:urls.clinic},encoding:'utf8'}));

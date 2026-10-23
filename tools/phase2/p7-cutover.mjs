@@ -4,8 +4,10 @@ import {validateMigration,assertFrozenSource} from './p7-migration.mjs';
 
 const targetKinds=['core','clinic','notification'];
 // AppointmentQueryEpoch: read by the aggregate cache, written only by its
-// SECURITY DEFINER trigger, so runtime gets SELECT and no DML.
-function runtimeTables(kind){const names=[...targets[kind],...(kind==='clinic'?['OutboxEvent','RequestDedup','ClinicReadRevision','AppointmentReadRow','AppointmentDailySummary','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','MedicalRecordRevision','AppointmentQueryEpoch','BlobCleanup','MedicalImageDeletion']:kind==='notification'?['RequestDedup','SessionRevocation']:[])];return [...new Set(names.map(n=>catalogs[kind][n].table))];}
+// SECURITY DEFINER trigger, so runtime gets SELECT and no DML. The same holds for
+// the P10 scheduling policy (migration seed) and slot tables (appointment_schedule_sync).
+const schedulingTables=['AppointmentResourceGroup','AppointmentTypePolicy','AppointmentSlotUsage','AppointmentPetSlot','AppointmentDoctorSlot'];
+function runtimeTables(kind){const names=[...targets[kind],...(kind==='clinic'?['OutboxEvent','RequestDedup','ClinicReadRevision','AppointmentReadRow','AppointmentDailySummary','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','MedicalRecordRevision','AppointmentQueryEpoch','BlobCleanup','MedicalImageDeletion',...schedulingTables]:kind==='notification'?['RequestDedup','SessionRevocation']:[])];return [...new Set(names.map(n=>catalogs[kind][n].table))];}
 // Exact runtime ACL statements. role/schema must already be quoted identifiers.
 // Exported so guarded trial harnesses test these grants, not a copied variant.
 export function runtimeGrantStatements(kind,role,write,schema='runtime'){
@@ -15,7 +17,7 @@ export function runtimeGrantStatements(kind,role,write,schema='runtime'){
   statements.push(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA ${schema} FROM ${role}`);
   statements.push(`GRANT SELECT ON ${runtimeTables(kind).map(q).concat(schema+'."_prisma_migrations"').join(',')} TO ${role}`);
   if(write){
-    const writable=runtimeTables(kind).filter(t=>kind!=='clinic'||!['ClinicReadRevision','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','AppointmentDailySummary','medical_record_revisions','medical_image_deletions','AppointmentQueryEpoch'].includes(t));
+    const writable=runtimeTables(kind).filter(t=>kind!=='clinic'||!['ClinicReadRevision','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','AppointmentDailySummary','medical_record_revisions','medical_image_deletions','AppointmentQueryEpoch',...schedulingTables.map(n=>catalogs.clinic[n].table)].includes(t));
     statements.push(`GRANT INSERT,UPDATE,DELETE ON ${writable.map(q).join(',')} TO ${role}`);
     if(kind==='clinic')statements.push(`GRANT INSERT,UPDATE ON ${q('ClinicReadRevision')} TO ${role}`,`GRANT UPDATE ("lockAnchor") ON ${q('ReadProjectionControl')} TO ${role}`,
       // Projector counters: atomic upsert/decrement only, zero rows are kept.

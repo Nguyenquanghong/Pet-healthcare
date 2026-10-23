@@ -23,7 +23,7 @@ test('D4 real stack: source -> summary via operator control, catch-up through wo
   await login(page,'admin');
   let r=await show(page);expect(r.status).toBe(200);expect(r.body.meta.source).toBe('source');expect(r.body.current.total).toBe(0);
   expect(r.headers['cache-control']).toBe('no-store');
-  const a=await appointment(page,0,'general_checkup','2040-05-10','09:00');await appointment(page,1,'spa_bath','2040-05-10','10:00');await appointment(page,2,'vaccination','2040-05-11','11:00');
+  const a=await appointment(page,0,'general_checkup','2040-05-10','09:00');await appointment(page,1,'spa_bath','2040-05-10','10:30');await appointment(page,2,'vaccination','2040-05-11','11:00');
   await controls({activityMode:'summary'});await expect.poll(()=>observed().activityMode).toBe('summary');
   // Background evidence (row audit 2s, summary audit 30s) + worker catch-up decide eligibility.
   await expect.poll(async()=>{const b=await state(page);return `${b.meta.source}:${b.current.total}`;},{timeout:60000,intervals:[500,1000,2000]}).toBe('summary:3');

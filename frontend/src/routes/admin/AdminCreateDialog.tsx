@@ -7,6 +7,7 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Textarea } from "../../components/ui/Textarea";
+import { SlotPicker } from "../../components/ui/SlotPicker";
 import { appointmentServiceOptions, spaServiceOptions, hotelServiceOptions } from "../../data/services";
 import { apiClient } from "../../services/apiClient";
 import { useAppStore } from "../../store/AppStoreProvider";
@@ -281,7 +282,7 @@ function AdminCreateDialog({ kind, onClose, onCreated }: { kind: Kind; onClose: 
                 <Select id="reception-service" label="Dịch vụ" value={type} options={services.map(item => ({ value: item.type, label: item.label }))} onChange={e => setType(e.target.value as AppointmentType)} />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Input id="reception-date" label="Ngày hẹn" type="date" min={todayVietnam()} required value={date} onChange={e => setDate(e.target.value)} />
-                  <Input id="reception-time" label="Giờ hẹn" type="time" required value={time} onChange={e => setTime(e.target.value)} />
+                  <SlotPicker id="reception-time" label="Giờ hẹn" required type={type} date={date} value={time} onChange={setTime} />
                 </div>
                 <p className="text-sm text-slate-500">Giá tham khảo: {formatCurrency(service.estimatedPrice)}. Phí cuối cùng được chốt trên hóa đơn sau khi sử dụng dịch vụ.</p>
               </> : <>
