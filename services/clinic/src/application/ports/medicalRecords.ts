@@ -47,9 +47,10 @@ export interface MedicalRecordRepository {
   delete(id: string, actor: Actor): Promise<void>;
   history(recordId: string): Promise<MedicalRevisionValue[]>;
   createImage(data: MedicalImageWrite): Promise<MedicalImageValue>;
-  // Deletes the row and queues its object for removal in one transaction.
-  deleteImage(id: string): Promise<{ storageKey: string | null }>;
-  completeBlobCleanup(storageKey: string): Promise<void>;
+  // AQ-09 retention: tombstone + deletion log + cleanup claim due after the window, in one transaction.
+  deleteImage(id: string, actor: Actor): Promise<void>;
+  // Clears the tombstone and cancels the cleanup claim while the window is open.
+  restoreImage(id: string, actor: Actor): Promise<void>;
   completeAppointment(id: string, actor: Actor): Promise<void>;
 }
 

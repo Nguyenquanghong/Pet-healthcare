@@ -20,7 +20,7 @@ test('medical list compatibility preserves owner scope and redacts records and l
 test('medical image list retains scoped pagination, signs a valet key per stored image and exposes no storage fields',async()=>{
   const image={id:'image',ownerId:actor.sub,petId:'pet-a',title:'Fixture',imageUrl:null,storageKey:'images/image',sizeBytes:8,sha256:'a'.repeat(64),mimeType:'image/png',createdAt:new Date('2028-02-01')};
   const blobs={signedGetUrl:key=>({url:'https://blob.test/'+key,expiresAt:new Date('2028-02-01T00:05:00Z')})};
-  const tx={medicalImage:{count:async({where})=>{assert.deepEqual(where,{ownerId:actor.sub});return 1;},findMany:async query=>{
+  const tx={medicalImage:{count:async({where})=>{assert.deepEqual(where,{deletedAt:null,ownerId:actor.sub});return 1;},findMany:async query=>{
     assert.deepEqual(query.orderBy,[{createdAt:'desc'},{id:'desc'}]);assert.equal(query.skip,0);assert.equal(query.take,20);return[image];
   }}};
   const db={$transaction:async(work,options)=>{assert.deepEqual(options,{isolationLevel:'RepeatableRead'});return work(tx);}};

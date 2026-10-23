@@ -47,7 +47,7 @@ export async function list(db:ListDatabase,resource:Resource,actor:Actor,directo
       const where:Prisma.MedicalRecordWhereInput={...scope,...identity,...(q.q?{OR:[...joined,text('title'),text('doctorName'),text('diagnosis')]}:{})};
       total=await tx.medicalRecord.count({where});records=await tx.medicalRecord.findMany({where,...bounds,orderBy:[{visitDate:'desc'},{id:'desc'}]});appointments=await tx.appointment.findMany({where:{id:{in:records.flatMap(r=>r.appointmentId?[r.appointmentId]:[])},...(ownerId?{ownerId}:{})}});
     }else{
-      const where:Prisma.MedicalImageWhereInput={...identity,...(actor.role==='owner'?{ownerId:actor.sub}:{}),...(q.petId?{petId:q.petId as string}:{}),...(q.q?{OR:[text('title'),{petId:{in:petMatches}}]}:{})};
+      const where:Prisma.MedicalImageWhereInput={...identity,deletedAt:null,...(actor.role==='owner'?{ownerId:actor.sub}:{}),...(q.petId?{petId:q.petId as string}:{}),...(q.q?{OR:[text('title'),{petId:{in:petMatches}}]}:{})};
       total=await tx.medicalImage.count({where});images=await tx.medicalImage.findMany({where,...bounds,orderBy:[{createdAt:'desc'},{id:'desc'}],select:imageColumns});
     }
     const projection=q.petId?await tx.directoryProjection.findUnique({where:{kind_id:{kind:'pet',id:q.petId as string}},select:{sourceVersion:true,deletedAt:true}}):null;

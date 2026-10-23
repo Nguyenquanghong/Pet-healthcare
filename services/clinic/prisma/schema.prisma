@@ -152,11 +152,34 @@ model MedicalImage {
   sha256    String?
   mimeType  String   @map("mime_type")
   createdAt DateTime @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+  deletedBy String?  @map("deleted_by")
 
   @@index([petId])
   @@index([petId, createdAt, id], map: "medical_images_pet_page_idx")
   @@index([ownerId, createdAt, id], map: "medical_images_owner_page_idx")
   @@map("medical_images")
+}
+
+// AQ-09 retention: a deleted image is a tombstone (deleted_at) for the retention
+// window, restorable by an admin; the worker then removes the row and its object.
+// Append-only log of delete/restore/purge; a trigger blocks UPDATE/DELETE and the
+// runtime role only has INSERT/SELECT.
+model MedicalImageDeletion {
+  id         String   @id @default(uuid())
+  imageId    String   @map("image_id")
+  action     String
+  petId      String   @map("pet_id")
+  ownerId    String   @map("owner_id")
+  storageKey String?  @map("storage_key")
+  sha256     String?
+  sizeBytes  Int?     @map("size_bytes")
+  actorId    String   @map("actor_id")
+  actorRole  String   @map("actor_role")
+  at         DateTime @default(now())
+
+  @@index([imageId, at, id], map: "medical_image_deletions_image_idx")
+  @@map("medical_image_deletions")
 }
 
 // AQ-09: bucket objects whose image row is gone but whose delete has not been
