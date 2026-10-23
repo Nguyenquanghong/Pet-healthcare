@@ -19,6 +19,8 @@ import { CoreSendAuthorization } from '../../services/notification/dist/coreAuth
 import { ManualSend } from '../../services/notification/dist/manualSend.js';
 import { createPublicRescueDependencies } from '../../backend/dist/src/infrastructure/persistence/publicRescueRepository.js';
 import { validate, responseSchema } from './openapi-validate.mjs';
+import { PrismaHotelPendingExpiryStore } from '../../backend/dist/src/infrastructure/persistence/hotelPendingExpiryStore.js';
+import { expiryBounds } from '../../backend/dist/src/domain/hotelPendingExpiry.js';
 import { readFileSync as readSpec } from 'node:fs';
 import { writeNotification as clinicNotification } from '../../services/clinic/dist/notificationOutbox.js';
 import { OutboxRelay as ClinicRelay } from '../../services/clinic/dist/relay.js';
@@ -330,6 +332,40 @@ test('AQ-10 capacity: the database refuses the booking beyond rooms per type and
   } finally {
     await core.hotelBooking.deleteMany({ where: { petId: { in: pets.map(p => p.id) } } });
     await core.$executeRaw`UPDATE hotel_room_capacity SET capacity = 1000`; await core.$executeRaw`UPDATE hotel_room_nights SET capacity = 1000`;
+  }
+});
+test('AQ-10 pending expiry: an unconfirmed stay past 48 h or noon of its check-in day is cancelled by the system and frees its nights', async () => {
+  const store = new PrismaHotelPendingExpiryStore(core), now = new Date(), hour = 3600000;
+  const date = ms => new Date(new Date(ms).toISOString().slice(0, 10) + 'T00:00:00.000Z');
+  const pets = await Promise.all([1, 2, 3, 4].map(i => core.pet.create({ data: { ownerId: owner, name: 'AQ-10 expiry pet ' + i, species: 'dog', allergies: [] } })));
+  const far = 4000 * 86400000 + Math.floor(Math.random() * 1000) * 86400000;
+  const row = (pet, checkIn, createdAt, status = 'pending') => core.hotelBooking.create({ data: { petId: pet.id, ownerId: owner, checkIn, checkOut: new Date(checkIn.getTime() + 2 * 86400000), nights: 2, roomType: 'deluxe', serviceKeys: [], totalAmount: 1, status, createdAt } });
+  const old = await row(pets[0], date(now.getTime() + far), new Date(now.getTime() - 49 * hour));
+  const today = await row(pets[1], date(now.getTime() - 86400000), now); // check-in already passed its noon
+  const fresh = await row(pets[2], date(now.getTime() + far + 10 * 86400000), now);
+  const confirmed = await row(pets[3], date(now.getTime() + far + 20 * 86400000), new Date(now.getTime() - 72 * hour), 'confirmed');
+  const booked = async b => (await core.hotelRoomNight.findMany({ where: { roomType: 'deluxe', night: { gte: b.checkIn, lt: b.checkOut } } })).map(n => n.booked);
+  try {
+    const before = await booked(old);
+    const due = await store.duePending(expiryBounds(now), 100000);
+    assert.ok(due.includes(old.id) && due.includes(today.id), 'both expired stays are due');
+    assert.ok(!due.includes(fresh.id) && !due.includes(confirmed.id), 'a fresh or confirmed stay is not');
+    assert.equal(await store.expire(old.id, now), true);
+    assert.equal(await store.expire(old.id, now), false, 'expiring twice changes nothing');
+    assert.equal(await store.expire(fresh.id, now), false);
+    assert.equal(await store.expire(confirmed.id, now), false);
+    assert.equal(await store.expire(today.id, now), true);
+    const after = await core.hotelBooking.findUniqueOrThrow({ where: { id: old.id } });
+    assert.equal(after.status, 'cancelled'); assert.equal(after.statusRevision, old.statusRevision + 1);
+    assert.deepEqual((await booked(old)).map((n, i) => before[i] - n), [1, 1], 'its two nights are freed');
+    const event = await core.bookingStatusEvent.findFirstOrThrow({ where: { kind: 'hotel', bookingId: old.id } });
+    assert.deepEqual([event.action, event.fromStatus, event.toStatus, event.actorRole, event.revision], ['expired', 'pending', 'cancelled', 'system', after.statusRevision]);
+    const notice = (await core.outboxEvent.findMany({ where: { envelope: { path: ['payload', 'relatedBookingId'], equals: old.id } } }))[0];
+    assert.equal(notice?.envelope.payload.recipientOwnerId, owner);
+    assert.equal((await core.hotelBooking.findUniqueOrThrow({ where: { id: fresh.id } })).status, 'pending');
+    assert.equal((await core.hotelBooking.findUniqueOrThrow({ where: { id: confirmed.id } })).status, 'confirmed');
+  } finally {
+    await core.hotelBooking.deleteMany({ where: { petId: { in: pets.map(p => p.id) } } });
   }
 });
 test('AQ-07: real responses through Core match the public OpenAPI contract the frontend types are generated from', async () => {

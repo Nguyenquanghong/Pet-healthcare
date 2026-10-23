@@ -11,7 +11,7 @@ const labels: Record<string, string> = { pending: "Chờ xác nhận", confirmed
   in_progress: "Đang thực hiện", completed: "Hoàn thành dịch vụ", in_stay: "Đang lưu trú", checked_out: "Đã trả thú cưng",
   cancelled: "Đã hủy lịch", rejected: "Đã từ chối", no_show: "Vắng mặt" };
 const actionLabels: Record<string, string> = { transition: "Chuyển trạng thái", undo: "Hoàn tác thao tác nhầm", medical_completed: "Hoàn thành khi lưu bệnh án",
-  note_updated: "Cập nhật ghi chú", cancelled: "Hủy lịch", rescheduled: "Đổi lịch" };
+  note_updated: "Cập nhật ghi chú", cancelled: "Hủy lịch", rescheduled: "Đổi lịch", expired: "Tự hủy do quá hạn xác nhận" };
 type Entry = { id: string; action: string; fromStatus: string; toStatus: string; actorName: string; actorRole: string;
   reason: string | null; reversesId: string | null; createdAt: string };
 export type StatusDialogSelection = { booking: Appointment | HotelBooking; intent: string; pet?: Pet; owner?: Owner };
