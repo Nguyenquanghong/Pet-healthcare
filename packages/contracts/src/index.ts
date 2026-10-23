@@ -3,6 +3,17 @@ export * from './permissions.js';
 export * from './notificationCategories.js';
 export const eventTypes = ['notification.requested.v1', 'billing.invoice-issued.v1', 'billing.operation-aborted.v1', 'directory.owner-upserted.v1', 'directory.pet-upserted.v1', 'directory.staff-upserted.v1', 'clinic.appointment-read-changed.v1', 'identity.sessions-revoked.v1'] as const;
 export type EventType = typeof eventTypes[number];
+// F7: the event types each consumer applies, named one by one. A new type reaches a
+// consumer only once it is listed here and the consumer handles it explicitly.
+export const consumedEvents = {
+  notification: ['notification.requested.v1', 'identity.sessions-revoked.v1'],
+  clinic: ['directory.owner-upserted.v1', 'directory.pet-upserted.v1', 'directory.staff-upserted.v1', 'billing.invoice-issued.v1', 'billing.operation-aborted.v1'],
+  'clinic-read-v1': ['clinic.appointment-read-changed.v1'],
+} as const satisfies Record<string, readonly EventType[]>;
+export type EventConsumer = keyof typeof consumedEvents;
+export function consumes(consumer: EventConsumer, eventType: string): boolean {
+  return (consumedEvents[consumer] as readonly string[]).includes(eventType);
+}
 export interface Envelope {
   eventId: string; eventType: EventType; schemaVersion: 1; producer: 'core' | 'clinic';
   aggregateType: string; aggregateId: string; aggregateVersion: number; occurredAt: string; correlationId: string;

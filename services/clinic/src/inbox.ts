@@ -1,12 +1,14 @@
 import type { PrismaClient } from './generated/client/index.js';
-import { parseEnvelope, type DirectoryEntry } from '@nipopeto/contracts';
+import { consumes, parseEnvelope, type DirectoryEntry } from '@nipopeto/contracts';
 import { applyBillingTerminal } from './runtimeBilling.js';
+import { billingOutcome } from './billingEvents.js';
 export type ProjectionEntry=DirectoryEntry&{email?:string|null;microchipId?:string|null};
 export class ClinicInbox {
   constructor(private readonly db: PrismaClient,private readonly hydrate?:(kind:string,p:DirectoryEntry)=>Promise<ProjectionEntry>) {}
   async apply(raw: string) {
     const event = parseEnvelope(raw);
-    if (!event.eventType.startsWith('directory.') && !event.eventType.startsWith('billing.')) throw new Error('UNSUPPORTED_EVENT');
+    const billing = billingOutcome(event.eventType);
+    if (!consumes('clinic', event.eventType) || (event.eventType.startsWith('billing.') && !billing)) throw new Error('UNSUPPORTED_EVENT');
     // A committed inbox row already proves completion. Duplicate delivery must
     // not depend on Core being available again merely to ACK the same event.
     if(await this.db.inboxEvent.findUnique({where:{consumerName_eventId:{consumerName:'clinic-v1',eventId:event.eventId}}}))return false;
@@ -25,11 +27,11 @@ export class ClinicInbox {
           ON CONFLICT (kind,id) DO UPDATE SET "sourceVersion" = EXCLUDED."sourceVersion", "displayName" = EXCLUDED."displayName", "ownerId" = EXCLUDED."ownerId", species = EXCLUDED.species, phone=EXCLUDED.phone,breed=EXCLUDED.breed,email=EXCLUDED.email,"microchipId"=EXCLUDED."microchipId","updatedAt"=now(), "deletedAt" = EXCLUDED."deletedAt" WHERE "DirectoryProjection"."sourceVersion" < EXCLUDED."sourceVersion"`;
       } else {
         const p = event.payload as Record<string, string>;
-        if(p.appointmentId){await applyBillingTerminal(tx,p.operationId!,{state:event.eventType==='billing.invoice-issued.v1'?'COMMITTED':'ABORTED',appointmentId:p.appointmentId,invoiceId:p.invoiceId});return true;}
+        if(p.appointmentId){await applyBillingTerminal(tx,p.operationId!,{state:billing!.terminal,appointmentId:p.appointmentId,invoiceId:p.invoiceId});return true;}
         const r = await tx.billingReservation.findUniqueOrThrow({ where: { operationId: p.operationId } });
         await tx.$queryRaw`SELECT id FROM "ProofAppointment" WHERE id = ${r.appointmentId} FOR UPDATE`;
         const current = await tx.billingReservation.findUniqueOrThrow({ where: { operationId: p.operationId } });
-        const state = event.eventType === 'billing.invoice-issued.v1' ? 'INVOICED' : 'RELEASED';
+        const state = billing!.reservation;
         if (current.state !== 'HELD' && (current.state !== state || (state === 'INVOICED' && current.invoiceId !== p.invoiceId))) throw new Error('TERMINAL_CONFLICT');
         if (current.state === 'HELD') await tx.billingReservation.update({ where: { operationId: p.operationId }, data: { state, invoiceId: p.invoiceId } });
       }
