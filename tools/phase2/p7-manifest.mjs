@@ -4,7 +4,9 @@ import {Prisma as Notification} from '../../services/notification/src/generated/
 import {createHash} from 'node:crypto';
 import {ident} from './p7-environment.mjs';
 
-const coreNames=['User','OwnerActivation','Pet','HotelBooking','HotelBookingRequest','BookingStatusEvent','DailyCareNote','RescueReport','Invoice','InvoiceItem','PaymentAttempt','PaymentEvent','OutboxEvent','AppointmentBillingOperation'];
+// AQ-10: HotelRoomCapacity/HotelRoomNight are copied as-is (the import disables the
+// hotel_room_nights_sync trigger), so capacities and counted nights match the source.
+const coreNames=['User','OwnerActivation','Pet','HotelBooking','HotelBookingRequest','HotelRoomCapacity','HotelRoomNight','BookingStatusEvent','DailyCareNote','RescueReport','Invoice','InvoiceItem','PaymentAttempt','PaymentEvent','OutboxEvent','AppointmentBillingOperation'];
 const clinicNames=['Appointment','MedicalRecord','MedicalImage','BookingStatusEvent','AppointmentReservation','AppointmentBillingTerminal','DirectoryProjection','InboxEvent'];
 const descriptors=p=>Object.fromEntries(p.dmmf.datamodel.models.map(m=>[m.name,{model:m.name,table:m.dbName??m.name,fields:m.fields.filter(f=>f.kind!=='object').map(f=>({name:f.name,column:f.dbName??f.name,type:f.type,required:f.isRequired,list:f.isList,...(f.kind==='enum'?{enumValues:p.dmmf.datamodel.enums.find(e=>e.name===f.type).values.map(v=>v.name)}:{})})),keys:m.fields.some(f=>f.isId)?m.fields.filter(f=>f.isId).map(f=>f.dbName??f.name):(m.primaryKey?.fields??[]).map(name=>m.fields.find(f=>f.name===name)?.dbName??name)}]));
 export const catalogs={source:descriptors(Prisma),core:descriptors(Prisma),clinic:descriptors(Clinic),notification:descriptors(Notification)};

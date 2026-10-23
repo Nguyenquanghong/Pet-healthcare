@@ -33,6 +33,8 @@ const core=[ // [permission, method, path, body?]
   ['booking.manage','PATCH',`/api/hotel-bookings/${id}/status`,{status:'confirmed',expectedRevision:0}],
   ['booking.manage','GET',`/api/hotel-bookings/${id}/status-history`],
   ['hotel.care-note.write','POST',`/api/hotel-bookings/${id}/care-notes`,{note:'fixture'}],
+  ['booking.manage','GET','/api/hotel-capacity'],
+  ['hotel.capacity.manage','PUT','/api/hotel-capacity/standard',{capacity:10}],
   ['medical-record.write','POST','/api/medical-records',{petId:id}],
   ['medical-record.write','PATCH',`/api/medical-records/${id}`,{title:'fixture'}],
   ['medical-record.write','DELETE',`/api/medical-records/${id}`],

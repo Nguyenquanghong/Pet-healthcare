@@ -11,6 +11,7 @@ export const permissionMatrix = {
   'booking.manage': { roles: ['doctor', 'staff', 'admin'], denied: 'Chỉ nhân viên được thực hiện thao tác này.' },
   'booking.reopen': { roles: ['admin'], denied: 'Chỉ quản trị viên được mở lại dịch vụ đã hoàn thành.' },
   'hotel.care-note.write': { roles: ['doctor', 'staff', 'admin'], denied: 'Chỉ nhân viên được ghi nhật ký chăm sóc.' },
+  'hotel.capacity.manage': { roles: ['admin'], denied: 'Chỉ quản trị viên được đổi sức chứa phòng.' },
   'medical-record.write': { roles: ['doctor', 'admin'], denied: 'Chỉ bác sĩ hoặc quản trị viên được ghi bệnh án và ảnh y tế.' },
   'medical-record.history': { roles: ['doctor', 'staff', 'admin'], denied: 'Chỉ nhân viên được xem lịch sử bệnh án.' },
   'medical-record.restore': { roles: ['admin'], denied: 'Chỉ quản trị viên được khôi phục ảnh y tế đã xóa.' },

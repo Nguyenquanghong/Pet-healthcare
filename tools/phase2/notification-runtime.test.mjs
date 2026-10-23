@@ -87,6 +87,9 @@ test.before(async () => {
     const schema = service === 'core' ? 'backend/prisma/schema.prisma' : `services/${service}/prisma/schema.prisma`;
     execFileSync(process.execPath, ['node_modules/prisma/build/index.js','migrate','deploy','--schema',schema], { env: { ...process.env, DATABASE_URL: urls[service] }, stdio: 'pipe' });
   }
+  // AQ-10: this persistent test database accumulates active stays across runs; suites that do not test
+  // capacity run with 1000 rooms per type. The capacity test below sets and restores its own values.
+  await core.$executeRaw`UPDATE hotel_room_capacity SET capacity = 1000`; await core.$executeRaw`UPDATE hotel_room_nights SET capacity = 1000`;
   const [{ now }] = await core.$queryRaw`SELECT clock_timestamp() AS now`;
   runStartedAt = new Date(now.getTime() - 1000).toISOString();
   olderPending = await core.outboxEvent.findFirst({ where: { publishedAt: null, createdAt: { lt: new Date(runStartedAt) } }, select: { id: true } });
@@ -291,6 +294,41 @@ test('AQ-10 hotel stays: API 409 plus a database exclusion constraint for writer
   const cancelled = await core.hotelBooking.create({ data: row(10, 13, 'cancelled') });
   await assert.rejects(core.hotelBooking.update({ where: { id: cancelled.id }, data: { status: 'confirmed' } }), /hotel_bookings_pet_active_stay_excl|23P01/);
   await core.hotelBooking.create({ data: { ...row(10, 13), petId: pet.id } }); // another pet is independent
+});
+test('AQ-10 capacity: the database refuses the booking beyond rooms per type and night, under concurrency too', async () => {
+  // Far-future vip nights, unique per run, so earlier runs never share them.
+  const base = 3650 + Math.floor(Math.random() * 3000), day = n => new Date(Date.now() + 7 * 3600000 + (base + n) * 86400000).toISOString().slice(0, 10);
+  const pets = await Promise.all([1, 2, 3, 4, 5, 6].map(i => core.pet.create({ data: { ownerId: owner, name: 'AQ-10 capacity pet ' + i, species: 'cat', allergies: [] } })));
+  const body = (p, from, to) => ({ petId: p.id, checkIn: day(from), checkOut: day(to), roomType: 'vip', services: [] });
+  const nights = async () => Object.fromEntries((await core.hotelRoomNight.findMany({ where: { roomType: 'vip', night: { gte: new Date(day(0)), lt: new Date(day(6)) } }, orderBy: { night: 'asc' } })).map(n => [n.night.toISOString().slice(0, 10), n.booked]));
+  const created = [];
+  try {
+    for (const role of ['staff', 'doctor']) assert.match(requireStatus(await request('/api/hotel-capacity/vip', { method: 'PUT', token: tokens[role], body: { capacity: 1 } }), 403).error, /quản trị viên/);
+    assert.equal(requireStatus(await request('/api/hotel-capacity/vip', { method: 'PUT', token: tokens.admin, body: { capacity: 1 } }), 200).capacity.capacity, 1);
+    assert.deepEqual(requireStatus(await request('/api/hotel-capacity', { token: tokens.staff }), 200).items.map(i => i.roomType).sort(), ['deluxe', 'standard', 'vip']);
+    created.push(requireStatus(await request('/api/hotel-bookings', { method: 'POST', key: randomUUID(), body: body(pets[0], 0, 3) }), 201).booking);
+    assert.match(requireStatus(await request('/api/hotel-bookings', { method: 'POST', key: randomUUID(), body: body(pets[1], 2, 4) }), 409).error, /hết chỗ/);
+    created.push(requireStatus(await request('/api/hotel-bookings', { method: 'POST', key: randomUUID(), body: body(pets[1], 3, 5) }), 201).booking); // half-open: check-out night is free
+    assert.deepEqual(await nights(), { [day(0)]: 1, [day(1)]: 1, [day(2)]: 1, [day(3)]: 1, [day(4)]: 1 });
+    assert.match(requireStatus(await request('/api/hotel-capacity/vip', { method: 'PUT', token: tokens.admin, body: { capacity: 0 } }), 409).error, /đã đặt/);
+    // Cancelling frees the nights; reopening a stay (admin undo) needs a free room again.
+    const first = created[0];
+    const cancelled = requireStatus(await request(`/api/hotel-bookings/${first.id}/cancel`, { method: 'PATCH', token: tokens.admin, body: { expectedRevision: first.statusRevision } }), 200).booking;
+    assert.equal(cancelled.status, 'cancelled');
+    assert.deepEqual(await nights(), { [day(0)]: 0, [day(1)]: 0, [day(2)]: 0, [day(3)]: 1, [day(4)]: 1 });
+    // Five writers race for the one free night; the row lock + CHECK let exactly one in.
+    const race = await Promise.all(pets.slice(2, 6).concat(pets[0]).map(p => request('/api/hotel-bookings', { method: 'POST', key: randomUUID(), body: body(p, 1, 2) })));
+    assert.deepEqual(race.map(r => r.status).sort(), [201, 409, 409, 409, 409]);
+    created.push(...race.filter(r => r.status === 201).map(r => r.body.booking));
+    // A writer that bypasses the service (direct insert) is refused by the same CHECK.
+    await assert.rejects(core.hotelBooking.create({ data: { petId: pets[1].id, ownerId: owner, checkIn: new Date(day(1)), checkOut: new Date(day(2)), nights: 1, roomType: 'vip', serviceKeys: [], totalAmount: 1 } }), /hotel_room_nights_capacity_check/);
+    // The counters always equal the active stays they summarize.
+    const [drift] = await core.$queryRaw`SELECT count(*)::int AS n FROM hotel_room_nights n WHERE n.booked <> (SELECT count(*) FROM hotel_bookings b WHERE b.room_type = n.room_type AND b.status IN ('pending','confirmed','in_stay') AND b.check_in <= n.night AND b.check_out > n.night)`;
+    assert.equal(drift.n, 0);
+  } finally {
+    await core.hotelBooking.deleteMany({ where: { petId: { in: pets.map(p => p.id) } } });
+    await core.$executeRaw`UPDATE hotel_room_capacity SET capacity = 1000`; await core.$executeRaw`UPDATE hotel_room_nights SET capacity = 1000`;
+  }
 });
 test('legacy export/dry-run/import/verify preserve IDs/status/timestamps; resume and deleted/read rows never regress', async () => {
   const source = [];

@@ -75,7 +75,7 @@ test.after(async()=>{
 });
 
 test('fresh marked source and targets use non-owner roles; original monolith credentials and all legacy model fields are present',async()=>{
-  assert.equal(sourceNames.length,18);assert.equal((await db.legacy.appointment.findMany()).length,10);
+  assert.equal(sourceNames.length,20);// + AQ-10 HotelRoomCapacity, HotelRoomNightassert.equal((await db.legacy.appointment.findMany()).length,10);
   assert.ok(status(await request('/api/pets'),200).items.some(p=>p.id===fixture.pet.id));
   for(const kind of ['legacy','core','clinic','notification']){const [role]=await db[kind].$queryRaw`SELECT rolsuper,rolcreatedb,rolcreaterole FROM pg_roles WHERE rolname=current_user`;assert.deepEqual(role,{rolsuper:false,rolcreatedb:false,rolcreaterole:false});const owners=await db[kind].$queryRaw`SELECT tableowner FROM pg_tables WHERE schemaname='runtime'`;assert.ok(owners.every(r=>r.tableowner==='p2_bootstrap'));}
 });
@@ -87,7 +87,7 @@ test('maintenance blocks public writes; SQL fence waits for an actual in-flight 
   await assert.rejects(()=>db.legacy.$executeRaw`UPDATE runtime.daily_care_notes SET note=note`);
   snapshot=await exportMigration(ctx,{evidence:fixture.evidence});expected=buildMigration(snapshot,ctx);assert.equal(snapshot.tables.User.find(u=>u.id===fixture.users.owner.id).address,'P7 last in-flight value');writeFileSync(resolve(artifacts,'snapshot.json'),JSON.stringify(snapshot),{flag:'wx'});
 });
-test('real custom-format pg_dump restores successfully to a new database and all 18 models, IDs, decimals, JSON nulls and timestamps match',async()=>{
+test('real custom-format pg_dump restores successfully to a new database and all 20 models, IDs, decimals, JSON nulls and timestamps match',async()=>{
   const backup=await backupAndRestore(ctx);assert.ok(backup.bytes>1000);
   const restored=await exportMigration(ctx,{component:'restore',evidence:fixture.evidence});assert.equal(digest(restored.tables),digest(snapshot.tables));assert.deepEqual(restored.source.sequence,snapshot.source.sequence);writeFileSync(resolve(artifacts,'restore-report.json'),JSON.stringify({backup,models:18,tablesHash:digest(restored.tables),exact:true}));
 });

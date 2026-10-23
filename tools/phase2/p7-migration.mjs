@@ -120,8 +120,12 @@ export async function assertFrozenSource(ctx,snapshot){
     const [sequence]=await tx.$queryRaw`SELECT last_value::text,is_called FROM runtime.invoice_transfer_code_seq`;fail(digest(sequence)===digest(snapshot.source.sequence),'FROZEN_SEQUENCE_DRIFT');
   },{isolationLevel:'RepeatableRead',timeout:30000}),{admin:true});
 }
+// AQ-10: a fresh target already holds the migration's default room capacities; before
+// the import that seed counts as empty (the import replaces it with the source rows).
+const SEEDED={core:{HotelRoomCapacity:['standard','deluxe','vip']}};
+const onlySeed=(kind,name,rows)=>!!SEEDED[kind]?.[name]&&rows.map(r=>r.room_type).sort().join()===[...SEEDED[kind][name]].sort().join();
 async function compareComponent(db,kind,expected,{emptyAllowed=false}={}){
-  let empty=true,exact=true;const tables={};for(const name of targets[kind]){const actual=await readRows(db,catalogs[kind][name]);empty&&=actual.length===0;exact&&=digest(actual)===digest(expected[name]);tables[name]=reportTable(catalogs[kind][name],actual);}
+  let empty=true,exact=true;const tables={};for(const name of targets[kind]){const actual=await readRows(db,catalogs[kind][name]);empty&&=actual.length===0||onlySeed(kind,name,actual);exact&&=digest(actual)===digest(expected[name]);tables[name]=reportTable(catalogs[kind][name],actual);}
   fail(exact||emptyAllowed&&empty,'TARGET_COLLISION_OR_DRIFT');return {empty,exact,tables};
 }
 // This importer only runs under its existing source-freeze/marker/journal guard.
@@ -145,12 +149,16 @@ async function importMigrationLocked(ctx,snapshot,fault){
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(710007)::text`;
     const journals=await tx.$queryRaw`SELECT snapshot_hash FROM public.p7_import_journal`;fail(journals.every(j=>j.snapshot_hash===snapshot.sha256),'IMPORT_SNAPSHOT_REUSE');
     if(journals.length){await compareComponent(tx,kind,expected[kind]);if(kind==='clinic')await registerFrozenClinicReadRevisions(tx);return;}
+    // AQ-10: the target migration seeds default room capacities; the source's own rows replace them
+    // (rolled back with the transaction if the import fails).
+    if(kind==='core')await tx.$executeRawUnsafe('DELETE FROM runtime.hotel_room_capacity');
     const before=await compareComponent(tx,kind,expected[kind],{emptyAllowed:true});fail(before.empty,'TARGET_NOT_EMPTY');
-    if(kind==='core')for(const [table,prefix]of [['users','users'],['pets','pets']])for(const suffix of ['directory_revision','directory_event'])await tx.$executeRawUnsafe(`ALTER TABLE runtime.${ident(table)} DISABLE TRIGGER ${ident(prefix+'_'+suffix)}`);
+    if(kind==='core'){for(const [table,prefix]of [['users','users'],['pets','pets']])for(const suffix of ['directory_revision','directory_event'])await tx.$executeRawUnsafe(`ALTER TABLE runtime.${ident(table)} DISABLE TRIGGER ${ident(prefix+'_'+suffix)}`);await tx.$executeRawUnsafe('ALTER TABLE runtime.hotel_bookings DISABLE TRIGGER hotel_room_nights_sync');}
     for(const name of targets[kind]){await insertRows(tx,catalogs[kind][name],expected[kind][name]);await fault?.(kind,name);}
     if(kind==='clinic')await registerFrozenClinicReadRevisions(tx);
     if(kind==='core'){
       for(const [table,prefix]of [['users','users'],['pets','pets']])for(const suffix of ['directory_revision','directory_event'])await tx.$executeRawUnsafe(`ALTER TABLE runtime.${ident(table)} ENABLE TRIGGER ${ident(prefix+'_'+suffix)}`);
+      await tx.$executeRawUnsafe('ALTER TABLE runtime.hotel_bookings ENABLE TRIGGER hotel_room_nights_sync');
       const [codes]=await tx.$queryRaw`SELECT COALESCE(max(substring(transfer_code from '^NIPO([0-9]+)$')::bigint),0)::text AS maximum FROM runtime.invoices`;
       const maximum=BigInt(codes.maximum)>BigInt(snapshot.source.sequence.last_value)?codes.maximum:snapshot.source.sequence.last_value;
       await tx.$queryRawUnsafe(`SELECT setval('runtime.invoice_transfer_code_seq', $1::bigint, true)`,maximum);
