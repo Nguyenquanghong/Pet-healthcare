@@ -27,6 +27,7 @@ import { formatCurrency } from "../../utils/formatCurrency";
 import { bookingStatusLabels, eatingStatusLabels, labelOf, moodLabels } from "../../utils/statusLabels";
 import { compareBookingStatus } from "../../utils/bookingOrder";
 import { AdminCreateButton } from "./AdminCreateDialog";
+import { HotelCapacityPanel } from "./HotelCapacityPanel";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
@@ -123,6 +124,7 @@ export function AdminHotelBookingsPage() {
       <div className="mb-4 flex justify-end">
         <AdminCreateButton kind="hotel" onCreated={() => { setTab("all"); setRoomTypeFilter("all"); setSearchQuery(""); }} />
       </div>
+      <HotelCapacityPanel />
       {actionError && <p role="alert" className="fixed right-4 top-20 z-[100] max-w-md rounded-xl border border-rose-300 bg-white p-4 text-rose-700 shadow-lg">{actionError}</p>}
       {invoiceLoadError && <p role="alert" className="mb-4 text-sm text-rose-700">{invoiceLoadError} Không thể xác định điều kiện check-out.</p>}
       {statusDialog && <BookingStatusDialog kind="hotel" selection={statusDialog} onClose={() => setStatusDialog(null)} onSaved={() => toast("Đã lưu thao tác và lịch sử.")} />}
