@@ -1,5 +1,6 @@
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { authorize } from "../../domain/authorization.js";
 import { calendarDate } from "../../domain/validation.js";
 import type { ListsRepository, ListQuery, ListResource } from "../ports/lists.js";
 
@@ -46,14 +47,14 @@ export function parseListQuery(resource: ListResource, raw: Record<string, unkno
 export class ListsService {
   constructor(private readonly repository: ListsRepository) {}
   async load(resource: ListResource, actor: Actor, raw: Record<string, unknown>) {
-    if (resource === "owners" && actor.role === "owner") throw new BusinessError(403, "Owner directory is for staff only.");
+    if (resource === "owners") authorize(actor, "directory.read");
     const query = parseListQuery(resource, raw);
     const scope = actor.role === "owner" ? { ownerId: actor.sub } : resource === "notifications" ? { recipientRole: "admin" } : {};
     const result = await this.repository.page(resource, scope, query);
     return { ...result, pagination: { page: query.page, pageSize: query.pageSize, total: result.total, totalPages: Math.ceil(result.total / query.pageSize) } };
   }
   async billingFigures(actor: Actor, rawMonth: unknown) {
-    if (actor.role === "owner") throw new BusinessError(403, "Billing analytics is for staff only.");
+    authorize(actor, "billing.audit");
     if (rawMonth !== undefined && (typeof rawMonth !== "string" || !/^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(rawMonth))) throw new BusinessError(422, "Invalid month.");
     return this.repository.billingFigures(rawMonth as string | undefined);
   }

@@ -1,5 +1,6 @@
 import type { MedicalImage } from "../../types/medicalImage";
 import { MedicalImageView } from "../../components/MedicalImageView";
+import { useSession } from "../../store/SessionContext";
 import { usePagedList } from "../../services/usePagedList";
 import { Pagination } from "../../components/ui/Pagination";
 import { PetLookup, PagedSelect } from "../../components/ui/PagedSelect";
@@ -32,6 +33,7 @@ import type { MedicalRecord } from "../../types/medicalRecord";
 import { useRequestIntent } from '../../services/useRequestIntent';
 
 export function AdminMedicalRecordsPage() {
+  const canWrite = useSession().can("medical-record.write");
   const intent=useRequestIntent(),recordSending=useRef(false);
   const {
     createMedicalRecord: createMedicalRecordInStore,
@@ -303,7 +305,7 @@ export function AdminMedicalRecordsPage() {
           <PetLookup label="Lọc thú cưng" value={selectedPetFilter} onChange={setSelectedPetFilter} emptyValue="all" emptyLabel="Tất cả thú cưng" />
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        {canWrite ? <div className="flex flex-wrap gap-3">
           <button
             onClick={() => setShowImageForm((value) => !value)}
             disabled={isSubmitting}
@@ -323,7 +325,7 @@ export function AdminMedicalRecordsPage() {
           <FilePlus2 size={16} />
           {showCreateForm ? "Đóng form" : "Tạo hồ sơ mới"}
         </button>
-        </div>
+        </div> : <p className="text-sm font-semibold text-slate-500">Bạn chỉ có quyền xem bệnh án và ảnh y tế.</p>}
       </div>
 
       {showImageForm && (
@@ -364,7 +366,7 @@ export function AdminMedicalRecordsPage() {
                   <div key={image.id} className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                     <MedicalImageView image={image} onExpired={imagePage.reload} className="h-24 w-full object-cover" />
                     <p className="truncate px-2 py-1.5 text-xs font-semibold text-slate-700">{image.title}</p>
-                    <button type="button" onClick={() => deleteMedicalImage(image.id)} className="absolute right-1.5 top-1.5 rounded-md bg-white/95 p-1.5 text-rose-600 shadow-sm hover:bg-rose-50" aria-label={`Delete ${image.title}`}><Trash size={14} /></button>
+                    {canWrite && <button type="button" onClick={() => deleteMedicalImage(image.id)} className="absolute right-1.5 top-1.5 rounded-md bg-white/95 p-1.5 text-rose-600 shadow-sm hover:bg-rose-50" aria-label={`Delete ${image.title}`}><Trash size={14} /></button>}
                   </div>
                 ))}
               </div>
@@ -584,7 +586,7 @@ export function AdminMedicalRecordsPage() {
                         >
                           <Eye size={14} />
                         </button>
-                        <button
+                        {canWrite && <><button
                           onClick={() => openEdit(r)}
                           title="Chỉnh sửa"
                           className="rounded-lg bg-blue-50 border border-blue-200 p-2 text-blue-700 hover:bg-blue-100 transition-colors"
@@ -597,7 +599,7 @@ export function AdminMedicalRecordsPage() {
                           className="rounded-lg bg-rose-50 border border-rose-200 p-2 text-rose-700 hover:bg-rose-100 transition-colors"
                         >
                           <Trash2 size={14} />
-                        </button>
+                        </button></>}
                       </div>
                     </td>
                   </tr>

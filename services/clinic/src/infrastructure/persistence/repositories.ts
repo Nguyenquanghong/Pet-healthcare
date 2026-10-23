@@ -94,7 +94,7 @@ export class Lifecycle implements BookingLifecycleStore {
         latestTransition:()=>tx.bookingStatusEvent.findFirst({where:{bookingId:id,action:{not:'note_updated'}},orderBy:{revision:'desc'}}),
         save:async(status,patch={})=>{const saved=await appointmentSlotWrite(tx.appointment.update({where:{id},data:{...patch,status:status as Prisma.AppointmentUpdateInput['status'],statusRevision:{increment:1}}}));await trackAppointmentChange(tx,id);return saved;},
         event:(actor,action,from,to,rev,reason,original)=>appendStatusEvent(tx,this.directory,id,actor,action,from,to,rev,reason,original),
-        notify:async(message,role='owner')=>{await writeNotification(tx,{recipientOwnerId:role==='owner'?booking.ownerId:null,recipientRole:role,type:'booking_status_updated',title:'Appointment updated',message,relatedPetId:booking.petId,relatedAppointmentId:id,actionUrl:role==='admin'?'/admin/appointments':booking.type.startsWith('spa_')?'/owner/spa-booking':'/owner/appointments'});},
+        notify:async(message,recipient='owner')=>{await writeNotification(tx,{recipientOwnerId:recipient==='owner'?booking.ownerId:null,recipientRole:recipient,type:'booking_status_updated',title:'Appointment updated',message,relatedPetId:booking.petId,relatedAppointmentId:id,actionUrl:recipient==='admin'?'/admin/appointments':booking.type.startsWith('spa_')?'/owner/spa-booking':'/owner/appointments'});},
       });
     });
   }

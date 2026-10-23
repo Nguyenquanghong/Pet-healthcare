@@ -1,5 +1,6 @@
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { authorize } from "../../domain/authorization.js";
 import type { InvoiceRepository, InvoiceLine, BankTransferDetails, TransferQrGenerator } from "../ports/invoices.js";
 import pricing from "../../domain/pricing.json" with { type: "json" };
 
@@ -26,11 +27,11 @@ export class InvoicesService {
     return this.invoices.list(actor.role === "owner" ? actor.sub : requestedOwnerId);
   }
   create(actor: Actor, input: Record<string, unknown>) {
-    if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
+    authorize(actor, "billing.manage");
     return this.issue(actor, input, false);
   }
   checkout(actor: Actor, input: Record<string, unknown>) {
-    if (actor.role !== "owner") throw new BusinessError(403, "Chỉ chủ nuôi được tự tạo yêu cầu thanh toán.");
+    authorize(actor, "billing.self-service");
     if (input.type === "hotel_booking") throw new BusinessError(403, "Hóa đơn lưu trú cần nhân viên chốt phí cuối kỳ.");
     if (Object.keys(input).some(key => !["type", "relatedId"].includes(key)))
       throw new BusinessError(422, "Giá được tính ở hệ thống, không nhận số tiền từ khách hàng.");
@@ -82,11 +83,11 @@ export class InvoicesService {
     });
   }
   chooseOnsite(actor: Actor, id: string) {
-    if (actor.role !== "owner") throw new BusinessError(403, "Chỉ chủ nuôi được chọn cách thanh toán.");
+    authorize(actor, "billing.self-service");
     return this.invoices.chooseOnsite(id, actor.sub);
   }
   chooseTransfer(actor: Actor, id: string) {
-    if (actor.role !== "owner") throw new BusinessError(403, "Chỉ chủ nuôi được chọn cách thanh toán.");
+    authorize(actor, "billing.self-service");
     if (!this.bankTransfer) throw new BusinessError(409, "Cửa hàng chưa cấu hình tài khoản nhận chuyển khoản.");
     return this.invoices.chooseTransfer(id, actor.sub, this.bankTransfer);
   }
@@ -101,25 +102,25 @@ export class InvoicesService {
     return { dataUrl, content, amount: Number(invoice.totalAmount) };
   }
   reportTransfer(actor: Actor, id: string, reference: unknown) {
-    if (actor.role !== "owner") throw new BusinessError(403, "Chỉ chủ nuôi được báo đã chuyển khoản.");
+    authorize(actor, "billing.self-service");
     if (reference !== undefined && (typeof reference !== "string" || reference.length > 100))
       throw new BusinessError(422, "Mã giao dịch tối đa 100 ký tự.");
     return this.invoices.reportTransfer(id, actor.sub, typeof reference === "string" ? reference.trim() || null : null, actor);
   }
   rejectTransfer(actor: Actor, id: string, reason: unknown) {
-    if (actor.role === "owner") throw new BusinessError(403, "Chỉ nhân viên được kiểm tra chuyển khoản.");
+    authorize(actor, "billing.manage");
     if (typeof reason !== "string" || !reason.trim() || reason.length > 500)
       throw new BusinessError(422, "Nhập lý do chưa xác nhận (tối đa 500 ký tự).");
     return this.invoices.rejectTransfer(id, reason.trim(), actor);
   }
   pay(actor: Actor, id: string, paymentMethod: unknown = "cash") {
-    if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
+    authorize(actor, "billing.manage");
     if (typeof paymentMethod !== "string" || !["cash", "bank_transfer"].includes(paymentMethod))
       throw new BusinessError(422, "Phương thức thanh toán không hợp lệ.");
     return this.invoices.pay(id, paymentMethod, new Date(), actor);
   }
   async paymentHistory(actor: Actor, id: string) {
-    if (actor.role === "owner") throw new BusinessError(403, "Chỉ nhân viên được xem lịch sử kiểm tra thu tiền.");
+    authorize(actor, "billing.audit");
     const invoice = await this.invoices.find(id);
     if (!invoice) throw new BusinessError(404, "Không tìm thấy hóa đơn.");
     return this.invoices.paymentHistory(id);

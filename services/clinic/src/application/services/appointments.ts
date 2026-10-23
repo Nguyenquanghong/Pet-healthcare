@@ -1,5 +1,6 @@
 import { BookingLifecycleService, type LifecycleInput, type UndoInput } from "./bookingLifecycle.js";
 import { BusinessError } from "../../domain/error.js";
+import { authorize } from "../../domain/authorization.js";
 import { todayInVietnam } from "../../domain/validation.js";
 import type { Actor } from "../../domain/auth.js";
 import {
@@ -72,7 +73,7 @@ export class AppointmentService {
   }
 
   async changeStatus(actor: Actor, id: string, input: StatusInput): Promise<AppointmentRecord> {
-    if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
+    authorize(actor, "booking.manage");
     if (!appointmentStatuses.includes(String(input.status) as AppointmentStatus)) throw new BusinessError(422, "Select a valid appointment status.");
     return await this.lifecycle.change(actor, "appointment", id, input) as AppointmentRecord;
   }
@@ -102,7 +103,7 @@ export class AppointmentService {
   }
 
   async sendReminder(actor: Actor, id: string): Promise<void> {
-    if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
+    authorize(actor, "booking.manage");
     const item = await this.deps.appointments.findWithPet(id);
     if (!item) throw new BusinessError(404, "Appointment not found.");
     const isSpa = spaTypes.has(item.appointment.type);

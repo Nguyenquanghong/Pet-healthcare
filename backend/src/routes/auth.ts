@@ -1,7 +1,7 @@
 import { Router, type Response } from "express";
 import { AuthService } from "../application/services/auth.js";
 import { BusinessError } from "../domain/error.js";
-import { publicUser } from "../lib/serialize.js";
+import { sessionUser } from "../lib/serialize.js";
 import { requireAuth } from "../middleware/auth.js";
 import { OwnerActivationService } from "../application/services/ownerActivation.js";
 
@@ -19,21 +19,21 @@ export function createAuthRouter(service: AuthService, activation: OwnerActivati
   router.post("/owner/login", async (req, res) => {
     try {
       const result = await service.ownerLogin(req.body);
-      if(!res.headersSent)res.json({ token: result.token, user: publicUser(result.user) });
+      if(!res.headersSent)res.json({ token: result.token, user: sessionUser(result.user) });
     } catch (error) { failure(res, error); }
   });
 
   router.post("/admin/login", async (req, res) => {
     try {
       const result = await service.adminLogin(req.body);
-      if(!res.headersSent)res.json({ token: result.token, user: publicUser(result.user) });
+      if(!res.headersSent)res.json({ token: result.token, user: sessionUser(result.user) });
     } catch (error) { failure(res, error); }
   });
 
   router.post("/owner/register", async (req, res) => {
     try {
       const result = await service.registerOwner(req.body);
-      if(!res.headersSent)res.status(201).json({ token: result.token, user: publicUser(result.user) });
+      if(!res.headersSent)res.status(201).json({ token: result.token, user: sessionUser(result.user) });
     } catch (error) { failure(res, error); }
   });
 
@@ -50,13 +50,13 @@ export function createAuthRouter(service: AuthService, activation: OwnerActivati
 
   router.get("/me", requireAuth, async (req, res) => {
     try {
-      const user=await service.me(req.auth!);if(!res.headersSent)res.json({ user: publicUser(user) });
+      const user=await service.me(req.auth!);if(!res.headersSent)res.json({ user: sessionUser(user) });
     } catch (error) { failure(res, error); }
   });
 
   router.patch("/me", requireAuth, async (req, res) => {
     try {
-      const user=await service.updateProfile(req.auth!,req.body);if(!res.headersSent)res.json({ user: publicUser(user) });
+      const user=await service.updateProfile(req.auth!,req.body);if(!res.headersSent)res.json({ user: sessionUser(user) });
     } catch (error) { failure(res, error); }
   });
 

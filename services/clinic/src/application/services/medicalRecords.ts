@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { authorize } from "../../domain/authorization.js";
 import { calendarDate, imageContent, objectInput, optionalText, positiveNumber, requiredText } from "../../domain/validation.js";
 import type { BlobStore } from "../ports/blobs.js";
 import type { MedicalDependencies, MedicalImageValue, MedicalRecordValue, MedicalUpdate, MedicalWrite } from "../ports/medicalRecords.js";
@@ -16,9 +17,7 @@ export type ImageInput = { petId?: string; title?: string; imageUrl?: string; mi
 
 const date = (value: unknown) => calendarDate(value, "Medical date");
 const optionalDate = (value: unknown) => value === undefined || value === null || value === "" ? null : date(value);
-const staffOnly = (actor: Actor) => {
-  if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
-};
+const canWrite = (actor: Actor) => authorize(actor, "medical-record.write");
 
 export function medicalFields(input:MedicalInput){
   objectInput(input);
@@ -39,7 +38,7 @@ export class MedicalRecordsService {
   }
 
   async create(actor: Actor, input: MedicalInput): Promise<MedicalRecordValue> {
-    staffOnly(actor);
+    canWrite(actor);
     objectInput(input);
     const pet = await this.deps.records.findPet(requiredText(input.petId, "Pet", 200));
     if (!pet) throw new BusinessError(404, "Pet not found.");
@@ -75,7 +74,7 @@ export class MedicalRecordsService {
   }
 
   async update(actor: Actor, id: string, input: MedicalInput): Promise<MedicalRecordValue> {
-    staffOnly(actor);
+    canWrite(actor);
     objectInput(input);
     const existing = await this.deps.records.find(id);
     if (!existing) throw new BusinessError(404, "Medical record not found.");
@@ -105,20 +104,20 @@ export class MedicalRecordsService {
   }
 
   async delete(actor: Actor, id: string) {
-    staffOnly(actor);
+    canWrite(actor);
     await this.deps.records.delete(id, actor);
   }
 
   // AQ-15: staff-only audit history; still readable after the record is deleted.
   async history(actor: Actor, id: string) {
-    staffOnly(actor);
+    authorize(actor, "medical-record.history");
     const revisions = await this.deps.records.history(id);
     if (!revisions.length) throw new BusinessError(404, "Medical record not found.");
     return revisions;
   }
 
   async createImage(actor: Actor, input: ImageInput) {
-    staffOnly(actor);
+    canWrite(actor);
     objectInput(input);
     const petId = requiredText(input.petId, "Pet", 200);
     const title = requiredText(input.title, "Title"), imageUrl = requiredText(input.imageUrl, "Image", 7_000_000);
@@ -139,7 +138,7 @@ export class MedicalRecordsService {
   }
 
   async deleteImage(actor: Actor, id: string) {
-    staffOnly(actor);
+    canWrite(actor);
     const { storageKey } = await this.deps.records.deleteImage(id);
     if (!storageKey) return;
     // The cleanup row is already committed; if the bucket is down the worker retries it.

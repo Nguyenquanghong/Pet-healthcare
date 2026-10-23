@@ -1,5 +1,6 @@
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { authorize } from "../../domain/authorization.js";
 import { objectInput, passwordPolicy } from "../../domain/validation.js";
 import type { PasswordPort } from "../ports/auth.js";
 import type { ActivationTokenPort, OwnerActivationRepository, OwnerInvitation } from "../ports/ownerActivation.js";
@@ -20,7 +21,7 @@ export class OwnerActivationService {
 
   async issue(actor: Actor, ownerId: string, input: { email?: unknown; customerVerified?: unknown }) {
     objectInput(input);
-    if (actor.role !== "admin" && actor.role !== "staff") throw new BusinessError(403, "Chỉ admin hoặc nhân viên được cấp liên kết kích hoạt.");
+    authorize(actor, "owner.manage");
     if (input.customerVerified !== true) throw new BusinessError(422, "Cần xác minh đúng khách và email trước khi cấp liên kết.");
     const email = typeof input.email === "string" ? input.email.trim().toLowerCase() : "";
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BusinessError(422, "Nhập email hợp lệ để khách đăng nhập.");

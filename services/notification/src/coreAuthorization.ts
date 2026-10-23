@@ -1,5 +1,6 @@
 import { ApiError, type Actor } from './notifications.js';
 import { traceHeaders } from '@nipopeto/runtime';
+import { deniedMessage } from '@nipopeto/contracts';
 
 export interface SendAuthorization {
   authorize(actor: Actor, recipientOwnerId: string, actorToken: string): Promise<void>;
@@ -16,7 +17,7 @@ export class CoreSendAuthorization implements SendAuthorization {
         method: 'POST', headers: { ...traceHeaders(), 'Content-Type': 'application/json', Authorization: `Bearer ${actorToken}`, 'X-Service-Token': this.credential },
         body: JSON.stringify({ recipientOwnerId }), redirect: 'error', signal: AbortSignal.timeout(this.timeoutMs),
       });
-      if (res.status === 403) throw new ApiError(403, 'Staff access is required.');
+      if (res.status === 403) throw new ApiError(403, deniedMessage('notification.send'));
       if (res.status === 404) throw new ApiError(404, 'Recipient not found.');
       if (res.status !== 200) throw new Error('CORE_UNAVAILABLE');
       const value = await res.json();

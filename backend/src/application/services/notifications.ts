@@ -1,5 +1,6 @@
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { authorize } from "../../domain/authorization.js";
 import { objectInput, requiredText } from "../../domain/validation.js";
 import type { NotificationRepository } from "../ports/notifications.js";
 
@@ -37,7 +38,7 @@ export class NotificationsService {
   }
 
   async send(actor: Actor, input: SendNotificationInput) {
-    if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
+    authorize(actor, "notification.send");
     objectInput(input);
     const recipientOwnerId = requiredText(input.recipientOwnerId, "Recipient", 200);
     const title = requiredText(input.title, "Title"), message = requiredText(input.message, "Message");

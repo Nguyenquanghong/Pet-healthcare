@@ -4,7 +4,8 @@ import { ApiError } from '../utils/apiError';
 import type { Owner } from '../types/owner';
 
 export type AuthRole = 'owner' | 'admin' | null;
-export type SessionUser = Omit<Owner, 'petIds'> & { role: string };
+// AQ-05: `permissions` comes from Core's shared matrix (session responses only).
+export type SessionUser = Omit<Owner, 'petIds'> & { role: string; permissions?: string[] };
 type Registration = { fullName?: string; phone?: string; email: string; password: string; confirmPassword: string; address?: string };
 type Session = {
   user: SessionUser | null; authRole: AuthRole; userRole: string | null; isAuthReady: boolean;
@@ -14,6 +15,9 @@ type Session = {
   loginAdmin: (username: string, password: string) => Promise<string | null>;
   registerOwner: (input: Registration) => Promise<void>;
   updateUser: (user: SessionUser, token: string | null) => void;
+  // UI hint only: hides actions the server would refuse. A server without the list
+  // (older single backend) shows everything and still enforces every request.
+  can: (permission: string) => boolean;
 };
 const SessionContext = createContext<Session | null>(null);
 
@@ -67,6 +71,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     loginOwner: (email, password) => login('/auth/owner/login', { email, password }),
     loginAdmin: (username, password) => login('/auth/admin/login', { username, password }),
     registerOwner: input => authenticate('/auth/owner/register', input),
+    can: permission => !!user && (user.permissions === undefined || user.permissions.includes(permission)),
   }), [user, status, error, sessionKey, registrationComplete, retrySession, logout, updateUser, isCurrent, login, authenticate]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

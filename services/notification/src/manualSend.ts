@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { Prisma, type PrismaClient } from './generated/client/index.js';
 import { ApiError, type Actor } from './notifications.js';
 import type { SendAuthorization } from './coreAuthorization.js';
+import { allows, deniedMessage } from '@nipopeto/contracts';
 
 function input(raw: unknown, key: unknown) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new ApiError(422, 'Request body must be a JSON object.');
@@ -18,7 +19,7 @@ function input(raw: unknown, key: unknown) {
 export class ManualSend {
   constructor(private readonly db: PrismaClient, private readonly authorization?: SendAuthorization) {}
   async send(actor: Actor, actorToken: string, raw: unknown, key: unknown, fault?: () => void) {
-    if (actor.role === 'owner') throw new ApiError(403, 'Staff access is required.');
+    if (!allows(actor.role, 'notification.send')) throw new ApiError(403, deniedMessage('notification.send'));
     const data = input(raw, key), operationType = 'notification.send';
     const existing = await this.db.requestDedup.findUnique({ where: { actorId_operationType_key: { actorId: actor.sub, operationType, key: data.key } } });
     const replay = (row: { requestHash: string; responsePayload: Prisma.JsonValue }) => {

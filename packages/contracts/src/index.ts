@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+export * from './permissions.js';
 export const eventTypes = ['notification.requested.v1', 'billing.invoice-issued.v1', 'billing.operation-aborted.v1', 'directory.owner-upserted.v1', 'directory.pet-upserted.v1', 'directory.staff-upserted.v1', 'clinic.appointment-read-changed.v1', 'identity.sessions-revoked.v1'] as const;
 export type EventType = typeof eventTypes[number];
 export interface Envelope {

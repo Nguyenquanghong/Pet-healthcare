@@ -1,5 +1,6 @@
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { authorize } from "../../domain/authorization.js";
 import type { BookingKind, BookingLifecycleStore, LifecycleTransaction, BookingPatch } from "../ports/bookingLifecycle.js";
 
 export type LifecycleInput = { status?: unknown; expectedRevision?: unknown; internalNote?: string | null };
@@ -11,7 +12,7 @@ const transitions: Record<BookingKind, Record<string, string[]>> = {
 const statusLabels: Record<string, string> = { pending: "chờ xác nhận", confirmed: "đã xác nhận", checked_in: "đã nhận thú cưng",
   in_progress: "đang thực hiện", completed: "hoàn thành dịch vụ", in_stay: "đang lưu trú", checked_out: "đã trả thú cưng",
   cancelled: "đã hủy", rejected: "đã từ chối", no_show: "vắng mặt" };
-function staff(actor: Actor) { if (actor.role === "owner") throw new BusinessError(403, "Chỉ nhân viên được thực hiện thao tác này."); }
+function staff(actor: Actor) { authorize(actor, "booking.manage"); }
 function revision(tx: LifecycleTransaction, value: unknown) {
   if (!Number.isSafeInteger(value) || Number(value) < 0) throw new BusinessError(422, "Thiếu phiên bản lịch đặt. Hãy tải lại trang.");
   if (value !== tx.booking.statusRevision) throw new BusinessError(409, "Lịch đặt vừa được cập nhật. Hãy tải lại và kiểm tra trước khi thao tác.");
@@ -62,7 +63,7 @@ export class BookingLifecycleService {
       const checkin = kind === "appointment" ? from === "checked_in" : from === "in_stay";
       const finished = kind === "appointment" ? from === "completed" : from === "checked_out";
       if (!checkin && !finished) throw new BusinessError(409, "Chỉ hoàn tác check-in khi chưa bắt đầu dịch vụ, hoặc mở lại dịch vụ vừa hoàn thành.");
-      if (finished && actor.role !== "admin") throw new BusinessError(403, "Chỉ quản trị viên được mở lại dịch vụ đã hoàn thành.");
+      if (finished) authorize(actor, "booking.reopen");
       const linked = await tx.dependencies();
       const hotelHandoverUndo = kind === "hotel" && finished;
       if (linked.medical || (!hotelHandoverUndo && linked.invoices) || (checkin && linked.care))

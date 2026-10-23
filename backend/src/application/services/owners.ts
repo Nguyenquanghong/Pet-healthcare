@@ -1,5 +1,6 @@
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { authorize } from "../../domain/authorization.js";
 import type { OwnerRepository } from "../ports/owners.js";
 
 export type CounterOwnerInput = { fullName?: unknown; phone?: unknown; email?: unknown; address?: unknown };
@@ -8,7 +9,7 @@ const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
 export class OwnersService {
   constructor(private readonly owners: OwnerRepository) {}
   async create(actor: Actor, input: CounterOwnerInput) {
-    if (actor.role !== "admin" && actor.role !== "staff") throw new BusinessError(403, "Chỉ quản trị viên hoặc nhân viên được tạo khách tại quầy.");
+    authorize(actor, "owner.manage");
     if ((input.email !== undefined && typeof input.email !== "string") || (input.address !== undefined && typeof input.address !== "string"))
       throw new BusinessError(422, "Email và địa chỉ phải là chuỗi ký tự.");
     const fullName = text(input.fullName);

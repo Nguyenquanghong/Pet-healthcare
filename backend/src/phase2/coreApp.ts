@@ -12,6 +12,7 @@ import { mountDashboards } from './dashboardApi.js';
 import { coreRuntime } from './runtime.js';
 import { createCoreDomains } from './coreDomains.js';
 import { credential, traceHeaders } from '@nipopeto/runtime';
+import { allows, deniedMessage } from '@nipopeto/contracts';
 import { createAuthRouter } from '../routes/auth.js';
 import { AuthService } from '../application/services/auth.js';
 import { OwnerActivationService } from '../application/services/ownerActivation.js';
@@ -71,7 +72,7 @@ export function createCoreApp(db: PrismaClient, config: {notificationUrl?:string
       if (!token?.startsWith('Bearer ') || token.length > 8192) throw new Error('INVALID_TOKEN');
       actor = verifyToken(token.slice(7));
     } catch { res.status(401).json({ error: 'Invalid actor context.' }); return; }
-    if (actor.role === 'owner') { res.status(403).json({ error: 'Staff access is required.' }); return; }
+    if (!allows(actor.role, 'notification.send')) { res.status(403).json({ error: deniedMessage('notification.send') }); return; }
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || typeof req.body.recipientOwnerId !== 'string' || !req.body.recipientOwnerId || req.body.recipientOwnerId.length > 200 || Object.keys(req.body).some(k => k !== 'recipientOwnerId')) { res.status(422).json({ error: 'Invalid recipient request.' }); return; }
     try {
       const sender = await db.user.findUnique({ where: { id: actor.sub }, select: { id: true, role: true } });

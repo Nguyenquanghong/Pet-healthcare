@@ -1,5 +1,6 @@
 import type { Actor } from "../../domain/auth.js";
 import { BusinessError } from "../../domain/error.js";
+import { authorize } from "../../domain/authorization.js";
 import { calendarDate, objectInput, optionalText, positiveNumber, requiredText } from "../../domain/validation.js";
 import type { MedicalDependencies, MedicalRecordValue, MedicalUpdate, MedicalWrite } from "../ports/medicalRecords.js";
 
@@ -14,9 +15,7 @@ export type ImageInput = { petId?: string; title?: string; imageUrl?: string; mi
 
 const date = (value: unknown) => calendarDate(value, "Medical date");
 const optionalDate = (value: unknown) => value === undefined || value === null || value === "" ? null : date(value);
-const staffOnly = (actor: Actor) => {
-  if (actor.role === "owner") throw new BusinessError(403, "Staff access is required.");
-};
+const canWrite = (actor: Actor) => authorize(actor, "medical-record.write");
 
 export class MedicalRecordsService {
   constructor(private readonly deps: MedicalDependencies) {}
@@ -26,7 +25,7 @@ export class MedicalRecordsService {
   }
 
   async create(actor: Actor, input: MedicalInput): Promise<MedicalRecordValue> {
-    staffOnly(actor);
+    canWrite(actor);
     objectInput(input);
     const pet = await this.deps.records.findPet(requiredText(input.petId, "Pet", 200));
     if (!pet) throw new BusinessError(404, "Pet not found.");
@@ -62,7 +61,7 @@ export class MedicalRecordsService {
   }
 
   async update(actor: Actor, id: string, input: MedicalInput): Promise<MedicalRecordValue> {
-    staffOnly(actor);
+    canWrite(actor);
     objectInput(input);
     const existing = await this.deps.records.find(id);
     if (!existing) throw new BusinessError(404, "Medical record not found.");
@@ -92,12 +91,12 @@ export class MedicalRecordsService {
   }
 
   async delete(actor: Actor, id: string) {
-    staffOnly(actor);
+    canWrite(actor);
     await this.deps.records.delete(id);
   }
 
   async createImage(actor: Actor, input: ImageInput) {
-    staffOnly(actor);
+    canWrite(actor);
     objectInput(input);
     const petId = requiredText(input.petId, "Pet", 200);
     const title = requiredText(input.title, "Title"), imageUrl = requiredText(input.imageUrl, "Image", 7_000_000);
@@ -107,7 +106,7 @@ export class MedicalRecordsService {
   }
 
   async deleteImage(actor: Actor, id: string) {
-    staffOnly(actor);
+    canWrite(actor);
     await this.deps.records.deleteImage(id);
   }
 }

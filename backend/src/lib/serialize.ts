@@ -3,6 +3,7 @@ import type { AppointmentRecord } from "../application/ports/appointments.js";
 import type { MedicalRecordValue } from "../application/ports/medicalRecords.js";
 import type { CareNoteValue, HotelBookingValue } from "../application/ports/hotelBookings.js";
 import type { PetValue } from "../application/ports/pets.js";
+import { permissionsFor } from "@nipopeto/contracts";
 
 export const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
 
@@ -18,6 +19,11 @@ export function publicUser(user: UserAccount) {
     avatarUrl: user.avatarUrl ?? undefined,
     ...(user.directoryRevision?{directoryVersion:user.directoryRevision}:{}),
   };
+}
+// AQ-05: the signed-in user also gets what the matrix lets them do, so clients hide
+// actions instead of hard-coding roles. Every request is still checked server-side.
+export function sessionUser(user: UserAccount) {
+  return { ...publicUser(user), permissions: permissionsFor(user.role) };
 }
 
 export function ownerDto(user: UserAccount & { pets?: Array<{ id: string }>; _count?: { pets: number } }) {

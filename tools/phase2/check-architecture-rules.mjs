@@ -8,6 +8,9 @@
 //  3. Gateways never expose /internal, /metrics or /health to clients.
 //  4. P7 least-privilege runtime grants cover every Prisma model, or the model is
 //     explicitly excluded with a reason (stale exclusions also fail).
+//  5. AQ-05 permissions come from the matrix in @nipopeto/contracts: no role list
+//     or staff-role comparison in Core/Clinic/Notification, no 403 decided by the
+//     owner role without an ownership check, and no matrix entry left unchecked.
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -123,9 +126,45 @@ const grantsCheck=Promise.all([import(pathToFileURL(resolve(root,'tools/phase2/p
     return 'core/clinic/notification models granted or excluded with a reason';
   }),error=>rule('runtime-grants-cover-every-model',()=>{throw error;}));
 
+// ---- 5. Permissions come from the matrix (AQ-05) -------------------------------
+const SERVICE_SOURCES=['backend/src','services/clinic/src','services/notification/src'];
+const AUTHORIZATION=new Set(['backend/src/domain/authorization.ts','services/clinic/src/domain/authorization.ts']);
+const OWNER_ROLE=/\brole\s*[!=]==?\s*['"]owner['"]|['"]owner['"]\s*[!=]==?\s*[\w.?]*\brole\b/;
+// Identity checks (token role equals stored role) and ownership scope are not permissions.
+export function permissionViolations(source){
+  const found=[];
+  source.split(/\r?\n/).forEach((line,index)=>{
+    const at='line '+(index+1)+': ';
+    if(/\brequireRole\s*\(/.test(line))found.push(at+'requireRole');
+    if(/\brole\s*[!=]==?\s*['"](admin|doctor|staff)['"]|['"](admin|doctor|staff)['"]\s*[!=]==?\s*[\w.?]*\brole\b/.test(line))found.push(at+'staff-role comparison');
+    if(/\[\s*['"](owner|admin|doctor|staff)['"]\s*,[^\]]*\]\s*\.includes\([^)]*\brole\b/.test(line))found.push(at+'inline role list');
+    if(/Error\(\s*403|status\(\s*403\s*\)/.test(line)&&OWNER_ROLE.test(line)&&!/\.sub\b|ownerId/.test(line))found.push(at+'403 decided by the owner role');
+  });
+  return found;
+}
+const checked=(source,permission)=>new RegExp(`\\b(authorize|requirePermission|allows|deniedMessage)\\([^)]*['"]${permission.replaceAll('.','\\.')}['"]`).test(source);
+const permissionCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.reject(new Error('build packages/contracts first (npm run build -w @nipopeto/contracts)')))
+  .then(({permissions})=>rule('permissions-from-matrix',()=>{
+    const scanned=SERVICE_SOURCES.flatMap(d=>files(resolve(root,d))).filter(f=>f.endsWith('.ts')&&!AUTHORIZATION.has(relative(root,f).split(sep).join('/')));
+    const bad=scanned.flatMap(f=>permissionViolations(readFileSync(f,'utf8')).map(v=>relative(root,f)+' '+v));
+    assert.deepEqual(bad,[],'role decisions outside the permission matrix: '+bad.join('; '));
+    const all=scanned.map(f=>readFileSync(f,'utf8')).join('\n');
+    const unused=permissions.filter(p=>!checked(all,p));
+    assert.deepEqual(unused,[],'matrix permissions never checked: '+unused.join(', '));
+    // negative fixtures
+    for(const sample of ["if (actor.role === 'admin') x();","if(!['admin','staff'].includes(actor.role))throw e;","if (actor.role === 'owner') throw new BusinessError(403, 'x');","router.use(requireRole('admin'))","if(actor.role==='owner'){res.status(403);return;}"])
+      assert.ok(permissionViolations(sample).length,'fixture not detected: '+sample);
+    for(const sample of ["if (actor.role === 'owner' && pet.ownerId !== actor.sub) throw new BusinessError(403, 'x');","if(!sender||sender.role!==actor.role)res.status(403);","const own=actor.role==='owner'?{ownerId:actor.sub}:{};","authorize(actor, 'booking.manage');"])
+      assert.deepEqual(permissionViolations(sample),[],'false positive: '+sample);
+    assert.equal(checked("authorize(actor, 'booking.manage')",'booking.manage'),true);
+    assert.equal(checked("authorize(actor, 'booking.manager')",'booking.manage'),false);
+    return scanned.length+' files, '+permissions.length+' permissions checked';
+  }),error=>rule('permissions-from-matrix',()=>{throw error;}));
+
 await envelopeCheck;
 await grantsCheck;
+await permissionCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, negative fixtures.\n');
+else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, negative fixtures.\n');

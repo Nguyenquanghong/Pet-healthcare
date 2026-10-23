@@ -4953,6 +4953,27 @@
             "type": "integer",
             "minimum": 1,
             "description": "Core source revision. Projection search may lag; related DTOs use current Core source."
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "booking.manage",
+                "booking.reopen",
+                "hotel.care-note.write",
+                "medical-record.write",
+                "medical-record.history",
+                "billing.manage",
+                "billing.audit",
+                "billing.self-service",
+                "owner.manage",
+                "directory.read",
+                "notification.send",
+                "clinic-activity.read"
+              ]
+            },
+            "description": "AQ-05: only in session responses (login, register, /auth/me). What the shared permission matrix lets this role do; a UI hint, every request is still authorized by the server."
           }
         },
         "required": [

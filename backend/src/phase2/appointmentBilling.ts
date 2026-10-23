@@ -4,6 +4,7 @@ import {traceHeaders} from '@nipopeto/runtime';
 import type {BillingSourceSnapshot,Envelope} from '@nipopeto/contracts';
 import type {Actor} from '../domain/auth.js';
 import {BusinessError} from '../domain/error.js';
+import {authorize} from '../domain/authorization.js';
 import {money,lines} from '../application/services/invoices.js';
 import type {InvoiceLine,InvoiceValue} from '../application/ports/invoices.js';
 import pricing from '../domain/pricing.json' with {type:'json'};
@@ -52,7 +53,7 @@ export class AppointmentInvoiceBilling{
   async actor(actor:Actor){const current=await this.db.user.findUnique({where:{id:actor.sub},select:{role:true}});if(!current||current.role!==actor.role)throw new BusinessError(403,'Current actor role is required.');}
   async begin(actor:Actor,input:Record<string,unknown>,key:unknown,self=false){
     await this.actor(actor);
-    if(self?actor.role!=='owner':actor.role==='owner')throw new BusinessError(403,'Billing permission required.');
+    authorize(actor,self?'billing.self-service':'billing.manage');
     if(typeof key!=='string'||!key.trim()||key!==key.trim()||key.length>128)throw new BusinessError(422,'Idempotency-Key is required (maximum 128 characters).');
     const payload=fees(input,self),operationType=self?'invoice.checkout':'invoice.create';
     const hash=createHash('sha256').update(JSON.stringify(payload)).digest('hex');

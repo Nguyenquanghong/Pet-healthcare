@@ -2,6 +2,7 @@ import express, { type ErrorRequestHandler } from 'express';
 import type { PrismaClient } from './generated/client/index.js';
 import type { Actor } from './domain/auth.js';
 import { BusinessError } from './domain/error.js';
+import { authorize } from './domain/authorization.js';
 import { objectInput,calendarDate,requiredText } from './domain/validation.js';
 import { CoreDirectory, RequestDirectory } from './directory.js';
 import { AppointmentService } from './application/services/appointments.js';
@@ -56,10 +57,10 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   app.use('/internal/clinic', (req,res,next)=>{if(req.path!=='/bootstrap'||req.method!=='GET'){res.status(404).json({error:'Clinic route not found.'});return;}if(!source||!source.acceptsService(req.headers['x-service-token'],'bootstrap')){res.status(401).json({error:'Service authentication required.'});return;}next();});
   router.use((req,res,next)=>{if(!verify||!source){res.status(503).json({error:'Clinic authentication or directory is not configured.'});return;}const bearer=req.headers.authorization;if(!bearer?.startsWith('Bearer ')||bearer.length>8192){res.status(401).json({error:'Authentication required.'});return;}try{res.locals.actor=requestActor(req,verify);next();}catch{res.status(401).json({error:'Invalid or expired token.'});}});
   router.use(express.json({limit:'8mb'}));
-  router.use((req,_res,next)=>{if(req.path==='/dashboard/clinic/activity'&&_res.locals.actor.role!=='admin')throw new BusinessError(403,'Admin activity access is required.');next();});
+  router.use((req,_res,next)=>{if(req.path==='/dashboard/clinic/activity')authorize(_res.locals.actor,'clinic-activity.read');next();});
   router.use(async(req,res,next)=>{
     const actor=res.locals.actor as Actor;
-    if(actor.role==='owner'&&req.path.startsWith('/medical-records')&&req.method!=='GET')throw new BusinessError(403,'Staff access is required.');
+    if(req.path.startsWith('/medical-records')&&req.method!=='GET')authorize(actor,'medical-record.write');
     if(req.body===undefined&&['POST','PATCH','PUT'].includes(req.method))req.body={};
     if(req.body!==undefined)objectInput(req.body);
     const petIds:string[]=[];
@@ -125,7 +126,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   router.get('/dashboard/clinic/activity',async(req,res)=>{
     // Express also matches trailing slashes/case variants; authorize the matched
     // operation itself, independently of the early exact-path rejection above.
-    if(res.locals.actor.role!=='admin')throw new BusinessError(403,'Admin activity access is required.');
+    authorize(res.locals.actor,'clinic-activity.read');
     const filter=parseActivityFilter(req.query);
     try{const result=await activity.read(filter);res.setHeader('X-Clinic-Read-Source',result.meta.source);if(result.meta.generation)res.setHeader('X-Clinic-Projection-Generation',result.meta.generation);if(result.meta.degraded)res.setHeader('X-Service-Degraded','clinic-activity');res.json(result);}
     catch(error){if(error instanceof BusinessError)throw error;throw new BusinessError(503,'Clinic activity is unavailable. Retry later.');}
