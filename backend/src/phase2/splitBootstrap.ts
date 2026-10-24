@@ -31,7 +31,7 @@ export function mountSplitBootstrap(app:Express,db:PrismaClient,clinic:URL,crede
       res.setHeader('Cache-Control','no-store');
       res.json({...data,owners:[...new Map([...data.owners.map(ownerDto),...(remote?.owners??[])].map(r=>[r.id,r])).values()],pets:[...new Map([...data.pets.map(petDto),...(remote?.pets??[])].map(r=>[r.id,r])).values()],
         appointments:remote?.appointments??[],medicalRecords:remote?.medicalRecords??[],medicalImages:remote?.medicalImages??[],
-        hotelBookings:data.hotelBookings.map(r=>hotelBookingDto(r,actor.role==='owner')),dailyCareNotes:data.dailyCareNotes.map(careNoteDto),notifications:view==='dashboard'?(notice?.items??[]):[],
+        hotelBookings:data.hotelBookings.map(r=>hotelBookingDto(r,actor)),dailyCareNotes:data.dailyCareNotes.map(careNoteDto),notifications:view==='dashboard'?(notice?.items??[]):[],
         summary:{...data.summary,totals:{...data.summary.totals,appointments:remote?.summary.totals.appointments??null,medicalRecords:remote?.summary.totals.medicalRecords??null,medicalImages:remote?.summary.totals.medicalImages??null,notifications:notice?.pagination.total??null},
           unread:notice?notice.counts.sent??0:null,notificationCategory:notice?Object.fromEntries(Object.entries(notice.counts).filter(([k])=>k.startsWith('category:')&&k!=='category:all').map(([k,v])=>[k.slice(9),v])):{},
           appointmentStatus:remote?.summary.appointmentStatus??{},todayAppointments:remote?.summary.todayAppointments??null},

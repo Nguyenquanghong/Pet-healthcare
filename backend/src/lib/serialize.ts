@@ -4,7 +4,12 @@ import type { MedicalRecordValue } from "../application/ports/medicalRecords.js"
 import type { CareNoteValue, HotelBookingValue } from "../application/ports/hotelBookings.js";
 import type { PetValue } from "../application/ports/pets.js";
 import type { InvoiceValue } from "../application/ports/invoices.js";
-import { permissionsFor } from "@nipopeto/contracts";
+import { allowedActions, permissionsFor } from "@nipopeto/contracts";
+import type { Actor } from "../domain/auth.js";
+
+// Who reads a booking: owners get the owner view; everyone gets the actions their
+// permissions allow (P01 allowedActions; the server still checks each one).
+export type Viewer = Pick<Actor, "role" | "sub">;
 
 export const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
 
@@ -85,9 +90,10 @@ export function publicPetDto(pet: PetValue) {
   };
 }
 
-export function appointmentDto(item: AppointmentRecord, owner = false) {
-  const { internalNote, ...visible } = item;
-  return { ...visible, ...(owner ? {} : { internalNote }), date: dateOnly(item.appointmentDate), time: item.appointmentTime, appointmentDate: undefined, appointmentTime: undefined };
+export function appointmentDto(item: AppointmentRecord, viewer: Viewer) {
+  const { internalNote, ...visible } = item, owner = viewer.role === "owner";
+  return { ...visible, ...(owner ? {} : { internalNote }), date: dateOnly(item.appointmentDate), time: item.appointmentTime, appointmentDate: undefined, appointmentTime: undefined,
+    allowedActions: allowedActions("appointment", item.status, viewer.role, owner && item.ownerId === viewer.sub) };
 }
 
 export function medicalRecordDto(item: MedicalRecordValue, owner = false) {
@@ -101,8 +107,8 @@ export function medicalRecordDto(item: MedicalRecordValue, owner = false) {
   };
 }
 
-export function hotelBookingDto(item: HotelBookingValue, owner = false) {
-  const { internalNote, ...visible } = item;
+export function hotelBookingDto(item: HotelBookingValue, viewer: Viewer) {
+  const { internalNote, ...visible } = item, owner = viewer.role === "owner";
   return {
     ...visible, ...(owner ? {} : { internalNote }),
     checkIn: dateOnly(item.checkIn),
@@ -110,6 +116,7 @@ export function hotelBookingDto(item: HotelBookingValue, owner = false) {
     totalAmount: Number(item.totalAmount),
     dailyCareNoteIds: item.dailyCareNotes?.map((note) => note.id) ?? [],
     dailyCareNotes: undefined,
+    allowedActions: allowedActions("hotel", item.status, viewer.role, owner && item.ownerId === viewer.sub),
   };
 }
 

@@ -72,6 +72,16 @@ export interface ApiSchemas {
     showMedicalAlerts: boolean;
     rescueNote?: string;
   };
+  BookingAction: {
+    kind: "transition" | "undo";
+    to: string;
+  } | {
+    kind: "step";
+    name: string;
+    to: string;
+  } | {
+    kind: "cancel" | "reschedule";
+  };
   Appointment: {
     id: string;
     petId: string;
@@ -90,6 +100,8 @@ export interface ApiSchemas {
     createdBy: "owner" | "staff";
     createdAt: string;
     updatedAt: string;
+    /** P01: the actions this viewer may try, from the booking lifecycle table and the viewer's permissions. Guards over linked data (medical record, invoice, care note) are not evaluated, so the server can still answer 409. */
+    allowedActions: ApiSchemas["BookingAction"][];
   };
   MedicalRecord: {
     id: string;
@@ -148,6 +160,8 @@ export interface ApiSchemas {
     dailyCareNoteIds: string[];
     createdAt: string;
     updatedAt: string;
+    /** P01: the actions this viewer may try, from the booking lifecycle table and the viewer's permissions. Guards over linked data (medical record, invoice, care note) are not evaluated, so the server can still answer 409. */
+    allowedActions: ApiSchemas["BookingAction"][];
   };
   CareNote: {
     id: string;

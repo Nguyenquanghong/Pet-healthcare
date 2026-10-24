@@ -90,3 +90,37 @@ test('Admin list notices a booking written from another browser without a tab me
     status: 'pending', statusRevision: 0, createdBy: 'owner', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
   await expect(admin.locator('tbody tr').filter({ hasText: 'External booking' })).toBeVisible({ timeout: 8000 });
 });
+
+test('P01: lifecycle buttons follow allowedActions from the server, not the status', async ({ context }) => {
+  const api = await fixture(context);
+  const visit = (serviceName: string, status: string, allowedActions: unknown[]) => ({ id: 'actions-' + serviceName.replaceAll(' ', '-'), petId: 'refresh-pet', ownerId: 'refresh-owner',
+    type: 'general_checkup', serviceName, clinicName: 'Nippon Pet Care', date: '2030-01-02', time: '09:00', status, statusRevision: 1, createdBy: 'owner',
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), allowedActions });
+  const to = (kind: string, target: string) => ({ kind, to: target });
+  api.state.appointments.push(
+    visit('Confirmed visit', 'confirmed', [to('transition', 'checked_in'), to('transition', 'no_show'), to('transition', 'cancelled')]),
+    visit('Completed for staff', 'completed', []),
+    visit('Completed for admin', 'completed', [to('undo', 'in_progress')]),
+    visit('Checked in for staff', 'checked_in', [to('transition', 'in_progress'), to('undo', 'confirmed')]),
+    visit('Checked in for doctor', 'checked_in', [to('transition', 'in_progress'), to('undo', 'confirmed'), { kind: 'step', name: 'medical-completed', to: 'completed' }]),
+    visit('Pending, cancel only', 'pending', [{ kind: 'cancel' }]),
+  );
+  const admin = await api.open('admin', '/admin/appointments');
+  const row = (name: string) => admin.locator('tbody tr').filter({ hasText: name });
+  await expect(row('Confirmed visit').getByRole('button', { name: 'Check-in', exact: true })).toBeVisible();
+  await expect(row('Confirmed visit').getByTitle('Đánh dấu vắng mặt')).toBeVisible();
+  await expect(row('Confirmed visit').getByTitle('Hủy lịch')).toBeVisible();
+  await expect(row('Confirmed visit').getByTitle('Gửi nhắc nhở')).toBeVisible();
+  await expect(row('Completed for admin').getByRole('button', { name: 'Mở lại dịch vụ', exact: true })).toBeVisible();
+  await expect(row('Completed for staff').getByRole('button')).toHaveText(['', 'Lịch sử thao tác'], { useInnerText: true });
+  await expect(row('Checked in for staff').getByRole('button', { name: 'Hoàn tác check-in', exact: true })).toBeVisible();
+  await expect(row('Checked in for staff').getByRole('button', { name: 'Bắt đầu khám', exact: true })).toBeVisible();
+  await expect(row('Checked in for staff').getByRole('button', { name: 'Tạo bệnh án', exact: true })).toHaveCount(0);
+  await expect(row('Checked in for doctor').getByRole('button', { name: 'Tạo bệnh án', exact: true })).toBeVisible();
+  await expect(row('Pending, cancel only').getByRole('button', { name: 'Xác nhận', exact: true })).toHaveCount(0);
+  const owner = await api.open('owner', '/owner/appointments');
+  const card = owner.locator('div').filter({ hasText: 'Pending, cancel only' }).filter({ has: owner.getByRole('button', { name: 'Hủy lịch' }) }).last();
+  await expect(card.getByRole('button', { name: 'Hủy lịch' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Đổi lịch' })).toHaveCount(0);
+  await expect(owner.getByRole('button', { name: 'Đổi lịch' })).toHaveCount(0);
+});

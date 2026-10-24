@@ -309,3 +309,22 @@ test('AQ-05 password change revokes earlier sessions on Core and on direct Clini
   await sleep(1100);const fresh=signToken(id,'staff');
   for(const base of [coreUrl,bases[0]])status(await request('/api/appointments?pageSize=1',{base,token:fresh}),200);
 });
+test('P01: allowedActions in Clinic responses follow the role, and the server accepts each listed move',async()=>{
+  const p=await core.pet.create({data:{ownerId:owner,name:'P01 pet '+run,species:'dog',allergies:[]}});
+  const actions=a=>a.allowedActions.map(x=>x.kind+(x.to?':'+x.to:'')+(x.name?'@'+x.name:''));
+  const read=async(a,token)=>status(await request('/api/appointments?petId='+p.id,{token}),200).items.find(i=>i.id===a.id);
+  let a=await create('13:00',{petId:p.id});
+  assert.deepEqual(actions(a),['cancel','reschedule'],'the owner who booked it');
+  for(const role of ['staff','admin'])assert.deepEqual(actions(await read(a,tokens[role])),['transition:confirmed','transition:cancelled'],role);
+  // Walk the visit with what the server lists; each listed move is accepted.
+  for(const to of ['confirmed','checked_in']){assert.ok(actions(await read(a,tokens.staff)).includes('transition:'+to),to);a=await change(a,to,tokens.staff);}
+  assert.deepEqual(actions(a),['transition:in_progress','undo:confirmed'],'staff may not write the record that completes the visit');
+  assert.deepEqual(actions(await read(a,tokens.doctor)),['transition:in_progress','undo:confirmed','step:completed@medical-completed']);
+  assert.deepEqual(actions(await read(a,tokens.owner)),[],'nothing for the owner once the pet is checked in');
+  // The listed step is real: the doctor's record completes the visit.
+  status(await request('/api/medical-records',{method:'POST',token:tokens.doctor,key:randomUUID(),body:record(a,{petId:p.id})}),201);
+  a=await read(a,tokens.admin);assert.equal(a.status,'completed');assert.deepEqual(actions(a),['undo:in_progress']);
+  assert.deepEqual(actions(await read(a,tokens.staff)),[],'reopening is for admins');
+  // Guards over linked data are not in the list: the record now blocks the reopen with a 409 that says why.
+  assert.match(status(await request(`/api/appointments/${a.id}/undo-status`,{method:'POST',token:tokens.admin,body:{expectedRevision:a.statusRevision,reason:'P01 fixture'}}),409).error,/bệnh án/);
+});

@@ -106,10 +106,10 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   router.get('/appointments/calendar',async(req,res)=>read(req,res,reader=>reader.calendar(res.locals.actor,{month:req.query.month,category:req.query.category})));
   router.get('/appointments/availability',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await appointment(res).availability(res.locals.actor,req.query));});
   router.post('/appointments',async(req,res)=>{
-    const result=await deduplicated(db,res.locals.actor.sub,'appointment.create',req.headers['idempotency-key'],normalizeCreate(req.body,false),async tx=>{const row=await appointment(res,tx).create(res.locals.actor,req.body);return{resourceId:row.id,appointmentId:row.id,response:{appointment:appointmentDto(row,res.locals.actor.role==='owner')}};},true);sendMutation(res,result as {response:unknown;versions:ReadVersions},201);
+    const result=await deduplicated(db,res.locals.actor.sub,'appointment.create',req.headers['idempotency-key'],normalizeCreate(req.body,false),async tx=>{const row=await appointment(res,tx).create(res.locals.actor,req.body);return{resourceId:row.id,appointmentId:row.id,response:{appointment:appointmentDto(row,res.locals.actor)}};},true);sendMutation(res,result as {response:unknown;versions:ReadVersions},201);
   });
   const change=async(req:express.Request,res:express.Response,action:'changeStatus'|'reschedule'|'cancel'|'undoStatus')=>{
-    const result=await db.$transaction(async tx=>{const row=await appointment(res,tx)[action](res.locals.actor,String(req.params.id),req.body??{});return {response:{appointment:appointmentDto(row,res.locals.actor.role==='owner')},versions:await committedVersions(tx,row.id)};});sendMutation(res,result);
+    const result=await db.$transaction(async tx=>{const row=await appointment(res,tx)[action](res.locals.actor,String(req.params.id),req.body??{});return {response:{appointment:appointmentDto(row,res.locals.actor)},versions:await committedVersions(tx,row.id)};});sendMutation(res,result);
   };
   router.patch('/appointments/:id/status',async(req,res)=>change(req,res,'changeStatus'));
   router.patch('/appointments/:id/reschedule',async(req,res)=>change(req,res,'reschedule'));

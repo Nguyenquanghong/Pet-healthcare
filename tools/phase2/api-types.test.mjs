@@ -42,9 +42,11 @@ test('frontend API DTO types alias the generated contract, not hand-written copi
 
 test('strict response validator catches what the lenient one let through',()=>{
   const at=(name,value)=>validate(spec,{$ref:'#/components/schemas/'+name},value);
-  const appointment={id:'a',petId:'p',ownerId:'o',doctorId:null,type:'vaccination',serviceName:'S',clinicName:'C',date:'2026-10-23',time:'09:30',status:'pending',statusRevision:0,ownerNote:null,createdBy:'owner',createdAt:'2026-10-23T01:02:03.000Z',updatedAt:'2026-10-23T01:02:03.000Z'};
+  const appointment={id:'a',petId:'p',ownerId:'o',doctorId:null,type:'vaccination',serviceName:'S',clinicName:'C',date:'2026-10-23',time:'09:30',status:'pending',statusRevision:0,ownerNote:null,createdBy:'owner',createdAt:'2026-10-23T01:02:03.000Z',updatedAt:'2026-10-23T01:02:03.000Z',allowedActions:[{kind:'transition',to:'confirmed'},{kind:'step',name:'medical-completed',to:'completed'},{kind:'cancel'}]};
   assert.deepEqual(at('Appointment',appointment),[]);
   assert.match(at('Appointment',{...appointment,serviceName:null}).join(),/null but not nullable/);
+  // P01: each action is exactly one of the three shapes.
+  for(const bad of [{kind:'transition'},{kind:'cancel',to:'x'},{kind:'archive'}])assert.ok(at('Appointment',{...appointment,allowedActions:[bad]}).length,JSON.stringify(bad));
   assert.match(at('Appointment',{...appointment,status:'archived'}).join(),/not in enum/);
   assert.match(at('Appointment',{...appointment,createdAt:'yesterday'}).join(),/expected date-time/);
   const {createdBy,...missing}=appointment;assert.match(at('Appointment',missing).join(),/createdBy: required/);

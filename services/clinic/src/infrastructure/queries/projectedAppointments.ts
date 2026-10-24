@@ -109,7 +109,7 @@ export class ProjectedAppointmentQueries implements AppointmentQueries{
     this.diagnostics.mark('projection-directory');
     const rows=result.appointments,source=rows.length?await directory.lookup(rows.map(r=>r.petId),rows.map(r=>r.ownerId)):{pets:[],owners:[]};
     const pet=q.petId?source.pets.find(p=>p.id===q.petId)??await directory.pet(q.petId as string):null;
-    return {items:rows.map(r=>appointmentDto(r,actor.role==='owner')),pagination:{page:q.page,pageSize:q.pageSize,total:result.total,totalPages:Math.ceil(result.total/q.pageSize)},counts:result.counts,
+    return {items:rows.map(r=>appointmentDto(r,actor)),pagination:{page:q.page,pageSize:q.pageSize,total:result.total,totalPages:Math.ceil(result.total/q.pageSize)},counts:result.counts,
       related:{owners:source.owners,pets:source.pets,appointments:[],medicalRecords:[],medicalImages:[],hotelBookings:[],dailyCareNotes:[],notifications:[],invoices:[]},
       ...(pet?{directory:{petId:pet.id,sourceVersion:pet.directoryVersion,projectionVersion:result.projectionVersion,searchReady:result.projectionVersion>=pet.directoryVersion}}:{}),...(q.q?{searchConsistency:'eventual' as const}:{})};
   }
