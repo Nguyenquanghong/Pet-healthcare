@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import { OutboxRelay } from '../../backend/dist/src/phase2/relay.js';
 import { RuntimeOutboxStore } from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';
 import { topology, declareTopology } from '@nipopeto/messaging';
+import { topologyQueues } from './test-project.mjs';
 
 // Core relay gets the Clinic relay fix (list study v1 K3-F1) through the shared
 // ConfirmPublisher. Rows share this run's aggregateId and every relay is scoped
@@ -39,7 +40,7 @@ test.before(async () => {
 });
 test.after(async () => {
   try {
-    for (const q of [routes.notification, routes.clinic, routes.clinicRead]) for (const name of [q, q + '.dlq']) await channel.deleteQueue(name).catch(() => {});
+    for (const name of topologyQueues(routes, [routes.notification, routes.identity, routes.clinic, routes.clinicRead])) await channel.deleteQueue(name).catch(() => {});
     await channel.deleteExchange(routes.exchange).catch(() => {});
   } finally { await channel?.close().catch(() => {}); await connection?.close().catch(() => {}); await db.$disconnect(); }
 });

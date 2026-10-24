@@ -4,6 +4,7 @@ import { createDependencies } from './composition.js';
 import { ClinicInbox } from './inbox.js';
 import { OutboxRelay } from './relay.js';
 import { DirectorySync } from './directorySync.js';
+import { classifyClinicFailure } from './messagingErrors.js';
 import { withRequestId, eventCorrelation, integer } from '@nipopeto/runtime';
 import { blobStoreConfigured, blobStoreFromEnv } from './blobStore.js';
 import { drainBlobCleanup } from './blobCleanup.js';
@@ -18,7 +19,7 @@ await startWorker('clinic', async signal => {
     await Promise.all([
       reconnect('clinic-consumer', signal, async () => {
         await declareTopology(config.brokerUrl, config.topology);
-        const consumer = await consumeEvents(config.brokerUrl, config.topology.clinic, 'clinic', raw => withRequestId(eventCorrelation(raw), () => inbox.apply(raw)));
+        const consumer = await consumeEvents(config.brokerUrl, config.topology.clinic, 'clinic', raw => withRequestId(eventCorrelation(raw), () => inbox.apply(raw)), { classify: classifyClinicFailure });
         process.stdout.write(JSON.stringify({ service: 'clinic', status: 'worker-ready' }) + '\n');
         const stopped = new AbortController();
         const abort = () => stopped.abort(); signal.addEventListener('abort', abort, { once: true });

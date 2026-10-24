@@ -6,7 +6,7 @@ import { createServer as tcpServer } from 'node:net';
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { randomUUID, generateKeyPairSync } from 'node:crypto';
-import { assertTestProject, waitForQueueIdle } from './test-project.mjs';
+import { assertTestProject, topologyQueues, waitForQueueIdle } from './test-project.mjs';
 import { PrismaClient as Core } from '@prisma/client';
 import { PrismaClient as Clinic } from '../../services/clinic/src/generated/client/index.js';
 import { PrismaClient as Notification } from '../../services/notification/src/generated/client/index.js';
@@ -168,7 +168,7 @@ export async function shutdown(){
   let conn,channel;
   try{
     conn=await amqp.connect(broker);channel=await conn.createChannel();
-    for(const name of [routes.clinic,routes.notification,routes.clinic+'.dlq',routes.notification+'.dlq']){const q=await channel.checkQueue(name);if(!q4E2e&&!failure&&q.messageCount===0&&q.consumerCount===0)await channel.deleteQueue(name);}
+    for(const name of topologyQueues(routes,[routes.clinic,routes.notification,routes.identity])){const q=await channel.checkQueue(name);if(!q4E2e&&!failure&&q.messageCount===0&&q.consumerCount===0)await channel.deleteQueue(name);}
   }catch(error){failure??=error;}
   finally{
     await channel?.close().catch(error=>{failure??=error;});await conn?.close().catch(error=>{failure??=error;});

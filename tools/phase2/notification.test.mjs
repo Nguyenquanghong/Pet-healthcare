@@ -9,6 +9,7 @@ import { createApp } from '../../services/notification/src/app.ts';
 import { actorVerifier } from '../../services/notification/src/auth.ts';
 import { NotificationInbox } from '../../services/notification/src/inbox.ts';
 import { declareTopology, topology, publishConfirmed, consumeEvents } from '@nipopeto/messaging';
+import { topologyQueues } from './test-project.mjs';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM, 'pet-phase2-p1-test', 'Use guarded phase2:test:notification');
 const url = 'postgresql://p2_notification:p2_notification_fixture_only@127.0.0.1:55432/p2_notification_test?schema=p1_proof';
@@ -67,7 +68,7 @@ test.after(async () => {
   try {
     await consumer?.close();
     if (channel) {
-      for (const name of [routes.notification, `${routes.notification}.dlq`, routes.clinic, `${routes.clinic}.dlq`]) {
+      for (const name of topologyQueues(routes, [routes.notification, routes.identity, routes.clinic])) {
         const state = await channel.checkQueue(name);
         if (state.messageCount) retained.push(name); else await channel.deleteQueue(name);
       }

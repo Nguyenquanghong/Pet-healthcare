@@ -7,7 +7,7 @@ export function logEvent(service:string,event:Envelope,status:string,started=per
   try{process.stdout.write(JSON.stringify({service,eventId:id(event.eventId),correlationId:id(event.correlationId),eventType:event.eventType,status,latencyMs:Math.round(performance.now()-started)})+'\n');}catch{}
 }
 export type ConsumerName = EventConsumer;
-export const topology = (prefix = 'nipopeto.v1') => ({ exchange: `${prefix}.events`, notification: `${prefix}.notification`, clinic: `${prefix}.clinic`, clinicRead: `${prefix}.clinic-read-v1` });
+export const topology = (prefix = 'nipopeto.v1') => ({ exchange: `${prefix}.events`, notification: `${prefix}.notification`, identity: `${prefix}.identity`, clinic: `${prefix}.clinic`, clinicRead: `${prefix}.clinic-read-v1` });
 export type Topology = ReturnType<typeof topology>;
 export async function declareTopology(brokerUrl: string, t: Topology) {
   const connection = await amqp.connect(brokerUrl, { timeout: 5000 });
@@ -15,12 +15,14 @@ export async function declareTopology(brokerUrl: string, t: Topology) {
   try {
     const channel = await connection.createChannel();
     await channel.assertExchange(t.exchange, 'topic', { durable: true });
-    for (const consumer of ['notification', 'clinic', 'clinicRead'] as const) {
+    for (const consumer of ['notification', 'identity', 'clinic', 'clinicRead'] as const) {
       await channel.assertQueue(t[consumer], { durable: true });
       await channel.assertQueue(`${t[consumer]}.dlq`, { durable: true });
     }
     await channel.bindQueue(t.notification, t.exchange, 'notification.requested.v1');
-    await channel.bindQueue(t.notification, t.exchange, 'identity.sessions-revoked.v1');
+    // P03: revocations have their own queue. Removing the old binding is a no-op once it is gone.
+    await channel.unbindQueue(t.notification, t.exchange, 'identity.sessions-revoked.v1');
+    await channel.bindQueue(t.identity, t.exchange, 'identity.sessions-revoked.v1');
     await channel.bindQueue(t.clinic, t.exchange, 'directory.#');
     await channel.bindQueue(t.clinic, t.exchange, 'billing.#');
     await channel.bindQueue(t.clinicRead, t.exchange, 'clinic.appointment-read-changed.v1');
@@ -91,14 +93,58 @@ export class ConfirmPublisher {
     await connection?.close().catch(() => {});
   }
 }
+// ---- P03: retry without blocking the queue -----------------------------------------
+// A failure retry can heal: a dependency not answering, a timeout, a lost connection.
+export class TransientError extends Error { constructor(readonly code: string) { super(code); } }
+// A failure no retry can heal: the same message fails the same way every time.
+export class PermanentError extends Error { constructor(readonly code: string) { super(code); } }
+export type FailureKind = 'transient' | 'permanent';
+export type ClassifyFailure = (error: unknown) => FailureKind;
+// Unknown failures are retried. Retrying a permanent one costs a few idempotent
+// attempts inside the retry window and no longer blocks the queue; sending a transient
+// one to the DLQ needs a manual replay. Each service names what is permanent.
+export function permanentOn(codes: readonly string[], also: (error: unknown) => boolean = () => false): ClassifyFailure {
+  return error => error instanceof PermanentError || (error instanceof Error && codes.includes(error.message)) || also(error) ? 'permanent' : 'transient';
+}
+export const defaultClassify = permanentOn([]);
+// The code written to the p2-error-code header: an UPPER_CASE code (Prisma's P2002,
+// ECONNREFUSED included), never free text that could carry data.
+export function failureCode(error: unknown) {
+  const code = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : error instanceof Error ? error.message : '';
+  return /^[A-Z][A-Z0-9_]{2,63}$/.test(code) ? code : 'PROCESSING_FAILED';
+}
+// The delay before each retry. Default 1 s, 5 s, 30 s, 2 min, 10 min: about 12.6 minutes,
+// enough for a restart or deploy of a service or the database, before the DLQ.
+export const defaultRetryDelaysMs = [1000, 5000, 30000, 120000, 600000] as const;
+export function retryDelays(raw = process.env.BROKER_RETRY_DELAYS_MS): number[] {
+  if (raw === undefined || raw === '') return [...defaultRetryDelaysMs];
+  const delays = raw.split(',').map(Number);
+  if (delays.length > 6 || delays.some((d, i) => !Number.isSafeInteger(d) || d < 1 || d > 3600000 || (i > 0 && d <= delays[i - 1]!))) throw new Error('INVALID_BROKER_RETRY_DELAYS');
+  return delays;
+}
+// A retry queue holds a failed message for its delay, then dead-letters it back to the
+// consumer queue through the default exchange. Nobody consumes it. The delay is in the
+// name because a queue's TTL cannot change: another ladder declares other queues.
+export const retryQueue = (queue: string, delayMs: number) => `${queue}.retry.${delayMs}ms`;
+export function retryTarget(queue: string, attempt: number, kind: FailureKind, delays: readonly number[]) {
+  const delay = kind === 'transient' ? delays[attempt] : undefined;
+  return delay === undefined ? { queue: `${queue}.dlq`, delay: null } : { queue: retryQueue(queue, delay), delay };
+}
 export interface ConsumerOptions {
+  // Delay before each retry; default BROKER_RETRY_DELAYS_MS, else defaultRetryDelaysMs.
+  retryDelaysMs?: readonly number[];
+  // Tests only: the former ladder of b and 2b ms (three attempts in all).
   retryBaseMs?: number;
+  classify?: ClassifyFailure;
   // Test callbacks only; never exposed by HTTP/environment variables.
   afterCommit?: () => void | Promise<void>;
   beforeRepublish?: () => void | Promise<void>;
   afterRepublishConfirm?: () => void | Promise<void>;
 }
 export async function consumeEvents(brokerUrl: string, queue: string, consumerName: ConsumerName, apply: (raw: string) => Promise<unknown>, options: ConsumerOptions = {}) {
+  // Validated before connecting: a bad ladder fails the start, not the first retry.
+  const delays = options.retryDelaysMs ? retryDelays(options.retryDelaysMs.join(',')) : options.retryBaseMs !== undefined ? retryDelays(`${options.retryBaseMs},${options.retryBaseMs * 2}`) : retryDelays();
+  const classify = options.classify ?? defaultClassify;
   const connection = await amqp.connect(brokerUrl, { timeout: 5000 });
   connection.on('error', () => {});
   const channel = await connection.createConfirmChannel().catch(async error => { await connection.close().catch(() => {}); throw error; });
@@ -115,11 +161,12 @@ export async function consumeEvents(brokerUrl: string, queue: string, consumerNa
   try {
     await channel.assertQueue(queue, { durable: true });
     await channel.assertQueue(`${queue}.dlq`, { durable: true });
+    for (const delay of delays) await channel.assertQueue(retryQueue(queue, delay), { durable: true, messageTtl: delay, deadLetterExchange: '', deadLetterRoutingKey: queue });
     await channel.prefetch(1);
   } catch (error) { await terminate(); throw error; }
   async function handle(message: amqp.ConsumeMessage) {
     const started=performance.now();let observed:Envelope|undefined;
-    let valid = false, reason = 'INVALID_EVENT';
+    let valid = false, reason = 'INVALID_EVENT', failure: FailureKind = 'permanent';
     try {
       const event = parseEnvelope(message.content.toString('utf8'));
       observed=event;
@@ -133,17 +180,20 @@ export async function consumeEvents(brokerUrl: string, queue: string, consumerNa
         try { await options.afterCommit?.(); } catch { await terminate(); return; }
         if (!disconnected){channel.ack(message);logEvent(consumerName,observed!,'acknowledged',started);}
         return;
-      } catch { reason = 'PROCESSING_FAILED'; }
+      } catch (error) {
+        reason = failureCode(error);
+        try { failure = classify(error); } catch { failure = 'transient'; }
+      }
     }
     const header = message.properties.headers?.['p2-attempt'];
     const attempt = Number.isSafeInteger(header) && header >= 0 ? header as number : 0;
-    const target = !valid || attempt >= 2 ? `${queue}.dlq` : queue;
+    // The message waits in a retry queue, not in this handler: the next message runs now.
+    const target = retryTarget(queue, attempt, failure, delays);
     try {
-      if (target === queue) await new Promise(resolve => setTimeout(resolve, (options.retryBaseMs ?? 1000) * (attempt + 1)));
       if (disconnected) return;
       await options.beforeRepublish?.();
-      await publishConfirmed(channel, '', target, message.content, { ...message.properties, headers: { ...message.properties.headers, 'p2-attempt': attempt + 1, 'p2-error-code': reason } });
-      if(observed)logEvent(consumerName,observed,target===queue?'retry-confirmed':'dlq-confirmed',started);
+      await publishConfirmed(channel, '', target.queue, message.content, { ...message.properties, headers: { ...message.properties.headers, 'p2-attempt': attempt + 1, 'p2-error-code': reason, 'p2-failure': failure } });
+      if(observed)logEvent(consumerName,observed,target.delay===null?'dlq-confirmed':'retry-confirmed',started);
       await options.afterRepublishConfirm?.();
       if (!disconnected) channel.ack(message);
     } catch { await terminate(); } // original remains unacknowledged

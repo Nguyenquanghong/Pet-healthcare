@@ -13,7 +13,7 @@ import {PrismaClient as NotificationClient} from '../../services/notification/sr
 import {hashPassword,hashPasswordAsync} from '../../backend/dist/src/lib/password.js';
 import {createClient} from 'redis';
 import jwt from 'jsonwebtoken';
-import {assertTestProject,waitForQueueIdle} from './test-project.mjs';
+import {assertTestProject,topologyQueues,waitForQueueIdle} from './test-project.mjs';
 import {declareTopology,topology} from '@nipopeto/messaging';
 import amqp from 'amqplib';
 import {OutboxRelay as CoreRelay} from '../../backend/dist/src/phase2/relay.js';
@@ -100,7 +100,7 @@ test.after(async()=>{
   for(const handle of handles.reverse())try{if(!handle.ended())await handle.stop();}catch(error){failure??=error;await handle.kill().catch(()=>{});}
   if(nginx){try{execFileSync(binary,['-p',artifacts.replaceAll('\\','/')+'/','-c','nginx.conf','-s','quit'],{stdio:'pipe'});await until(()=>nginx.exitCode!==null,'nginx graceful exit',15000);}catch(error){failure??=error;nginx.kill();}}
   try{
-    if(declared){amqpConnection=await amqp.connect(broker);amqpConnection.on('error',()=>{});amqpChannel=await amqpConnection.createChannel();const retained=[];for(const q of [routes.clinic,routes.clinic+'.dlq',routes.notification,routes.notification+'.dlq']){const state=await amqpChannel.checkQueue(q);if(state.messageCount)retained.push(q);else await amqpChannel.deleteQueue(q);}if(!retained.length)await amqpChannel.deleteExchange(routes.exchange);assert.deepEqual(retained,[],'Nonempty failed proof queues retained');}
+    if(declared){amqpConnection=await amqp.connect(broker);amqpConnection.on('error',()=>{});amqpChannel=await amqpConnection.createChannel();const retained=[];for(const q of topologyQueues(routes,[routes.clinic,routes.notification,routes.identity])){const state=await amqpChannel.checkQueue(q);if(state.messageCount)retained.push(q);else await amqpChannel.deleteQueue(q);}if(!retained.length)await amqpChannel.deleteExchange(routes.exchange);assert.deepEqual(retained,[],'Nonempty failed proof queues retained');}
     for(const h of handles){assert.ok(!/fixture_only|postgresql:\/\/|amqp:\/\/|BEGIN PRIVATE KEY|Bearer |P6Fixture-only/.test(h.logs()),'No credential in logs: '+h.name);for(const secret of Object.values(secrets))assert.ok(!h.logs().includes(secret));}
   }catch(error){failure??=error;}finally{await amqpConnection?.close().catch(()=>{});await Promise.all(Object.values(db).map(c=>c.$disconnect()));}
   if(failure)throw failure;

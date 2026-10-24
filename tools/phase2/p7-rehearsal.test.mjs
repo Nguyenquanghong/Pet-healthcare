@@ -8,7 +8,7 @@ import {mkdirSync,writeFileSync,existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 import amqp from 'amqplib';
 import {topology,declareTopology,publishConfirmed} from '@nipopeto/messaging';
-import {assertTestProject,waitForQueueIdle} from './test-project.mjs';
+import {assertTestProject,topologyQueues,waitForQueueIdle} from './test-project.mjs';
 import {createEnvironment,client,url,assertDatabase,backupAndRestore,withDatabase} from './p7-environment.mjs';
 import {legacyFixture} from './p7-fixture.mjs';
 import {catalogs,sourceNames,digest,readRows} from './p7-manifest.mjs';
@@ -72,7 +72,7 @@ test.after(async()=>{
   if(declared)try{await settled();}catch(e){failure=e;}
   for(const h of handles.reverse())try{await h.stop();}catch(e){failure??=e;await h.kill();}
   if(nginx)try{execFileSync(binary,['-p',artifacts.replaceAll('\\','/')+'/','-c','nginx.conf','-s','quit'],{stdio:'pipe'});await until(()=>nginx.exitCode!==null,'nginx_exit',15000);assert.equal(nginx.exitCode,0);}catch(e){failure??=e;nginx.kill();}
-  if(declared)try{const conn=await amqp.connect(broker),ch=await conn.createChannel();try{for(const name of [routes.clinic,routes.notification,routes.clinic+'.dlq',routes.notification+'.dlq']){const q=await ch.checkQueue(name);if(q.messageCount!==0)failure??=new Error('P7_NONEMPTY_QUEUE_RETAINED');if(!failure&&q.messageCount===0&&q.consumerCount===0)await ch.deleteQueue(name);}if(!failure)await ch.deleteExchange(routes.exchange);}finally{await ch.close();await conn.close();}}catch(e){failure??=e;}
+  if(declared)try{const conn=await amqp.connect(broker),ch=await conn.createChannel();try{for(const name of topologyQueues(routes,[routes.clinic,routes.notification,routes.identity])){const q=await ch.checkQueue(name);if(q.messageCount!==0)failure??=new Error('P7_NONEMPTY_QUEUE_RETAINED');if(!failure&&q.messageCount===0&&q.consumerCount===0)await ch.deleteQueue(name);}if(!failure)await ch.deleteExchange(routes.exchange);}finally{await ch.close();await conn.close();}}catch(e){failure??=e;}
   for(const h of handles){assert.ok(!/postgresql:\/\/|amqp:\/\/|BEGIN PRIVATE KEY|P7-fixture-only/.test(h.logs()),'No credential in owned child logs');for(const secret of [...Object.values(secrets),...Object.values(ctx?.components??{}).map(c=>c.password)])assert.ok(!h.logs().includes(secret));}
   await Promise.all(Object.values(db).map(c=>c.$disconnect()));if(failure)throw failure;
 });

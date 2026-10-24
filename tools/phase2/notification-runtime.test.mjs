@@ -1,5 +1,5 @@
 import test from 'node:test';
-import {waitForQueueIdle} from './test-project.mjs';
+import {topologyQueues,waitForQueueIdle} from './test-project.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID, generateKeyPairSync, createHash } from 'node:crypto';
@@ -115,7 +115,7 @@ test.after(async () => {
     await Promise.all(workers.map(w => w.stop()));
     if (stoppedBroker) { docker('up','-d','--wait','rabbitmq'); stoppedBroker = false; }
     if (!connection) { connection = await brokerConnection(); channel = await connection.createConfirmChannel(); channel.on('error', () => {}); }
-    for (const q of [routes.notification,`${routes.notification}.dlq`,routes.clinic,`${routes.clinic}.dlq`]) {
+    for (const q of topologyQueues(routes, [routes.notification, routes.identity, routes.clinic])) {
       const state = await channel.checkQueue(q); if (state.messageCount) retained.push(q); else await channel.deleteQueue(q);
     }
     if (!retained.length) await channel.deleteExchange(routes.exchange);

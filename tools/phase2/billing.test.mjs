@@ -1,5 +1,5 @@
 import test from 'node:test';
-import {waitForQueueIdle} from './test-project.mjs';
+import {topologyQueues,waitForQueueIdle} from './test-project.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID,generateKeyPairSync} from 'node:crypto';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
@@ -70,7 +70,7 @@ test.before(async()=>{
 test.after(async()=>{
   if(q5Races){const dir='test-results/phase2/cqrs/q5-billing-'+run;mkdirSync(dir,{recursive:true});writeFileSync(dir+'/races.json',JSON.stringify(raceEvidence,null,2));console.log(JSON.stringify({q5BillingRun:run,prepareUndoPairs:raceEvidence.prepareUndo.length,commitAbortPairs:raceEvidence.commitAbort.length,artifact:dir}));}
   for(const h of handles.reverse())await h.stop();await close(sourceServer);
-  if(channel&&declared&&!q5Races)for(const name of [routes.notification,routes.clinic,routes.notification+'.dlq',routes.clinic+'.dlq']){try{const q=await channel.checkQueue(name);if(q.messageCount===0&&q.consumerCount===0)await channel.deleteQueue(name);}catch{break;}}
+  if(channel&&declared&&!q5Races)for(const name of topologyQueues(routes,[routes.notification,routes.identity,routes.clinic])){try{const q=await channel.checkQueue(name);if(q.messageCount===0&&q.consumerCount===0)await channel.deleteQueue(name);}catch{break;}}
   try{await channel?.close();}catch{}try{await connection?.close();}catch{}
   await Promise.all([core.$disconnect(),clinic.$disconnect(),notification.$disconnect()]);
 });
