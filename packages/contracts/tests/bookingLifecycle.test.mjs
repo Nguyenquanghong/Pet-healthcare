@@ -43,3 +43,27 @@ test('lookups answer from the table and nothing else', () => {
   assert.equal(statusLabel('no_show'), 'vắng mặt');
   assert.equal(statusLabel('unknown'), 'unknown');
 });
+
+// P01 step 6: allowedActions is the table filtered by the actor's permissions.
+test('allowedActions offers exactly the moves the table allows the role, and owner steps to the owner', async () => {
+  const { allowedActions } = await import('../dist/index.js');
+  const names = (kind, status, role, own = false) => allowedActions(kind, status, role, own).map(a => a.kind + (a.to ? ':' + a.to : '') + (a.name ? '@' + a.name : ''));
+  assert.deepEqual(names('appointment', 'confirmed', 'staff'), ['transition:checked_in', 'transition:no_show', 'transition:cancelled']);
+  assert.deepEqual(names('appointment', 'checked_in', 'staff'), ['transition:in_progress', 'undo:confirmed'], 'staff may not write the record that completes the visit');
+  assert.deepEqual(names('appointment', 'checked_in', 'doctor'), ['transition:in_progress', 'undo:confirmed', 'step:completed@medical-completed']);
+  assert.deepEqual(names('appointment', 'completed', 'staff'), [], 'reopening is for admins');
+  assert.deepEqual(names('appointment', 'completed', 'admin'), ['undo:in_progress']);
+  assert.deepEqual(names('appointment', 'pending', 'owner', true), ['cancel', 'reschedule']);
+  assert.deepEqual(names('appointment', 'checked_in', 'owner', true), []);
+  assert.deepEqual(names('appointment', 'pending', 'owner', false), [], 'another owner gets nothing');
+  assert.deepEqual(names('hotel', 'pending', 'owner', true), ['cancel'], 'hotel stays are not rescheduled');
+  assert.deepEqual(names('hotel', 'in_stay', 'staff'), ['transition:checked_out', 'undo:confirmed']);
+  assert.deepEqual(names('hotel', 'checked_out', 'admin'), ['undo:in_stay']);
+  assert.deepEqual(names('appointment', 'cancelled', 'admin'), []);
+  assert.deepEqual(names('appointment', 'toString', 'admin'), [], 'only own table keys');
+  assert.deepEqual(names('appointment', 'pending', 'nobody'), []);
+  // Every manual rule appears for some role, so no move is unreachable from the UI.
+  for (const [kind, lifecycle] of Object.entries(bookingLifecycles))
+    for (const [from, rules] of Object.entries(lifecycle.manual)) for (const rule of rules)
+      assert.ok(['staff', 'doctor', 'admin'].some(role => names(kind, from, role).includes('transition:' + rule.to)), `${kind} ${from} -> ${rule.to}`);
+});

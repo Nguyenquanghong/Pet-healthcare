@@ -1,4 +1,5 @@
 import { usePagedList } from "../../services/usePagedList";
+import { hasAction } from "../../utils/bookingActions";
 import { Pagination } from "../../components/ui/Pagination";
 import { BookingStatusDialog, type StatusDialogSelection } from "./BookingStatusDialog";
 import { useBookingAction } from "./useBookingAction";
@@ -57,7 +58,6 @@ export function AdminAppointmentsPage() {
   const {search: locationSearch}=useLocation();
   const drilldown=useMemo(()=>readActivityDrilldown(locationSearch),[locationSearch]);
   const {
-    userRole,
     sendReminder,
   } = useAppStore();
 
@@ -376,10 +376,10 @@ export function AdminAppointmentsPage() {
                         </button>
 
                         <button onClick={() => setStatusDialog({ booking: a, intent: "history", pet: pets.find(pet => pet.id === a.petId), owner: owners.find(owner => owner.id === a.ownerId) })} className="rounded-lg border px-2 py-1.5 text-xs">Lịch sử thao tác</button>
-                        {(a.status === "checked_in" || (a.status === "completed" && userRole === "admin")) &&
-                          <button onClick={() => setStatusDialog({ booking: a, intent: "undo", pet: pets.find(pet => pet.id === a.petId), owner: owners.find(owner => owner.id === a.ownerId) })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{a.status === "checked_in" ? "Hoàn tác check-in" : "Mở lại dịch vụ"}</button>}
+                        {hasAction(a, "undo") &&
+                          <button onClick={() => setStatusDialog({ booking: a, intent: "undo", pet: pets.find(pet => pet.id === a.petId), owner: owners.find(owner => owner.id === a.ownerId) })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{hasAction(a, "undo", "confirmed") ? "Hoàn tác check-in" : "Mở lại dịch vụ"}</button>}
                         {/* Status workflow buttons */}
-                        {a.status === "pending" && (
+                        {hasAction(a, "transition", "confirmed") && (
                           <button
                             onClick={() => handleStatusUpdate(a.id, "confirmed")}
                             className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-bold text-white hover:bg-primary-dark transition-colors"
@@ -388,14 +388,16 @@ export function AdminAppointmentsPage() {
                           </button>
                         )}
 
-                        {a.status === "confirmed" && (
-                          <>
+                        {hasAction(a, "transition", "checked_in") && (
                             <button
                               onClick={() => handleStatusUpdate(a.id, "checked_in")}
                               className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors"
                             >
                               <UserCheck size={13} /> Check-in
                             </button>
+                        )}
+                        {/* A reminder is not a lifecycle move: it is offered for a confirmed visit. */}
+                        {a.status === "confirmed" && (
                             <button
                               onClick={() => sendReminder(a.id)}
                               title="Gửi nhắc nhở"
@@ -403,6 +405,8 @@ export function AdminAppointmentsPage() {
                             >
                               <Bell size={14} />
                             </button>
+                        )}
+                        {hasAction(a, "transition", "no_show") && (
                             <button
                               onClick={() => handleStatusUpdate(a.id, "no_show")}
                               title="Đánh dấu vắng mặt"
@@ -410,10 +414,9 @@ export function AdminAppointmentsPage() {
                             >
                               <UserX size={14} />
                             </button>
-                          </>
                         )}
 
-                        {a.status === "checked_in" && (
+                        {hasAction(a, "transition", "in_progress") && (
                           <button
                             onClick={() => handleStatusUpdate(a.id, "in_progress")}
                             className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-violet-700 transition-colors"
@@ -422,7 +425,7 @@ export function AdminAppointmentsPage() {
                           </button>
                         )}
 
-                        {!isSpa && (a.status === "in_progress" || a.status === "checked_in") && (
+                        {!isSpa && hasAction(a, "step", "medical-completed") && (
                           <button
                             onClick={() => openCreateRecordForAppointment(a)}
                             className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-xs"
@@ -431,7 +434,7 @@ export function AdminAppointmentsPage() {
                           </button>
                         )}
 
-                        {a.status === "in_progress" && (
+                        {hasAction(a, "transition", "completed") && (
                           <button
                             onClick={() => handleStatusUpdate(a.id, "completed")}
                             className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-800 transition-colors"
@@ -440,7 +443,7 @@ export function AdminAppointmentsPage() {
                           </button>
                         )}
 
-                        {["pending", "confirmed"].includes(a.status) && (
+                        {hasAction(a, "transition", "cancelled") && (
                           <button
                             onClick={() => {
                               setCancelModal(a);

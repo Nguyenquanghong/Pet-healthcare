@@ -1,4 +1,5 @@
 import { usePagedList } from "../../services/usePagedList";
+import { hasAction } from "../../utils/bookingActions";
 import { Pagination } from "../../components/ui/Pagination";
 import { BookingStatusDialog, type StatusDialogSelection } from "./BookingStatusDialog";
 import { useBookingAction } from "./useBookingAction";
@@ -20,7 +21,6 @@ import {
   BedDouble,
 } from "lucide-react";
 import { AdminLayout } from "../../components/layout/admin/AdminLayout";
-import { useAppStore } from "../../store/AppStoreProvider";
 import type { DailyCareNote, HotelBooking, HotelBookingStatus } from "../../types/booking";
 import type { Invoice } from "../../types/invoice";
 import { formatCurrency } from "../../utils/formatCurrency";
@@ -42,9 +42,6 @@ const TABS = ["all", "pending", "confirmed", "in_stay", "checked_out", "rejected
 type TabKey = (typeof TABS)[number];
 
 export function AdminHotelBookingsPage() {
-  const {
-    userRole,
-  } = useAppStore();
 
   const [tab, setTab] = useState<TabKey>("all");
   const [roomTypeFilter, setRoomTypeFilter] = useState("all");
@@ -289,17 +286,18 @@ export function AdminHotelBookingsPage() {
 
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button onClick={() => setStatusDialog({ booking: b, intent: "history", pet: pets.find(pet => pet.id === b.petId), owner: owners.find(owner => owner.id === b.ownerId) })} className="rounded-lg border px-2 py-1.5 text-xs">Lịch sử thao tác</button>
-                  {(b.status === "in_stay" || (b.status === "checked_out" && userRole === "admin")) &&
-                    <button onClick={() => setStatusDialog({ booking: b, intent: "undo", pet: pets.find(pet => pet.id === b.petId), owner: owners.find(owner => owner.id === b.ownerId) })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{b.status === "in_stay" ? "Hoàn tác check-in" : "Hoàn tác trả thú cưng"}</button>}
+                  {hasAction(b, "undo") &&
+                    <button onClick={() => setStatusDialog({ booking: b, intent: "undo", pet: pets.find(pet => pet.id === b.petId), owner: owners.find(owner => owner.id === b.ownerId) })} className="rounded-lg border border-amber-300 px-2 py-1.5 text-xs text-amber-800">{hasAction(b, "undo", "confirmed") ? "Hoàn tác check-in" : "Hoàn tác trả thú cưng"}</button>}
 
-                  {b.status === "pending" && (
-                    <>
+                  {hasAction(b, "transition", "confirmed") && (
                       <button
                         onClick={() => handleStatus(b.id, "confirmed")}
                         className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary-dark transition-colors"
                       >
                         <CheckCircle2 size={13} /> Xác nhận
                       </button>
+                  )}
+                  {hasAction(b, "transition", "rejected") && (
                       <button
                         onClick={() => {
                           setRejectModal(b);
@@ -309,10 +307,9 @@ export function AdminHotelBookingsPage() {
                       >
                         <XCircle size={13} /> Từ chối
                       </button>
-                    </>
                   )}
 
-                  {b.status === "confirmed" && (
+                  {hasAction(b, "transition", "in_stay") && (
                     <button
                       onClick={() => handleStatus(b.id, "in_stay")}
                       className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors shadow-xs"
@@ -335,14 +332,14 @@ export function AdminHotelBookingsPage() {
                       >
                         <MessageSquarePlus size={13} /> Cập nhật nhật ký
                       </button>
-                      <button
+                      {hasAction(b, "transition", "checked_out") && <button
                         onClick={() => handleStatus(b.id, "checked_out")}
                         disabled={invoice?.paymentStatus !== "paid"}
                         title={invoice?.paymentStatus === "paid" ? "Xác nhận bàn giao thú cưng" : "Cần chốt hóa đơn và xác nhận đã thu đủ tiền"}
                         className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <LogOut size={13} /> {invoice?.paymentStatus === "paid" ? "Check-out" : "Chờ thanh toán"}
-                      </button>
+                      </button>}
                     </>
                   )}
                 </div>

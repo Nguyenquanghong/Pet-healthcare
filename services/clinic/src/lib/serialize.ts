@@ -1,10 +1,14 @@
+import { allowedActions } from '@nipopeto/contracts';
 import type { AppointmentRecord } from '../application/ports/appointments.js';
+import type { Actor } from '../domain/auth.js';
 import type { MedicalRecordValue } from '../application/ports/medicalRecords.js';
 export { medicalImageDto } from '../application/services/medicalRecords.js';
 const dateOnly=(value:Date)=>value.toISOString().slice(0,10);
-export function appointmentDto(item: AppointmentRecord, owner = false) {
-  const { internalNote, ...visible } = item;
-  return { ...visible, ...(owner ? {} : { internalNote }), date: dateOnly(item.appointmentDate), time: item.appointmentTime, appointmentDate: undefined, appointmentTime: undefined };
+// P01: allowedActions tells the viewer which buttons to offer; the server still checks.
+export function appointmentDto(item: AppointmentRecord, viewer: Pick<Actor, 'role' | 'sub'>) {
+  const { internalNote, ...visible } = item, owner = viewer.role === 'owner';
+  return { ...visible, ...(owner ? {} : { internalNote }), date: dateOnly(item.appointmentDate), time: item.appointmentTime, appointmentDate: undefined, appointmentTime: undefined,
+    allowedActions: allowedActions('appointment', item.status, viewer.role, owner && item.ownerId === viewer.sub) };
 }
 
 export function medicalRecordDto(item: MedicalRecordValue, owner = false) {

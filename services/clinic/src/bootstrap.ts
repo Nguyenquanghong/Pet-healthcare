@@ -15,5 +15,5 @@ export async function bootstrap(db:PrismaClient,actor:Actor,directory:RequestDir
     return{appointments,medicalRecords,summary:{totals:{appointments:counts.reduce((n,g)=>n+g._count,0),medicalRecords:await tx.medicalRecord.count({where:own}),medicalImages:await tx.medicalImage.count({where:{...own,deletedAt:null}})},appointmentStatus:Object.fromEntries(counts.map(g=>[g.status,g._count])),todayAppointments:await tx.appointment.count({where:{...own,appointmentDate:today}})}};
   },{isolationLevel:'RepeatableRead'});
   const rows=[...result.appointments,...result.medicalRecords],source=rows.length?await directory.lookup(rows.map(r=>r.petId),rows.map(r=>r.ownerId)):{pets:[],owners:[]};
-  return{...source,appointments:result.appointments.map(r=>appointmentDto(r,actor.role==='owner')),medicalRecords:result.medicalRecords.map(r=>medicalRecordDto(r,actor.role==='owner')),medicalImages:[],summary:result.summary};
+  return{...source,appointments:result.appointments.map(r=>appointmentDto(r,actor)),medicalRecords:result.medicalRecords.map(r=>medicalRecordDto(r,actor.role==='owner')),medicalImages:[],summary:result.summary};
 }

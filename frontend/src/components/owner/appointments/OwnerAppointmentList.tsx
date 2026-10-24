@@ -1,4 +1,5 @@
 import { usePagedList } from "../../../services/usePagedList";
+import { hasAction } from "../../../utils/bookingActions";
 import { Pagination } from "../../ui/Pagination";
 import { useMemo, useRef, useState } from "react";
 import { Ban, CalendarClock, CheckCircle2, X } from "lucide-react";
@@ -157,7 +158,7 @@ export function OwnerAppointmentList({ mode = "medical", selectedDate, onClearDa
       <div className="divide-y divide-slate-100">
         {visibleAppointments.map((appointment) => {
           const pet = pets.find((item) => item.id === appointment.petId);
-          const canModify = ["pending", "confirmed"].includes(appointment.status);
+          const canReschedule = hasAction(appointment, "reschedule"), canCancel = hasAction(appointment, "cancel");
 
           return (
             <div key={appointment.id} className="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
@@ -184,9 +185,9 @@ export function OwnerAppointmentList({ mode = "medical", selectedDate, onClearDa
                   {appointmentStatusLabels[appointment.status]}
                 </Badge>
 
-                {canModify && (
+                {(canReschedule || canCancel) && (
                   <div className="flex items-center gap-2 pt-1">
-                    <button
+                    {canReschedule && <button
                       type="button"
                       onClick={() => openReschedule(appointment)}
                       className="inline-flex items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 hover:text-primary-dark"
@@ -194,8 +195,8 @@ export function OwnerAppointmentList({ mode = "medical", selectedDate, onClearDa
                     >
                       <CalendarClock size={13} />
                       Đổi lịch
-                    </button>
-                    <button
+                    </button>}
+                    {canCancel && <button
                       type="button"
                       onClick={() => setCancelItem(appointment)}
                       className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-100 hover:text-rose-700"
@@ -203,7 +204,7 @@ export function OwnerAppointmentList({ mode = "medical", selectedDate, onClearDa
                     >
                       <Ban size={13} />
                       Hủy lịch
-                    </button>
+                    </button>}
                   </div>
                 )}
               </div>

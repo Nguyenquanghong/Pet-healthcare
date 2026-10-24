@@ -2462,6 +2462,70 @@
           "showMedicalAlerts"
         ]
       },
+      "BookingAction": {
+        "description": "P01: an action this viewer may try. transition and undo: PATCH status or undo-status to `to`; step: a use case that moves the booking (medical-completed: saving its medical record); cancel and reschedule: the owner's own booking.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "transition",
+                  "undo"
+                ]
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "to"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "step"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "name",
+              "to"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "cancel",
+                  "reschedule"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
       "Appointment": {
         "type": "object",
         "properties": {
@@ -2546,6 +2610,13 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "P01: the actions this viewer may try, from the booking lifecycle table and the viewer's permissions. Guards over linked data (medical record, invoice, care note) are not evaluated, so the server can still answer 409.",
+            "items": {
+              "$ref": "#/components/schemas/BookingAction"
+            }
           }
         },
         "required": [
@@ -2563,7 +2634,8 @@
           "ownerNote",
           "createdBy",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "allowedActions"
         ]
       },
       "MedicalRecord": {
@@ -2793,6 +2865,13 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "P01: the actions this viewer may try, from the booking lifecycle table and the viewer's permissions. Guards over linked data (medical record, invoice, care note) are not evaluated, so the server can still answer 409.",
+            "items": {
+              "$ref": "#/components/schemas/BookingAction"
+            }
           }
         },
         "required": [
@@ -2810,7 +2889,8 @@
           "ownerNote",
           "dailyCareNoteIds",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "allowedActions"
         ]
       },
       "CareNote": {

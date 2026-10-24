@@ -11,10 +11,10 @@ export function createBootstrapRouter(service: BootstrapService) {
       summary: data.summary,
       owners: data.owners.map(ownerDto),
       pets: data.pets.map(petDto),
-      appointments: data.appointments.map(item => appointmentDto(item, req.auth!.role === "owner")),
+      appointments: data.appointments.map(item => appointmentDto(item, req.auth!)),
       medicalRecords: data.medicalRecords.map(item => medicalRecordDto(item, req.auth!.role === "owner")),
       medicalImages: data.medicalImages,
-      hotelBookings: data.hotelBookings.map(item => hotelBookingDto(item, req.auth!.role === "owner")),
+      hotelBookings: data.hotelBookings.map(item => hotelBookingDto(item, req.auth!)),
       dailyCareNotes: data.dailyCareNotes.map(careNoteDto),
       notifications: data.notifications,
     });

@@ -311,6 +311,7 @@ test('AQ-10 capacity: the database refuses the booking beyond rooms per type and
     assert.equal(requireStatus(await request('/api/hotel-capacity/vip', { method: 'PUT', token: tokens.admin, body: { capacity: 1 } }), 200).capacity.capacity, 1);
     assert.deepEqual(requireStatus(await request('/api/hotel-capacity', { token: tokens.staff }), 200).items.map(i => i.roomType).sort(), ['deluxe', 'standard', 'vip']);
     created.push(requireStatus(await request('/api/hotel-bookings', { method: 'POST', key: randomUUID(), body: body(pets[0], 0, 3) }), 201).booking);
+    assert.deepEqual(created[0].allowedActions, [{ kind: 'cancel' }], 'P01: the owner may cancel a pending stay, nothing else');
     assert.match(requireStatus(await request('/api/hotel-bookings', { method: 'POST', key: randomUUID(), body: body(pets[1], 2, 4) }), 409).error, /hết chỗ/);
     created.push(requireStatus(await request('/api/hotel-bookings', { method: 'POST', key: randomUUID(), body: body(pets[1], 3, 5) }), 201).booking); // half-open: check-out night is free
     assert.deepEqual(await nights(), { [day(0)]: 1, [day(1)]: 1, [day(2)]: 1, [day(3)]: 1, [day(4)]: 1 });

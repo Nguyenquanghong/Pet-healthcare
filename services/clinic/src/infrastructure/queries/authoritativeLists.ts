@@ -55,7 +55,7 @@ export async function list(db:ListDatabase,resource:Resource,actor:Actor,directo
   },{isolationLevel:'RepeatableRead'});
   const rows=[...result.appointments,...result.records,...result.images];
   const source=rows.length?await directory.lookup(rows.map(r=>r.petId),rows.map(r=>r.ownerId)):{pets:[],owners:[]};
-  const related={owners:source.owners,pets:source.pets,appointments:result.appointments.map(r=>appointmentDto(r,actor.role==='owner')),medicalRecords:result.records.map(r=>medicalRecordDto(r,actor.role==='owner')),medicalImages:result.images.map(image=>medicalImageDto(image,blobs)),hotelBookings:[],dailyCareNotes:[],notifications:[],invoices:[]};
+  const related={owners:source.owners,pets:source.pets,appointments:result.appointments.map(r=>appointmentDto(r,actor)),medicalRecords:result.records.map(r=>medicalRecordDto(r,actor.role==='owner')),medicalImages:result.images.map(image=>medicalImageDto(image,blobs)),hotelBookings:[],dailyCareNotes:[],notifications:[],invoices:[]};
   const currentPet=q.petId?source.pets.find(p=>p.id===q.petId)??await directory.pet(q.petId as string):null;
   return{items:related[resource],pagination:{page:q.page,pageSize:q.pageSize,total:result.total,totalPages:Math.ceil(result.total/q.pageSize)},counts:result.counts,related:{...related,[resource]:[]},
     ...(currentPet?{directory:{petId:currentPet.id,sourceVersion:currentPet.directoryVersion,projectionVersion:result.projectionVersion,searchReady:result.projectionVersion>=currentPet.directoryVersion}}:{}),...(q.q?{searchConsistency:'eventual' as const}:{})};

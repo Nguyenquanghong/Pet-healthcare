@@ -18,21 +18,21 @@ export function createAppointmentsRouter(service: AppointmentService) {
   router.post("/", async (req, res) => {
     try {
       const appointment = await service.create(req.auth!, req.body);
-      res.status(201).json({ appointment: appointmentDto(appointment, req.auth!.role === "owner") });
+      res.status(201).json({ appointment: appointmentDto(appointment, req.auth!) });
     } catch (error) { failure(res, error); }
   });
 
   router.patch("/:id/status", async (req, res) => {
     try {
       const appointment = await service.changeStatus(req.auth!, req.params.id, req.body ?? {});
-      res.json({ appointment: appointmentDto(appointment, req.auth!.role === "owner") });
+      res.json({ appointment: appointmentDto(appointment, req.auth!) });
     } catch (error) { failure(res, error); }
   });
 
   router.patch("/:id/reschedule", async (req, res) => {
     try {
       const appointment = await service.reschedule(req.auth!, req.params.id, req.body ?? {});
-      res.json({ appointment: appointmentDto(appointment, req.auth!.role === "owner") });
+      res.json({ appointment: appointmentDto(appointment, req.auth!) });
     } catch (error) { failure(res, error); }
   });
 
@@ -41,14 +41,14 @@ export function createAppointmentsRouter(service: AppointmentService) {
     catch (error) { failure(res, error); }
   });
   router.post("/:id/undo-status", async (req, res) => {
-    try { res.json({ appointment: appointmentDto(await service.undoStatus(req.auth!, req.params.id, req.body ?? {}), req.auth!.role === "owner") }); }
+    try { res.json({ appointment: appointmentDto(await service.undoStatus(req.auth!, req.params.id, req.body ?? {}), req.auth!) }); }
     catch (error) { failure(res, error); }
   });
 
   router.patch("/:id/cancel", async (req, res) => {
     try {
       const appointment = await service.cancel(req.auth!, req.params.id, req.body ?? {});
-      res.json({ appointment: appointmentDto(appointment, req.auth!.role === "owner") });
+      res.json({ appointment: appointmentDto(appointment, req.auth!) });
     } catch (error) { failure(res, error); }
   });
 

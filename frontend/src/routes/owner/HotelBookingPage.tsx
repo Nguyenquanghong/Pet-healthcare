@@ -1,4 +1,5 @@
 import { CareNotesPanel } from "../../components/owner/booking/CareNotesPanel";
+import { hasAction } from "../../utils/bookingActions";
 import { usePagedList } from "../../services/usePagedList";
 import { Pagination } from "../../components/ui/Pagination";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -157,7 +158,7 @@ const nights = calculateNights(checkIn, checkOut);
               <div className="divide-y divide-slate-100">
                 {ownerBookings.map((b) => {
                   const pet = list.related.pets.find((p) => p.id === b.petId);
-                  const canCancel = ["pending", "confirmed"].includes(b.status);
+                  const canCancel = hasAction(b, "cancel");
 
                   return (
                     <div key={b.id} className="p-5 space-y-3.5">
