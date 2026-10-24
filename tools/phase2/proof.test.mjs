@@ -358,6 +358,22 @@ test('P03: revocations route to the identity queue; one queued before the split 
   }
 });
 
+test('P03: replay --all moves the DLQ back in order and stops at a repeated or invalid event', async () => {
+  const q = await registerQueue('replay-all'), [a, b] = [notificationEvent(), notificationEvent()];
+  for (const body of [a, b, a].map(e => JSON.stringify(e)).concat('not an event')) await publishConfirmed(channel, '', `${q}.dlq`, Buffer.from(body), { messageId: randomUUID(), headers: { 'p2-attempt': 3 } });
+  const replay = (...args) => JSON.parse(execFileSync(process.execPath, ['tools/phase2/replay-event.mjs', q, '--all', ...args], { env: { ...process.env, BROKER_URL: broker }, encoding: 'utf8' }));
+  try {
+    assert.deepEqual(replay(), { queue: q, replayed: [a.eventId, b.eventId], stopped: 'repeat' }, 'the second copy of a waits for the next replay');
+    assert.deepEqual(replay('--max', '1'), { queue: q, replayed: [a.eventId], stopped: 'max' });
+    assert.deepEqual(replay(), { queue: q, replayed: [], stopped: 'invalid' });
+    assert.equal((await channel.checkQueue(`${q}.dlq`)).messageCount, 1, 'the invalid message stays in the DLQ');
+    const back = [];
+    for (let m; (m = await channel.get(q, { noAck: false }));) { back.push([JSON.parse(m.content.toString()).eventId, m.properties.headers['p2-attempt']]); channel.ack(m); }
+    assert.deepEqual(back, [[a.eventId, 0], [b.eventId, 0], [a.eventId, 0]]);
+    assert.throws(() => replay('--max', '0'), /REPLAY_FAILED/);
+  } finally { await channel.purgeQueue(q); await channel.purgeQueue(`${q}.dlq`); }
+});
+
 async function spawnWorker(service, env) {
   const path = service === 'core' ? 'backend/dist/src/phase2/worker.js' : `services/${service}/dist/worker.js`;
   if(service==='clinic')env={...env,CORE_SERVICE_URL:'',CLINIC_PROOF_ONLY:'1'};

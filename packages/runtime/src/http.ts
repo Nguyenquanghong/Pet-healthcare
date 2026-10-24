@@ -23,7 +23,9 @@ export function withRequestId<T>(requestId:unknown,work:()=>T):T{return context.
 // correlationId of a raw event, without validating the rest (the inbox does that).
 export function eventCorrelation(raw:string):unknown{try{return (JSON.parse(raw) as {correlationId?:unknown})?.correlationId;}catch{return undefined;}}
 export type OwnSnapshot={pending:number;outboxAgeSeconds:number;outboxRetries:number;billingPending:number;billingAgeSeconds:number;dbLockWaits:number};
-export type RuntimeOptions={service:'core'|'clinic'|'notification';verify:(token:string)=>Actor;probe:()=>Promise<OwnSnapshot>;extras?:()=>Record<string,number>};
+// queues: the consumer queues under BROKER_PREFIX and their retry queue suffixes (P03),
+// summed into queue_ready, retry_ready and dlq_ready. Default: the service's own queue.
+export type RuntimeOptions={service:'core'|'clinic'|'notification';verify:(token:string)=>Actor;probe:()=>Promise<OwnSnapshot>;extras?:()=>Record<string,number>;queues?:{consumers:readonly string[];retrySuffixes:readonly string[]}};
 const buckets=[.01,.05,.1,.25,.5,.75,1,1.5,2,3,5,10];
 function routeTemplate(path:string){
   const p=path.split('?')[0]!;
@@ -53,6 +55,7 @@ export class ServiceRuntime {
   private broker=false;
   private queueReady=-1;
   private dlqReady=-1;
+  private retryReady=-1;
   private failures=0;
   private http=new Map<string,HttpMetric>();
   private lag=monitorEventLoopDelay({resolution:20});
@@ -143,11 +146,13 @@ export class ServiceRuntime {
       connection=await amqp.connect(url,{timeout:500});connection.on('error',()=>{});
       const prefix=process.env.BROKER_PREFIX;
       if(prefix&&this.options.service!=='core'){
-        for(const [suffix,kind]of [['','ready'],['.dlq','dlq']] as const){
-          const channel=await connection.createChannel();channel.on('error',()=>{});
-          try{const q=await channel.checkQueue(prefix+'.'+this.options.service+suffix);if(kind==='ready')this.queueReady=q.messageCount;else this.dlqReady=q.messageCount;}
-          catch{if(kind==='ready')this.queueReady=-1;else this.dlqReady=-1;}finally{await channel.close().catch(()=>{});}
-        }
+        // A missing queue closes its channel, so each check has its own; -1 means unknown.
+        const ready=async(name:string)=>{const channel=await connection!.createChannel();channel.on('error',()=>{});
+          try{return (await channel.checkQueue(prefix+'.'+name)).messageCount;}catch{return -1;}finally{await channel.close().catch(()=>{});}};
+        const total=async(names:readonly string[])=>{let sum=0;for(const name of names){const n=await ready(name);if(n<0)return -1;sum+=n;}return sum;};
+        const consumers=this.options.queues?.consumers??[this.options.service],retry=this.options.queues?.retrySuffixes??[];
+        this.queueReady=await total(consumers);this.dlqReady=await total(consumers.map(c=>c+'.dlq'));
+        this.retryReady=retry.length?await total(consumers.flatMap(c=>retry.map(s=>c+s))):-1;
       }return true;
     }catch{return false;}finally{await connection?.close().catch(()=>{});}
   }
@@ -179,7 +184,7 @@ export class ServiceRuntime {
     gauge('redis_available',Number(this.redis));gauge('broker_available',Number(this.broker));gauge('db_available',Number(this.database));
     gauge('limiter_shared_total',this.limiter.stats.shared);gauge('limiter_degraded_total',this.limiter.stats.degraded);gauge('limiter_rejected_total',this.limiter.stats.rejected);gauge('redis_failures_total',this.failures);
     const cpu=process.cpuUsage();gauge('cpu_seconds_total',(cpu.user+cpu.system)/1000000);gauge('rss_bytes',process.memoryUsage().rss);gauge('event_loop_p99_seconds',this.lag.percentile(99)/1e9);
-    gauge('queue_ready',this.queueReady);gauge('dlq_ready',this.dlqReady);
+    gauge('queue_ready',this.queueReady);gauge('retry_ready',this.retryReady);gauge('dlq_ready',this.dlqReady);
     if(this.own){gauge('outbox_pending',this.own.pending);gauge('outbox_oldest_seconds',this.own.outboxAgeSeconds);gauge('outbox_retry_attempts',this.own.outboxRetries);gauge('billing_pending',this.own.billingPending);gauge('billing_oldest_seconds',this.own.billingAgeSeconds);gauge('db_lock_waits',this.own.dbLockWaits);}
     for(const [k,v]of Object.entries(this.options.extras?.()??{})){if(/^[a-z_]{1,60}$/.test(k))gauge(k,v);}
     return lines.join('\n')+'\n';

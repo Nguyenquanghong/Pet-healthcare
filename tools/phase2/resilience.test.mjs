@@ -254,7 +254,9 @@ test('activation revoke and expiry remain effective without consuming or replaci
 test('private metrics show actual HTTP, DB/pool/hash/outbox/queue/billing state without high-cardinality or secret labels',async()=>{
   const correlation=randomUUID(),response=await request('/api/appointments?petId='+pet.id,{headers:{'X-Request-Id':correlation}});expectStatus(response,200);assert.equal(response.headers.get('x-request-id'),correlation);
   const metrics=expectStatus(await request('/metrics',{base:clinicApis[1].base,headers:{'X-Service-Token':common.OBSERVABILITY_TOKEN}}),200);
-  for(const metric of ['http_duration_seconds_bucket','outbox_pending','outbox_oldest_seconds','db_lock_waits','queue_ready','dlq_ready','billing_pending','rss_bytes','cpu_seconds_total'])assert.ok(metrics.includes('pet_'+metric));assert.ok(!metrics.includes(pet.id));assert.ok(!metrics.includes(users[0].email));
+  for(const metric of ['http_duration_seconds_bucket','outbox_pending','outbox_oldest_seconds','db_lock_waits','queue_ready','retry_ready','dlq_ready','billing_pending','rss_bytes','cpu_seconds_total'])assert.ok(metrics.includes('pet_'+metric));
+  // P03: the Clinic worker declared its retry queues, so the gauge is a count, not -1 (unknown).
+  assert.match(metrics,/pet_retry_ready\{[^}]*\} \d+\n/);assert.ok(!metrics.includes(pet.id));assert.ok(!metrics.includes(users[0].email));
   assert.ok(clinicApis[1].logs().includes(correlation));assert.ok(coreApis[0].logs().includes(correlation),'Directory call propagates correlation');
   const [connections]=await db.clinic.$queryRaw`SELECT count(*) AS count FROM pg_stat_activity WHERE usename=current_user`;
   assert.ok(Number(connections.count)<=10,'Two API pools of 2, worker pool of 2, fixture/control pool <=4');

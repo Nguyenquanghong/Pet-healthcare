@@ -1,6 +1,7 @@
 import type { PrismaClient } from './generated/client/index.js';
 import { createRuntime, type Actor } from '@nipopeto/runtime';
-export const notificationRuntime=(db:PrismaClient,verify:(token:string)=>Actor)=>createRuntime({service:'notification',verify,probe:async()=>db.$transaction(async tx=>{
+import { runtimeQueues } from '@nipopeto/messaging';
+export const notificationRuntime=(db:PrismaClient,verify:(token:string)=>Actor)=>createRuntime({service:'notification',verify,queues:runtimeQueues(['notification','identity']),probe:async()=>db.$transaction(async tx=>{
   await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '1500ms'");
   const migrations=await tx.$queryRaw<{count:bigint}[]>`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name='20261011000500_manual_send_dedup' AND finished_at IS NOT NULL AND rolled_back_at IS NULL`;
   if(Number(migrations[0]?.count)!==1)throw new Error('MIGRATION_REQUIRED');
