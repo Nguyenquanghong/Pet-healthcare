@@ -6,14 +6,23 @@ export const eventTypes = ['notification.requested.v1', 'billing.invoice-issued.
 export type EventType = typeof eventTypes[number];
 // F7: the event types each consumer applies, named one by one. A new type reaches a
 // consumer only once it is listed here and the consumer handles it explicitly.
+// P03: session revocation has its own consumer and queue, so a notification backlog
+// or retry never delays it.
 export const consumedEvents = {
-  notification: ['notification.requested.v1', 'identity.sessions-revoked.v1'],
+  notification: ['notification.requested.v1'],
+  identity: ['identity.sessions-revoked.v1'],
   clinic: ['directory.owner-upserted.v1', 'directory.pet-upserted.v1', 'directory.staff-upserted.v1', 'billing.invoice-issued.v1', 'billing.operation-aborted.v1'],
   'clinic-read-v1': ['clinic.appointment-read-changed.v1'],
 } as const satisfies Record<string, readonly EventType[]>;
 export type EventConsumer = keyof typeof consumedEvents;
+// Types that moved to another consumer's queue. The old consumer still applies those
+// already waiting in its queue, but its queue is no longer bound to them. Remove an
+// entry once that queue holds none (P03: revocations queued before the split).
+export const drainingEvents: Partial<Record<EventConsumer, readonly EventType[]>> = {
+  notification: ['identity.sessions-revoked.v1'],
+};
 export function consumes(consumer: EventConsumer, eventType: string): boolean {
-  return (consumedEvents[consumer] as readonly string[]).includes(eventType);
+  return (consumedEvents[consumer] as readonly string[]).includes(eventType) || (drainingEvents[consumer] ?? []).includes(eventType as EventType);
 }
 export interface Envelope {
   eventId: string; eventType: EventType; schemaVersion: 1; producer: 'core' | 'clinic';

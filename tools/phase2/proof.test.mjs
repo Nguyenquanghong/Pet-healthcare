@@ -10,7 +10,8 @@ import { OutboxRelay } from '../../backend/src/phase2/relay.ts';
 import { ClinicBilling } from '../../services/clinic/src/billing.ts';
 import { NotificationInbox } from '../../services/notification/src/inbox.ts';
 import amqp from 'amqplib';
-import { declareTopology, topology, publishConfirmed, consumeEvents, replayEvent } from '@nipopeto/messaging';
+import { declareTopology, topology, publishConfirmed, consumeEvents, replayEvent, TransientError, permanentOn } from '@nipopeto/messaging';
+import { brokerQueues, topologyQueues } from './test-project.mjs';
 import { ClinicInbox } from '../../services/clinic/src/inbox.ts';
 import { OutboxRelay as ClinicRelay } from '../../services/clinic/src/relay.ts';
 assert.equal(process.env.PHASE2_TEST_CONFIRM, 'pet-phase2-p1-test', 'Use phase2:test:integration; direct execution refused');
@@ -40,7 +41,9 @@ test.after(async () => {
   const retained = [];
   try {
     if (channel) {
-      for (const q of [...extraQueues, queue]) {
+      // P03: with the retry queues each consumer declared for its delays.
+      const routed = ['routes', 'workers', 'identity'].flatMap(name => { const t = topology(`p2.${name}.${run}`); return topologyQueues(t, [t.clinic, t.clinicRead, t.notification, t.identity]); });
+      for (const q of new Set([...extraQueues, queue, ...brokerQueues(`p2.proof.${run}`), ...routed])) {
         const state = await channel.checkQueue(q);
         if (state.messageCount) retained.push(q); else await channel.deleteQueue(q);
       }
@@ -276,7 +279,9 @@ test('consumer crash before/after retry confirm and after DB commit retains orig
     let closed = false; consumer.done.then(() => { closed = true; });
     await send(q, message); await until(() => closed, 'fault closes original channel');
     await consumer.close();
-    const pending = await channel.checkQueue(q); assert.equal(pending.messageCount, stage === 'afterRepublishConfirm' ? 2 : 1);
+    // P03: a confirmed retry copy comes back to the queue from its 25 ms retry queue.
+    const expected = stage === 'afterRepublishConfirm' ? 2 : 1;
+    await until(async () => (await channel.checkQueue(q)).messageCount === expected, `${stage}: ${expected} message(s) retained`);
     if (stage === 'missingDLQ') {
       await channel.assertQueue(`${q}.dlq`, { durable: true });
       consumer = await consumeEvents(broker, q, 'notification', raw => inbox.apply(raw));
@@ -289,6 +294,67 @@ test('consumer crash before/after retry confirm and after DB commit retains orig
         assert.equal(await clients.notification.notification.count({ where: { id: event.payload.notificationId } }), 1);
       } finally { await consumer.close(); }
     }
+  }
+});
+
+// P03: retry through delay queues, failure classes, and the identity queue.
+test('P03: a failing message waits in a retry queue, not in the handler; the 20 messages behind it run at once', async () => {
+  const q = await registerQueue('hol'), failing = notificationEvent(), behind = Array.from({ length: 20 }, () => notificationEvent());
+  const attempts = []; let lastBehindAt = 0;
+  const consumer = await consumeEvents(broker, q, 'notification', async raw => {
+    if (JSON.parse(raw).eventId === failing.eventId) { attempts.push(performance.now()); throw new TransientError('PROOF_DEPENDENCY_DOWN'); }
+    const applied = await inbox.apply(raw); lastBehindAt = performance.now(); return applied;
+  }, { retryDelaysMs: [500] });
+  try {
+    await send(q, failing); for (const event of behind) await send(q, event);
+    const dead = await until(() => channel.get(`${q}.dlq`, { noAck: false }), 'failing message reaches the DLQ after its one retry');
+    assert.equal(attempts.length, 2);
+    assert.equal(await clients.notification.notification.count({ where: { id: { in: behind.map(e => e.payload.notificationId) } } }), 20);
+    assert.ok(lastBehindAt < attempts[1], 'all 20 finished before the failing message came back');
+    assert.ok(attempts[1] - attempts[0] >= 450, `it waited out its delay in the retry queue (${Math.round(attempts[1] - attempts[0])} ms)`);
+    const h = dead.properties.headers;
+    assert.deepEqual([h['p2-attempt'], h['p2-failure'], h['p2-error-code']], [2, 'transient', 'PROOF_DEPENDENCY_DOWN']);
+    channel.ack(dead);
+  } finally { await consumer.close(); }
+});
+
+test('P03: a transient failure heals inside the ladder; a permanent one reaches the DLQ on its first failure', async () => {
+  const q = await registerQueue('classify'), healed = notificationEvent(); let calls = 0;
+  let consumer = await consumeEvents(broker, q, 'notification', raw => inbox.apply(raw, () => { if (++calls <= 3) throw new TransientError('PROOF_DB_UNAVAILABLE'); }), { retryDelaysMs: [20, 40, 80, 160] });
+  try {
+    await send(q, healed); await until(() => clients.notification.notification.findUnique({ where: { id: healed.payload.notificationId } }), 'fourth attempt applies');
+    await empty(q); assert.equal(calls, 4); assert.equal((await channel.checkQueue(`${q}.dlq`)).messageCount, 0);
+  } finally { await consumer.close(); }
+  calls = 0;
+  consumer = await consumeEvents(broker, q, 'notification', async () => { calls++; throw new Error('TERMINAL_CONFLICT'); }, { retryDelaysMs: [20, 40], classify: permanentOn(['TERMINAL_CONFLICT']) });
+  try {
+    await send(q, notificationEvent());
+    const dead = await until(() => channel.get(`${q}.dlq`, { noAck: false }), 'permanent failure DLQ'), h = dead.properties.headers;
+    assert.equal(calls, 1); assert.deepEqual([h['p2-attempt'], h['p2-failure'], h['p2-error-code']], [1, 'permanent', 'TERMINAL_CONFLICT']);
+    channel.ack(dead);
+  } finally { await consumer.close(); }
+});
+
+test('P03: revocations route to the identity queue; one queued before the split is still applied from the notification queue', async () => {
+  const t = topology(`p2.identity.${run}`), users = [randomUUID(), randomUUID()]; extraExchanges.add(t.exchange);
+  const revocation = userId => { const at = Math.floor(Date.now() / 1000); return { eventId: randomUUID(), eventType: 'identity.sessions-revoked.v1', schemaVersion: 1, producer: 'core', aggregateType: 'user', aggregateId: userId, aggregateVersion: at, occurredAt: new Date().toISOString(), correlationId: run, payload: { userId, revokedBefore: new Date(at * 1000).toISOString() } }; };
+  const publish = event => publishConfirmed(channel, t.exchange, event.eventType, Buffer.from(JSON.stringify(event)), { messageId: event.eventId });
+  // A broker declared before P03 binds revocations to the notification queue.
+  await channel.assertExchange(t.exchange, 'topic', { durable: true }); await channel.assertQueue(t.notification, { durable: true });
+  await channel.bindQueue(t.notification, t.exchange, 'identity.sessions-revoked.v1');
+  await publish(revocation(users[0]));
+  await declareTopology(broker, t); await declareTopology(broker, t); // removing the old binding again is a no-op
+  await publish(revocation(users[1]));
+  assert.equal((await channel.checkQueue(t.notification)).messageCount, 1, 'only the revocation queued before the split');
+  assert.equal((await channel.checkQueue(t.identity)).messageCount, 1);
+  const consumers = [await consumeEvents(broker, t.notification, 'notification', raw => inbox.apply(raw)), await consumeEvents(broker, t.identity, 'identity', raw => inbox.apply(raw))];
+  try {
+    for (const userId of users) await until(() => clients.notification.sessionRevocation.findUnique({ where: { userId } }), 'revocation applied');
+    await empty(t.notification); await empty(t.identity);
+    for (const q of [t.notification, t.identity]) assert.equal((await channel.checkQueue(`${q}.dlq`)).messageCount, 0);
+  } finally {
+    await Promise.all(consumers.map(c => c.close()));
+    await clients.notification.sessionRevocation.deleteMany({ where: { userId: { in: users } } });
   }
 });
 

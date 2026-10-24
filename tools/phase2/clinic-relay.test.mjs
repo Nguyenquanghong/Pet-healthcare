@@ -6,6 +6,7 @@ import amqp from 'amqplib';
 import { PrismaClient } from '../../services/clinic/src/generated/client/index.js';
 import { OutboxRelay } from '../../services/clinic/dist/relay.js';
 import { topology, declareTopology } from '@nipopeto/messaging';
+import { topologyQueues } from './test-project.mjs';
 
 // List study v1 K3-F1: one event per AMQP connection capped the Clinic relay near
 // 11 events/s while the AB build stores two events per appointment write. Every
@@ -43,7 +44,7 @@ test.before(async () => {
 });
 test.after(async () => {
   try {
-    for (const q of [routes.notification, routes.clinic, routes.clinicRead]) for (const name of [q, q + '.dlq']) await channel.deleteQueue(name).catch(() => {});
+    for (const name of topologyQueues(routes, [routes.notification, routes.identity, routes.clinic, routes.clinicRead])) await channel.deleteQueue(name).catch(() => {});
     await channel.deleteExchange(routes.exchange).catch(() => {});
     mkdirSync('test-results/phase2', { recursive: true });
     writeFileSync(`test-results/phase2/clinic-relay-${run}.json`, JSON.stringify(report, null, 2));

@@ -59,7 +59,7 @@ export function topicMatches(pattern,key){
   const match=(p,k)=>!p.length?!k.length:p[0]==='#'?match(p.slice(1),k)||(k.length>0&&match(p,k.slice(1))):k.length>0&&(p[0]==='*'||p[0]===k[0])&&match(p.slice(1),k.slice(1));
   return match(pattern.split('.'),key.split('.'));
 }
-export function bindings(messagingSource){return [...messagingSource.matchAll(/bindQueue\(t\.(\w+),\s*t\.exchange,\s*'([^']+)'\)/g)].map(m=>({queue:m[1],key:m[2]}));}
+export function bindings(messagingSource){return [...messagingSource.matchAll(/\bbindQueue\(t\.(\w+),\s*t\.exchange,\s*'([^']+)'\)/g)].map(m=>({queue:m[1],key:m[2]}));}
 export function declaredTypes(contractsSource){const m=contractsSource.match(/export const eventTypes\s*=\s*\[([^\]]+)\]/);return m?[...m[1].matchAll(/'([^']+)'/g)].map(x=>x[1]):[];}
 export function emittedTypes(source,families){return [...source.matchAll(/['"`]([a-z]+\.[a-z]+(?:-[a-z]+)*\.v\d+)['"`]/g)].map(m=>m[1]).filter(t=>families.has(t.split('.')[0]));}
 const contractsSource=read('packages/contracts/src/index.ts'),types=declaredTypes(contractsSource),families=new Set(types.map(t=>t.split('.')[0]));
@@ -185,9 +185,14 @@ const permissionCheck=(existsSync(built)?import(pathToFileURL(built).href):Promi
 // consumer, and every billing type Clinic consumes has an explicit outcome, so a new
 // billing event cannot be read as an abort by default.
 const clinicBilling=resolve(root,'services/clinic/dist/billingEvents.js');
-const consumerQueues={notification:'notification',clinic:'clinic','clinic-read-v1':'clinicRead'};
-export function consumerGaps({eventTypes,consumedEvents},bound,outcomes){
+const consumerQueues={notification:'notification',identity:'identity',clinic:'clinic','clinic-read-v1':'clinicRead'};
+// P03: a draining type moved to another consumer's queue; the old queue no longer receives it.
+export function consumerGaps({eventTypes,consumedEvents,drainingEvents={}},bound,outcomes){
   const gaps=[];
+  for(const [consumer,list] of Object.entries(drainingEvents))for(const t of list){
+    if(!Object.entries(consumedEvents).some(([other,types])=>other!==consumer&&types.includes(t)))gaps.push(consumer+' drains '+t+' that no other consumer took over');
+    if(bound.some(b=>b.queue===consumerQueues[consumer]&&topicMatches(b.key,t)))gaps.push(consumer+' queue still bound to draining '+t);
+  }
   for(const t of eventTypes)if(!Object.values(consumedEvents).some(list=>list.includes(t)))gaps.push('no consumer for '+t);
   for(const [consumer,list] of Object.entries(consumedEvents))for(const t of list){
     if(!eventTypes.includes(t))gaps.push(consumer+' consumes undeclared '+t);
@@ -207,6 +212,9 @@ const consumerCheck=(existsSync(built)&&existsSync(clinicBilling)?Promise.all([i
     assert.deepEqual(consumerGaps(voided,bound,billingOutcomes),['clinic has no billing outcome for billing.invoice-voided.v1']);
     assert.ok(consumerGaps({...contracts,eventTypes:[...contracts.eventTypes,'audit.thing-happened.v1']},bound,billingOutcomes).includes('no consumer for audit.thing-happened.v1'));
     assert.ok(consumerGaps(contracts,bound.filter(b=>b.queue!=='notification'),billingOutcomes).some(g=>g.startsWith('notification queue not bound')));
+    assert.deepEqual(consumerGaps(contracts,[...bound,{queue:'notification',key:'identity.sessions-revoked.v1'}],billingOutcomes),['notification queue still bound to draining identity.sessions-revoked.v1']);
+    assert.deepEqual(consumerGaps({...contracts,drainingEvents:{...contracts.drainingEvents,clinic:['audit.thing-happened.v1']}},bound,billingOutcomes),['clinic drains audit.thing-happened.v1 that no other consumer took over']);
+    assert.deepEqual(bindings("await channel.unbindQueue(t.notification, t.exchange, 'identity.sessions-revoked.v1');"),[],'an unbind is not a binding');
     return Object.keys(contracts.consumedEvents).length+' consumers, '+Object.keys(billingOutcomes).length+' billing outcomes';
   }),error=>rule('event-consumers-explicit',()=>{throw error;}));
 

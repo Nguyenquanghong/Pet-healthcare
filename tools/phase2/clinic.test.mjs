@@ -1,5 +1,5 @@
 import test from 'node:test';
-import {waitForQueueIdle} from './test-project.mjs';
+import {topologyQueues,waitForQueueIdle} from './test-project.mjs';
 import assert from 'node:assert/strict';
 import {execFileSync,spawn} from 'node:child_process';
 import {randomUUID,generateKeyPairSync} from 'node:crypto';
@@ -62,7 +62,7 @@ test.before(async()=>{
   await startCore();sync=new DirectorySync(coreUrl,credential);await declareTopology(broker,routes);declared=true;connection=await connect();channel=await connection.createConfirmChannel();channel.on('error',()=>{});
 });
 test.after(async()=>{
-  try{await Promise.all(handles.map(h=>h.stop()));if(stopped){docker('up','-d','--wait','rabbitmq');stopped=false;}if(!connection){connection=await connect();channel=await connection.createConfirmChannel();}const retained=[];for(const q of (declared?[routes.notification,routes.notification+'.dlq',routes.clinic,routes.clinic+'.dlq']:[])){const state=await channel.checkQueue(q);if(state.messageCount)retained.push(q);else await channel.deleteQueue(q);}if(!retained.length)await channel.deleteExchange(routes.exchange);assert.deepEqual(retained,[],'Failed nonempty queues retained');assert.ok(handles.every(h=>!/fixture_only|postgresql:|amqp:\/\//.test(h.logs())),'No secrets in process logs');}
+  try{await Promise.all(handles.map(h=>h.stop()));if(stopped){docker('up','-d','--wait','rabbitmq');stopped=false;}if(!connection){connection=await connect();channel=await connection.createConfirmChannel();}const retained=[];for(const q of (declared?topologyQueues(routes,[routes.notification,routes.identity,routes.clinic]):[])){const state=await channel.checkQueue(q);if(state.messageCount)retained.push(q);else await channel.deleteQueue(q);}if(!retained.length)await channel.deleteExchange(routes.exchange);assert.deepEqual(retained,[],'Failed nonempty queues retained');assert.ok(handles.every(h=>!/fixture_only|postgresql:|amqp:\/\//.test(h.logs())),'No secrets in process logs');}
   finally{await channel?.close().catch(()=>{});await connection?.close().catch(()=>{});await close(server);await Promise.all([core.$disconnect(),clinic.$disconnect(),notification.$disconnect()]);}
 });
 

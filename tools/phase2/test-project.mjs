@@ -17,6 +17,20 @@ export function assertTestProject() {
   if (expected.size) throw new Error('Missing test infrastructure service');
 }
 
+// P03: each consumer declares one retry queue per delay, so teardown asks the broker
+// for the queues of a run instead of listing names. brokerQueues: every queue under a
+// prefix. topologyQueues: the given consumer queues with their DLQ and retry queues.
+export function brokerQueues(prefix) {
+  if (typeof prefix !== 'string' || !/^p[1-7]\.[A-Za-z0-9.-]{8,200}$/.test(prefix)) throw new Error('Invalid test queue scope');
+  assertTestProject();
+  const rows = JSON.parse(execFileSync('docker', ['compose','-f','deploy/phase2/compose.test.yml','exec','-T','rabbitmq','rabbitmqctl','list_queues','--formatter','json','name'], { encoding: 'utf8', timeout: 30000 }));
+  return rows.map(q => q.name).filter(name => name.startsWith(prefix + '.')).sort();
+}
+export function topologyQueues(routes, consumerQueues) {
+  const of = name => consumerQueues.some(q => name === q || name === q + '.dlq' || new RegExp('^' + q.replace(/[.-]/g, '\\$&') + '\\.retry\\.\\d+ms$').test(name));
+  return brokerQueues(routes.exchange.replace(/\.events$/, '')).filter(of);
+}
+
 // AMQP checkQueue only reports ready messages. A worker can have zero ready
 // messages while its SQL work/ACK is still in flight; killing it then requeues.
 // Read broker counters before test teardown, without consuming/deleting data.
