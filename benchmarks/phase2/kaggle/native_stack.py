@@ -36,7 +36,7 @@ def wait_port(port, process, seconds=90):
 
 
 class NativeStack:
-    def __init__(self, repo, accounts=40, replicas=1, dataset_profile='deep', *, cqrs_configuration=None):
+    def __init__(self, repo, accounts=40, replicas=1, dataset_profile='deep', *, cqrs_configuration=None, service_env=None):
         if platform.system() != 'Linux':
             raise RuntimeError('Native stack requires Linux (Kaggle CPU notebook)')
         maximum = 100 if dataset_profile in ('pcn', 'query-heavy') else 40
@@ -47,6 +47,11 @@ class NativeStack:
         if cqrs_configuration is not None and (cqrs_configuration not in ('O', 'A', 'B', 'F')
                 or dataset_profile not in ('query-heavy', 'pcn') or replicas != 1):
             raise ValueError('Q6 requires O/A/B/F, a benchmark fixture and one Clinic')
+        # Limiter thresholds only (stack.mjs refuses any other key); the limiter still runs.
+        service_env = dict(service_env or {})
+        if any(not k.endswith('_LIMIT') or not str(v).isdigit() for k, v in service_env.items()):
+            raise ValueError('service_env accepts numeric *_LIMIT values only')
+        self.service_env = service_env
         self.cqrs_configuration = cqrs_configuration
         self.dataset_profile = dataset_profile
         self.repo = Path(repo).resolve(strict=True)
@@ -133,7 +138,7 @@ class NativeStack:
         context = {'kind': 'phase2-kaggle-native-v1', 'run': self.run, 'directory': str(self.private),
             'urls': urls, 'pgData': str(data), 'pgPort': pg, 'accounts': self.accounts, 'replicas': self.replicas,
             'datasetProfile': self.dataset_profile,
-            'cqrsConfiguration': self.cqrs_configuration,
+            'cqrsConfiguration': self.cqrs_configuration, 'serviceEnv': self.service_env,
             'broker': f'amqp://p8:{rabbit_password}@127.0.0.1:{rabbit}', 'redis': f'redis://127.0.0.1:{redis}'}
         path = self.private / 'context.json'
         path.write_text(json.dumps(context)); path.chmod(0o600)

@@ -95,9 +95,12 @@ def stop_load(child):
             child.kill(); child.wait(timeout=10)
 
 
-def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_configuration=None):
+def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_configuration=None,
+            settings=None, locustfile='benchmarks/phase2/kaggle/pcn_locust.py', service_env=None):
+    # settings/locustfile/service_env: the M/H bridge study (bridge_study.py) runs a
+    # shorter window, its own booking grid and raised per-IP limiter thresholds.
     if cqrs_configuration not in (None, 'O', 'A', 'B'): raise ValueError('Unknown CQRS configuration')
-    settings = configuration(mode)
+    settings = configuration(mode) if settings is None else dict(settings)
     repo, output = Path(repo).resolve(), Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     kaggle = platform.system() == 'Linux' and Path('/kaggle/working').is_dir()
@@ -130,6 +133,9 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
     try:
         progress(f"PCN {mode}: {settings['users']} users, {settings['seconds']}s measured, Clinic={replicas}")
         options = {} if cqrs_configuration is None else {'cqrs_configuration': cqrs_configuration}
+        if service_env:
+            options['service_env'] = service_env
+            manifest['service_env'] = dict(service_env)
         stack = NativeStack(repo, accounts=settings['users'], replicas=replicas, dataset_profile='pcn', **options)
         with stack:
             manifest['run'] = stack.run
@@ -157,7 +163,7 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
             stage = 'load'
             with (stack.private / 'pcn-load.log').open('w') as log:
                 child = subprocess.Popen([sys.executable, '-m', 'locust', '-f',
-                    str(repo / 'benchmarks/phase2/kaggle/pcn_locust.py'), '--headless', '--only-summary',
+                    str(repo / locustfile), '--headless', '--only-summary',
                     '--host', stack.fixture['baseUrl'], '--users', str(settings['users']),
                     '--spawn-rate', str(settings['spawn_rate']), '--stop-timeout', '12'],
                     cwd=repo, env=env, stdout=log, stderr=subprocess.STDOUT)
