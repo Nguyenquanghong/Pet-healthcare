@@ -87,6 +87,8 @@ try{
   // Read diagnostics are a study aid for the maintained-projection members only; F runs the product defaults.
   const cqrsEnv=cqrsTools?{...cqrsTools.apiEnvironment(cqrsMode,secret()),CLINIC_READ_DIAGNOSTICS:['A','B'].includes(cqrsMode)?'1':'0'}:{CLINIC_READ_DIAGNOSTICS:'0'};
   const common={HOST:'127.0.0.1',PHASE2_RUNTIME_REQUIRED:'1',JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:keys.publicKey.export({type:'spki',format:'pem'}).toString(),JWT_KEY_ID:'p8-kaggle',JWT_ISSUER:'p8-core',JWT_AUDIENCE:'pet-healthcare',JWT_SECRET:'',REDIS_URL:context.redis,RATE_LIMIT_NAMESPACE:'p8-'+context.run,RATE_LIMIT_KEY_SECRET:secret(),OBSERVABILITY_TOKEN:secret(),DB_POOL_LIMIT:'4',HASH_CONCURRENCY:'2',HASH_PENDING_LIMIT:'16',TRUST_PROXY_CIDRS:'',BROKER_URL:context.broker,BROKER_PREFIX:'p8.'+context.run,PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',BANK_TRANSFER_ENABLED:'false',CORS_ORIGIN:''};
+  // Bridge study: raise named limiter thresholds only; the limiter still runs.
+  for(const [key,value] of Object.entries(context.serviceEnv??{})){assert.match(key,/^(API|RESCUE_REPORT)_[A-Z_]+_LIMIT$/);assert.match(String(value),/^[0-9]+$/);common[key]=String(value);}
   const ports={core:await port(),notification:await port(),clinic:await port(),gateway:await port()};
   const clinicPorts=[];for(let n=0;n<context.replicas;n++)clinicPorts.push(await port());
   const origins=Object.fromEntries(Object.entries(ports).map(([k,v])=>[k,'http://127.0.0.1:'+v]));
