@@ -36,12 +36,18 @@ def wait_port(port, process, seconds=90):
 
 
 class NativeStack:
-    def __init__(self, repo, accounts=40, replicas=1, dataset_profile='deep', *, cqrs_configuration=None, service_env=None):
+    def __init__(self, repo, accounts=40, replicas=1, dataset_profile='deep', *, cqrs_configuration=None, service_env=None, core_replicas=1, core_proxy=False, server_cpus=None):
         if platform.system() != 'Linux':
             raise RuntimeError('Native stack requires Linux (Kaggle CPU notebook)')
         maximum = 100 if dataset_profile in ('pcn', 'query-heavy') else 40
         if dataset_profile not in ('deep', 'pcn', 'query-heavy') or not isinstance(accounts, int) or not 2 <= accounts <= maximum or replicas not in (1, 2):
             raise ValueError('deep accounts 2..40 / pcn or query-heavy accounts 2..100; Clinic replicas 1 or 2')
+        # Bridge VM study: Clinic and Notification reach Core through an nginx upstream (core_proxy), with one or two
+        # instances behind it; the CQRS and query-heavy studies keep the plain single Core.
+        if core_replicas not in (1, 2) or (core_replicas != 1 or core_proxy) and (cqrs_configuration is not None or dataset_profile != 'pcn'):
+            raise ValueError('Core replicas 1 or 2 and core_proxy only for the pcn profile without a CQRS configuration')
+        if not isinstance(core_proxy, bool) or server_cpus is not None and (not server_cpus or not all(isinstance(c, int) and c >= 0 for c in server_cpus)):
+            raise ValueError('core_proxy is a boolean; server_cpus a non-empty list of CPU numbers')
         if dataset_profile == 'query-heavy' and (accounts != 100 or replicas != 1):
             raise ValueError('query-heavy requires 100 accounts and exactly one Clinic')
         if cqrs_configuration is not None and (cqrs_configuration not in ('O', 'A', 'B', 'F')
@@ -60,13 +66,15 @@ class NativeStack:
         self.private.mkdir(mode=0o700)
         self.processes, self.logs = [], []
         self.pg_started = False
-        self.accounts, self.replicas = accounts, replicas
+        self.accounts, self.replicas, self.core_replicas, self.core_proxy = accounts, replicas, core_replicas, core_proxy
+        # Every process the stack starts (databases, broker, services) runs on these CPUs when given; the controller is elsewhere.
+        self.server_prefix = ['taskset', '-c', ','.join(str(c) for c in server_cpus)] if server_cpus else []
         self.application = None
 
     def command(self, args, **kwargs):
         log = (self.private / 'setup.log').open('a')
         try:
-            return subprocess.run(args, check=True, stdout=log, stderr=subprocess.STDOUT,
+            return subprocess.run([*self.server_prefix, *args], check=True, stdout=log, stderr=subprocess.STDOUT,
                                   timeout=180, **kwargs)
         except subprocess.CalledProcessError as error:
             # Command arguments can contain a synthetic credential; never print them.
@@ -77,7 +85,7 @@ class NativeStack:
     def start_process(self, name, args, **kwargs):
         log = (self.private / (name + '.log')).open('w')
         self.logs.append(log)
-        child = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT,
+        child = subprocess.Popen([*self.server_prefix, *args], stdout=log, stderr=subprocess.STDOUT,
                                  start_new_session=True, **kwargs)
         self.processes.append((name, child))
         return child
@@ -137,7 +145,7 @@ class NativeStack:
         wait_port(rabbit, self.rabbit)
         context = {'kind': 'phase2-kaggle-native-v1', 'run': self.run, 'directory': str(self.private),
             'urls': urls, 'pgData': str(data), 'pgPort': pg, 'accounts': self.accounts, 'replicas': self.replicas,
-            'datasetProfile': self.dataset_profile,
+            'coreReplicas': self.core_replicas, 'coreProxy': self.core_proxy, 'datasetProfile': self.dataset_profile,
             'cqrsConfiguration': self.cqrs_configuration, 'serviceEnv': self.service_env,
             'broker': f'amqp://p8:{rabbit_password}@127.0.0.1:{rabbit}', 'redis': f'redis://127.0.0.1:{redis}'}
         path = self.private / 'context.json'

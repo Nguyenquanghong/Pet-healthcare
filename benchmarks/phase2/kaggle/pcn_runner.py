@@ -86,6 +86,33 @@ def resource_sample(tracked, samplers, now):
     return samples
 
 
+def taskset_prefix(pinning):
+    """Command prefix that puts the Locust generator on its own CPUs (bridge VM study)."""
+    return ['taskset', '-c', ','.join(str(cpu) for cpu in pinning['generator'])] if pinning else []
+
+
+def server_taskset_prefix(cpus):
+    """Prefix of every server process a member starts (NativeStack, Monolith): the controller itself stays on the generator CPU."""
+    return ['taskset', '-c', ','.join(str(cpu) for cpu in cpus)] if cpus else []
+
+
+PINNING_METHOD = 'taskset -c for the generator and for every server process the controller starts; the controller sits on the generator CPU'
+
+
+def observed_affinity(tracked, pinning):
+    """Evidence that pinning took effect: generator and controller sit on the generator CPUs only, every server process inside the server CPUs."""
+    import psutil
+    seen, verified = {}, True
+    for name, pid, _ in tracked:
+        try:
+            cpus = sorted(psutil.Process(pid).cpu_affinity())
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+        seen[name] = cpus
+        verified = verified and (set(cpus) == set(pinning['generator']) if name in ('generator', 'controller') else set(cpus) <= set(pinning['server']))
+    return {'observed': seen, 'verified': verified and 'generator' in seen}
+
+
 def stop_load(child):
     if child and child.poll() is None:
         child.terminate()
@@ -96,18 +123,22 @@ def stop_load(child):
 
 
 def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_configuration=None,
-            settings=None, locustfile='benchmarks/phase2/kaggle/pcn_locust.py', service_env=None):
+            settings=None, locustfile='benchmarks/phase2/kaggle/pcn_locust.py', service_env=None,
+            core_replicas=1, core_proxy=False, pinning=None, vm=False):
     # settings/locustfile/service_env: the M/H bridge study (bridge_study.py) runs a
     # shorter window, its own booking grid and raised per-IP limiter thresholds.
+    # core_replicas/core_proxy/pinning/vm: the bridge VM study runs outside Kaggle, with
+    # Clinic and Notification reaching Core through an nginx upstream (two instances in H2),
+    # the generator and the controller pinned to their own CPU and the servers to the others.
     if cqrs_configuration not in (None, 'O', 'A', 'B'): raise ValueError('Unknown CQRS configuration')
     settings = configuration(mode) if settings is None else dict(settings)
     repo, output = Path(repo).resolve(), Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     kaggle = platform.system() == 'Linux' and Path('/kaggle/working').is_dir()
-    if mode == 'full' and not kaggle:
+    if mode == 'full' and not kaggle and not vm:
         raise RuntimeError('Full PCN acceptance requires a Kaggle session; use smoke for local validation')
-    manifest = {'protocol': PROTOCOL, 'mode': mode, **settings, 'clinic_replicas': replicas,
-                'configuration': cqrs_configuration or 'O',
+    manifest = {'protocol': PROTOCOL, 'mode': mode, **settings, 'clinic_replicas': replicas, 'core_replicas': core_replicas,
+                'core_proxy': core_proxy, 'configuration': cqrs_configuration or 'O',
                 'kaggle': kaggle, 'python': sys.version, 'platform': platform.platform(),
                 'cpu_count': os.cpu_count(), 'hashes': {}, 'status': 'STARTING',
                 'differences_from_phase1': [
@@ -119,9 +150,19 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
                     'Shared Kaggle host, no per-service quota: not equal-budget B0/B1 proof',
                     'No security/browser/restart/backup checks; PCN03..PCN07 NOT_RUN'],
                 'resource_limitations': 'CPU per PID/create-time; short-lived processes between samples missed; RSS sum double-counts shared pages.'}
+    if vm:
+        manifest['vm'] = True
+    if pinning:
+        manifest['pinning'] = {**pinning, 'method': PINNING_METHOD}
+    # Relative to the tree this file belongs to: the bridge VM study runs several trees with one harness.
+    root = Path(__file__).resolve().parents[3]
     for file in [LEGACY / 'pcn_contract.py', LEGACY / 'pcn_locustfile.py', LEGACY / 'metrics.py',
-                 *[Path(__file__).with_name(name) for name in ('pcn_runner.py', 'pcn_locust.py', 'pcn_adapter.py', 'pcn_dataset.mjs', 'native_stack.py', 'stack.mjs', 'benchmark.py', 'acceptance.json')]]:
-        manifest['hashes'][file.relative_to(repo).as_posix()] = hashlib.sha256(file.read_bytes()).hexdigest()
+                 *[Path(__file__).with_name(name) for name in ('pcn_runner.py', 'pcn_locust.py', 'pcn_adapter.py', 'pcn_dataset.mjs', 'native_stack.py', 'stack.mjs', 'benchmark.py', 'acceptance.json')],
+                 *[root / name for name in ('benchmarks/phase2/dataset.mjs', locustfile) if (root / name).is_file()]]:
+        manifest['hashes'][file.resolve().relative_to(root).as_posix()] = hashlib.sha256(file.read_bytes()).hexdigest()
+    # The run executes the repo's own copies (stack.mjs, locust files, fixtures); they must be the hashed harness bytes.
+    manifest['harness_mismatch'] = [name for name, expected in manifest['hashes'].items()
+                                    if not (repo / name).is_file() or hashlib.sha256((repo / name).read_bytes()).hexdigest() != expected]
     for name in ('cpu.max', 'memory.max'):
         path = Path('/sys/fs/cgroup') / name
         if path.is_file(): manifest[name] = path.read_text().strip()
@@ -132,13 +173,24 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
     stack = None
     try:
         progress(f"PCN {mode}: {settings['users']} users, {settings['seconds']}s measured, Clinic={replicas}")
+        stage = 'harness-integrity'
+        if manifest['harness_mismatch']:
+            raise RuntimeError('Harness files of the repo differ from the hashed harness')
+        stage = 'startup'
         options = {} if cqrs_configuration is None else {'cqrs_configuration': cqrs_configuration}
         if service_env:
             options['service_env'] = service_env
             manifest['service_env'] = dict(service_env)
+        if core_replicas != 1:
+            options['core_replicas'] = core_replicas
+        if core_proxy:
+            options['core_proxy'] = True
+        if pinning:
+            options['server_cpus'] = pinning['server']
         stack = NativeStack(repo, accounts=settings['users'], replicas=replicas, dataset_profile='pcn', **options)
         with stack:
             manifest['run'] = stack.run
+            manifest['gateway'] = stack.fixture.get('gateway')
             manifest['dataset'] = stack.fixture['dataset']
             manifest['db_cross_connect_denied'] = stack.fixture['dbCrossConnectDenied']
             stage = 'authentication'
@@ -162,7 +214,7 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
                        PCN_GENERATOR=str(output / 'generator.json'))
             stage = 'load'
             with (stack.private / 'pcn-load.log').open('w') as log:
-                child = subprocess.Popen([sys.executable, '-m', 'locust', '-f',
+                child = subprocess.Popen([*taskset_prefix(pinning), sys.executable, '-m', 'locust', '-f',
                     str(repo / locustfile), '--headless', '--only-summary',
                     '--host', stack.fixture['baseUrl'], '--users', str(settings['users']),
                     '--spawn-rate', str(settings['spawn_rate']), '--stop-timeout', '12'],
@@ -172,6 +224,8 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
                 tracked += [('postgres', int((stack.private / 'pgdata/postmaster.pid').read_text().splitlines()[0]), True),
                             ('nginx', int((stack.private / 'nginx.pid').read_text().strip()), True),
                             ('generator', child.pid, False)]
+                if pinning and cqrs_configuration is None:
+                    tracked.append(('controller', os.getpid(), False))
                 if cqrs_configuration is not None:
                     tracked += [('stack-supervisor', stack.application.pid, False), ('controller', os.getpid(), False)]
                 started, samplers, process_errors = time.monotonic(), {}, 0
@@ -183,6 +237,8 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
                             now = time.monotonic()
                             if now > deadline: raise TimeoutError('Bounded PCN load deadline exceeded')
                             samples = resource_sample(tracked, samplers, now)
+                            if pinning and 'verified' not in manifest['pinning'] and now - started >= 3:
+                                manifest['pinning'].update(observed_affinity(tracked, pinning))
                             if cqrs_configuration is not None:
                                 with (output / 'cqrs.jsonl').open('a', encoding='utf-8') as handle:
                                     handle.write(json.dumps({'monotonic_s': now, **stack.control('cqrs-observe')}) + '\n')
