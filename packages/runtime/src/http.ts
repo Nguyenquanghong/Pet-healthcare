@@ -504,11 +504,12 @@ export class ServiceRuntime {
       gauge('billing_oldest_seconds', this.own.billingAgeSeconds);
       gauge('db_lock_waits', this.own.dbLockWaits);
     }
-    // 1 while a breaker is open or half-open (its probe has not yet succeeded), 0 once closed.
+    // 1 only while a breaker is refusing calls (open, trial wait not over). Half-open, where the next call is let
+    // through, is 0: an idle system must not look broken until a request closes the breaker.
     const circuits = new Map<string, { open: number; opened: number; rejected: number }>();
     for (const breaker of circuitBreakers()) {
       const c = circuits.get(breaker.target) ?? { open: 0, opened: 0, rejected: 0 };
-      c.open = Math.max(c.open, breaker.state === 'closed' ? 0 : 1);
+      c.open = Math.max(c.open, breaker.rejecting ? 1 : 0);
       c.opened += breaker.counters.opened;
       c.rejected += breaker.counters.rejected;
       circuits.set(breaker.target, c);

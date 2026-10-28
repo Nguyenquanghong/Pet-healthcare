@@ -56,6 +56,11 @@ export class CircuitBreaker {
     return this.current === 'open' && this.now() - this.openedAt >= this.openMs ? 'half-open' : this.current;
   }
 
+  // True only while calls are being refused: open, and the wait before the next trial call is not over.
+  get rejecting(): boolean {
+    return this.current === 'open' && this.now() - this.openedAt < this.openMs;
+  }
+
   async run<T>(work: () => Promise<T>, isFailure: (error: unknown) => boolean = () => true): Promise<T> {
     if (this.current === 'open') {
       if (this.now() - this.openedAt < this.openMs) {
