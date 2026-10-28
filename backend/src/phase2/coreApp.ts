@@ -9,7 +9,7 @@ import { mountAppointmentBilling } from './billingApi.js';
 import { mountDashboards } from './dashboardApi.js';
 import { coreRuntime } from './runtime.js';
 import { createCoreDomains } from './coreDomains.js';
-import { acceptsCredential, credential, serviceOrigin } from '@nipopeto/runtime';
+import { acceptsCredential, credential, requestFault, serviceOrigin } from '@nipopeto/runtime';
 import { serviceProxy } from './serviceProxy.js';
 import { allows, deniedMessage } from '@nipopeto/contracts';
 import { createAuthRouter } from '../routes/auth.js';
@@ -191,14 +191,14 @@ export function createCoreApp(
     return notificationProxy(req, res, next);
   });
   app.use(runtime ? createCoreDomains(db) : createApp(db));
-  app.use((error: { type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (res.headersSent) {
       res.end();
       return;
     }
-    res
-      .status(error?.type === 'entity.parse.failed' ? 400 : error?.type === 'entity.too.large' ? 413 : 503)
-      .json({ error: 'Request unavailable or invalid.' });
+    const text = 'Request unavailable or invalid.';
+    const fault = requestFault(error, { invalid: text, large: text, other: text });
+    res.status(fault?.status ?? 503).json({ error: text });
   });
   return app;
 }

@@ -27,7 +27,7 @@ import { ClinicActivityQueries } from './infrastructure/queries/clinicActivity.j
 import { mountBilling } from './billingApi.js';
 import { blobStoreFromEnv, type BlobStore } from './blobStore.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
-import { currentRequestId, isTransientFailure, reportUnexpected, requestActor } from '@nipopeto/runtime';
+import { currentRequestId, isTransientFailure, reportUnexpected, requestActor, requestFault } from '@nipopeto/runtime';
 
 export function createApp(
   db: PrismaClient,
@@ -310,6 +310,11 @@ export function createApp(
       res.end();
       return;
     }
+    const fault = requestFault(error, {
+      invalid: 'Invalid JSON.',
+      large: 'Request too large.',
+      other: 'Request body could not be read.',
+    });
     if (error instanceof BusinessError) {
       if (error.status === 503) res.setHeader('Retry-After', '1');
       res.status(error.status).json({
@@ -317,8 +322,7 @@ export function createApp(
         ...(error.code ? { code: error.code } : {}),
         ...(error instanceof StaleRevision ? { current: medicalRecordDto(error.current as MedicalRecordValue) } : {}),
       });
-    } else if (error?.type === 'entity.parse.failed') res.status(400).json({ error: 'Invalid JSON.' });
-    else if (error?.type === 'entity.too.large') res.status(413).json({ error: 'Request too large.' });
+    } else if (fault) res.status(fault.status).json(fault.body);
     else if (error?.code === 'P2025') res.status(404).json({ error: 'Clinic resource not found.' });
     else if (isTransientFailure(error)) {
       res.setHeader('Retry-After', '1');

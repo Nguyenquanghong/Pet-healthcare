@@ -125,6 +125,13 @@ test('JWT algorithm/issuer/audience/kid/role/expiry and forged actor are rejecte
   for(const token of [sign(undefined,{issuer:'wrong'}),sign(undefined,{audience:'wrong'}),sign(undefined,{keyid:'wrong'}),sign({role:'invalid'}),sign(undefined,{expiresIn:-1}),jwt.sign({role:'owner'},'hmac-fixture-only',{algorithm:'HS256',subject:users[0].id,expiresIn:'1h'})])for(const base of [coreApis[0].base,clinicApis[0].base,notificationApi.base])expectStatus(await request(base===coreApis[0].base?'/api/auth/me':base===clinicApis[0].base?'/api/appointments':'/api/notifications',{base,token}),401);
   expectStatus(await request('/internal/directory/authorize',{base:coreApis[0].base,method:'POST',token:null,headers:{'X-Service-Token':secrets.CORE_DIRECTORY_TOKEN,'X-Actor-Id':users[0].id,'X-Actor-Role':'admin'},body:{petIds:[pet.id]}}),401);
 });
+test('a body the parser refuses is the caller\'s 4xx with fixed text on every real service: unsupported charset is 415, not 500',async()=>{
+  const unreadable='Request body could not be read.';
+  for(const [base,path,error] of [[coreApis[0].base,'/api/pets',unreadable],[coreApis[0].base,'/api/appointments','Request unavailable or invalid.'],[clinicApis[0].base,'/api/appointments',unreadable],[notificationApi.base,'/api/notifications/send',unreadable]]){
+    const r=await request(path,{base,method:'POST',key:randomUUID(),body:{ok:true},headers:{'Content-Type':'application/json; charset=latin1'}});
+    assert.deepEqual([r.status,r.body],[415,{error}],base+path);
+  }
+});
 test('service credentials have separate endpoint permissions; public nginx never forwards internal or metrics paths',async()=>{
   for(const prefix of ['appointments','notifications']){
     const status=await new Promise((resolve,reject)=>{const req=httpRequest(coreApis[0].base,{path:'/api/'+prefix+'/%2e%2e/%2e%2e/health/ready',headers:{Authorization:'Bearer '+tokens.owner}},res=>{res.resume();resolve(res.statusCode);});req.on('error',reject);req.end();});assert.equal(status,404,'Normalized proxy path must remain in the public domain');
