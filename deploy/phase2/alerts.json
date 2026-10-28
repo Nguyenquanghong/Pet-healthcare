@@ -105,12 +105,12 @@
     },
     {
       "name": "CircuitOpen",
-      "metric": "pet_circuit_open",
+      "metric": "pet_circuit_rejected_total",
       "service": ["core", "clinic"],
-      "condition": "pet_circuit_open > 0",
+      "condition": "increase(pet_circuit_rejected_total[2m]) > 0",
       "threshold": 0,
       "for": "1m",
-      "why": "1 while a circuit breaker is open or half-open, labelled with its target: clinic-gateway and notification-gateway on core, core-directory on clinic. A breaker opens after 5 consecutive dependency failures and probes again every 5 s, so a value that holds for a minute means the probes keep failing: the dependency is down, not blipping. It returns to 0 after the first successful call, so it can stay 1 on a quiet system until the next request. pet_circuit_opened_total and pet_circuit_rejected_total show how often it opened and how many calls it refused."
+      "why": "A circuit breaker opens after 5 consecutive dependency failures: clinic-gateway and notification-gateway on core, core-directory on clinic. Every call it refuses is a 503 to a user, so any increase of pet_circuit_rejected_total within 2 min means a dependency is failing right now. When the dependency answers again, the next trial call (one is let through every 5 s) closes the breaker and the rejections stop. pet_circuit_open is 1 only while a breaker is refusing, so it flaps between trial calls and is not alerted on; pet_circuit_opened_total counts how often it opened."
     },
     {
       "name": "DatabaseLockWaits",
