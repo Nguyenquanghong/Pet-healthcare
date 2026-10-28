@@ -12,6 +12,7 @@ const checks=[
   {name:'OpenAPI matches routes',protects:'NFR10, NFR12',command:[process.execPath,'backend/scripts/check-openapi.mjs']},
   // One fixed command string (no user input): npm needs a shell on Windows.
   {name:'wire contracts + OpenAPI inventory',protects:'ADR-03/04, NFR10',command:['npm run phase2:test:contracts'],shell:true},
+  {name:'Phase 2 code formatted (Prettier)',protects:'maintainability',command:['npm run format:check:phase2'],shell:true},
   {name:'notification single writer',protects:'ADR-03, P2',command:[process.execPath,'tools/phase2/check-notification-writers.mjs']},
   {name:'document links',protects:'NFR12 (reproducible handoff)',command:[process.execPath,'tools/phase2/check-document-links.mjs']},
   {name:'alert rules reference real metrics',protects:'NFR12, ops',command:[process.execPath,'tools/phase2/check-alert-metrics.mjs']},
