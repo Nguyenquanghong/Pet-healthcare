@@ -27,8 +27,16 @@ M_COMMIT = '48d01c3c95d136f808b846a66a75fe08aacd92be'
 M_PATHS = ('backend', 'benchmarks/kaggle/prepare_fixture.mjs', 'benchmarks/kaggle/fixtureData.mjs',
            'frontend/package.json', 'package.json', 'package-lock.json')
 M_OVERLAY = ('benchmarks/kaggle/pcn_checks.mjs',)
-H_PATHS = ('backend', 'services', 'packages', 'benchmarks/kaggle', 'benchmarks/phase2/kaggle', 'benchmarks/phase2/dataset.mjs',
-           'frontend/package.json', 'package.json', 'package-lock.json')
+HARNESS = tuple('benchmarks/phase2/kaggle/' + name for name in (
+    'bridge_study.py', 'bridge_monolith.py', 'bridge_locust.py', 'make_bridge_notebook.py', 'pcn_runner.py', 'pcn_locust.py',
+    'pcn_adapter.py', 'pcn_dataset.mjs', 'native_stack.py', 'stack.mjs', 'benchmark.py', 'acceptance.json', 'cqrs_probe.py',
+    'cqrs_diagnostics.py')) + tuple('benchmarks/kaggle/' + name for name in (
+    'pcn_locustfile.py', 'pcn_contract.py', 'metrics.py', 'pcn_checks.mjs')) + ('benchmarks/phase2/dataset.mjs',)
+# phase2:build runs these after tsc (generated Prisma clients into dist).
+BUILD_TOOLS = ('tools/phase2/copy-core-client.mjs', 'tools/phase2/copy-client.mjs')
+H_PATHS = ('backend', 'services', 'packages', *BUILD_TOOLS, *HARNESS, 'frontend/package.json', 'package.json', 'package-lock.json')
+# Builds compile src only; test suites stay out of the archive.
+TEST_DIRS = ('tests', 'test')
 TARGET = REPO / 'benchmarks/phase2/bridge-m-h-kaggle-v1.ipynb'
 LIMIT = 1_000_000
 
@@ -55,21 +63,24 @@ def tree(commit, paths):
     files = {}
     with tarfile.open(fileobj=io.BytesIO(raw)) as archive:
         for info in archive.getmembers():
-            if info.isfile() and safe(info.name) and not info.name.startswith('benchmarks/kaggle/tmp'):
+            if info.isfile() and safe(info.name) and not set(PurePosixPath(info.name).parts[:-1]) & set(TEST_DIRS):
                 files[info.name] = archive.extractfile(info).read()
             elif info.issym() or info.islnk():
                 raise ValueError('BRIDGE_LINK_IN_TREE: ' + info.name)
     return files
 
 
-def pack(h_commit='HEAD'):
+def pack(h_commit='HEAD', worktree_harness=False):
+    """worktree_harness: local dry runs only; the harness comes from the working tree and the manifest says so."""
     h = git('rev-parse', h_commit).decode().strip()
     # Markdown stays local by repository policy and is never packed.
     dirty = '\n'.join(line for line in git('status', '--porcelain', '--untracked-files=all', '--', *H_PATHS).decode().splitlines()
-                      if not line.endswith('.md'))
+                      if not line.endswith('.md') and not (worktree_harness and line[3:] in HARNESS))
     if h_commit == 'HEAD' and dirty:
         raise ValueError('BRIDGE_H_WORKTREE_DIFFERS_FROM_HEAD:\n' + dirty)
     m_files, h_files = tree(M_COMMIT, M_PATHS), tree(h, H_PATHS)
+    if worktree_harness:
+        h_files.update({name: (REPO / name).read_bytes() for name in HARNESS})
     for name in M_OVERLAY:
         if name in m_files:
             raise ValueError('BRIDGE_M_OVERLAY_EXISTS: ' + name)
@@ -77,6 +88,7 @@ def pack(h_commit='HEAD'):
     payload = {**{'M/' + k: v for k, v in m_files.items()}, **{'H/' + k: v for k, v in h_files.items()}}
     files = [{'path': name, 'bytes': len(value), 'sha256': digest(value)} for name, value in sorted(payload.items())]
     manifest = {'format': FORMAT, 'study': STUDY, 'mCommit': M_COMMIT, 'hCommit': h, 'mOverlay': list(M_OVERLAY),
+                'harnessFromWorktree': worktree_harness,
                 'files': files, 'treeSha256': digest(json.dumps(files, separators=(',', ':')).encode()),
                 'scope': 'Build/runtime sources and benchmark harness only; H is the committed revision, M is 48d01c3 plus the PCN seed.'}
     buffer = io.BytesIO()
@@ -118,8 +130,8 @@ def verified_members(raw, expected):
         return manifest, values
 
 
-def build(target=TARGET, h_commit='HEAD'):
-    raw, manifest = pack(h_commit)
+def build(target=TARGET, h_commit='HEAD', worktree_harness=False):
+    raw, manifest = pack(h_commit, worktree_harness)
     expected = digest(raw)
     verified_members(raw, expected)
     validator = Path(__file__).read_bytes()
@@ -178,11 +190,10 @@ summary = study.run_study(PRIVATE / 'M', PRIVATE / 'H', WORK, OUTPUT, RUN, mode=
 comparison = summary.get('comparison', {})
 print(json.dumps({k: summary.get(k) for k in ('status', 'smoke', 'error_type', 'error')}, indent=2, ensure_ascii=False))
 if comparison.get('decision') == 'COMPARED':
-    import pandas as pd
-    rows = [{'operation': name, 'p95 M (ms)': op['p95_ms']['M'], 'p95 H (ms)': op['p95_ms']['H'],
-             'H/M p95': round(op['p95_ratio'], 3), 'H/M p50': round(op['p50_ratio'], 3), 'đọc': op['reading']}
-            for name, op in comparison['operations'].items()]
-    display(pd.DataFrame(rows))
+    print(f"{'operation':22} {'p95 M (ms)':>16} {'p95 H (ms)':>16} {'H/M p95':>8} {'H/M p50':>8}  đọc")
+    for name, op in comparison['operations'].items():
+        m, h = (' / '.join(f'{v:.1f}' for v in op['p95_ms'][k]) for k in ('M', 'H'))
+        print(f"{name:22} {m:>16} {h:>16} {op['p95_ratio']:8.2f} {op['p50_ratio']:8.2f}  {op['reading']}")
     print(json.dumps({'overall_ratios_H_over_M': comparison['overall_ratios_H_over_M'],
                       'overall_p95': comparison['overall_p95_reading'], 'cpu_per_success': comparison['cpu_per_success_reading']},
                      indent=2, ensure_ascii=False))
@@ -210,5 +221,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--h-commit', default='HEAD')
     parser.add_argument('--target', type=Path, default=TARGET)
+    parser.add_argument('--worktree-harness', action='store_true', help='local dry runs only')
     args = parser.parse_args()
-    print(json.dumps(build(args.target, args.h_commit), indent=2))
+    print(json.dumps(build(args.target, args.h_commit, args.worktree_harness), indent=2))

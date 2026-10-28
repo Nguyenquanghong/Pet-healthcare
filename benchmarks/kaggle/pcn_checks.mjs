@@ -38,11 +38,14 @@ try {
     // in the isolated fixture; it does not modify any application database.
     await client.user.create({ data: { id: 'doctor_mai', fullName: 'PCN fixture doctor', role: 'doctor', ...hashPassword(password) } });
     fixture.adminToken = signToken(admin.id, 'admin');
-    for (const user of fixture.users) {
+    for (const [index, user] of fixture.users.entries()) {
       user.ownerId = verifyToken(user.token).sub;
+      // Same slots as phase2 pcn_dataset.mjs existingVisit(): one 30-minute slot per owner, 08:00-17:00.
+      const minutes = 480 + 30 * (index % 19);
       const appointment = await client.appointment.create({ data: {
         ownerId: user.ownerId, petId: user.petId, type: 'general_checkup', serviceName: 'Synthetic existing visit',
-        clinicName: 'Synthetic clinic', appointmentDate: new Date('2098-01-01'), appointmentTime: '09:00',
+        clinicName: 'Synthetic clinic', appointmentDate: new Date(Date.UTC(2098, 0, 1 + Math.floor(index / 19))),
+        appointmentTime: `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`,
       } });
       user.appointmentId = appointment.id;
       const record = await client.medicalRecord.create({ data: {
@@ -55,7 +58,9 @@ try {
       } });
       user.notificationId = notice.id;
       const hotel = await client.hotelBooking.create({ data: {
-        ownerId: user.ownerId, petId: user.petId, checkIn: new Date('2098-02-01'), checkOut: new Date('2098-02-02'),
+        // As pcn_dataset.mjs existingStay(): at most 5 one-night stays per night.
+        ownerId: user.ownerId, petId: user.petId, checkIn: new Date(Date.UTC(2098, 1, 1 + Math.floor(index / 5))),
+        checkOut: new Date(Date.UTC(2098, 1, 2 + Math.floor(index / 5))),
         roomType: 'standard', status: 'confirmed', serviceKeys: [], nights: 1, totalAmount: 200000,
       } });
       user.hotelBookingId = hotel.id;

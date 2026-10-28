@@ -69,7 +69,8 @@ def percentile(values, q):
 
 
 # ---- evaluation (pure; tested offline) ---------------------------------------
-def member_metrics(directory, settings):
+def member_metrics(directory, settings, require_cpu=True):
+    """require_cpu=False for the smoke: its 15 s window has no steady part after trimming."""
     directory = Path(directory)
     report = json.loads((directory / 'pcn-report.json').read_text(encoding='utf-8'))
     manifest = json.loads((directory / 'manifest.json').read_text(encoding='utf-8'))
@@ -115,7 +116,7 @@ def member_metrics(directory, settings):
         reasons.append('unexpected process exit')
     if manifest.get('process_sample_errors'):
         reasons.append('process sample errors')
-    if not cores:
+    if require_cpu and not cores:
         reasons.append('no steady CPU samples')
     mean_cores = sum(cores) / len(cores) if cores else None
     return {'valid': not reasons, 'reasons': reasons, 'operations': ops, 'requests': len(rows),
@@ -266,7 +267,7 @@ class Study:
                 self.timed('prerequisites', self.prerequisites)
             self.timed('build', self.build)
             write_json(reports / 'environment.json', self.versions())
-            smoke = [member_metrics(self.member(i, c, SMOKE, 'smoke'), SMOKE) for i, c in enumerate(('M', 'H'))]
+            smoke = [member_metrics(self.member(i, c, SMOKE, 'smoke'), SMOKE, require_cpu=False) for i, c in enumerate(('M', 'H'))]
             result['smoke'] = [{'configuration': c, 'valid': m['valid'], 'reasons': m['reasons']} for c, m in zip(('M', 'H'), smoke)]
             if not all(m['valid'] for m in smoke):
                 result.update(status='SMOKE_FAILED', comparison={'decision': 'NOT_RUN'})
@@ -274,9 +275,14 @@ class Study:
                 result.update(status='SMOKE_PASSED', comparison={'decision': 'NOT_RUN'})
             else:
                 settings = FULL if self.mode == 'full' else {**FULL, 'seconds': 60, 'warmup': 10}
-                members = [member_metrics(self.member(i, c, settings, 'full'), settings) for i, c in enumerate(ORDER)]
+                members = []
+                for i, c in enumerate(ORDER):
+                    members.append(member_metrics(self.member(i, c, settings, 'full'), settings))
+                    if not members[-1]['valid']:
+                        break  # an invalid member already makes the comparison INVALID; save the session time
                 result['members'] = [{'configuration': c, **m} for c, m in zip(ORDER, members)]
-                result['comparison'] = compare(members)
+                result['comparison'] = compare(members) if len(members) == len(ORDER) else {
+                    'decision': 'INVALID', 'invalid': [f'{len(members) - 1}:{ORDER[len(members) - 1]}: ' + ', '.join(members[-1]['reasons'])]}
                 result['settings'] = settings
                 result['status'] = 'COMPLETE'
         except Exception as error:
