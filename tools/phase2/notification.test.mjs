@@ -172,13 +172,22 @@ test('public-key verification rejects missing, expired, wrong issuer/audience/ro
     jwt.sign({ role: 'owner' }, keys.privateKey, { algorithm: 'RS256', subject: a, issuer: config.issuer, audience: config.audience })];
   for (const token of invalid) assert.equal((await request('', { token })).status, 401);
 });
-test('DB failure returns unavailable instead of a false zero unread count; unconfigured API fails closed', async () => {
-  const failed = { $transaction: async () => { throw new Error('Fixture credential must not leak'); } };
-  const offline = createApp(failed, verify).listen(0, '127.0.0.1'); await new Promise(r => offline.once('listening', r));
+test('DB failure returns unavailable instead of a false zero unread count; a bug is a 500; unconfigured API fails closed', async () => {
+  const failing = error => ({ sessionRevocation: { findUnique: async () => null }, $transaction: async () => { throw error; } });
+  const unreachable = Object.assign(new Error('Fixture credential must not leak'), { name: 'PrismaClientInitializationError' });
+  const offline = createApp(failing(unreachable), verify).listen(0, '127.0.0.1'); await new Promise(r => offline.once('listening', r));
   try {
     const res = await fetch(`http://127.0.0.1:${offline.address().port}/api/notifications/unread-count`, { headers: { Authorization: `Bearer ${tokens.a}` } });
-    assert.equal(res.status, 503); const body = await res.json(); assert.equal(body.unread, undefined); assert.equal(body.error, 'Notification service unavailable.');
+    assert.equal(res.status, 503); assert.equal(res.headers.get('retry-after'), '1'); const body = await res.json(); assert.equal(body.unread, undefined); assert.equal(body.error, 'Notification service unavailable.');
   } finally { await new Promise(r => offline.close(r)); }
+  const buggy = createApp(failing(new Error('Fixture credential must not leak')), verify).listen(0, '127.0.0.1'); await new Promise(r => buggy.once('listening', r));
+  const stderr = process.stderr.write; const logged = []; process.stderr.write = chunk => (logged.push(String(chunk)), true);
+  try {
+    const res = await fetch(`http://127.0.0.1:${buggy.address().port}/api/notifications/unread-count`, { headers: { Authorization: `Bearer ${tokens.a}` } });
+    process.stderr.write = stderr;
+    assert.equal(res.status, 500); assert.deepEqual(await res.json(), { error: 'An unexpected server error occurred.', code: 'INTERNAL_ERROR' });
+    assert.equal(logged.length, 1); assert.equal(JSON.parse(logged[0]).code, 'UNEXPECTED_APPLICATION_ERROR'); assert.doesNotMatch(logged[0], /credential/i);
+  } finally { process.stderr.write = stderr; await new Promise(r => buggy.close(r)); }
   const closed = createApp(db).listen(0, '127.0.0.1'); await new Promise(r => closed.once('listening', r));
   try { assert.equal((await fetch(`http://127.0.0.1:${closed.address().port}/api/notifications`)).status, 503); }
   finally { await new Promise(r => closed.close(r)); }

@@ -41,6 +41,8 @@ import { databaseHealthCheck } from '../infrastructure/persistence/healthReposit
 import { passwordAdapter, tokenAdapter } from '../infrastructure/security/authAdapters.js';
 import { qrTokenAdapter } from '../infrastructure/security/qrToken.js';
 import { BusinessError } from '../domain/error.js';
+import { serviceVersion } from '../lib/version.js';
+import { currentRequestId, isTransientFailure, reportUnexpected } from '@nipopeto/runtime';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { createAppointmentsRouter } from '../routes/appointments.js';
 import { createAuthRouter } from '../routes/auth.js';
@@ -99,9 +101,11 @@ export function createCoreDomains(client: PrismaClient) {
   app.get('/api/health', async (_req, res) => {
     try {
       await checkDatabase();
-      res.json({ status: 'ok', service: 'NIPOPETO API', version: '2.0.0', database: 'connected' });
+      res.json({ status: 'ok', service: 'NIPOPETO API', version: serviceVersion, database: 'connected' });
     } catch {
-      res.status(503).json({ status: 'degraded', service: 'NIPOPETO API', version: '2.0.0', database: 'disconnected' });
+      res
+        .status(503)
+        .json({ status: 'degraded', service: 'NIPOPETO API', version: serviceVersion, database: 'disconnected' });
     }
   });
 
@@ -176,8 +180,12 @@ export function createCoreDomains(client: PrismaClient) {
       res.status(413).json({ error: 'Request body is too large.' });
       return;
     }
-    process.stderr.write(JSON.stringify({ service: 'core', code: 'UNEXPECTED_APPLICATION_ERROR' }) + '\n');
-    res.status(500).json({ error: 'An unexpected server error occurred.' });
+    if (isTransientFailure(error)) {
+      res.setHeader('Retry-After', '1');
+      res.status(503).json({ error: 'Core unavailable. Retry the same request key.' });
+      return;
+    }
+    res.status(500).json(reportUnexpected('core', error, currentRequestId()));
   });
 
   return app;

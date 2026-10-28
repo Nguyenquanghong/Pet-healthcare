@@ -27,7 +27,7 @@ import { ClinicActivityQueries } from './infrastructure/queries/clinicActivity.j
 import { mountBilling } from './billingApi.js';
 import { blobStoreFromEnv, type BlobStore } from './blobStore.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
-import { requestActor } from '@nipopeto/runtime';
+import { currentRequestId, isTransientFailure, reportUnexpected, requestActor } from '@nipopeto/runtime';
 
 export function createApp(
   db: PrismaClient,
@@ -320,7 +320,10 @@ export function createApp(
     } else if (error?.type === 'entity.parse.failed') res.status(400).json({ error: 'Invalid JSON.' });
     else if (error?.type === 'entity.too.large') res.status(413).json({ error: 'Request too large.' });
     else if (error?.code === 'P2025') res.status(404).json({ error: 'Clinic resource not found.' });
-    else res.status(503).json({ error: 'Clinic unavailable. Retry the same request key.' });
+    else if (isTransientFailure(error)) {
+      res.setHeader('Retry-After', '1');
+      res.status(503).json({ error: 'Clinic unavailable. Retry the same request key.' });
+    } else res.status(500).json(reportUnexpected('clinic', error, currentRequestId()));
   };
   app.use(errors);
   return app;

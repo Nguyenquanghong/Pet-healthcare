@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { PrismaClient } from "@prisma/client";
 import { createApp } from "../dist/src/app.js";
@@ -28,7 +29,9 @@ test("app factory serves OpenAPI/Swagger and protects GET/POST before DB access"
     );
     const health = await fetch(`${base}/api/health`);
     assert.equal(health.status, 503);
-    assert.equal((await health.json()).status, "degraded");
+    const degraded = await health.json();
+    assert.equal(degraded.status, "degraded");
+    assert.equal(degraded.version, JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version, "health reports backend/package.json, not a literal");
     const get = await fetch(`${base}/api/pets`);
     const post = await fetch(`${base}/api/pets`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
     assert.equal(get.status, 401);

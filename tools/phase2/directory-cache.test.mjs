@@ -97,7 +97,7 @@ const rowsOf={
 };
 // A database double that records every call; `data` puts one row of that resource on the page.
 function database({data,fail=false}={}){
-  const touched=[],call=(name,value)=>async()=>{touched.push(name);if(fail)throw new Error('database down');return value;},has=name=>data===name;
+  const touched=[],call=(name,value)=>async()=>{touched.push(name);if(fail==='unexpected')throw new Error('private-bug-detail postgres://user:secret@db');if(fail)throw Object.assign(new Error('database down'),{name:'PrismaClientInitializationError'});return value;},has=name=>data===name;
   const db={touched,
     appointment:{groupBy:call('groupBy',has('appointments')?[{status:'pending',_count:1}]:[]),count:call('count',0),findMany:call('appointments',has('appointments')?[rowsOf.appointments]:[])},
     medicalRecord:{count:call('recordCount',has('records')?1:0),findMany:call('records',has('records')?[rowsOf.records]:[])},
@@ -114,7 +114,7 @@ async function serve(db,source){
 }
 const routes=[{name:'appointments',path:'/api/appointments',data:'appointments'},{name:'medical-records',path:'/api/medical-records',data:'records'},{name:'medical-records/images',path:'/api/medical-records/images',data:'images'}];
 
-test('a list GET asks Core once, after its query: routes x {empty, data, petId, 422, DB failure, retired read header}',async()=>{
+test('a list GET asks Core once, after its query: routes x {empty, data, petId, 422, DB failure 503, unexpected error 500, retired read header}',async()=>{
   const core=await fakeCore(),source=directoryTo(core.url);
   const cases=[
     {name:'empty page',query:'',status:200,petIds:[],ownerIds:[]},
@@ -123,6 +123,7 @@ test('a list GET asks Core once, after its query: routes x {empty, data, petId, 
     {name:'petId, data page (no duplicate pet)',query:'?petId=one',data:true,status:200,petIds:['one'],ownerIds:['owner'],pet:'one'},
     {name:'invalid pageSize (422 after Core agreed)',query:'?pageSize=0',status:422,petIds:[],ownerIds:[]},
     {name:'database failure (503 after Core agreed)',query:'',fail:true,status:503,petIds:[],ownerIds:[]},
+    {name:'unexpected error (500 INTERNAL_ERROR after Core agreed)',query:'',fail:'unexpected',status:500,petIds:[],ownerIds:[]},
     {name:'retired read-version header (ignored)',query:'',headers:{'x-clinic-min-version':'x'},status:200,petIds:[],ownerIds:[]},
   ];
   try{
@@ -130,8 +131,17 @@ test('a list GET asks Core once, after its query: routes x {empty, data, petId, 
       core.state.mode='ok';core.state.calls.length=0;
       const db=database({data:c.data?route.data:undefined,fail:c.fail}),app=await serve(db,source);
       try{
-        const res=await app.get(route.path+c.query,c.headers),body=await res.json(),label=route.name+': '+c.name;
+        const logged=[],write=process.stderr.write;
+        if(c.fail)process.stderr.write=chunk=>(logged.push(String(chunk)),true);
+        let res,body;
+        try{res=await app.get(route.path+c.query,c.headers);body=await res.json();}finally{process.stderr.write=write;}
+        const label=route.name+': '+c.name;
         assert.equal(res.status,typeof c.status==='function'?c.status(route):c.status,label+' '+JSON.stringify(body));
+        if(c.fail===true)assert.equal(res.headers.get('retry-after'),'1',label+': a dependency failure is retryable');
+        if(c.fail==='unexpected'){
+          assert.deepEqual(body,{error:'An unexpected server error occurred.',code:'INTERNAL_ERROR'},label);assert.equal(res.headers.get('retry-after'),null,label);
+          assert.equal(logged.length,1,label+': one structured line');assert.equal(JSON.parse(logged[0]).code,'UNEXPECTED_APPLICATION_ERROR');assert.doesNotMatch(logged[0],/private-bug-detail|secret/);
+        }
         assert.equal(core.state.calls.length,1,label+': exactly one Core call');
         assert.deepEqual(core.state.calls[0],{path:'/internal/directory/authorize',body:{petIds:c.petIds,ownerIds:c.ownerIds}},label);
         if(res.status===200){

@@ -3,7 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth.js';
 import { BusinessError } from '../domain/error.js';
 import { AppointmentInvoiceBilling, ClinicBillingRemote } from './appointmentBilling.js';
-import { acceptsCredential, currentRequestId } from '@nipopeto/runtime';
+import { acceptsCredential, currentRequestId, isTransientFailure, reportUnexpected } from '@nipopeto/runtime';
 
 export function mountAppointmentBilling(
   app: express.Express,
@@ -21,7 +21,10 @@ export function mountAppointmentBilling(
       } catch (e) {
         if (res.headersSent) return;
         if (e instanceof BusinessError) res.status(e.status).json({ error: e.message });
-        else res.status(503).json({ error: 'Billing temporarily unavailable. Retry the same request key.' });
+        else if (isTransientFailure(e)) {
+          res.setHeader('Retry-After', '1');
+          res.status(503).json({ error: 'Billing temporarily unavailable. Retry the same request key.' });
+        } else res.status(500).json(reportUnexpected('core', e, currentRequestId()));
       }
     };
   app.get(
