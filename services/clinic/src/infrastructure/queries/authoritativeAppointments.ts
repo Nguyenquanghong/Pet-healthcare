@@ -14,14 +14,24 @@ type CalendarDatabase = { appointment: Pick<PrismaClient['appointment'], 'groupB
 const spa = ['spa_bath', 'spa_grooming', 'spa_combo'] as const;
 
 export class AuthoritativeAppointmentQueries implements AppointmentQueries {
-  constructor(private readonly db: CalendarDatabase & Pick<PrismaClient, '$transaction' | 'appointment' | 'directoryProjection'>) {}
+  constructor(
+    private readonly db: CalendarDatabase & Pick<PrismaClient, '$transaction' | 'appointment' | 'directoryProjection'>,
+  ) {}
 
-  list(actor: Actor, directory: AppointmentQueryDirectory, raw: Record<string, unknown>): Promise<AppointmentListResult> {
+  list(
+    actor: Actor,
+    directory: AppointmentQueryDirectory,
+    raw: Record<string, unknown>,
+  ): Promise<AppointmentListResult> {
     return list(this.db, 'appointments', actor, directory, raw);
   }
 
   async calendar(actor: Actor, { month, category }: AppointmentCalendarQuery): Promise<AppointmentCalendarResult> {
-    if (typeof month !== 'string' || !/^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(month) || category !== undefined && !['medical', 'spa'].includes(String(category))) {
+    if (
+      typeof month !== 'string' ||
+      !/^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(month) ||
+      (category !== undefined && !['medical', 'spa'].includes(String(category)))
+    ) {
       throw new BusinessError(422, 'Invalid month or category.');
     }
     const [y, m] = month.split('-').map(Number);

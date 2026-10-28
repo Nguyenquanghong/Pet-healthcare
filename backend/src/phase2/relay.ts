@@ -12,22 +12,39 @@ export class OutboxRelay {
   private readonly batchSize: number;
   // createdAfter (ISO instant) is a guarded-test scope like scopeAggregateId: a
   // run relays only its own rows from a shared trial schema.
-  constructor(db: PrismaClient | OutboxStore, brokerUrl: string, private readonly scopeAggregateId?: string, private readonly createdAfter?: string, options: RelayOptions = {}) {
+  constructor(
+    db: PrismaClient | OutboxStore,
+    brokerUrl: string,
+    private readonly scopeAggregateId?: string,
+    private readonly createdAfter?: string,
+    options: RelayOptions = {},
+  ) {
     this.store = 'claim' in db ? db : new ProofOutboxStore(db);
     this.batchSize = options.batchSize ?? 1;
-    if (!Number.isSafeInteger(this.batchSize) || this.batchSize < 1 || this.batchSize > 500 || (this.batchSize > 1 && !this.store.claimBatch)) throw new Error('INVALID_RELAY_BATCH');
+    if (
+      !Number.isSafeInteger(this.batchSize) ||
+      this.batchSize < 1 ||
+      this.batchSize > 500 ||
+      (this.batchSize > 1 && !this.store.claimBatch)
+    )
+      throw new Error('INVALID_RELAY_BATCH');
     this.publisher = new ConfirmPublisher(brokerUrl, 'core-relay', options.persistent ?? false);
   }
-  get connection() { return this.publisher.connection; }
-  close() { return this.publisher.close(); }
+  get connection() {
+    return this.publisher.connection;
+  }
+  close() {
+    return this.publisher.close();
+  }
   private async claim(leaseOwner: string): Promise<Claimed[]> {
-    const scope = this.scopeAggregateId ?? null, after = this.createdAfter ?? null;
+    const scope = this.scopeAggregateId ?? null,
+      after = this.createdAfter ?? null;
     if (this.batchSize > 1) return this.store.claimBatch!(leaseOwner, scope, after, this.batchSize);
     const one = await this.store.claim(leaseOwner, scope, after);
     return one ? [one] : [];
   }
   async once(workerId: string, destination: string | Topology, afterConfirm?: () => void) {
-    const started=performance.now();
+    const started = performance.now();
     const leaseOwner = `${workerId}:${randomUUID()}`;
     const claimed = await this.claim(leaseOwner);
     if (!claimed.length) return false;
@@ -37,8 +54,13 @@ export class OutboxRelay {
       for (const id of confirmed) await this.store.markPublished(id, leaseOwner);
     }
     if (failed.length) {
-      if (!afterConfirm) for (const row of claimed.filter(r => failed.includes(r.id)))
-        await this.store.retry(row.id, leaseOwner, new Date(Date.now() + Math.min(60000, 1000 * 2 ** Math.min(row.attempts, 6))));
+      if (!afterConfirm)
+        for (const row of claimed.filter(r => failed.includes(r.id)))
+          await this.store.retry(
+            row.id,
+            leaseOwner,
+            new Date(Date.now() + Math.min(60000, 1000 * 2 ** Math.min(row.attempts, 6))),
+          );
       throw error;
     }
     return true;
@@ -54,15 +76,26 @@ class ProofOutboxStore implements OutboxStore {
   constructor(private readonly db: PrismaClient) {}
   claim(leaseOwner: string, scope: string | null, createdAfter: string | null = null) {
     return this.db.$transaction(async tx => {
-      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "OutboxEvent" WHERE "publishedAt" IS NULL AND "nextAttemptAt" <= now() AND ("leaseUntil" IS NULL OR "leaseUntil" < now()) AND (${scope}::text IS NULL OR envelope->>'aggregateId' = ${scope}) AND (${createdAfter}::text IS NULL OR "createdAt" >= (${createdAfter}::timestamptz AT TIME ZONE 'UTC')) ORDER BY "createdAt",id FOR UPDATE SKIP LOCKED LIMIT 1`;
+      const rows = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM "OutboxEvent" WHERE "publishedAt" IS NULL AND "nextAttemptAt" <= now() AND ("leaseUntil" IS NULL OR "leaseUntil" < now()) AND (${scope}::text IS NULL OR envelope->>'aggregateId' = ${scope}) AND (${createdAfter}::text IS NULL OR "createdAt" >= (${createdAfter}::timestamptz AT TIME ZONE 'UTC')) ORDER BY "createdAt",id FOR UPDATE SKIP LOCKED LIMIT 1`;
       if (!rows[0]) return null;
-      return tx.outboxEvent.update({ where: { id: rows[0].id }, data: { leaseOwner, leaseUntil: new Date(Date.now() + 30000), attempts: { increment: 1 } } });
+      return tx.outboxEvent.update({
+        where: { id: rows[0].id },
+        data: { leaseOwner, leaseUntil: new Date(Date.now() + 30000), attempts: { increment: 1 } },
+      });
     });
   }
   async markPublished(id: string, leaseOwner: string) {
-    await this.db.outboxEvent.updateMany({ where: { id, leaseOwner, leaseUntil: { gt: new Date() } }, data: { publishedAt: new Date(), leaseOwner: null, leaseUntil: null, lastErrorCode: null } });
+    await this.db.outboxEvent.updateMany({
+      where: { id, leaseOwner, leaseUntil: { gt: new Date() } },
+      data: { publishedAt: new Date(), leaseOwner: null, leaseUntil: null, lastErrorCode: null },
+    });
   }
   async retry(id: string, leaseOwner: string, nextAttemptAt: Date) {
-    await this.db.outboxEvent.updateMany({ where: { id, leaseOwner }, data: { leaseOwner: null, leaseUntil: null, nextAttemptAt, lastErrorCode: 'DELIVERY_UNCONFIRMED' } });
+    await this.db.outboxEvent.updateMany({
+      where: { id, leaseOwner },
+      data: { leaseOwner: null, leaseUntil: null, nextAttemptAt, lastErrorCode: 'DELIVERY_UNCONFIRMED' },
+    });
   }
 }

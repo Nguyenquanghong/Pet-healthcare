@@ -19,16 +19,23 @@ export const notificationTypes: string[] = [...Object.values(notificationCategor
 export function isNotificationCategory(value: unknown): value is NotificationCategory {
   return typeof value === 'string' && Object.hasOwn(notificationCategories, value);
 }
-export function notificationCategory(row: { type: string; relatedBookingId?: string | null }): NotificationCategory | undefined {
+export function notificationCategory(row: {
+  type: string;
+  relatedBookingId?: string | null;
+}): NotificationCategory | undefined {
   if (row.type === bookingStatusUpdated) return row.relatedBookingId ? 'hotel' : 'appointments';
-  return notificationCategoryNames.find(category => (notificationCategories[category] as readonly string[]).includes(row.type));
+  return notificationCategoryNames.find(category =>
+    (notificationCategories[category] as readonly string[]).includes(row.type),
+  );
 }
 
 // Prisma filters, structurally valid for every service's Notification model.
 type TypeFilter = { type: { in: string[] } };
 type StatusUpdateFilter = { type: typeof bookingStatusUpdated; relatedBookingId: null | { not: null } };
 export const hotelStatusUpdates: StatusUpdateFilter = { type: bookingStatusUpdated, relatedBookingId: { not: null } };
-export function notificationCategoryWhere(category: NotificationCategory): TypeFilter | { OR: (TypeFilter | StatusUpdateFilter)[] } {
+export function notificationCategoryWhere(
+  category: NotificationCategory,
+): TypeFilter | { OR: (TypeFilter | StatusUpdateFilter)[] } {
   const listed: TypeFilter = { type: { in: [...notificationCategories[category]] } };
   if (category === 'appointments') return { OR: [listed, { type: bookingStatusUpdated, relatedBookingId: null }] };
   if (category === 'hotel') return { OR: [listed, hotelStatusUpdates] };
@@ -36,12 +43,20 @@ export function notificationCategoryWhere(category: NotificationCategory): TypeF
 }
 // Tab counts from a group-by on type plus the count matching `hotelStatusUpdates`
 // (the only type whose tab depends on another column). Empty tabs are omitted.
-export function notificationCategoryCounts(byType: readonly { type: string; count: number }[], hotelStatusUpdateCount: number) {
+export function notificationCategoryCounts(
+  byType: readonly { type: string; count: number }[],
+  hotelStatusUpdateCount: number,
+) {
   const counts: Partial<Record<NotificationCategory, number>> = {};
-  const add = (category: NotificationCategory | undefined, n: number) => { if (category && n > 0) counts[category] = (counts[category] ?? 0) + n; };
+  const add = (category: NotificationCategory | undefined, n: number) => {
+    if (category && n > 0) counts[category] = (counts[category] ?? 0) + n;
+  };
   for (const row of byType) {
     if (row.type !== bookingStatusUpdated) add(notificationCategory(row), row.count);
-    else { add('hotel', hotelStatusUpdateCount); add('appointments', row.count - hotelStatusUpdateCount); }
+    else {
+      add('hotel', hotelStatusUpdateCount);
+      add('appointments', row.count - hotelStatusUpdateCount);
+    }
   }
   return counts;
 }

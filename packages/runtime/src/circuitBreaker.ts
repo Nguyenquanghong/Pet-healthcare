@@ -7,7 +7,9 @@
 export type CircuitState = 'closed' | 'open' | 'half-open';
 
 export class CircuitOpenError extends Error {
-  constructor(readonly target: string) { super('CIRCUIT_OPEN'); }
+  constructor(readonly target: string) {
+    super('CIRCUIT_OPEN');
+  }
 }
 
 export class CircuitBreaker {
@@ -17,11 +19,23 @@ export class CircuitBreaker {
   private probing = false;
   readonly counters = { opened: 0, rejected: 0 };
 
-  constructor(readonly target: string, private readonly failureThreshold = 5, private readonly openMs = 5000,
+  constructor(
+    readonly target: string,
+    private readonly failureThreshold = 5,
+    private readonly openMs = 5000,
     private readonly now = () => Date.now(),
-    private readonly report = (entry: Record<string, unknown>) => { process.stderr.write(JSON.stringify(entry) + '\n'); }) {
-    if (!/^[a-z0-9-]{1,64}$/.test(target) || !Number.isSafeInteger(failureThreshold) || failureThreshold < 1
-      || !Number.isSafeInteger(openMs) || openMs < 1) throw new Error('INVALID_CIRCUIT_BREAKER');
+    private readonly report = (entry: Record<string, unknown>) => {
+      process.stderr.write(JSON.stringify(entry) + '\n');
+    },
+  ) {
+    if (
+      !/^[a-z0-9-]{1,64}$/.test(target) ||
+      !Number.isSafeInteger(failureThreshold) ||
+      failureThreshold < 1 ||
+      !Number.isSafeInteger(openMs) ||
+      openMs < 1
+    )
+      throw new Error('INVALID_CIRCUIT_BREAKER');
   }
 
   get state(): CircuitState {
@@ -30,13 +44,19 @@ export class CircuitBreaker {
 
   async run<T>(work: () => Promise<T>, isFailure: (error: unknown) => boolean = () => true): Promise<T> {
     if (this.current === 'open') {
-      if (this.now() - this.openedAt < this.openMs) { this.counters.rejected++; throw new CircuitOpenError(this.target); }
+      if (this.now() - this.openedAt < this.openMs) {
+        this.counters.rejected++;
+        throw new CircuitOpenError(this.target);
+      }
       this.move('half-open');
     }
     const probe = this.current === 'half-open';
     if (probe) {
       // One probe at a time; everyone else keeps failing fast until it answers.
-      if (this.probing) { this.counters.rejected++; throw new CircuitOpenError(this.target); }
+      if (this.probing) {
+        this.counters.rejected++;
+        throw new CircuitOpenError(this.target);
+      }
       this.probing = true;
     }
     try {
@@ -44,7 +64,8 @@ export class CircuitBreaker {
       this.succeeded();
       return value;
     } catch (error) {
-      if (isFailure(error)) this.failed(probe); else this.succeeded();
+      if (isFailure(error)) this.failed(probe);
+      else this.succeeded();
       throw error;
     } finally {
       if (probe) this.probing = false;
@@ -60,12 +81,19 @@ export class CircuitBreaker {
     this.failures++;
     if (probe || this.current !== 'closed' || this.failures >= this.failureThreshold) {
       this.openedAt = this.now();
-      if (this.current !== 'open') { this.counters.opened++; this.move('open'); }
+      if (this.current !== 'open') {
+        this.counters.opened++;
+        this.move('open');
+      }
     }
   }
 
   private move(next: CircuitState) {
     this.current = next;
-    this.report({ code: 'CIRCUIT_' + next.toUpperCase().replace('-', '_'), target: this.target, failures: this.failures });
+    this.report({
+      code: 'CIRCUIT_' + next.toUpperCase().replace('-', '_'),
+      target: this.target,
+      failures: this.failures,
+    });
   }
 }
