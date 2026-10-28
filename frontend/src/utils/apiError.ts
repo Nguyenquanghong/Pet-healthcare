@@ -30,7 +30,7 @@ export enum ApiErrorCode {
   UNKNOWN = "UNKNOWN",
 }
 
-export const API_ERROR_MESSAGES: Record<ApiErrorCode, string> = {
+const API_ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   [ApiErrorCode.UNAUTHORIZED]: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
   [ApiErrorCode.FORBIDDEN]: "Bạn không có quyền thực hiện thao tác này.",
   [ApiErrorCode.NOT_FOUND]: "Không tìm thấy dữ liệu yêu cầu.",

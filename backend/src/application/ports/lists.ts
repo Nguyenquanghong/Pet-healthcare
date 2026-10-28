@@ -2,7 +2,7 @@ import type { BootstrapData } from "./bootstrap.js";
 import type { InvoiceValue } from "./invoices.js";
 
 export type ListData = BootstrapData & { invoices: InvoiceValue[] };
-export const listResources = ["owners", "pets", "appointments", "hotelBookings", "medicalRecords", "medicalImages", "dailyCareNotes", "notifications", "invoices"] as const;
+const listResources = ["owners", "pets", "appointments", "hotelBookings", "medicalRecords", "medicalImages", "dailyCareNotes", "notifications", "invoices"] as const;
 export type ListResource = typeof listResources[number];
 export type ListQuery = {
   page: number; pageSize: number; q?: string; ownerId?: string; petId?: string; id?: string;

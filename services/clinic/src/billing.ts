@@ -1,6 +1,6 @@
 import type { PrismaClient, Prisma } from './generated/client/index.js';
 import type { CoreState, ReservationSnapshot } from '@nipopeto/contracts';
-export class ReservationConflict extends Error {}
+class ReservationConflict extends Error {}
 export class ClinicBilling {
   constructor(private readonly db: PrismaClient) {}
   async prepare(operationId: string, appointmentId: string, revision: number, afterLock?: () => Promise<void>) {

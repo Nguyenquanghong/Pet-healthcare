@@ -116,7 +116,7 @@ test('every medical read/write scopes through Core; pagination/filter/count/rela
   const all=status(await request(`/api/appointments?petId=${pet.id}&pageSize=1&statusGroup=completed`),200);assert.equal(all.items[0].status,'completed');assert.ok(all.counts.pending>=1);assert.ok(all.counts.completed>=1);assert.equal(all.related.appointments.length,0);assert.ok(all.related.pets.every(p=>p.id===pet.id));
   status(await request('/api/appointments?petId='+encodeURIComponent(' '+pet.id+' ')),200);
   const calendar=status(await request('/api/appointments/calendar?month='+date.slice(0,7)),200);assert.ok(calendar[date]>=1);status(await request('/api/appointments?pageSize=101'),422);status(await request('/api/appointments?date=2026-02-30'),422);
-  const dashboard=status(await request('/api/bootstrap?view=dashboard'),200);assert.ok(dashboard.appointments.some(a=>a.petId===pet.id));assert.ok(dashboard.medicalRecords.some(r=>r.petId===pet.id));assert.equal(dashboard.summary.totals.appointments,await clinic.appointment.count({where:{ownerId:owner}}));assert.ok(!JSON.stringify(dashboard).includes('P3_PRIVATE_MARKER'));status(await request('/api/bootstrap',{base:bases[0]}),404);
+  const dashboard=status(await request('/api/dashboard/clinic'),200);assert.ok(dashboard.appointments.some(a=>a.petId===pet.id));assert.ok(dashboard.medicalRecords.some(r=>r.petId===pet.id));assert.equal(dashboard.summary.totals.appointments,await clinic.appointment.count({where:{ownerId:owner}}));assert.ok(!JSON.stringify(dashboard).includes('P3_PRIVATE_MARKER'));
   // P4 now owns this flow and rejects missing durable request keys.
   status(await request('/api/invoices',{method:'POST',token:tokens.admin,body:{type:'appointment',relatedId:all.items[0].id,subtotal:100000}}),422);
 });

@@ -7,7 +7,7 @@ import { BootstrapService } from '../application/services/bootstrap.js';
 import { PrismaBootstrapRepository } from '../infrastructure/persistence/bootstrapRepository.js';
 import { ownerDto, petDto, hotelBookingDto, appointmentDto, medicalRecordDto } from '../lib/serialize.js';
 
-export async function currentActor(db:PrismaClient,actor:Actor) {
+async function currentActor(db:PrismaClient,actor:Actor) {
   const user=await db.user.findUnique({where:{id:actor.sub},select:{role:true}});
   if(!user||user.role!==actor.role)throw new BusinessError(403,'Current account permission is required.');
 }

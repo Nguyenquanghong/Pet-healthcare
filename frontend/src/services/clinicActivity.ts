@@ -1,9 +1,9 @@
 import type {ActivityCategory, ActivityFilters} from '../types/clinicActivity';
 import type {AppointmentStatus} from '../types/appointment';
 const day = 86_400_000;
-export const activityStatuses: AppointmentStatus[] = ['pending','confirmed','checked_in','in_progress','completed','cancelled','no_show'];
+const activityStatuses: AppointmentStatus[] = ['pending','confirmed','checked_in','in_progress','completed','cancelled','no_show'];
 const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-export function validActivityDay(value: string) {
+function validActivityDay(value: string) {
   return /^[1-9]\d{3}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value + 'T00:00:00Z')) && iso(Date.parse(value + 'T00:00:00Z')) === value;
 }
 export function activityPreset(preset: 'today' | '30days' | '12months', today = iso(Date.now() + 7 * 3_600_000)): Pick<ActivityFilters, 'from' | 'to' | 'groupBy'> {

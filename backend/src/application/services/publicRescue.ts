@@ -5,7 +5,7 @@ export type RescueReportInput = { finderPhone?: string; location?: string; finde
 // AQ-01: the same finder reporting the same pet again within this window is one
 // report (double submit, retry, impatient finder): no second row, no second owner
 // notification. The per-token limiter bounds everything else.
-export const RESCUE_DEDUP_MS = 10 * 60 * 1000;
+const RESCUE_DEDUP_MS = 10 * 60 * 1000;
 
 export class PublicRescueService {
   constructor(private readonly deps: PublicRescueDependencies, private readonly now = () => new Date()) {}

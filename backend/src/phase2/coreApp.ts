@@ -6,7 +6,6 @@ import type { PrismaClient } from '@prisma/client';
 import { createApp } from '../app.js';
 import { asymmetricConfig, verifyToken } from '../lib/token.js';
 import { mountDirectory } from './directoryApi.js';
-import { mountSplitBootstrap } from './splitBootstrap.js';
 import { mountAppointmentBilling } from './billingApi.js';
 import { mountDashboards } from './dashboardApi.js';
 import { coreRuntime } from './runtime.js';
@@ -24,17 +23,16 @@ import { passwordAdapter, tokenAdapter } from '../infrastructure/security/authAd
 import { currentAccount } from './currentAccount.js';
 
 // Paths the gateway forwards to Clinic; the proxy checks them again after resolving the URL.
-export const clinicPrefixes = ['/api/appointments', '/api/medical-records', '/api/dashboard/clinic'] as const;
+const clinicPrefixes = ['/api/appointments', '/api/medical-records', '/api/dashboard/clinic'] as const;
 
 // Keep the user's app.ts intact. This composition owns the split service route
 // and the private Core authorization endpoint before mounting existing domains.
-export function createCoreApp(db: PrismaClient, config: {notificationUrl?:string;notificationToken?:string;clinicUrl?:string;clinicToken?:string;directoryToken?:string;clinicBootstrapToken?:string;evidenceToken?:string} = {
+export function createCoreApp(db: PrismaClient, config: {notificationUrl?:string;notificationToken?:string;clinicUrl?:string;clinicToken?:string;directoryToken?:string;evidenceToken?:string} = {
   notificationUrl: process.env.NOTIFICATION_SERVICE_URL,
   notificationToken: process.env.CORE_NOTIFICATION_SEND_TOKEN??process.env.NOTIFICATION_SERVICE_TOKEN,
   clinicUrl:process.env.CLINIC_SERVICE_URL,
   clinicToken:process.env.CLINIC_BILLING_TOKEN??process.env.CLINIC_SERVICE_TOKEN,
   directoryToken:process.env.CORE_DIRECTORY_TOKEN,
-  clinicBootstrapToken:process.env.CLINIC_BOOTSTRAP_TOKEN,
   evidenceToken:process.env.CORE_BILLING_EVIDENCE_TOKEN,
 }) {
   const app = express(); app.disable('x-powered-by');
@@ -56,7 +54,6 @@ export function createCoreApp(db: PrismaClient, config: {notificationUrl?:string
   if(clinic&&(!['http:','https:'].includes(clinic.protocol)||clinic.username||clinic.password||clinic.pathname!=='/'||clinic.search||clinic.hash))throw new Error('INVALID_CLINIC_SERVICE_URL');
   mountDashboards(app,db,Boolean(clinic));
   if(clinic){
-    mountSplitBootstrap(app,db,clinic,config.clinicBootstrapToken??config.clinicToken!,config.notificationUrl);
     app.use([...clinicPrefixes],express.json({limit:'8mb'}),serviceProxy({name:'clinic',origin:clinic,prefixes:clinicPrefixes,
       forwardRequestHeaders:['authorization','idempotency-key','x-clinic-min-version','x-clinic-read-consistency'],
       forwardResponseHeaders:['x-service-instance','x-service-degraded','retry-after','x-clinic-read-token','x-clinic-read-source','x-clinic-projection-generation','cache-control'],

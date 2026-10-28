@@ -294,43 +294,6 @@ export interface ApiSchemas {
       petIds: ApiSchemas["String"][];
     };
   };
-  Bootstrap: {
-    currentOwnerId: string;
-    owners: ApiSchemas["Owner"][];
-    pets: ApiSchemas["Pet"][];
-    appointments: ApiSchemas["Appointment"][];
-    medicalRecords: ApiSchemas["MedicalRecord"][];
-    medicalImages: ApiSchemas["MedicalImage"][];
-    hotelBookings: ApiSchemas["HotelBooking"][];
-    dailyCareNotes: ApiSchemas["CareNote"][];
-    notifications: ApiSchemas["Notification"][];
-    summary: {
-      totals: Record<string, number | null>;
-      species: Record<string, number>;
-      appointmentStatus: Record<string, number | null>;
-      hotelStatus: Record<string, number>;
-      notificationCategory: Record<string, number | null>;
-      unread: number | null;
-      todayAppointments: number | null;
-    };
-    regions?: {
-      core?: {
-        status: "available" | "unavailable";
-        asOf: string | null;
-        error?: string;
-      };
-      clinic?: {
-        status: "available" | "unavailable";
-        asOf: string | null;
-        error?: string;
-      };
-      notifications?: {
-        status: "available" | "unavailable";
-        asOf: string | null;
-        error?: string;
-      };
-    };
-  };
   OwnerLoginInput: {
     email: string;
     password: string;

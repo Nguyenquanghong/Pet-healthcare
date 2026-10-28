@@ -5,7 +5,7 @@ export interface Actor { sub: string; role: 'owner' | 'doctor' | 'staff' | 'admi
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
-export function parseQuery(raw: Record<string, unknown>) {
+function parseQuery(raw: Record<string, unknown>) {
   const integer = (key: string, fallback: number, max: number) => {
     if (raw[key] === undefined) return fallback;
     if (typeof raw[key] !== 'string' || !/^[1-9]\d*$/.test(raw[key] as string)) throw new ApiError(422, `Invalid ${key}.`);

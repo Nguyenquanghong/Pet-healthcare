@@ -25,7 +25,7 @@ class DependencyStatus extends Error {
 // answering; it must not open the circuit for every other route of that service.
 const isDependencyFailure = (error: unknown) => !(error instanceof DependencyStatus && error.response.headers.has('x-service-degraded'));
 
-export function gatewayBreaker(name: ProxyTarget['name']) {
+function gatewayBreaker(name: ProxyTarget['name']) {
   const key = name.toUpperCase();
   return new CircuitBreaker(`${name}-gateway`, integer(`${key}_GATEWAY_BREAKER_FAILURES`, 5, 1, 100), integer(`${key}_GATEWAY_BREAKER_OPEN_MS`, 5000, 100, 60000));
 }

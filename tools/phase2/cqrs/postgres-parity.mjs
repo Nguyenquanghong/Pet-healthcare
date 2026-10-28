@@ -155,7 +155,7 @@ try {
       assert.deepEqual(await current.calendar(actor, {month, category}), await old.calendar(readerDb, actor, month, category));
       report.parityCases++;
     }
-    const {list} = await import('../../../services/clinic/dist/lists.js');
+    const {list} = await import('../../../services/clinic/dist/infrastructure/queries/authoritativeLists.js');
     // AQ-09: an image list returns metadata and a valet key, never the content or the
     // storage columns. The pinned reader returns whole rows (now with the claim columns),
     // so the fixture's legacy base64 rows list as that row without content and storage fields.

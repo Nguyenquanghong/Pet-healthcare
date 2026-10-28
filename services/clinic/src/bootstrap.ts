@@ -1,12 +1,10 @@
 import type { PrismaClient } from './generated/client/index.js';
 import type { Actor } from './domain/auth.js';
-import { BusinessError } from './domain/error.js';
 import { todayInVietnam } from './domain/validation.js';
 import { appointmentDto,medicalRecordDto } from './lib/serialize.js';
 import type { RequestDirectory } from './directory.js';
-export async function bootstrap(db:PrismaClient,actor:Actor,directory:RequestDirectory,view:unknown){
-  if(view===undefined)view='session';if(view!=='session'&&view!=='dashboard')throw new BusinessError(422,'Invalid bootstrap view.');
-  if(view==='session')return{appointments:[],medicalRecords:[],medicalImages:[],pets:[],owners:[],summary:{totals:{appointments:0,medicalRecords:0,medicalImages:0},appointmentStatus:{},todayAppointments:0}};
+// The bounded Clinic dashboard view served at GET /api/dashboard/clinic.
+export async function bootstrap(db:PrismaClient,actor:Actor,directory:RequestDirectory){
   const own=actor.role==='owner'?{ownerId:actor.sub}:{},today=new Date(todayInVietnam()+'T00:00:00Z');
   const result=await db.$transaction(async tx=>{
     const counts=await tx.appointment.groupBy({by:['status'],where:own,_count:true});

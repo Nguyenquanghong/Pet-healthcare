@@ -371,8 +371,8 @@ test('AQ-10 pending expiry: an unconfirmed stay past 48 h or noon of its check-i
 });
 test('AQ-07: real responses through Core match the public OpenAPI contract the frontend types are generated from', async () => {
   const spec = JSON.parse(readSpec(new URL('../../backend/openapi.json', import.meta.url), 'utf8'));
-  const reads = { owner: ['/api/auth/me', '/api/pets?pageSize=100', '/api/appointments?pageSize=100', '/api/hotel-bookings', '/api/medical-records?pageSize=100', '/api/invoices', '/api/notifications?pageSize=100', '/api/bootstrap'],
-    admin: ['/api/auth/me', '/api/pets?pageSize=100', '/api/owners?pageSize=100', '/api/appointments?pageSize=100', '/api/hotel-bookings', '/api/medical-records?pageSize=100', '/api/invoices', '/api/notifications?pageSize=100', '/api/bootstrap?view=dashboard', '/api/hotel-care-notes', '/api/hotel-capacity'] };
+  const reads = { owner: ['/api/auth/me', '/api/pets?pageSize=100', '/api/appointments?pageSize=100', '/api/hotel-bookings', '/api/medical-records?pageSize=100', '/api/invoices', '/api/notifications?pageSize=100', '/api/dashboard/core', '/api/dashboard/clinic'],
+    admin: ['/api/auth/me', '/api/pets?pageSize=100', '/api/owners?pageSize=100', '/api/appointments?pageSize=100', '/api/hotel-bookings', '/api/medical-records?pageSize=100', '/api/invoices', '/api/notifications?pageSize=100', '/api/dashboard/core', '/api/dashboard/clinic', '/api/hotel-care-notes', '/api/hotel-capacity'] };
   // The check brings its own rows: a fresh database (CI) has no other runs' leftovers.
   // A new pending appointment is in the owner's list and the admin dashboard preview.
   const fixture = requireStatus(await request('/api/appointments', { method: 'POST', body: { petId: pet.id, type: 'general_checkup', date, time: '14:00', serviceName: 'AQ-07 contract fixture', ownerNote: 'Fixture note' } }), 201).appointment;
@@ -380,7 +380,7 @@ test('AQ-07: real responses through Core match the public OpenAPI contract the f
   // This Core runs without Clinic, so medical records come from Core's Phase 1 service.
   // P02/P11 (revision lock, server-decided doctorId) live in Clinic only (P02 §142, P08);
   // clinic.test.mjs checks those fields on the real Phase 2 path.
-  const phase1Only = /GET \/api\/(medical-records|bootstrap)\S*\.(items|medicalRecords)\[\d+\]\.(doctorId|revision): required$/;
+  const phase1Only = /GET \/api\/(medical-records|dashboard\/clinic)\S*\.(items|medicalRecords)\[\d+\]\.(doctorId|revision): required$/;
   let phase1Seen = false;
   for (const [role, paths] of Object.entries(reads)) for (const path of paths) {
     const body = requireStatus(await request(path, { token: tokens[role] }), 200);
@@ -393,7 +393,7 @@ test('AQ-07: real responses through Core match the public OpenAPI contract the f
   assert.deepEqual(problems.slice(0, 30), [], problems.length + ' contract problems');
   assert.ok(phase1Seen, 'the Phase 1 exception is still needed; drop it once Core serves Phase 2 records');
   for (const key of ['items', 'appointments']) assert.ok(checked[key] > 0, 'the check saw real ' + key);
-  for (const read of ['owner GET /api/appointments?pageSize=100', 'admin GET /api/bootstrap?view=dashboard']) assert.ok(sawFixture.includes(read), `the fixture appointment was validated by ${read}; seen by: ${sawFixture.join(', ')}`);
+  for (const read of ['owner GET /api/appointments?pageSize=100', 'admin GET /api/dashboard/clinic']) assert.ok(sawFixture.includes(read), `the fixture appointment was validated by ${read}; seen by: ${sawFixture.join(', ')}`);
 });
 test('legacy export/dry-run/import/verify preserve IDs/status/timestamps; resume and deleted/read rows never regress', async () => {
   const source = [];

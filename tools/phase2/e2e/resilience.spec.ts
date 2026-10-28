@@ -4,12 +4,11 @@ import { fixture,login,api,appointment,completedSpa,controls,observed,network,pi
 import { database } from './database';
 test.afterEach(()=>controls());
 
-test('real Notification API outage preserves session, unknown unread, Clinic writes and partial bootstrap',async({page})=>{
+test('real Notification API outage preserves session, unknown unread and Clinic writes',async({page})=>{
   const f=fixture(),created=await appointment(page,4);
   const confirmed=await api(page,'/appointments/'+created.id+'/status',{method:'PATCH',body:{status:'confirmed',expectedRevision:created.statusRevision}});expect(confirmed.status).toBe(200);
   await expect.poll(async()=>{const n=await api(page,'/notifications/unread-count',{role:'owner'});return n.body.unread;}).toBeGreaterThan(0);
   await page.clock.install();await login(page);const token=await page.evaluate(()=>sessionStorage.getItem('nipopeto_access_token'));await expect(page.getByRole('link',{name:'Thông báo',exact:true})).toContainText(/\d/);await controls({stopNotification:true});await expect.poll(()=>observed().notificationStopped).toBe(true);await page.clock.fastForward(25000);await expect(page.getByLabel('Chưa cập nhật được thông báo').first()).toHaveText(/!$/);await page.reload();await expect(page.getByRole('heading',{name:'Tổng quan',exact:true})).toBeVisible();await expect(page.getByLabel('Chưa cập nhật được thông báo').first()).toHaveText('?');expect(await page.evaluate(()=>sessionStorage.getItem('nipopeto_access_token'))).toBe(token);
-  const partial=await api(page,'/bootstrap?view=dashboard',{role:'owner'});expect(partial.status).toBe(200);expect(partial.body.regions.notifications.status).toBe('unavailable');expect(partial.body.summary.unread).toBeNull();expect(partial.body.regions.clinic.status).toBe('available');
   await page.goto('/owner/spa-booking');await pickPet(page,5,'Thú cưng *');await page.getByLabel('Ngày Spa *').fill('2040-04-01');const saved=page.waitForResponse(r=>r.url().endsWith('/api/appointments')&&r.request().method()==='POST');await page.getByRole('button',{name:'Gửi yêu cầu đặt Spa',exact:true}).click();expect((await saved).status()).toBe(201);await expect(page.getByText('Yêu cầu Spa đã được gửi và đang chờ xác nhận.',{exact:true})).toBeVisible();
   await controls();await expect.poll(()=>observed().notificationStopped).toBe(false);await expect.poll(async()=>{const n=await api(page,'/notifications/unread-count',{role:'owner'});return n.status;}).toBe(200);expect(await page.evaluate(()=>sessionStorage.getItem('nipopeto_access_token'))).toBe(token);
 });

@@ -225,7 +225,6 @@ const consumerCheck=(existsSync(built)&&existsSync(clinicBilling)?Promise.all([i
 // The frontend types are generated from the gateway spec; Clinic's spec is the
 // service's own contract. A schema both declare must not drift apart silently.
 const SPEC_DIFFERENCES={
-  Bootstrap:'gateway composes Core and Clinic regions; Clinic returns only its own part',
   CreateInvoiceInput:'expectedRevision belongs to Core split billing (P4), Clinic never receives it',
   User:'permissions is only in Core session responses (AQ-05)',
 };
