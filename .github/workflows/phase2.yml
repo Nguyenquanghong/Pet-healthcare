@@ -12,11 +12,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run phase2:build
-      - run: npm run phase2:test:contracts
-      - run: npm run phase2:test:architecture
+      # arch:check runs boundaries, layering, rules, OpenAPI, contracts, notification writers,
+      # links and the permission/lifecycle/api-type tests; npm test already ran phase2:test:source.
       - run: npm run arch:check
-      - run: npm run phase2:test:notification-writers
-      - run: npm run phase2:test:source
       - run: npx playwright install --with-deps chromium
       - run: npm run phase2:test:notification-ui
       - run: npm run phase2:up
