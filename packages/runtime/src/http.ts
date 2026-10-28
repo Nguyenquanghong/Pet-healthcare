@@ -77,6 +77,7 @@ export class ServiceRuntime {
   private ownAt = 0;
   private checking: Promise<void> | undefined;
   private refreshTimer: ReturnType<typeof setInterval> | undefined;
+  private probing: amqp.ChannelModel | undefined;
   private database = false;
   private redis = false;
   private broker = false;
@@ -90,6 +91,7 @@ export class ServiceRuntime {
   readonly softLimit: number;
   readonly hardLimit: number;
   readonly deadlineMs: number;
+  readonly brokerProbeMs: number;
   constructor(readonly options: RuntimeOptions) {
     this.metricsToken = credential('OBSERVABILITY_TOKEN');
     this.limiter = new SharedLimiter(
@@ -105,6 +107,7 @@ export class ServiceRuntime {
     this.hardLimit = integer('OUTBOX_HARD_LIMIT', 20000);
     if (this.softLimit >= this.hardLimit) throw new Error('INVALID_OUTBOX_LIMITS');
     this.deadlineMs = integer('HTTP_DEADLINE_MS', 10000, 100, 30000);
+    this.brokerProbeMs = integer('BROKER_PROBE_TIMEOUT_MS', 2000, 200, 10000);
     this.lag.enable();
   }
   install(app: Express) {
@@ -314,18 +317,46 @@ export class ServiceRuntime {
       ],
     };
   }
+  // One connection serves every probe: a new one every 3 s per process is needless churn for the broker.
+  private async probeConnection(url: string) {
+    if (this.probing) return this.probing;
+    const connection = await amqp.connect(url, { timeout: 500 });
+    connection.on('error', () => {});
+    connection.once('close', () => {
+      if (this.probing === connection) this.probing = undefined;
+    });
+    return (this.probing = connection);
+  }
+  private async dropProbeConnection() {
+    const broken = this.probing;
+    this.probing = undefined;
+    await broken?.close().catch(() => {});
+  }
+  // A kept connection no longer fails fast through the connect timeout, so the whole probe has a deadline.
   private async brokerProbe() {
     const url = process.env.BROKER_URL;
     if (!url) return false;
-    let connection: amqp.ChannelModel | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<boolean>(resolve => {
+      timer = setTimeout(() => {
+        void this.dropProbeConnection();
+        resolve(false);
+      }, this.brokerProbeMs);
+    });
     try {
-      connection = await amqp.connect(url, { timeout: 500 });
-      connection.on('error', () => {});
+      return await Promise.race([this.probeBroker(url), expired]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  private async probeBroker(url: string) {
+    try {
+      const connection = await this.probeConnection(url);
       const prefix = process.env.BROKER_PREFIX;
       if (prefix && this.options.service !== 'core') {
         // A missing queue closes its channel, so each check has its own; -1 means unknown.
         const ready = async (name: string) => {
-          const channel = await connection!.createChannel();
+          const channel = await connection.createChannel();
           channel.on('error', () => {});
           try {
             return (await channel.checkQueue(prefix + '.' + name)).messageCount;
@@ -352,9 +383,9 @@ export class ServiceRuntime {
       }
       return true;
     } catch {
+      // The connection may be the broken part; the next probe opens a new one.
+      await this.dropProbeConnection();
       return false;
-    } finally {
-      await connection?.close().catch(() => {});
     }
   }
   async refresh(force = false) {
@@ -469,6 +500,8 @@ export class ServiceRuntime {
     }
     this.limiter.close();
     this.lag.disable();
+    void this.probing?.close().catch(() => {});
+    this.probing = undefined;
   }
   async drain(server: Server, disconnect: () => Promise<void>) {
     this.stopping = true;
