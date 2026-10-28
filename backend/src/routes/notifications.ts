@@ -1,17 +1,9 @@
-import { Router, type Response } from "express";
+import { Router } from "express";
 import { NotificationsService } from "../application/services/notifications.js";
-import { BusinessError } from "../domain/error.js";
+import { failure } from "./failure.js";
 
 export function createNotificationsRouter(service: NotificationsService) {
   const router = Router();
-  function failure(res: Response, error: unknown) {
-    if (error instanceof BusinessError) {
-      res.status(error.status).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
-
 
   router.patch("/read-all", async (req, res) => {
     await service.markAllRead(req.auth!);

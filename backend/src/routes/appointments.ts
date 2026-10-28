@@ -1,19 +1,11 @@
-import { Router, type Response } from "express";
+/** @deprecated Legacy monolith route (createApp only); split mode proxies this prefix to Clinic. */
+import { Router } from "express";
 import { AppointmentService } from "../application/services/appointments.js";
-import { BusinessError } from "../domain/error.js";
 import { appointmentDto } from "../lib/serialize.js";
+import { failure } from "./failure.js";
 
 export function createAppointmentsRouter(service: AppointmentService) {
   const router = Router();
-
-  function failure(res: Response, error: unknown) {
-    if (error instanceof BusinessError) {
-      res.status(error.status).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
-
 
   router.post("/", async (req, res) => {
     try {

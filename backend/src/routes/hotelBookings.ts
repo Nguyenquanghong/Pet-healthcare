@@ -1,17 +1,10 @@
-import { Router, type Response } from "express";
+import { Router } from "express";
 import { HotelBookingsService } from "../application/services/hotelBookings.js";
-import { BusinessError } from "../domain/error.js";
 import { careNoteDto, hotelBookingDto } from "../lib/serialize.js";
+import { failure } from "./failure.js";
 
 export function createHotelBookingsRouter(service: HotelBookingsService) {
   const router = Router();
-  function failure(res: Response, error: unknown) {
-    if (error instanceof BusinessError) {
-      res.status(error.status).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
 
   router.get("/:id", async (req, res) => {
     try { res.json({ booking: hotelBookingDto(await service.find(req.auth!, req.params.id), req.auth!) }); }
