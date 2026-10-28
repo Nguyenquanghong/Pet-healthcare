@@ -150,3 +150,40 @@ test('a downstream body that is not JSON is a 502 with a code, not an outage', a
     }
   });
 });
+
+// The legacy appointment and medical-record routers are still mounted behind the proxy for the
+// monolith (createApp). In split mode nothing may reach them: the fake database has no clinical
+// tables, so a legacy handler could not produce the stub's marker.
+test('split mode: every Clinic prefix reaches the Clinic proxy and never a legacy Core handler', async () => {
+  const requests = [
+    ['GET', '/api/appointments'], ['GET', '/api/appointments/'], ['GET', '/api/appointments?status=pending&page=2'],
+    ['POST', '/api/appointments'], ['GET', '/api/appointments/calendar?month=2099-01'], ['GET', '/api/appointments/availability?date=2099-01-01'],
+    ['GET', '/api/appointments/a1'], ['PATCH', '/api/appointments/a1/status'], ['PATCH', '/api/appointments/a1/reschedule'],
+    ['PATCH', '/api/appointments/a1/cancel'], ['POST', '/api/appointments/a1/undo-status'], ['GET', '/api/appointments/a1/status-history'],
+    ['GET', '/api/medical-records'], ['POST', '/api/medical-records'], ['GET', '/api/medical-records/images'], ['POST', '/api/medical-records/images'],
+    ['GET', '/api/medical-records/images/i1'], ['DELETE', '/api/medical-records/images/i1'], ['GET', '/api/medical-records/r1'],
+    ['PATCH', '/api/medical-records/r1'], ['DELETE', '/api/medical-records/r1?expectedRevision=1'],
+    ['GET', '/api/dashboard/clinic'], ['GET', '/api/dashboard/clinic/activity'],
+  ];
+  await gateway({}, async ({ base, token, state }) => {
+    state.reply = () => ({ status: 200, body: { marker: 'clinic-stub' } });
+    for (const [method, path] of requests) {
+      const before = state.calls.length;
+      const res = await fetch(base + path, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: ['GET', 'DELETE'].includes(method) ? undefined : '{}' });
+      const label = `${method} ${path}`;
+      assert.equal(res.status, 200, label); assert.deepEqual(await res.json(), { marker: 'clinic-stub' }, label);
+      assert.equal(state.calls.length, before + 1, label + ': exactly one Clinic call');
+      assert.equal(state.calls.at(-1).method, method, label); assert.equal(state.calls.at(-1).url, path, label);
+    }
+    // Express matches the prefix without regard to case; the proxy then refuses, so the legacy router still never answers.
+    for (const path of ['/API/appointments', '/api/Appointments/a1', '/api/MEDICAL-RECORDS', '/api/Dashboard/Clinic']) {
+      const before = state.calls.length, res = await rawGet(base, path, token);
+      assert.equal(res.status, 404, path); assert.equal(res.body.error, 'Clinic route not found.', path);
+      assert.equal(state.calls.length, before, path + ': refused before any call');
+    }
+    // Control: a Core route is not proxied.
+    const before = state.calls.length;
+    await fetch(base + '/api/health');
+    assert.equal(state.calls.length, before, 'Core routes stay in Core');
+  });
+});

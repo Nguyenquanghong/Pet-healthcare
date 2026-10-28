@@ -21,6 +21,8 @@
 //     that answer through authorizedRead, and the gate only opens for GET.
 // 10. No two .ts files in services/*/src or backend/src/phase2 are identical: a copy
 //     belongs in packages/runtime or packages/messaging.
+// 11. Clinic reaches other systems over HTTP only from directory.ts and directorySync.ts
+//     (the Core calls, ADR-P13) and blobStore.ts (object storage, not Core).
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -383,6 +385,39 @@ rule('no-duplicated-service-modules',()=>{
   return modules.length+' modules, none identical';
 });
 
+// ---- 11. Clinic -> Core calls stay confined (ADR-P13) -----------------------------------
+// Clinic's synchronous dependency on Core is read-only authorization and lookup. Keeping every
+// outbound HTTP call in these files means a new Core call is a visible change to this list.
+const CLINIC_HTTP_FILES = new Map([
+  ['directory.ts', 'Core authorize / lookup / terminal evidence'],
+  ['directorySync.ts', 'Core directory export for the projection'],
+  ['blobStore.ts', 'S3-compatible object storage (not Core)'],
+]);
+const withoutComments = source => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+const HTTP_CALL = /(?:^|[^\w$])fetch\s*\(|from\s*['"](?:node:)?https?['"]|from\s*['"](?:undici|axios|node-fetch|got)['"]/;
+export function unconfinedHttpCalls(modules, allowed = CLINIC_HTTP_FILES) {
+  return modules.filter(m => !allowed.has(m.file) && HTTP_CALL.test(withoutComments(m.source))).map(m => m.file);
+}
+rule('clinic-core-calls-confined', () => {
+  const src = resolve(root, 'services/clinic/src');
+  const modules = files(src).filter(f => f.endsWith('.ts')).map(f => ({ file: relative(src, f).split(sep).join('/'), source: readFileSync(f, 'utf8') }));
+  assert.ok(modules.length >= 40, 'found the Clinic modules (' + modules.length + ')');
+  const stray = unconfinedHttpCalls(modules);
+  assert.deepEqual(stray, [], 'outbound HTTP outside ' + [...CLINIC_HTTP_FILES.keys()].join(', ') + ' (add it to the list with a reason, or call Core through directory.ts): ' + stray.join(', '));
+  const listed = [...CLINIC_HTTP_FILES.keys()].filter(f => !modules.some(m => m.file === f && HTTP_CALL.test(withoutComments(m.source))));
+  assert.deepEqual(listed, [], 'listed files that no longer make a call (remove them): ' + listed.join(', '));
+  // negative fixtures
+  const at = (file, source) => unconfinedHttpCalls([{ file, source }]);
+  assert.deepEqual(at('app.ts', "const r = await fetch(new URL('/internal/directory/authorize', origin));"), ['app.ts']);
+  assert.deepEqual(at('application/services/x.ts', 'await globalThis.fetch(url)'), ['application/services/x.ts']);
+  assert.deepEqual(at('x.ts', "import { request } from 'node:https';"), ['x.ts']);
+  assert.deepEqual(at('x.ts', "import axios from 'axios';"), ['x.ts']);
+  assert.deepEqual(at('directory.ts', 'await fetch(url)'), []);
+  assert.deepEqual(at('x.ts', '// fetch(url) is what directory.ts does' + String.fromCharCode(10) + '/* fetch(url) */' + String.fromCharCode(10) + 'const fetched = refetch(url);'), []);
+  assert.deepEqual(at('x.ts', "const a = 'http://x'; // fetch(a)"), []);
+  return modules.length + ' modules; HTTP only in ' + [...CLINIC_HTTP_FILES.keys()].join(', ');
+});
+
 await envelopeCheck;
 await lifecycleCheck;
 await grantsCheck;
@@ -392,4 +427,4 @@ await categoryCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, no duplicated service modules, negative fixtures.\n');
+else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, no duplicated service modules, Clinic HTTP calls confined, negative fixtures.\n');

@@ -1,17 +1,10 @@
-import { Router, type Response } from "express";
+import { Router } from "express";
 import { PublicRescueService } from "../application/services/publicRescue.js";
-import { BusinessError } from "../domain/error.js";
 import { publicPetDto } from "../lib/serialize.js";
+import { failure } from "./failure.js";
 
 export function createPublicRouter(service: PublicRescueService) {
   const router = Router();
-  function failure(res: Response, error: unknown) {
-    if (error instanceof BusinessError) {
-      res.status(error.status).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
 
   router.get("/pets/:token", async (req, res) => {
     try {

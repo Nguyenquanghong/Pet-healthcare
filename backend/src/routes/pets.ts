@@ -1,18 +1,10 @@
-import { Router, type Response } from "express";
+import { Router } from "express";
 import { PetsService } from "../application/services/pets.js";
-import { BusinessError } from "../domain/error.js";
 import { petDto } from "../lib/serialize.js";
+import { failure } from "./failure.js";
 
 export function createPetsRouter(service: PetsService) {
   const router = Router();
-  function failure(res: Response, error: unknown) {
-    if (error instanceof BusinessError) {
-      res.status(error.status).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
-
 
   router.post("/", async (req, res) => {
     try {

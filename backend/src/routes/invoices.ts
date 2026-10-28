@@ -1,18 +1,11 @@
-import { Router, type Response } from "express";
+import { Router } from "express";
 import { InvoicesService } from "../application/services/invoices.js";
-import { BusinessError } from "../domain/error.js";
 import { invoiceDto } from "../lib/serialize.js";
+import { failure } from "./failure.js";
 
 
 export function createInvoicesRouter(service: InvoicesService) {
   const router = Router();
-  function failure(res: Response, error: unknown) {
-    if (error instanceof BusinessError) {
-      res.status(error.status).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
 
   router.get("/:id/payment-history", async (req, res) => {
     try { res.json(await service.paymentHistory(req.auth!, req.params.id)); }
