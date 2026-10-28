@@ -58,7 +58,9 @@
     "activity:build": "npm run build -w @nipopeto/runtime && npm run build -w @nipopeto/contracts && npm run build -w @nipopeto/messaging && npm run build --ignore-scripts -w backend && npm run build --ignore-scripts -w @nipopeto/clinic",
     "activity:test:unit": "npm run activity:build && node --test --test-isolation=none --test-concurrency=1 tools/phase2/cqrs/activity/*.test.mjs",
     "activity:test:ui": "npm run activity:build && npm run build -w frontend && playwright test --config tools/phase2/playwright.config.ts activity.spec.ts",
-    "activity:test:postgres": "node tools/phase2/cqrs/activity/postgres.integration.mjs"
+    "activity:test:postgres": "node tools/phase2/cqrs/activity/postgres.integration.mjs",
+    "format:phase2": "prettier --write \"services/*/src/**/*.ts\" \"backend/src/phase2/**/*.ts\" \"packages/*/src/**/*.ts\"",
+    "format:check:phase2": "prettier --check \"services/*/src/**/*.ts\" \"backend/src/phase2/**/*.ts\" \"packages/*/src/**/*.ts\""
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",
@@ -78,10 +80,11 @@
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
+    "braces": "file:tools/vendor/braces",
     "concurrently": "^9.2.1",
     "deepmerge-ts": "8.0.0",
+    "prettier": "3.3.3",
     "prisma": "6.19.3",
-    "braces": "file:tools/vendor/braces",
     "tailwindcss": "3.4.19"
   }
 }

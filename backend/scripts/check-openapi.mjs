@@ -16,28 +16,28 @@ const mounts = {
   payments: "/api/payments", lists: "/api",
 };
 const runtime = new Set(["GET /api/health"]);
-assert.match(readFileSync(resolve(backend,'src/phase2/billingApi.ts'),'utf8'),/app\.get\('\/api\/operations\/:id'/);
+assert.match(readFileSync(resolve(backend,'src/phase2/billingApi.ts'),'utf8'),/app\.get\(\s*'\/api\/operations\/:id'/);
 runtime.add('GET /api/operations/{id}');
 const dashboardSource=readFileSync(resolve(backend,'src/phase2/dashboardApi.ts'),'utf8');
-for(const match of dashboardSource.matchAll(/app\.get\('([^']+)'/g))runtime.add('GET '+match[1]);
+for(const match of dashboardSource.matchAll(/app\.get\(\s*'([^']+)'/g))runtime.add('GET '+match[1]);
 for (const [file, mount] of Object.entries(mounts)) {
   const source = readFileSync(resolve(backend, "src/routes", `${file}.ts`), "utf8");
-  for (const match of source.matchAll(/\brouter\.(get|post|patch|put|delete)\("([^"]+)"/g)) {
+  for (const match of source.matchAll(/\brouter\.(get|post|patch|put|delete)\(\s*"([^"]+)"/g)) {
     const path = (mount + (match[2] === "/" ? "" : match[2])).replace(/:([A-Za-z][\w]*)/g, "{$1}");
     runtime.add(`${match[1].toUpperCase()} ${path}`);
   }
 }
 const documented = new Set();
 const clinicSource=readFileSync(resolve(backend,'../services/clinic/src/app.ts'),'utf8');
-for(const match of clinicSource.matchAll(/\brouter\.(get|post|patch|put|delete)\(['"]([^'"]+)['"]/g)){
+for(const match of clinicSource.matchAll(/\brouter\.(get|post|patch|put|delete)\(\s*['"]([^'"]+)['"]/g)){
   runtime.add(`${match[1].toUpperCase()} /api${match[2].replace(/:([A-Za-z][\w]*)/g,'{$1}')}`);
 }
 // Core entrypoint composes the independently owned Notification public router.
 // Include routes from its source, not just its spec, in the public inventory.
-assert.match(readFileSync(resolve(backend, 'src/phase2/coreApp.ts'), 'utf8'), /app\.use\('\/api\/notifications'/);
+assert.match(readFileSync(resolve(backend, 'src/phase2/coreApp.ts'), 'utf8'), /app\.use\(\s*'\/api\/notifications'/);
 assert.match(readFileSync(resolve(backend, 'src/index.ts'), 'utf8'), /createCoreApp/);
 const notificationSource = readFileSync(resolve(backend, '../services/notification/src/app.ts'), 'utf8');
-for (const match of notificationSource.matchAll(/\brouter\.(get|post|patch|put|delete)\(['"]([^'"]+)['"]/g)) {
+for (const match of notificationSource.matchAll(/\brouter\.(get|post|patch|put|delete)\(\s*['"]([^'"]+)['"]/g)) {
   const path = ('/api/notifications' + (match[2] === '/' ? '' : match[2])).replace(/:([A-Za-z][\w]*)/g, '{$1}');
   runtime.add(`${match[1].toUpperCase()} ${path}`);
 }
