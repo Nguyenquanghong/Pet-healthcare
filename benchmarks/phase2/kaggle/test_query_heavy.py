@@ -3,6 +3,7 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -12,6 +13,20 @@ sys.path.insert(0, str(Path(__file__).parent))
 from query_heavy import CONFIG, OPERATIONS, QueryClient, healthy, measure, run_workflow, run_trial, valid_response, preflight, validate_profile, limiter_headers
 from make_query_notebook import build, REPO, BASELINE
 from native_stack import NativeStack
+
+
+def reader_contract_dependencies_match_baseline():
+    """query_reader_contract.mjs byte-compares these working-tree Clinic files with the pinned baseline (CRLF-insensitive)."""
+    for name in ('domain/error.ts', 'domain/validation.ts', 'lib/serialize.ts'):
+        path = 'services/clinic/src/' + name
+        try:
+            pinned = subprocess.run(['git', 'show', BASELINE + ':' + path], cwd=REPO, capture_output=True, check=True).stdout
+            current = (REPO / path).read_bytes()
+        except (OSError, subprocess.CalledProcessError):
+            return False
+        if pinned.replace(b'\r\n', b'\n') != current.replace(b'\r\n', b'\n'):
+            return False
+    return True
 
 
 def owner_page():
@@ -76,8 +91,10 @@ class QueryTests(unittest.TestCase):
             else: body['counts']['billingHeld'] = value
             self.assertFalse(valid_response('owner-list', body, {'id': 'owner-a'}))
 
+    @unittest.skipUnless(reader_contract_dependencies_match_baseline(),
+                         'pinned O reader oracle needs domain/error.ts, domain/validation.ts and lib/serialize.ts identical to baseline 3e88d7e; '
+                         'they changed on main in 080aedf, ac1b8ef, 570ab0b, 62953f0 and 31a7429 (drift from the pinned baseline, not a removed file)')
     def test_validator_accepts_actual_pinned_reader_contract_for_all_operations(self):
-        import subprocess
         result = subprocess.run(['node', str(REPO/'benchmarks/phase2/kaggle/query_reader_contract.mjs')],
                                 cwd=REPO, capture_output=True, text=True, encoding='utf-8', check=True, timeout=60)
         oracle = json.loads(result.stdout)

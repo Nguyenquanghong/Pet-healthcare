@@ -25,10 +25,24 @@ if sys.platform=='win32':
 else:
     native=module('activity_native')
 
+# The D1 bundle packs every file in the D1 development manifest plus builder.EXTRA.
+# 63 of them were removed from main in be2267b (CQRS read projection; kept in tag
+# cqrs-projection-archive-20261028), 19 in 31a7429 (dead Core/Clinic routes, frontend
+# leftovers) and 9 earlier in e26ce03/27bc7aa (generated types, dead mocks).
+# The last two groups are not in the tag.
+_D1_MANIFEST = REPO / 'phase2-plan/cqrs/clinic-activity/evidence/d1-development-manifest.json'
+MISSING_SOURCES = sorted(name for name in {*(row['path'] for row in json.loads(_D1_MANIFEST.read_text(encoding='utf-8'))['files']), *builder.EXTRA}
+                         if not (REPO / name).is_file())
+needs_bundle = unittest.skipIf(
+    MISSING_SOURCES,
+    'source removed from main in be2267b (study reproducible from tag cqrs-projection-archive-20261028 only for the files '
+    'that commit removed; some bundled files were also removed in 31a7429, e26ce03, 27bc7aa); %d bundled files missing' % len(MISSING_SOURCES))
+
+
 class NotebookTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.raw, cls.manifest = builder.source_bundle()
+        cls.raw, cls.manifest = (None, None) if MISSING_SOURCES else builder.source_bundle()
 
     def rewrite(self, change):
         with zipfile.ZipFile(io.BytesIO(self.raw)) as z:
@@ -42,6 +56,7 @@ class NotebookTests(unittest.TestCase):
         with self.assertRaises((ValueError,KeyError)):
             builder.verified_members(raw,hashlib.sha256(raw).hexdigest())
 
+    @needs_bundle
     def test_bundle_exact_hashes_and_current_activity_source_no_secrets_or_windows_clients(self):
         manifest, values=builder.verified_members(self.raw,hashlib.sha256(self.raw).hexdigest())
         self.assertIn('tools/phase2/cqrs/activity/trial.mjs',values)
@@ -53,6 +68,7 @@ class NotebookTests(unittest.TestCase):
         self.assertFalse(any('/generated/' in n or '/node_modules/' in n or n.endswith('/.env') for n in values))
         self.assertEqual(len(values),len(manifest['files']))
 
+    @needs_bundle
     def test_tamper_and_inventory_path_symlink_reject_before_extraction(self):
         with self.assertRaises(ValueError):builder.verified_members(self.raw,'0'*64)
         def changed(items):
@@ -68,6 +84,7 @@ class NotebookTests(unittest.TestCase):
         self.check_rejected(self.rewrite(lambda items:items+[items[0]]))
         self.check_rejected(self.rewrite(lambda items:items[:-1]))
 
+    @needs_bundle
     def test_notebook_compiles_unexecuted_self_contained_and_no_benchmark_dispatch(self):
         directory=REPO/'test-results/phase2/cqrs/activity/notebook-package-tests'
         directory.mkdir(parents=True,exist_ok=True)
