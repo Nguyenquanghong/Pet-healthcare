@@ -1,40 +1,85 @@
-import type { Actor } from "../../domain/auth.js";
-import type { BlobStore } from "./blobs.js";
+import type { Actor } from '../../domain/auth.js';
+import type { BlobStore } from './blobs.js';
 export type MedicalRecordValue = {
-  id: string; petId: string; ownerId: string; appointmentId: string | null;
-  doctorId: string | null; doctorName: string; revision: number; visitDate: Date; title: string; symptoms: string | null;
-  diagnosis: string; treatment: string; medications: string | null;
-  vaccineName: string | null; followUpDate: Date | null;
+  id: string;
+  petId: string;
+  ownerId: string;
+  appointmentId: string | null;
+  doctorId: string | null;
+  doctorName: string;
+  revision: number;
+  visitDate: Date;
+  title: string;
+  symptoms: string | null;
+  diagnosis: string;
+  treatment: string;
+  medications: string | null;
+  vaccineName: string | null;
+  followUpDate: Date | null;
   weightKg: number | { toString(): string } | null;
   temperatureC: number | { toString(): string } | null;
-  heartRateBpm: number | null; internalNote: string | null;
-  createdAt: Date; updatedAt: Date;
+  heartRateBpm: number | null;
+  internalNote: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 // AQ-09 Claim Check: the row holds a claim on a bucket object, never the bytes.
 // storageKey is null only for legacy base64 rows not yet moved by the migration tool.
 export type MedicalImageValue = {
-  id: string; petId: string; title: string; mimeType: string; createdAt: Date;
-  storageKey: string | null; sizeBytes: number | null;
+  id: string;
+  petId: string;
+  title: string;
+  mimeType: string;
+  createdAt: Date;
+  storageKey: string | null;
+  sizeBytes: number | null;
 };
-export type MedicalImageWrite = { id: string; petId: string; title: string; mimeType: string; storageKey: string; sizeBytes: number; sha256: string };
+export type MedicalImageWrite = {
+  id: string;
+  petId: string;
+  title: string;
+  mimeType: string;
+  storageKey: string;
+  sizeBytes: number;
+  sha256: string;
+};
 
 export type MedicalWrite = {
-  petId: string; ownerId: string; appointmentId: string | null;
-  doctorId: string; doctorName: string; visitDate: Date; title: string; symptoms: string | null;
-  diagnosis: string; treatment: string; medications: string | null;
-  vaccineName: string | null; followUpDate: Date | null;
-  weightKg?: number | null; temperatureC?: number | null; heartRateBpm?: number | null;
+  petId: string;
+  ownerId: string;
+  appointmentId: string | null;
+  doctorId: string;
+  doctorName: string;
+  visitDate: Date;
+  title: string;
+  symptoms: string | null;
+  diagnosis: string;
+  treatment: string;
+  medications: string | null;
+  vaccineName: string | null;
+  followUpDate: Date | null;
+  weightKg?: number | null;
+  temperatureC?: number | null;
+  heartRateBpm?: number | null;
   internalNote: string | null;
 };
 
 // The author (doctorId/doctorName) is fixed at creation; edits never reassign it.
-export type MedicalUpdate = Partial<Omit<MedicalWrite, "petId" | "ownerId" | "appointmentId" | "doctorId" | "doctorName">>;
+export type MedicalUpdate = Partial<
+  Omit<MedicalWrite, 'petId' | 'ownerId' | 'appointmentId' | 'doctorId' | 'doctorName'>
+>;
 
 // AQ-15 audit entry; before/after are full record snapshots (staff-only).
 export type MedicalRevisionValue = {
-  id: string; recordId: string; action: "create" | "update" | "delete";
-  before: unknown; after: unknown; actorId: string; actorRole: string; changedAt: Date;
+  id: string;
+  recordId: string;
+  action: 'create' | 'update' | 'delete';
+  before: unknown;
+  after: unknown;
+  actorId: string;
+  actorRole: string;
+  changedAt: Date;
   recordRevision: number | null;
 };
 
@@ -63,7 +108,16 @@ export interface MedicalRecordRepository {
 }
 
 export interface MedicalNotificationWriter {
-  create(draft: { recipientOwnerId: string; recipientRole: string; type: string; title: string; message: string; actionUrl: string; relatedPetId: string; relatedAppointmentId: string | null }): Promise<void>;
+  create(draft: {
+    recipientOwnerId: string;
+    recipientRole: string;
+    type: string;
+    title: string;
+    message: string;
+    actionUrl: string;
+    relatedPetId: string;
+    relatedAppointmentId: string | null;
+  }): Promise<void>;
 }
 
 export interface MedicalTransaction {

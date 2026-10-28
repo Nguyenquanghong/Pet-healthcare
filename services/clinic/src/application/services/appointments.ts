@@ -1,24 +1,34 @@
-import { BookingLifecycleService, type LifecycleInput, type UndoInput } from "./bookingLifecycle.js";
-import { BusinessError } from "../../domain/error.js";
-import { authorize } from "../../domain/authorization.js";
-import { todayInVietnam } from "../../domain/validation.js";
-import { checkSlot, slotRange, slotTimes, vietnamInstant } from "../../domain/scheduling.js";
-import type { Actor } from "../../domain/auth.js";
+import { BookingLifecycleService, type LifecycleInput, type UndoInput } from './bookingLifecycle.js';
+import { BusinessError } from '../../domain/error.js';
+import { authorize } from '../../domain/authorization.js';
+import { todayInVietnam } from '../../domain/validation.js';
+import { checkSlot, slotRange, slotTimes, vietnamInstant } from '../../domain/scheduling.js';
+import type { Actor } from '../../domain/auth.js';
 import {
-  appointmentStatuses, appointmentTypes,
-  type AppointmentDependencies, type AppointmentRecord, type AppointmentStatus, type AppointmentType,
-} from "../ports/appointments.js";
+  appointmentStatuses,
+  appointmentTypes,
+  type AppointmentDependencies,
+  type AppointmentRecord,
+  type AppointmentStatus,
+  type AppointmentType,
+} from '../ports/appointments.js';
 
 export type CreateAppointmentInput = {
-  petId?: string; type?: string; date?: string; time?: string; serviceName?: string;
-  doctorId?: string; clinicName?: string; ownerNote?: string;
+  petId?: string;
+  type?: string;
+  date?: string;
+  time?: string;
+  serviceName?: string;
+  doctorId?: string;
+  clinicName?: string;
+  ownerNote?: string;
 };
 export type RescheduleInput = { date?: string; time?: string; ownerNote?: string | null; expectedRevision?: unknown };
 export type StatusInput = LifecycleInput;
 export type CancelInput = { ownerNote?: string; expectedRevision?: unknown };
 export type AvailabilityQuery = { type?: unknown; date?: unknown; doctorId?: unknown };
 
-const spaTypes = new Set<string>(["spa_bath", "spa_grooming", "spa_combo"]);
+const spaTypes = new Set<string>(['spa_bath', 'spa_grooming', 'spa_combo']);
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -32,115 +42,167 @@ function appointmentDate(value: string) {
 }
 
 export class AppointmentService {
-  constructor(private readonly deps: AppointmentDependencies, private readonly lifecycle: BookingLifecycleService) {}
+  constructor(
+    private readonly deps: AppointmentDependencies,
+    private readonly lifecycle: BookingLifecycleService,
+  ) {}
 
   list(actor: Actor, requestedOwnerId?: string) {
-    const ownerId = actor.role === "owner" ? actor.sub : requestedOwnerId;
+    const ownerId = actor.role === 'owner' ? actor.sub : requestedOwnerId;
     return this.deps.appointments.list(ownerId);
   }
 
   async create(actor: Actor, input: CreateAppointmentInput): Promise<AppointmentRecord> {
-    const pet = await this.deps.appointments.findPet(String(input.petId || ""));
-    if (!pet) throw new BusinessError(404, "Pet not found.");
-    if (actor.role === "owner" && pet.ownerId !== actor.sub) throw new BusinessError(403, "You cannot book for this pet.");
-    const type = String(input.type || "other");
-    const date = String(input.date || "");
-    const time = String(input.time || "");
-    const serviceName = String(input.serviceName || "").trim();
-    if (!date || !time || !serviceName) throw new BusinessError(422, "Pet, service, date, and time are required.");
-    if (!appointmentTypes.includes(type as AppointmentType)) throw new BusinessError(422, "Select a valid appointment service.");
-    if (!validDate(date)) throw new BusinessError(422, "Enter a valid appointment date.");
-    if (!timePattern.test(time)) throw new BusinessError(422, "Enter a valid appointment time.");
-    if (date < todayInVietnam()) throw new BusinessError(422, "The appointment date cannot be in the past.");
+    const pet = await this.deps.appointments.findPet(String(input.petId || ''));
+    if (!pet) throw new BusinessError(404, 'Pet not found.');
+    if (actor.role === 'owner' && pet.ownerId !== actor.sub)
+      throw new BusinessError(403, 'You cannot book for this pet.');
+    const type = String(input.type || 'other');
+    const date = String(input.date || '');
+    const time = String(input.time || '');
+    const serviceName = String(input.serviceName || '').trim();
+    if (!date || !time || !serviceName) throw new BusinessError(422, 'Pet, service, date, and time are required.');
+    if (!appointmentTypes.includes(type as AppointmentType))
+      throw new BusinessError(422, 'Select a valid appointment service.');
+    if (!validDate(date)) throw new BusinessError(422, 'Enter a valid appointment date.');
+    if (!timePattern.test(time)) throw new BusinessError(422, 'Enter a valid appointment time.');
+    if (date < todayInVietnam()) throw new BusinessError(422, 'The appointment date cannot be in the past.');
     // P10: opening hours and slot grid here; overlap and capacity in the database.
     checkSlot(await this.deps.appointments.slotPolicy(type as AppointmentType), time);
 
     return this.deps.unitOfWork.run(async ({ appointments, notifications }) => {
       const created = await appointments.create({
-        petId: pet.id, ownerId: pet.ownerId, doctorId: input.doctorId || null,
-        type: type as AppointmentType, serviceName,
-        clinicName: String(input.clinicName || "Nippon Pet Care"),
-        appointmentDate: appointmentDate(date), appointmentTime: time,
+        petId: pet.id,
+        ownerId: pet.ownerId,
+        doctorId: input.doctorId || null,
+        type: type as AppointmentType,
+        serviceName,
+        clinicName: String(input.clinicName || 'Nippon Pet Care'),
+        appointmentDate: appointmentDate(date),
+        appointmentTime: time,
         ownerNote: input.ownerNote?.trim() || null,
-        createdBy: actor.role === "owner" ? "owner" : "staff",
+        createdBy: actor.role === 'owner' ? 'owner' : 'staff',
       });
-      const serviceKind = spaTypes.has(type) ? "spa booking" : "appointment";
+      const serviceKind = spaTypes.has(type) ? 'spa booking' : 'appointment';
       await notifications.create({
-        recipientRole: "admin", type: "appointment_created",
-        title: spaTypes.has(type) ? "New spa booking" : "New appointment",
+        recipientRole: 'admin',
+        type: 'appointment_created',
+        title: spaTypes.has(type) ? 'New spa booking' : 'New appointment',
         message: `${pet.name} has a new ${serviceKind} on ${date} at ${time}.`,
-        actionUrl: "/admin/appointments", relatedPetId: pet.id, relatedAppointmentId: created.id,
+        actionUrl: '/admin/appointments',
+        relatedPetId: pet.id,
+        relatedAppointmentId: created.id,
       });
       return created;
     });
   }
 
   async changeStatus(actor: Actor, id: string, input: StatusInput): Promise<AppointmentRecord> {
-    authorize(actor, "booking.manage");
-    if (!appointmentStatuses.includes(String(input.status) as AppointmentStatus)) throw new BusinessError(422, "Select a valid appointment status.");
-    return await this.lifecycle.change(actor, "appointment", id, input) as AppointmentRecord;
+    authorize(actor, 'booking.manage');
+    if (!appointmentStatuses.includes(String(input.status) as AppointmentStatus))
+      throw new BusinessError(422, 'Select a valid appointment status.');
+    return (await this.lifecycle.change(actor, 'appointment', id, input)) as AppointmentRecord;
   }
   async undoStatus(actor: Actor, id: string, input: UndoInput): Promise<AppointmentRecord> {
-    return await this.lifecycle.undo(actor, "appointment", id, input) as AppointmentRecord;
+    return (await this.lifecycle.undo(actor, 'appointment', id, input)) as AppointmentRecord;
   }
-  history(actor: Actor, id: string) { return this.lifecycle.history(actor, "appointment", id); }
+  history(actor: Actor, id: string) {
+    return this.lifecycle.history(actor, 'appointment', id);
+  }
 
   async reschedule(actor: Actor, id: string, input: RescheduleInput): Promise<AppointmentRecord> {
     const existing = await this.deps.appointments.find(id);
-    if (!existing) throw new BusinessError(404, "Appointment not found.");
-    if (actor.role === "owner" && existing.ownerId !== actor.sub) throw new BusinessError(403, "You cannot reschedule this appointment.");
-    const date = String(input.date || "");
-    const time = String(input.time || "");
-    if (!validDate(date)) throw new BusinessError(422, "Enter a valid appointment date.");
-    if (!timePattern.test(time)) throw new BusinessError(422, "Enter a valid appointment time.");
-    if (date < todayInVietnam()) throw new BusinessError(422, "The appointment date cannot be in the past.");
+    if (!existing) throw new BusinessError(404, 'Appointment not found.');
+    if (actor.role === 'owner' && existing.ownerId !== actor.sub)
+      throw new BusinessError(403, 'You cannot reschedule this appointment.');
+    const date = String(input.date || '');
+    const time = String(input.time || '');
+    if (!validDate(date)) throw new BusinessError(422, 'Enter a valid appointment date.');
+    if (!timePattern.test(time)) throw new BusinessError(422, 'Enter a valid appointment time.');
+    if (date < todayInVietnam()) throw new BusinessError(422, 'The appointment date cannot be in the past.');
     checkSlot(await this.deps.appointments.slotPolicy(existing.type), time);
-    return await this.lifecycle.reschedule(actor, id, input.expectedRevision, {
-      appointmentDate: appointmentDate(date), appointmentTime: time,
+    return (await this.lifecycle.reschedule(actor, id, input.expectedRevision, {
+      appointmentDate: appointmentDate(date),
+      appointmentTime: time,
       ownerNote: input.ownerNote ?? existing.ownerNote,
-    }) as AppointmentRecord;
+    })) as AppointmentRecord;
   }
 
   // P10 Query Object: the slots of a day with the places left, as the database
   // counts them. Advisory only: the booking itself is checked again on create.
   async availability(actor: Actor, query: AvailabilityQuery) {
-    const type = String(query.type ?? ""), date = String(query.date ?? "");
-    if (!appointmentTypes.includes(type as AppointmentType)) throw new BusinessError(422, "Select a valid appointment service.");
-    if (!validDate(date)) throw new BusinessError(422, "Enter a valid appointment date.");
+    const type = String(query.type ?? ''),
+      date = String(query.date ?? '');
+    if (!appointmentTypes.includes(type as AppointmentType))
+      throw new BusinessError(422, 'Select a valid appointment service.');
+    if (!validDate(date)) throw new BusinessError(422, 'Enter a valid appointment date.');
     // A doctor's busy times are staff information.
-    const doctorId = query.doctorId === undefined || query.doctorId === "" ? null : String(query.doctorId);
-    if (doctorId) authorize(actor, "booking.manage");
+    const doctorId = query.doctorId === undefined || query.doctorId === '' ? null : String(query.doctorId);
+    if (doctorId) authorize(actor, 'booking.manage');
     const policy = await this.deps.appointments.slotPolicy(type as AppointmentType);
-    const from = vietnamInstant(date, "00:00"), to = new Date(from.getTime() + 86_400_000);
-    const usage = new Map((await this.deps.appointments.slotUsage(policy.resourceGroup, from, to)).map(u => [u.slotStart.getTime(), u]));
-    const busy = new Set(doctorId ? (await this.deps.appointments.doctorSlots(doctorId, from, to)).map(s => s.getTime()) : []);
+    const from = vietnamInstant(date, '00:00'),
+      to = new Date(from.getTime() + 86_400_000);
+    const usage = new Map(
+      (await this.deps.appointments.slotUsage(policy.resourceGroup, from, to)).map(u => [u.slotStart.getTime(), u]),
+    );
+    const busy = new Set(
+      doctorId ? (await this.deps.appointments.doctorSlots(doctorId, from, to)).map(s => s.getTime()) : [],
+    );
     const now = Date.now();
     return {
-      type, date, resourceGroup: policy.resourceGroup, durationMinutes: policy.durationMinutes,
+      type,
+      date,
+      resourceGroup: policy.resourceGroup,
+      durationMinutes: policy.durationMinutes,
       slots: slotTimes(policy).map(time => {
-        const range = slotRange(policy, date, time), slots = range.slots();
-        const remaining = Math.max(0, Math.min(...slots.map(s => { const u = usage.get(s.getTime()); return (u?.capacity ?? policy.capacity) - (u?.booked ?? 0); })));
-        const doctorBusy = slots.some(s => busy.has(s.getTime())), past = range.start.getTime() <= now;
-        return { time, remaining, past, available: remaining > 0 && !past && !doctorBusy, ...(doctorId ? { doctorBusy } : {}) };
+        const range = slotRange(policy, date, time),
+          slots = range.slots();
+        const remaining = Math.max(
+          0,
+          Math.min(
+            ...slots.map(s => {
+              const u = usage.get(s.getTime());
+              return (u?.capacity ?? policy.capacity) - (u?.booked ?? 0);
+            }),
+          ),
+        );
+        const doctorBusy = slots.some(s => busy.has(s.getTime())),
+          past = range.start.getTime() <= now;
+        return {
+          time,
+          remaining,
+          past,
+          available: remaining > 0 && !past && !doctorBusy,
+          ...(doctorId ? { doctorBusy } : {}),
+        };
       }),
     };
   }
 
   async cancel(actor: Actor, id: string, input: CancelInput): Promise<AppointmentRecord> {
-    return await this.lifecycle.cancel(actor, "appointment", id, input.expectedRevision, input.ownerNote) as AppointmentRecord;
+    return (await this.lifecycle.cancel(
+      actor,
+      'appointment',
+      id,
+      input.expectedRevision,
+      input.ownerNote,
+    )) as AppointmentRecord;
   }
 
   async sendReminder(actor: Actor, id: string): Promise<void> {
-    authorize(actor, "booking.manage");
+    authorize(actor, 'booking.manage');
     const item = await this.deps.appointments.findWithPet(id);
-    if (!item) throw new BusinessError(404, "Appointment not found.");
+    if (!item) throw new BusinessError(404, 'Appointment not found.');
     const isSpa = spaTypes.has(item.appointment.type);
     await this.deps.notifications.create({
-      recipientOwnerId: item.appointment.ownerId, recipientRole: "owner", type: "appointment_reminder",
-      title: isSpa ? "Spa booking reminder" : "Appointment reminder",
-      message: `${item.pet.name} has a ${isSpa ? "spa booking" : "appointment"} at ${item.appointment.appointmentTime}.`,
-      actionUrl: isSpa ? "/owner/spa-booking" : "/owner/appointments",
-      relatedPetId: item.appointment.petId, relatedAppointmentId: item.appointment.id,
+      recipientOwnerId: item.appointment.ownerId,
+      recipientRole: 'owner',
+      type: 'appointment_reminder',
+      title: isSpa ? 'Spa booking reminder' : 'Appointment reminder',
+      message: `${item.pet.name} has a ${isSpa ? 'spa booking' : 'appointment'} at ${item.appointment.appointmentTime}.`,
+      actionUrl: isSpa ? '/owner/spa-booking' : '/owner/appointments',
+      relatedPetId: item.appointment.petId,
+      relatedAppointmentId: item.appointment.id,
     });
   }
 }

@@ -36,5 +36,9 @@ export type AppointmentListResult = {
 };
 
 export interface AppointmentQueries extends AppointmentCalendarQueries {
-  list(actor: Actor, directory: AppointmentQueryDirectory, raw: Record<string, unknown>): Promise<AppointmentListResult>;
+  list(
+    actor: Actor,
+    directory: AppointmentQueryDirectory,
+    raw: Record<string, unknown>,
+  ): Promise<AppointmentListResult>;
 }

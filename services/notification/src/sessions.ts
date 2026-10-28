@@ -8,6 +8,10 @@ export async function sessionRevoked(db: PrismaClient, userId: string, token: st
   const row = await db.sessionRevocation.findUnique({ where: { userId }, select: { revokedBefore: true } });
   if (!row) return false;
   let iat: unknown;
-  try { iat = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'))?.iat; } catch { return true; }
+  try {
+    iat = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'))?.iat;
+  } catch {
+    return true;
+  }
   return typeof iat !== 'number' || iat < Math.floor(row.revokedBefore.getTime() / 1000);
 }
