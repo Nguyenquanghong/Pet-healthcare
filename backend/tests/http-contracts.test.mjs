@@ -80,7 +80,7 @@ test("representative routes keep JSON, auth and method contracts", async () => {
     const staffToken = signToken("staff-1", "staff");
 
     const expected = [
-      ["/api/health", 200], ["/api/auth/me", 200], ["/api/bootstrap", 200],
+      ["/api/health", 200], ["/api/auth/me", 200],
       ["/api/pets", 200], ["/api/appointments", 200], ["/api/medical-records", 200],
       ["/api/hotel-bookings", 200], ["/api/notifications", 200], ["/api/invoices", 200],
       ["/api/public/pets/qr-1", 200],
@@ -91,7 +91,9 @@ test("representative routes keep JSON, auth and method contracts", async () => {
       assert.ok(result.body, path);
       validateResponse(path === "/api/public/pets/qr-1" ? "/api/public/pets/{token}" : path, "GET", status, result.body);
     }
+    // The monolith mode still serves /api/bootstrap; the phase-2 contract no longer documents it.
     const bootstrap = await request("/api/bootstrap", "GET", ownerToken);
+    assert.equal(bootstrap.status, 200);
     assert.equal(bootstrap.body.currentOwnerId, owner.id);
     assert.equal(bootstrap.body.pets[0].name, pet.name);
 

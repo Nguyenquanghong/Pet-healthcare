@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {list} from '../../../services/clinic/dist/lists.js';
+import {list} from '../../../services/clinic/dist/infrastructure/queries/authoritativeLists.js';
 
 const actor={sub:'owner-a',role:'owner'};
 const directory={lookup:async()=>({pets:[{id:'pet-a',ownerId:actor.sub,name:'Fixture',directoryVersion:1}],owners:[{id:actor.sub,fullName:'Fixture',directoryVersion:1}]})};

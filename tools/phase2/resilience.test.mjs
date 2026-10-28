@@ -133,9 +133,7 @@ test('service credentials have separate endpoint permissions; public nginx never
   expectStatus(await request('/internal/directory/export?kind=pet',{base:coreApis[0].base,headers:{'X-Service-Token':secrets.CORE_NOTIFICATION_SEND_TOKEN}}),401);
   expectStatus(await request('/internal/billing-operations/'+randomUUID(),{base:coreApis[0].base,headers:{'X-Service-Token':secrets.CORE_DIRECTORY_TOKEN}}),401);
   expectStatus(await request('/internal/billing-sources/'+randomUUID(),{base:clinicApis[0].base,headers:{'X-Service-Token':secrets.CLINIC_BOOTSTRAP_TOKEN}}),401);
-  expectStatus(await request('/internal/clinic/bootstrap?view=dashboard',{base:clinicApis[0].base,headers:{'X-Service-Token':secrets.CLINIC_BILLING_TOKEN}}),401);
-  expectStatus(await request('/internal/clinic/bootstrap?view=dashboard',{base:clinicApis[0].base,headers:{'X-Service-Token':secrets.CLINIC_BOOTSTRAP_TOKEN}}),200);
-  const bootstrap=expectStatus(await request('/api/bootstrap?view=dashboard',{base:coreApis[0].base}),200);assert.equal(bootstrap.regions.clinic.status,'available');
+  expectStatus(await request('/internal/clinic/bootstrap?view=dashboard',{base:clinicApis[0].base,headers:{'X-Service-Token':secrets.CLINIC_BOOTSTRAP_TOKEN}}),404);
   expectStatus(await request('/internal/directory/export?kind=pet&id='+pet.id,{base:coreApis[0].base,headers:{'X-Service-Token':secrets.CORE_DIRECTORY_TOKEN}}),200);
   expectStatus(await request('/internal/billing-sources/'+randomUUID(),{base:clinicApis[0].base,token:tokens.admin,headers:{'X-Service-Token':secrets.CLINIC_BILLING_TOKEN}}),404);
   expectStatus(await request('/metrics',{base:clinicApis[0].base}),401);

@@ -35,7 +35,7 @@ http {
         location /api/ { proxy_pass http://core; }
         location / { return 404; }
     }
-    # Core CLINIC_SERVICE_URL may point here for private billing/bootstrap.
+    # Core CLINIC_SERVICE_URL may point here for private billing.
     # Each internal endpoint still verifies its scoped service/actor credential.
     server {
         listen 127.0.0.1:8081;

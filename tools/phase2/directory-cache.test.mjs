@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {RequestDirectory,CoreDirectory,DeferredDirectory,failClosed} from '../../services/clinic/dist/directory.js';
 import {createApp} from '../../services/clinic/dist/app.js';
-import {list} from '../../services/clinic/dist/lists.js';
+import {list} from '../../services/clinic/dist/infrastructure/queries/authoritativeLists.js';
 import {requestActor} from '@nipopeto/runtime';
 import {once} from 'node:events';
 import {createServer} from 'node:http';

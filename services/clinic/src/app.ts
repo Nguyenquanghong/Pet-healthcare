@@ -14,7 +14,7 @@ import { BookingLifecycleService } from './application/services/bookingLifecycle
 import { appointmentDependencies, medicalDependencies, Lifecycle, medicalMutation } from './infrastructure/persistence/repositories.js';
 import { appointmentDto, medicalRecordDto } from './lib/serialize.js';
 import { deduplicated } from './dedup.js';
-import { list } from './lists.js';
+import { list } from './infrastructure/queries/authoritativeLists.js';
 import { selectAppointmentQueries } from './application/queries/appointments.js';
 import { AuthoritativeAppointmentQueries } from './infrastructure/queries/authoritativeAppointments.js';
 import { ShadowAppointmentQueries } from './infrastructure/queries/shadowAppointments.js';
@@ -57,7 +57,6 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   app.get('/health/ready',async(_req,res)=>{try{await db.appointment.count();await db.medicalRecord.count();await db.medicalImage.count();await db.requestDedup.count();res.json({service:'clinic',status:'ready'});}catch{res.status(503).json({service:'clinic',status:'unavailable'});}});
   const router=express.Router();
   router.use('/dashboard/clinic/activity',(_req,res,next)=>{res.setHeader('Cache-Control','no-store');next();});
-  app.use('/internal/clinic', (req,res,next)=>{if(req.path!=='/bootstrap'||req.method!=='GET'){res.status(404).json({error:'Clinic route not found.'});return;}if(!source||!source.acceptsService(req.headers['x-service-token'],'bootstrap')){res.status(401).json({error:'Service authentication required.'});return;}next();});
   router.use((req,res,next)=>{if(!verify||!source){res.status(503).json({error:'Clinic authentication or directory is not configured.'});return;}const bearer=req.headers.authorization;if(!bearer?.startsWith('Bearer ')||bearer.length>8192){res.status(401).json({error:'Authentication required.'});return;}try{res.locals.actor=requestActor(req,verify);next();}catch{res.status(401).json({error:'Invalid or expired token.'});}});
   router.use(express.json({limit:'8mb'}));
   router.use((req,_res,next)=>{if(req.path==='/dashboard/clinic/activity')authorize(_res.locals.actor,'clinic-activity.read');next();});
@@ -137,8 +136,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   router.post('/medical-records/images',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.status(201).json({image:await medical(res).createImage(res.locals.actor,req.body)});});
   router.delete('/medical-records/images/:id',async(req,res)=>{await medical(res).deleteImage(res.locals.actor,req.params.id);res.status(204).end();});
   router.post('/medical-records/images/:id/restore',async(req,res)=>{await medical(res).restoreImage(res.locals.actor,req.params.id);res.status(204).end();});
-  router.get('/bootstrap',async(req,res)=>res.json(await bootstrap(db,res.locals.actor,res.locals.directory,req.query.view)));
-  router.get('/dashboard/clinic',async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({...await bootstrap(db,res.locals.actor,res.locals.directory,'dashboard'),asOf:new Date().toISOString()});});
+  router.get('/dashboard/clinic',async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({...await bootstrap(db,res.locals.actor,res.locals.directory),asOf:new Date().toISOString()});});
   router.get('/dashboard/clinic/activity',async(req,res)=>{
     // Express also matches trailing slashes/case variants; authorize the matched
     // operation itself, independently of the early exact-path rejection above.
@@ -147,9 +145,6 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
     try{const result=await activity.read(filter);res.setHeader('X-Clinic-Read-Source',result.meta.source);if(result.meta.generation)res.setHeader('X-Clinic-Projection-Generation',result.meta.generation);if(result.meta.degraded)res.setHeader('X-Service-Degraded','clinic-activity');res.json(result);}
     catch(error){if(error instanceof BusinessError)throw error;throw new BusinessError(503,'Clinic activity is unavailable. Retry later.');}
   });
-  app.use('/internal/clinic',router);
-  // Internal compatibility data is never reachable through the public router.
-  app.use('/api/bootstrap',(_req,res)=>res.status(404).json({error:'Clinic route not found.'}));
   app.use('/api',router);
   app.use((_req,res)=>res.status(404).json({error:'Clinic route not found.'}));
   // A stale medical record edit returns the stored record, so the editor can keep its draft and show what changed.

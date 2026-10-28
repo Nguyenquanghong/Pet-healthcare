@@ -13,7 +13,7 @@ export type Viewer = Pick<Actor, "role" | "sub">;
 
 export const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
 
-export function publicUser(user: UserAccount) {
+function publicUser(user: UserAccount) {
   return {
     id: user.id,
     username: user.username ?? undefined,

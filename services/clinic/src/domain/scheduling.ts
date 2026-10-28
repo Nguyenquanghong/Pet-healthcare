@@ -4,7 +4,7 @@ import { BusinessError } from "./error.js";
 // and appointment_type_policies). The database enforces what needs concurrency
 // (capacity per slot, pet and doctor overlap); these rules give the early, explained
 // 422s and list the slots a client may offer.
-export const SLOT_MINUTES = 30;
+const SLOT_MINUTES = 30;
 const VIETNAM_OFFSET = "+07:00"; // Vietnam has no daylight saving time.
 
 export type SlotPolicy = {
@@ -16,7 +16,7 @@ const minutesOf = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.
 const timeOf = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 
 // Value Object: a half-open instant range [start, end).
-export class TimeRange {
+class TimeRange {
   private constructor(readonly start: Date, readonly end: Date) {}
   static of(start: Date, minutes: number) {
     if (!Number.isInteger(minutes) || minutes <= 0) throw new Error("INVALID_DURATION");

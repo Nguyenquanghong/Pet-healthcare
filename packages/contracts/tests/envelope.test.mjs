@@ -33,13 +33,13 @@ test('internal OpenAPI validates actual billing and Core directory/send contract
   assert.ok(spec.paths['/internal/billing-reservations/{operationId}'].put.security[0].ActorBearer);
   assert.equal(spec.paths['/internal/billing-reservations/{operationId}/release'].post.requestBody.content['application/json'].schema.additionalProperties,false);
 });
-test('Clinic OpenAPI covers 21 public operations, bootstrap and 5 private billing operations',async()=>{
+test('Clinic OpenAPI covers 21 public operations and 5 private billing operations',async()=>{
   const spec=await SwaggerParser.validate(fileURLToPath(new URL('../../../services/clinic/openapi.json',import.meta.url)));
   // 19 public = the 17 of P3-P5 + GET /api/dashboard/clinic/activity (clinic-activity D1, admin-only)
   // + GET /api/medical-records/{id}/history (AQ-15 audit, staff-only)
   // + POST /api/medical-records/images/{id}/restore (AQ-09 retention, admin-only)
   // + GET /api/appointments/availability (P10 slots of a day).
-  assert.equal(Object.values(spec.paths).flatMap(p=>Object.keys(p).filter(k=>['get','post','patch','put','delete'].includes(k))).length,27);
+  assert.equal(Object.values(spec.paths).flatMap(p=>Object.keys(p).filter(k=>['get','post','patch','put','delete'].includes(k))).length,26);
   const restore=spec.paths['/api/medical-records/images/{id}/restore'].post;
   assert.ok(restore.security[0].BearerAuth);
   for(const status of ['204','401','403','404','409'])assert.ok(restore.responses[status],status);
@@ -52,15 +52,11 @@ test('Clinic OpenAPI covers 21 public operations, bootstrap and 5 private billin
   for(const status of ['401','403','422','503'])assert.ok(activity.responses[status],status);
   assert.deepEqual(activity.parameters.map(p=>p.name).sort(),['category','from','groupBy','to']);
   for(const path of ['/api/appointments','/api/medical-records'])assert.ok(spec.paths[path].post.parameters.some(p=>p.name==='Idempotency-Key'&&p.required));
-  assert.ok(spec.paths['/internal/clinic/bootstrap'].get.security[0].ServiceCredential);
   assert.ok(spec.paths['/api/dashboard/clinic'].get.responses['503']);
 });
-test('P5 public dashboard regions and partial bootstrap use explicit unavailable semantics',async()=>{
+test('P5 public dashboard regions use explicit unavailable semantics',async()=>{
   const spec=await SwaggerParser.validate(fileURLToPath(new URL('../../../backend/openapi.json',import.meta.url)));
   for(const region of ['core','clinic'])assert.ok(spec.paths['/dashboard/'+region].get.responses['503']);
-  const b=spec.components.schemas.Bootstrap.properties;
-  assert.equal(b.summary.properties.unread.nullable,true);
-  assert.equal(b.regions.properties.notifications.properties.asOf.nullable,true);
   assert.equal(spec.components.schemas.DirectoryStatus.properties.searchReady.type,'boolean');
 });
 

@@ -10,7 +10,6 @@ import openapi from "../../openapi.json" with { type: "json" };
 import { AppointmentService } from "../application/services/appointments.js";
 import { MedicalRecordsService } from "../application/services/medicalRecords.js";
 import { HotelBookingsService } from "../application/services/hotelBookings.js";
-import { NotificationsService } from "../application/services/notifications.js";
 import { AuthService } from "../application/services/auth.js";
 import { PetsService } from "../application/services/pets.js";
 import { ListsService } from "../application/services/lists.js";
@@ -30,17 +29,14 @@ import { PrismaPaymentRepository } from "../infrastructure/persistence/paymentRe
 import { VnpaySandboxGateway } from "../infrastructure/security/vnpay.js";
 import { bankTransferConfig } from "../infrastructure/config/bankTransfer.js";
 import { createPaymentsRouter } from "../routes/payments.js";
-import { BootstrapService } from "../application/services/bootstrap.js";
 import { createAppointmentDependencies } from "../infrastructure/persistence/appointmentRepository.js";
 import { createMedicalDependencies } from "../infrastructure/persistence/medicalRepository.js";
 import { createHotelDependencies } from "../infrastructure/persistence/hotelRepository.js";
-import { PrismaNotificationRepository } from "../infrastructure/persistence/notificationRepository.js";
 import { PrismaUserRepository } from "../infrastructure/persistence/userRepository.js";
 import { PrismaPetRepository } from "../infrastructure/persistence/petRepository.js";
 import { PrismaOwnerRepository } from "../infrastructure/persistence/ownerRepository.js";
 import { createPublicRescueDependencies } from "../infrastructure/persistence/publicRescueRepository.js";
 import { PrismaInvoiceRepository } from "../infrastructure/persistence/invoiceRepository.js";
-import { PrismaBootstrapRepository } from "../infrastructure/persistence/bootstrapRepository.js";
 import { databaseHealthCheck } from "../infrastructure/persistence/healthRepository.js";
 import { passwordAdapter, tokenAdapter } from "../infrastructure/security/authAdapters.js";
 import { qrTokenAdapter } from "../infrastructure/security/qrToken.js";
@@ -48,14 +44,12 @@ import { BusinessError } from "../domain/error.js";
 import { requireAuth, requirePermission } from "../middleware/auth.js";
 import { createAppointmentsRouter } from "../routes/appointments.js";
 import { createAuthRouter } from "../routes/auth.js";
-import { createBootstrapRouter } from "../routes/bootstrap.js";
 import { createHotelBookingsRouter } from "../routes/hotelBookings.js";
 import { createHotelCapacityRouter } from "../routes/hotelCapacity.js";
 import { HotelCapacityService } from "../application/services/hotelCapacity.js";
 import { PrismaHotelCapacityRepository } from "../infrastructure/persistence/hotelCapacityRepository.js";
 import { createInvoicesRouter } from "../routes/invoices.js";
 import { createMedicalRecordsRouter } from "../routes/medicalRecords.js";
-import { createNotificationsRouter } from "../routes/notifications.js";
 import { createPetsRouter } from "../routes/pets.js";
 import { createOwnersRouter } from "../routes/owners.js";
 import { createPublicRouter } from "../routes/public.js";
@@ -100,7 +94,6 @@ export function createCoreDomains(client: PrismaClient) {
   // Auth is mounted by createCoreApp before these domains, with shared policy.
   app.use("/api/public", createPublicRouter(new PublicRescueService(createPublicRescueDependencies(client))));
   app.use("/api", createListsRouter(new ListsService(new PrismaListsRepository(client))));
-  app.use("/api/bootstrap", requireAuth, createBootstrapRouter(new BootstrapService(new PrismaBootstrapRepository(client))));
   app.use("/api/pets", requireAuth, createPetsRouter(new PetsService(new PrismaPetRepository(client), qrTokenAdapter)));
   app.use("/api/owners", requireAuth, requirePermission("owner.manage"), createOwnersRouter(new OwnersService(new PrismaOwnerRepository(client)), activation));
   const lifecycle = new BookingLifecycleService(new PrismaBookingLifecycleStore(client));
@@ -108,7 +101,6 @@ export function createCoreDomains(client: PrismaClient) {
   app.use("/api/medical-records", requireAuth, createMedicalRecordsRouter(new MedicalRecordsService(createMedicalDependencies(client))));
   app.use("/api/hotel-bookings", requireAuth, createHotelBookingsRouter(new HotelBookingsService(createHotelDependencies(client), lifecycle)));
   app.use("/api/hotel-capacity", requireAuth, createHotelCapacityRouter(new HotelCapacityService(new PrismaHotelCapacityRepository(client))));
-  app.use("/api/notifications", requireAuth, createNotificationsRouter(new NotificationsService(new PrismaNotificationRepository(client))));
   app.use("/api/invoices", requireAuth, createInvoicesRouter(new InvoicesService(new PrismaInvoiceRepository(client), bankTransfer, new VietQrGenerator())));
   app.use("/api/payments", createPaymentsRouter(new PaymentsService(new PrismaPaymentRepository(client), new VnpaySandboxGateway({
     tmnCode: process.env.VNPAY_TMN_CODE || "", hashSecret: process.env.VNPAY_HASH_SECRET || "",

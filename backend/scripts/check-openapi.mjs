@@ -10,7 +10,7 @@ const basePath = spec.servers?.[0]?.url;
 assert.equal(basePath, "/api", "OpenAPI must declare the shared /api base URL");
 
 const mounts = {
-  auth: "/api/auth", public: "/api/public", bootstrap: "/api/bootstrap",
+  auth: "/api/auth", public: "/api/public",
   pets: "/api/pets", owners: "/api/owners", appointments: "/api/appointments", medicalRecords: "/api/medical-records",
   hotelBookings: "/api/hotel-bookings", hotelCapacity: "/api/hotel-capacity", notifications: "/api/notifications", invoices: "/api/invoices",
   payments: "/api/payments", lists: "/api",
@@ -28,10 +28,8 @@ for (const [file, mount] of Object.entries(mounts)) {
   }
 }
 const documented = new Set();
-assert.match(readFileSync(resolve(backend,'src/phase2/coreApp.ts'),'utf8'),/mountSplitBootstrap/);
 const clinicSource=readFileSync(resolve(backend,'../services/clinic/src/app.ts'),'utf8');
 for(const match of clinicSource.matchAll(/\brouter\.(get|post|patch|put|delete)\(['"]([^'"]+)['"]/g)){
-  if(match[2]==='/bootstrap')continue;
   runtime.add(`${match[1].toUpperCase()} /api${match[2].replace(/:([A-Za-z][\w]*)/g,'{$1}')}`);
 }
 // Core entrypoint composes the independently owned Notification public router.
@@ -61,5 +59,5 @@ for (const [path, methods] of Object.entries(spec.paths)) {
   }
 }
 assert.deepEqual([...documented].sort(), [...runtime].sort(), "OpenAPI routes differ from mounted runtime routes");
-assert.equal(runtime.size, 76, "P2 unread-count, P4 operations, P5 dashboard regions, D1 Clinic activity, AQ-15 medical record history, AQ-09 image restore, AQ-10 hotel capacity, P11 doctor list and P10 availability preserve the original 65 operations");
+assert.equal(runtime.size, 75, "P2 unread-count, P4 operations, P5 dashboard regions, D1 Clinic activity, AQ-15 medical record history, AQ-09 image restore, AQ-10 hotel capacity, P11 doctor list and P10 availability preserve the original 65 operations");
 process.stdout.write(`OpenAPI PASS: ${runtime.size} operations match source and schemas validate.\n`);

@@ -1,7 +1,7 @@
 import type { ListData, ListResource } from "../application/ports/lists.js";
 import { appointmentDto, careNoteDto, hotelBookingDto, invoiceDto, medicalRecordDto, ownerDto, petDto, type Viewer } from "./serialize.js";
 
-export function listDataDto(data: ListData, viewer: Viewer) {
+function listDataDto(data: ListData, viewer: Viewer) {
   const owner = viewer.role === "owner";
   return { owners: data.owners.map(ownerDto), pets: data.pets.map(petDto), appointments: data.appointments.map(item => appointmentDto(item, viewer)),
     hotelBookings: data.hotelBookings.map(item => hotelBookingDto(item, viewer)), medicalRecords: data.medicalRecords.map(item => medicalRecordDto(item, owner)),

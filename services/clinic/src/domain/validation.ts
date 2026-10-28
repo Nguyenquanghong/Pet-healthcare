@@ -59,7 +59,7 @@ const imageSignatures: Record<string, (bytes: Buffer) => boolean> = {
   "image/gif": bytes => ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("latin1")),
   "image/webp": bytes => bytes.subarray(0, 4).toString("latin1") === "RIFF" && bytes.subarray(8, 12).toString("latin1") === "WEBP",
 };
-export const allowedImageTypes = Object.keys(imageSignatures);
+const allowedImageTypes = Object.keys(imageSignatures);
 
 // Returns the decoded bytes once the data URL, MIME type and signature agree.
 export function imageContent(imageUrl: string, mimeType: string): Buffer {

@@ -36,7 +36,7 @@ export const spaServiceOptions: {
 /**
  * Loại phòng khách sạn thú cưng.
  */
-export const hotelRoomTypes: {
+const hotelRoomTypes: {
   key: HotelRoomType;
   label: string;
   description: string;

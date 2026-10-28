@@ -18,7 +18,7 @@ export const HOTEL_SERVICE_PRICES: Record<HotelServiceKey, { label: string; pric
 
 export const calculateNights = daysBetween;
 
-export const calculateServiceTotal = (serviceKeys: HotelServiceKey[], nights: number) =>
+const calculateServiceTotal = (serviceKeys: HotelServiceKey[], nights: number) =>
   serviceKeys.reduce((total, key) => {
     const service = HOTEL_SERVICE_PRICES[key];
     return total + service.price * (service.unit === "day" ? nights : 1);
