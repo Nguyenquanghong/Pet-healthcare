@@ -3,6 +3,9 @@ import { defineConfig } from "@playwright/test";
 // Run against a seeded LOCAL demo API + frontend. Does not start or reset a DB.
 export default defineConfig({
   testDir: "./tests/e2e",
+  // Playwright empties its outputDir before every run. The default (test-results/)
+  // would wipe the evidence of every other suite and study kept there.
+  outputDir: "./test-results/phase1-e2e",
   workers: 1,
   timeout: 60_000,
   webServer: process.env.E2E_START_FRONTEND === "1" ? {
