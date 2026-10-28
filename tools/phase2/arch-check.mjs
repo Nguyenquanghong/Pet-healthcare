@@ -14,6 +14,7 @@ const checks=[
   {name:'wire contracts + OpenAPI inventory',protects:'ADR-03/04, NFR10',command:['npm run phase2:test:contracts'],shell:true},
   {name:'notification single writer',protects:'ADR-03, P2',command:[process.execPath,'tools/phase2/check-notification-writers.mjs']},
   {name:'document links',protects:'NFR12 (reproducible handoff)',command:[process.execPath,'tools/phase2/check-document-links.mjs']},
+  {name:'alert rules reference real metrics',protects:'NFR12, ops',command:[process.execPath,'tools/phase2/check-alert-metrics.mjs']},
   {name:'permission matrix over HTTP (4 roles x every guard)',protects:'AQ-05, NFR04',command:[process.execPath,'--test','tools/phase2/permission-matrix.test.mjs']},
   {name:'booking lifecycle matrix (every from x to, guards, roles)',protects:'P01, functional correctness',command:[process.execPath,'--test','tools/phase2/lifecycle-matrix.test.mjs']},
   {name:'frontend API types generated from OpenAPI (fresh, aliased)',protects:'AQ-07, NFR10',command:[process.execPath,'--test','tools/phase2/api-types.test.mjs']},

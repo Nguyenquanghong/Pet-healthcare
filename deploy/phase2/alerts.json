@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "scale": "Course project, about 100 users. Every threshold and 'for' is a proposal to tune after the first load run, not a measured SLO.",
+  "scrape": "GET /metrics on core, clinic and notification with header x-service-token = OBSERVABILITY_TOKEN. Every name is the exported Prometheus name, with the pet_ prefix and a service label.",
+  "checkedBy": "tools/phase2/check-alert-metrics.mjs (npm run arch:check): each metric must be exported by packages/runtime/src/http.ts.",
+  "rules": [
+    {
+      "name": "DlqNotEmpty",
+      "metric": "pet_dlq_ready",
+      "service": ["clinic", "notification"],
+      "condition": "pet_dlq_ready > 0",
+      "threshold": 0,
+      "for": "1m",
+      "why": "A message only reaches a DLQ after a permanent failure or after the whole retry ladder (1 s, 5 s, 30 s, 2 min, 10 min). Nothing consumes the DLQ, so every message needs a person (tools/phase2/replay-event.mjs). At 100 users even one is worth a look. -1 (queue unreadable) does not fire here; QueueUnreadable covers it."
+    },
+    {
+      "name": "RetryBacklogSustained",
+      "metric": "pet_retry_ready",
+      "service": ["clinic", "notification"],
+      "condition": "pet_retry_ready > 0",
+      "threshold": 0,
+      "for": "15m",
+      "why": "One failing message leaves the retry queues within about 12.6 min (the default ladder adds up to 756 s) and either succeeds or goes to the DLQ. Messages waiting for longer than that mean new failures keep arriving, typically a dependency (Core, database) that is down."
+    },
+    {
+      "name": "ConsumerQueueBacklog",
+      "metric": "pet_queue_ready",
+      "service": ["clinic", "notification"],
+      "condition": "pet_queue_ready > 500",
+      "threshold": 500,
+      "for": "5m",
+      "why": "A healthy consumer acknowledges in milliseconds, so ready messages should sit near 0. A depth that stays high for 5 min means the worker is stopped or stuck. 500 is a loose proposal for 100 users; lower it once real traffic is known."
+    },
+    {
+      "name": "QueueUnreadable",
+      "metric": "pet_queue_ready",
+      "service": ["clinic", "notification"],
+      "condition": "pet_queue_ready < 0",
+      "threshold": 0,
+      "for": "5m",
+      "why": "The runtime reports -1 when a consumer queue cannot be read, for example a wrong BROKER_PREFIX or a queue nobody declared. The queue gauges are always -1 on core, which does not read queues, so core is not listed."
+    },
+    {
+      "name": "OutboxLagHigh",
+      "metric": "pet_outbox_oldest_seconds",
+      "service": ["core", "clinic"],
+      "condition": "pet_outbox_oldest_seconds > 120",
+      "threshold": 120,
+      "for": "5m",
+      "why": "The relay retries a failed publish with a backoff capped at 60 s. The oldest unpublished row staying above 120 s means two capped retries have failed: the broker is unreachable or the relay is stopped. Notification has no outbox (the gauge is always 0 there), so it is not listed."
+    },
+    {
+      "name": "OutboxPendingHigh",
+      "metric": "pet_outbox_pending",
+      "service": ["core", "clinic"],
+      "condition": "pet_outbox_pending > 5000",
+      "threshold": 5000,
+      "for": "5m",
+      "why": "At OUTBOX_SOFT_LIMIT (default 10000) /health/ready turns 'degraded', and at OUTBOX_HARD_LIMIT (default 20000) writes get 503. 5000 is half the soft limit, early enough to act before users notice."
+    },
+    {
+      "name": "BillingOperationStuck",
+      "metric": "pet_billing_oldest_seconds",
+      "service": ["core"],
+      "condition": "pet_billing_oldest_seconds > 300",
+      "threshold": 300,
+      "for": "5m",
+      "why": "On core this is the age of the oldest billing operation still PREPARING. The core-billing worker reconciles every 0.5 s, so 5 min means it is stopped or cannot reach Clinic. Not applied to clinic, where the same gauge is the age of the oldest HELD reservation, which is held until the visit is invoiced and can legitimately be old."
+    },
+    {
+      "name": "Http5xxRatioHigh",
+      "metric": "pet_http_duration_seconds_count",
+      "service": ["core", "clinic", "notification"],
+      "condition": "sum by (service) (rate(pet_http_duration_seconds_count{status=~\"5..\"}[5m])) / sum by (service) (rate(pet_http_duration_seconds_count[5m])) > 0.05",
+      "threshold": 0.05,
+      "for": "5m",
+      "why": "More than 1 in 20 responses failing for 5 min is a user-visible outage at any scale. Core answers 503 while a gateway circuit breaker to Clinic or Notification is open, so this rule is also the only alert for an open breaker (see 'gaps')."
+    },
+    {
+      "name": "HttpLatencyP95High",
+      "metric": "pet_http_duration_seconds_bucket",
+      "service": ["core", "clinic", "notification"],
+      "condition": "histogram_quantile(0.95, sum by (service, le) (rate(pet_http_duration_seconds_bucket[5m]))) > 2",
+      "threshold": 2,
+      "for": "10m",
+      "why": "2 s is the timeout of Clinic's call to Core's directory, so a p95 above it means many requests are already timing out. The histogram has a bucket at le=\"2\", so the quantile is not interpolated across the threshold."
+    },
+    {
+      "name": "DatabaseUnavailable",
+      "metric": "pet_db_available",
+      "service": ["core", "clinic", "notification"],
+      "condition": "pet_db_available == 0",
+      "threshold": 0,
+      "for": "1m",
+      "why": "/health/ready answers 503 when the service's own database is unusable and writes are refused. One minute rides out a restart of the database container."
+    },
+    {
+      "name": "BrokerUnavailable",
+      "metric": "pet_broker_available",
+      "service": ["core", "clinic", "notification"],
+      "condition": "pet_broker_available == 0",
+      "threshold": 0,
+      "for": "5m",
+      "why": "A broker outage does not make the API unready, because events wait in the outbox. It is a warning rather than an outage; OutboxLagHigh and OutboxPendingHigh fire next if it lasts."
+    },
+    {
+      "name": "DatabaseLockWaits",
+      "metric": "pet_db_lock_waits",
+      "service": ["core", "clinic", "notification"],
+      "condition": "pet_db_lock_waits > 5",
+      "threshold": 5,
+      "for": "2m",
+      "why": "Counts sessions of the service's own database role waiting on a lock. A few are normal; more than 5 for 2 min is a pile-up, for example behind an ACCESS EXCLUSIVE lock held by a migration (deploy/phase2/migration-a-runbook.md)."
+    }
+  ],
+  "gaps": [
+    {
+      "signal": "circuit breaker state",
+      "why": "CircuitBreaker keeps its state and opened/rejected counters in memory (packages/runtime/src/circuitBreaker.ts) and logs CIRCUIT_OPEN, CIRCUIT_HALF_OPEN and CIRCUIT_CLOSED to stderr, but nothing exports them in /metrics, so no metric rule can be written. Until a gauge is added through the runtime 'extras' option, Http5xxRatioHigh on core and a log search for CIRCUIT_OPEN are the only signals."
+    }
+  ]
+}
