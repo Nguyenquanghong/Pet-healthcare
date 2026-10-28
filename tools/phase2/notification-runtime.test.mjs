@@ -14,7 +14,7 @@ import { createCoreApp } from '../../backend/dist/src/phase2/coreApp.js';
 import { signToken } from '../../backend/dist/src/lib/token.js';
 import { hashPasswordAsync } from '../../backend/dist/src/lib/password.js';
 import { createApp } from '../../services/notification/dist/app.js';
-import { actorVerifier } from '../../services/notification/dist/auth.js';
+import { actorVerifier } from '@nipopeto/runtime';
 import { CoreSendAuthorization } from '../../services/notification/dist/coreAuthorization.js';
 import { ManualSend } from '../../services/notification/dist/manualSend.js';
 import { createPublicRescueDependencies } from '../../backend/dist/src/infrastructure/persistence/publicRescueRepository.js';

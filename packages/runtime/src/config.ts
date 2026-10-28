@@ -35,3 +35,27 @@ export function databaseUrl(value: string | undefined = process.env.DATABASE_URL
 export function runtimeEnabled() {
   return process.env.PHASE2_RUNTIME_REQUIRED === '1' || Boolean(process.env.REDIS_URL);
 }
+// Each service passes its own generated PrismaClient; this package never imports one.
+export function prismaClient<T>(Client: new (options?: { datasourceUrl?: string }) => T): T {
+  return new Client(runtimeEnabled() ? { datasourceUrl: databaseUrl() } : undefined);
+}
+// A service base URL: http(s) origin only, no path, query, fragment or userinfo. Anything else,
+// including text that is not a URL, throws Error(errorCode).
+export function serviceOrigin(raw: string | URL, errorCode: string) {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(errorCode);
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.pathname !== '/' ||
+    url.search ||
+    url.hash
+  )
+    throw new Error(errorCode);
+  return url;
+}

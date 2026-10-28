@@ -1,8 +1,9 @@
 import { declareTopology, delay, reconnect, requireBrokerConfig, startWorker } from '@nipopeto/messaging';
-import { createDependencies } from './composition.js';
+import { PrismaClient } from './generated/client/index.js';
+import { prismaClient } from '@nipopeto/runtime';
 import { NotificationInbox } from './inbox.js';
 import { openConsumer } from './consumer.js';
-const { db } = createDependencies();
+const db = prismaClient(PrismaClient);
 await startWorker('notification', async signal => {
   try {
     await db.$connect();

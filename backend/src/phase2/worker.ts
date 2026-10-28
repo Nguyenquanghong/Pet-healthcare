@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/phase2-core/index.js';
 import { declareTopology, delay, reconnect, requireBrokerConfig, startWorker } from '@nipopeto/messaging';
 import { OutboxRelay } from './relay.js';
-import { databaseUrl, runtimeEnabled } from '@nipopeto/runtime';
-const db = new PrismaClient(runtimeEnabled() ? { datasourceUrl: databaseUrl() } : undefined);
+import { prismaClient } from '@nipopeto/runtime';
+const db = prismaClient(PrismaClient);
 await startWorker('core', async signal => {
   try {
     await db.$connect();

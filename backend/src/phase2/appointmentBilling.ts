@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { Prisma, type PrismaClient, type AppointmentBillingOperation } from '@prisma/client';
-import { traceHeaders } from '@nipopeto/runtime';
+import { serviceOrigin, traceHeaders } from '@nipopeto/runtime';
 import type { BillingSourceSnapshot, Envelope } from '@nipopeto/contracts';
 import type { Actor } from '../domain/auth.js';
 import { BusinessError } from '../domain/error.js';
@@ -91,13 +91,8 @@ export class ClinicBillingRemote implements BillingRemote {
     private readonly credential: string,
     private readonly timeout = 1800,
   ) {
+    serviceOrigin(origin, 'INVALID_BILLING_REMOTE_CONFIGURATION');
     if (
-      !['http:', 'https:'].includes(origin.protocol) ||
-      origin.username ||
-      origin.password ||
-      origin.pathname !== '/' ||
-      origin.search ||
-      origin.hash ||
       credential.length < 32 ||
       credential.length > 512 ||
       !Number.isInteger(timeout) ||

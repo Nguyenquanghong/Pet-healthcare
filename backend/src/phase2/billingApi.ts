@@ -1,10 +1,9 @@
 import express from 'express';
-import { createHash, timingSafeEqual } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth.js';
 import { BusinessError } from '../domain/error.js';
 import { AppointmentInvoiceBilling, ClinicBillingRemote } from './appointmentBilling.js';
-import { currentRequestId } from '@nipopeto/runtime';
+import { acceptsCredential, currentRequestId } from '@nipopeto/runtime';
 
 export function mountAppointmentBilling(
   app: express.Express,
@@ -28,15 +27,7 @@ export function mountAppointmentBilling(
   app.get(
     '/internal/billing-operations/:operationId',
     safe(async (req, res) => {
-      const token = req.headers['x-service-token'];
-      if (
-        typeof token !== 'string' ||
-        token.length > 512 ||
-        !timingSafeEqual(
-          createHash('sha256').update(token).digest(),
-          createHash('sha256').update(evidenceCredential).digest(),
-        )
-      ) {
+      if (!acceptsCredential(req.headers['x-service-token'], evidenceCredential)) {
         res.status(401).json({ error: 'Service authentication required.' });
         return;
       }

@@ -1,6 +1,7 @@
 import { createHash, createHmac } from 'node:crypto';
 import { BusinessError } from './domain/error.js';
 import type { BlobStore } from './application/ports/blobs.js';
+import { serviceOrigin } from '@nipopeto/runtime';
 export type { BlobStore };
 
 // AQ-09 Claim Check + Valet Key. Medical image bytes live in an S3-compatible
@@ -25,24 +26,7 @@ export type BlobConfig = {
   urlTtlSeconds: number;
 };
 
-function origin(name: string, value: string) {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new Error('INVALID_' + name);
-  }
-  if (
-    !['http:', 'https:'].includes(url.protocol) ||
-    url.username ||
-    url.password ||
-    url.pathname !== '/' ||
-    url.search ||
-    url.hash
-  )
-    throw new Error('INVALID_' + name);
-  return url.origin;
-}
+const origin = (name: string, value: string) => serviceOrigin(value, 'INVALID_' + name).origin;
 
 export class S3BlobStore implements BlobStore {
   private readonly endpoint: URL;

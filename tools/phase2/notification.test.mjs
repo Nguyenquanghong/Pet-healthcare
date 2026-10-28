@@ -6,9 +6,9 @@ import jwt from 'jsonwebtoken';
 import amqp from 'amqplib';
 import { PrismaClient } from '../../services/notification/src/generated/client/index.js';
 import { createApp } from '../../services/notification/src/app.ts';
-import { actorVerifier } from '../../services/notification/src/auth.ts';
 import { NotificationInbox } from '../../services/notification/src/inbox.ts';
 import { declareTopology, topology, publishConfirmed, consumeEvents } from '@nipopeto/messaging';
+import { actorVerifier } from '@nipopeto/runtime';
 import { topologyQueues } from './test-project.mjs';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM, 'pet-phase2-p1-test', 'Use guarded phase2:test:notification');

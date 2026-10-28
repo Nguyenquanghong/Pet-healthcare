@@ -1,8 +1,7 @@
 import type { Response } from 'express';
 import type { Actor } from './domain/auth.js';
 import { BusinessError } from './domain/error.js';
-import { createHash, timingSafeEqual } from 'node:crypto';
-import { traceHeaders, CircuitBreaker, integer } from '@nipopeto/runtime';
+import { acceptsCredential, traceHeaders, CircuitBreaker, integer, serviceOrigin } from '@nipopeto/runtime';
 import type { PetSnapshot, OwnerSnapshot, DirectorySnapshot, DirectoryLookup } from './application/ports/directory.js';
 import type { AppointmentQueryDirectory } from './application/ports/appointmentQueries.js';
 export type { PetSnapshot, OwnerSnapshot, DirectorySnapshot } from './application/ports/directory.js';
@@ -23,26 +22,11 @@ export class CoreDirectory {
     private readonly credential: string,
     private readonly scopes?: { billing: string; evidence: string },
   ) {
-    this.origin = new URL(url);
-    if (
-      !['http:', 'https:'].includes(this.origin.protocol) ||
-      this.origin.pathname !== '/' ||
-      this.origin.search ||
-      this.origin.hash ||
-      this.origin.username ||
-      this.origin.password ||
-      credential.length < 32 ||
-      credential.length > 512
-    )
-      throw new Error('INVALID_DIRECTORY_CONFIGURATION');
+    this.origin = serviceOrigin(url, 'INVALID_DIRECTORY_CONFIGURATION');
+    if (credential.length < 32 || credential.length > 512) throw new Error('INVALID_DIRECTORY_CONFIGURATION');
   }
   acceptsService(token: unknown) {
-    const expected = this.scopes?.billing ?? this.credential;
-    return (
-      typeof token === 'string' &&
-      token.length <= 512 &&
-      timingSafeEqual(createHash('sha256').update(token).digest(), createHash('sha256').update(expected).digest())
-    );
+    return acceptsCredential(token, this.scopes?.billing ?? this.credential);
   }
   async operationEvidence(
     operationId: string,
