@@ -96,6 +96,7 @@ export class ServiceRuntime {
       credential('RATE_LIMIT_KEY_SECRET'),
       process.env.RATE_LIMIT_NAMESPACE ?? 'pet-phase2',
       integer('REDIS_TIMEOUT_MS', 350, 50, 1000),
+      integer('LOCAL_LIMITER_MAX_ENTRIES', 10000, 16, 1000000),
     );
     this.instance = process.env.SERVICE_INSTANCE_ID ?? randomUUID();
     if (!/^[a-zA-Z0-9_.-]{1,80}$/.test(this.instance)) throw new Error('INVALID_INSTANCE_ID');
@@ -196,25 +197,29 @@ export class ServiceRuntime {
         }
         const policy = this.policy(req);
         let decision;
-        try {
-          decision = await this.limiter.spend(policy.group, policy.buckets);
-          this.redis = true;
-        } catch {
-          this.redis = false;
-          this.failures++;
-          if (!policy.read) {
-            res.setHeader('Retry-After', '2');
-            res.status(503).json({ error: 'Rate limit authority unavailable. Retry shortly.' });
-            return;
+        // Reads that are not auth or public are counted per instance: no Redis round trip, and Redis
+        // being down does not touch them.
+        if (policy.local) decision = this.limiter.spendLocal(policy.group, policy.buckets);
+        else
+          try {
+            decision = await this.limiter.spend(policy.group, policy.buckets);
+            this.redis = true;
+          } catch {
+            this.redis = false;
+            this.failures++;
+            if (!policy.read) {
+              res.setHeader('Retry-After', '2');
+              res.status(503).json({ error: 'Rate limit authority unavailable. Retry shortly.' });
+              return;
+            }
+            res.setHeader('X-Service-Degraded', 'redis');
+            const local = policy.buckets.map(b => ({
+              ...b,
+              limit: Math.min(b.limit, b.identity.startsWith('actor:') ? 60 : 300),
+              windowMs: 60000,
+            }));
+            decision = this.limiter.localRead(policy.group, local);
           }
-          res.setHeader('X-Service-Degraded', 'redis');
-          const local = policy.buckets.map(b => ({
-            ...b,
-            limit: Math.min(b.limit, b.identity.startsWith('actor:') ? 60 : 300),
-            windowMs: 60000,
-          }));
-          decision = this.limiter.localRead(policy.group, local);
-        }
         res.setHeader('RateLimit-Limit', decision.limit);
         res.setHeader('RateLimit-Remaining', decision.remaining);
         if (!decision.allowed) {
@@ -242,7 +247,7 @@ export class ServiceRuntime {
       }
     });
   }
-  private policy(req: Request): { group: string; buckets: Bucket[]; read: boolean } {
+  private policy(req: Request): { group: string; buckets: Bucket[]; read: boolean; local?: boolean } {
     const ip = 'ip:' + (req.ip ?? req.socket.remoteAddress ?? 'unknown'),
       windowMs = 900000;
     const b = (identity: string, limit: number, window = windowMs) => ({ identity, limit, windowMs: window });
@@ -298,6 +303,8 @@ export class ServiceRuntime {
     return {
       group,
       read,
+      // Sign-in, activation and public pages (rescue tokens) stay on the shared limiter even for GET.
+      local: read && !/^\/+(auth|public)(\/|$)/i.test(req.path),
       buckets: [
         b(ip, limit(read ? 'API_READ_IP_LIMIT' : 'API_WRITE_IP_LIMIT', read ? 3000 : 1000), 60000),
         ...(actor
@@ -416,6 +423,7 @@ export class ServiceRuntime {
     gauge('limiter_shared_total', this.limiter.stats.shared);
     gauge('limiter_degraded_total', this.limiter.stats.degraded);
     gauge('limiter_rejected_total', this.limiter.stats.rejected);
+    gauge('limiter_local_total', this.limiter.stats.local);
     gauge('redis_failures_total', this.failures);
     const cpu = process.cpuUsage();
     gauge('cpu_seconds_total', (cpu.user + cpu.system) / 1000000);

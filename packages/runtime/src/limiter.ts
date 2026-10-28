@@ -25,19 +25,77 @@ for i,key in ipairs(KEYS) do
 end
 return {1,remaining,0,bound}`;
 
+// Fixed windows held in this process, with the Redis script's check-all-then-increment
+// semantics. Reads are counted per instance and cost no round trip. Windows are inserted in
+// order, so expired ones sit at the front; when the map is full the oldest windows go first,
+// which only ever forgets a count (never invents one), so memory stays bounded under any
+// number of distinct clients.
+export class MemoryWindows {
+  private readonly windows = new Map<string, { count: number; expires: number }>();
+  constructor(
+    readonly maxEntries = 10000,
+    private readonly now = () => Date.now(),
+  ) {
+    if (!Number.isSafeInteger(maxEntries) || maxEntries < 16) throw new Error('INVALID_LIMIT_POLICY');
+  }
+  get size() {
+    return this.windows.size;
+  }
+  spend(group: string, buckets: Bucket[]): Decision {
+    if (!buckets.length || buckets.some(b => b.limit < 1 || b.windowMs < 1)) throw new Error('INVALID_LIMIT_POLICY');
+    const now = this.now();
+    for (const [key, window] of this.windows) {
+      if (window.expires > now) break;
+      this.windows.delete(key);
+    }
+    let remaining = Infinity,
+      limit = Infinity,
+      retryMs = 0;
+    const live = buckets.map(b => {
+      const window = this.windows.get(group + '|' + b.identity);
+      const current = window && window.expires > now ? window : undefined;
+      limit = Math.min(limit, b.limit);
+      remaining = Math.min(remaining, Math.max(0, b.limit - (current?.count ?? 0) - 1));
+      if (current && current.count >= b.limit) retryMs = Math.max(retryMs, current.expires - now);
+      return current;
+    });
+    if (retryMs) return { allowed: false, remaining: 0, retryMs: Math.max(1, retryMs), limit };
+    buckets.forEach((b, i) => {
+      const current = live[i];
+      if (current) current.count++;
+      else {
+        const key = group + '|' + b.identity;
+        this.windows.delete(key);
+        this.windows.set(key, { count: 1, expires: now + b.windowMs });
+      }
+    });
+    for (const key of this.windows.keys()) {
+      if (this.windows.size <= this.maxEntries) break;
+      this.windows.delete(key);
+    }
+    return { allowed: true, remaining, retryMs: 0, limit };
+  }
+  clear() {
+    this.windows.clear();
+  }
+}
+
 export class SharedLimiter {
   readonly client;
   private connecting: Promise<unknown> | undefined;
   private closed = false;
   private retryAt = 0;
-  readonly stats = { shared: 0, degraded: 0, rejected: 0 };
+  readonly stats = { shared: 0, degraded: 0, rejected: 0, local: 0 };
+  private readonly memory: MemoryWindows;
   private fallback = new Map<string, { count: number; expires: number }>();
   constructor(
     url: string,
     private readonly keySecret: string,
     private readonly namespace: string,
     readonly timeoutMs = 350,
+    maxLocalEntries = 10000,
   ) {
+    this.memory = new MemoryWindows(maxLocalEntries);
     let parsed: URL;
     try {
       parsed = new URL(url);
@@ -111,6 +169,13 @@ export class SharedLimiter {
       if (timer) clearTimeout(timer);
     }
   }
+  // Reads that need no shared authority: counted per instance, never touching Redis.
+  spendLocal(group: string, buckets: Bucket[]): Decision {
+    const decision = this.memory.spend(group, buckets);
+    this.stats.local++;
+    if (!decision.allowed) this.stats.rejected++;
+    return decision;
+  }
   localRead(group: string, buckets: Bucket[]): Decision {
     this.stats.degraded++;
     const now = Date.now();
@@ -151,6 +216,7 @@ export class SharedLimiter {
   close() {
     this.closed = true;
     this.fallback.clear();
+    this.memory.clear();
     if (this.client.isOpen) this.client.destroy();
   }
 }

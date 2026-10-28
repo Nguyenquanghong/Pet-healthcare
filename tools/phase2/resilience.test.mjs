@@ -191,7 +191,7 @@ test('Redis down: auth writes fail closed, JWT reads stay available under explic
   docker('stop','redis');redisStopped=true;
   expectStatus(await login(63),503);
   const read=await request('/api/auth/me');expectStatus(read,200);assert.equal(read.headers.get('x-service-degraded'),'redis');
-  const clinic=await request('/api/appointments?petId='+pet.id);expectStatus(clinic,200);assert.equal(clinic.headers.get('x-service-degraded'),'redis');
+  const clinic=await request('/api/appointments?petId='+pet.id);expectStatus(clinic,200);assert.equal(clinic.headers.get('x-service-degraded'),null,'an ordinary read is limited in memory and never needed Redis');
   expectStatus(await request('/api/appointments',{method:'POST',body:appointment('12:00'),key:randomUUID()}),503);
   const policy=await request('/health/ready',{base:clinicApis[0].base});expectStatus(policy,200);assert.equal(policy.body.status,'degraded');
   execFileSync('docker',['compose','-f','deploy/phase2/compose.test.yml','up','-d','--wait','redis'],{stdio:'pipe'});redisStopped=false;
