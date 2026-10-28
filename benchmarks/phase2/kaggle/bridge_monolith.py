@@ -21,14 +21,16 @@ import uuid
 
 from benchmark import reconcile
 from native_stack import free_port
-from pcn_runner import generator_ok, http_summary, resource_sample, stop_load, verdict
+from pcn_runner import PINNING_METHOD, generator_ok, http_summary, observed_affinity, resource_sample, server_taskset_prefix, stop_load, taskset_prefix, verdict
 
 PROTOCOL = 'bridge-m-h-pcn-v1'
 
 
 class Monolith:
-    def __init__(self, root, users):
+    def __init__(self, root, users, server_cpus=None):
         self.root, self.users = Path(root).resolve(strict=True), users
+        # Bridge VM study: database and API run on the server CPUs, the controller on the generator CPU.
+        self.server_prefix = server_taskset_prefix(server_cpus)
         self.run = str(uuid.uuid4())
         self.private = Path('/tmp') / ('bridge-m-' + self.run)
         self.private.mkdir(mode=0o700)
@@ -38,7 +40,7 @@ class Monolith:
 
     def command(self, args, env=None, timeout=300, **kwargs):
         with (self.private / 'setup.log').open('a') as log:
-            result = subprocess.run(args, stdout=log, stderr=subprocess.STDOUT, timeout=timeout, env=env, **kwargs)
+            result = subprocess.run([*self.server_prefix, *args], stdout=log, stderr=subprocess.STDOUT, timeout=timeout, env=env, **kwargs)
         if result.returncode:
             raise RuntimeError('Monolith setup command failed; inspect private setup.log')
 
@@ -78,7 +80,7 @@ class Monolith:
         self.fixture_path.chmod(0o600)
         log = (self.private / 'api.log').open('w')
         self.logs.append(log)
-        self.api = subprocess.Popen(['node', 'backend/dist/src/index.js'], cwd=self.root, env=self.env,
+        self.api = subprocess.Popen([*self.server_prefix, 'node', 'backend/dist/src/index.js'], cwd=self.root, env=self.env,
                                     stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         self.base_url = f'http://127.0.0.1:{api_port}'
         deadline = time.monotonic() + 60
@@ -131,18 +133,20 @@ class Monolith:
         self.close()
 
 
-def run_monolith(root, harness, output, *, settings, locustfile, progress=print, kaggle=False):
-    """root: built M tree; harness: tree holding the locustfiles (the H tree)."""
+def run_monolith(root, harness, output, *, settings, locustfile, progress=print, kaggle=False, pinning=None):
+    """root: built M tree; harness: tree holding the locustfiles (the H tree). pinning: bridge VM study, see pcn_runner.taskset_prefix."""
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     manifest = {'protocol': PROTOCOL, **settings, 'configuration': 'M', 'kaggle': kaggle, 'python': sys.version,
                 'platform': platform.platform(), 'cpu_count': os.cpu_count(), 'status': 'STARTING',
                 'service_env': 'monolith defaults: Prisma pool, /api/auth limiter only'}
+    if pinning:
+        manifest['pinning'] = {**pinning, 'method': PINNING_METHOD}
     summary = {'load_status': 'NOT_RUN', 'capacity_accepted': False}
     child, stage, created = None, 'startup', []
     try:
         progress(f"M: {settings['users']} users, {settings['seconds']}s measured")
-        with Monolith(root, settings['users']) as app:
+        with Monolith(root, settings['users'], pinning['server'] if pinning else None) as app:
             manifest['run'] = app.run
             before = app.inspect()
             writes_path = app.private / 'pcn-created.jsonl'
@@ -154,13 +158,15 @@ def run_monolith(root, harness, output, *, settings, locustfile, progress=print,
                        PCN_GENERATOR=str(output / 'generator.json'))
             stage = 'load'
             with (app.private / 'pcn-load.log').open('w') as log:
-                child = subprocess.Popen([sys.executable, '-m', 'locust', '-f', str(Path(harness) / locustfile), '--headless',
+                child = subprocess.Popen([*taskset_prefix(pinning), sys.executable, '-m', 'locust', '-f', str(Path(harness) / locustfile), '--headless',
                                           '--only-summary', '--host', app.base_url, '--users', str(settings['users']),
                                           '--spawn-rate', str(settings['spawn_rate']), '--stop-timeout', '12'],
                                          cwd=harness, env=env, stdout=log, stderr=subprocess.STDOUT)
                 tracked = [('api', app.api.pid, False),
                            ('postgres', int((app.private / 'pgdata/postmaster.pid').read_text().splitlines()[0]), True),
                            ('generator', child.pid, False)]
+                if pinning:
+                    tracked.append(('controller', os.getpid(), False))
                 started, samplers, process_errors = time.monotonic(), {}, 0
                 deadline = started + settings['seconds'] + settings['warmup'] + settings['users'] / 10 + 90
                 next_progress = started
@@ -171,6 +177,8 @@ def run_monolith(root, harness, output, *, settings, locustfile, progress=print,
                             if now > deadline:
                                 raise TimeoutError('Bounded load deadline exceeded')
                             samples = resource_sample(tracked, samplers, now)
+                            if pinning and 'verified' not in manifest['pinning'] and now - started >= 3:
+                                manifest['pinning'].update(observed_affinity(tracked, pinning))
                             process_errors += sum('error' in row and row['component'] != 'generator' for row in samples)
                             for row in samples:
                                 resource_file.write(json.dumps(row) + '\n')

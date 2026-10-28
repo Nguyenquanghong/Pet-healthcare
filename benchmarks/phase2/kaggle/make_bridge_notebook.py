@@ -1,9 +1,11 @@
 """Pack M and H and write the bridge-m-h-kaggle-v1 notebook (not executed).
+(`--vm` instead packs M, H0 and H1 into the source bundle of bridge-m-h-vm-v1, see pack_vm.)
 
 M is commit 48d01c3 (the monolith the 29/09 nipopeto run measured) plus one harness
 file it predates (pcn_checks.mjs, the phase-1 PCN seed). H is a committed revision
-of this repository (default HEAD); the working tree must not differ from it in any
-packed path, so H is exactly that commit. Only build/runtime sources and the
+of this repository, pinned to e0e8937 (what the Kaggle run measured; --unpinned for local
+experiments); a newer H belongs to the VM study (--vm). The working tree must not differ
+from it in any packed path, so H is exactly that commit. Only build/runtime sources and the
 benchmark harness are packed: no .git, env files, keys, notebooks, dist or
 node_modules. The archive is embedded in the notebook (under Kaggle's 1 MB
 Save Version limit), so the user only imports the notebook and runs it.
@@ -39,6 +41,14 @@ H_PATHS = ('backend', 'services', 'packages', *BUILD_TOOLS, *HARNESS, 'frontend/
 TEST_DIRS = ('tests', 'test')
 TARGET = REPO / 'benchmarks/phase2/bridge-m-h-kaggle-v1.ipynb'
 LIMIT = 1_000_000
+# bridge-m-h-vm-v1: M, H0 (the Kaggle v1 anchor), H1 (commit under test); H2 is H1 run with two Core instances.
+VM_STUDY = 'bridge-m-h-vm-v1'
+VM_FORMAT = 'bridge-m-h-vm-source-1'
+VM_GROUPS = ('M', 'H0', 'H1')
+H0_COMMIT = 'e0e8937712d486bb0e4993541cca0255b4993e1e'
+V1_H_COMMIT = H0_COMMIT  # the revision bridge-m-h-kaggle-v1 measured; a newer H belongs to the VM study
+VM_HARNESS = HARNESS + ('benchmarks/phase2/kaggle/vm_run.sh',)
+VM_TARGET = REPO / 'benchmarks/phase2/bridge-m-h-vm-v1.zip'
 
 
 def digest(value):
@@ -70,7 +80,7 @@ def tree(commit, paths):
     return files
 
 
-def pack(h_commit='HEAD', worktree_harness=False):
+def pack(h_commit=V1_H_COMMIT, worktree_harness=False):
     """worktree_harness: local dry runs only; the harness comes from the working tree and the manifest says so."""
     h = git('rev-parse', h_commit).decode().strip()
     # Markdown stays local by repository policy and is never packed.
@@ -101,7 +111,60 @@ def pack(h_commit='HEAD', worktree_harness=False):
     return buffer.getvalue(), manifest
 
 
-def verified_members(raw, expected):
+def assemble_vm(m_files, h0_files, h1_files, harness):
+    """Group the trees of the VM bundle. Every H tree runs the same harness bytes; M gets the PCN seed it predates."""
+    h0, h1, m = {**h0_files, **harness}, {**h1_files, **harness}, dict(m_files)
+    for name in M_OVERLAY:
+        if name in m:
+            raise ValueError('BRIDGE_M_OVERLAY_EXISTS: ' + name)
+        m[name] = h1[name]
+    payload = {**{'M/' + k: v for k, v in m.items()}, **{'H0/' + k: v for k, v in h0.items()}, **{'H1/' + k: v for k, v in h1.items()}}
+    # Scripts run under bash on the VM: LF whatever core.autocrlf did to the checkout or git archive (the repository also has *.sh text eol=lf).
+    return {name: value.replace(b'\r\n', b'\n') if name.endswith('.sh') else value for name, value in payload.items()}
+
+
+def pack_vm(h_commit='HEAD', h0_commit=H0_COMMIT, worktree_harness=False):
+    """H1 = h_commit. worktree_harness: the harness (and vm_run.sh) comes from the working tree, for runs before it is committed."""
+    h1, h0 = (git('rev-parse', c).decode().strip() for c in (h_commit, h0_commit))
+    dirty = '\n'.join(line for line in git('status', '--porcelain', '--untracked-files=all', '--', *H_PATHS, *VM_HARNESS).decode().splitlines()
+                      if not line.endswith('.md') and not (worktree_harness and line[3:] in VM_HARNESS))
+    if h_commit == 'HEAD' and dirty:
+        raise ValueError('BRIDGE_H_WORKTREE_DIFFERS_FROM_HEAD:\n' + dirty)
+    try:
+        harness = {name: (REPO / name).read_bytes() for name in VM_HARNESS} if worktree_harness else tree(h1, VM_HARNESS)
+    except subprocess.CalledProcessError:
+        raise ValueError('BRIDGE_VM_HARNESS_NOT_IN_H1: commit the harness and vm_run.sh, or pass --worktree-harness') from None
+    payload = assemble_vm(tree(M_COMMIT, M_PATHS), tree(h0, H_PATHS), tree(h1, H_PATHS), harness)
+    files = [{'path': name, 'bytes': len(value), 'sha256': digest(value)} for name, value in sorted(payload.items())]
+    manifest = {'format': VM_FORMAT, 'study': VM_STUDY, 'mCommit': M_COMMIT, 'h0Commit': h0, 'h1Commit': h1, 'mOverlay': list(M_OVERLAY),
+                'harnessFromWorktree': worktree_harness, 'files': files,
+                'treeSha256': digest(json.dumps(files, separators=(',', ':')).encode()),
+                'scope': 'Build/runtime sources and benchmark harness only. M is 48d01c3 plus the PCN seed; H0 and H1 are committed product '
+                         'revisions, both run with the harness bytes of the harness commit (H1 unless taken from the working tree).'}
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for name, value in [('bundle-manifest.json', (json.dumps(manifest, indent=2) + '\n').encode()), *sorted(payload.items())]:
+            info = zipfile.ZipInfo(name, (2026, 10, 28, 0, 0, 0))
+            info.external_attr = (stat.S_IFREG | 0o600) << 16
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, value)
+    return buffer.getvalue(), manifest
+
+
+def build_vm(target=VM_TARGET, h_commit='HEAD', h0_commit=H0_COMMIT, worktree_harness=False):
+    raw, manifest = pack_vm(h_commit, h0_commit, worktree_harness)
+    expected = digest(raw)
+    verified_members(raw, expected, VM_GROUPS, VM_FORMAT)
+    target = Path(target)
+    target.write_bytes(raw)
+    record = {'study': VM_STUDY, 'bundle': target.name, 'bundleBytes': len(raw), 'sha256': expected, 'mCommit': M_COMMIT,
+              'h0Commit': manifest['h0Commit'], 'h1Commit': manifest['h1Commit'], 'harnessFromWorktree': worktree_harness,
+              'files': len(manifest['files']), 'execution': 'NOT_RUN'}
+    target.with_suffix('.manifest.json').write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
+    return record
+
+
+def verified_members(raw, expected, groups=('M', 'H'), fmt=FORMAT):
     """Pure validator, also executed by the notebook before anything is written."""
     if hashlib.sha256(raw).hexdigest() != expected:
         raise ValueError('BRIDGE_ARCHIVE_HASH')
@@ -114,14 +177,14 @@ def verified_members(raw, expected):
                 raise ValueError('BRIDGE_LINK_OR_DIRECTORY')
         manifest = json.loads(archive.read('bundle-manifest.json'))
         files = manifest['files']
-        if manifest['format'] != FORMAT or hashlib.sha256(json.dumps(files, separators=(',', ':')).encode()).hexdigest() != manifest['treeSha256']:
+        if manifest['format'] != fmt or hashlib.sha256(json.dumps(files, separators=(',', ':')).encode()).hexdigest() != manifest['treeSha256']:
             raise ValueError('BRIDGE_TREE_HASH')
         if {i.filename for i in infos} != {'bundle-manifest.json', *(r['path'] for r in files)}:
             raise ValueError('BRIDGE_INVENTORY')
         values = {}
         for row in files:
             group, _, name = row['path'].partition('/')
-            if group not in ('M', 'H') or not safe(name):
+            if group not in groups or not safe(name):
                 raise ValueError('BRIDGE_UNSAFE_PATH')
             value = archive.read(row['path'])
             if len(value) != row['bytes'] or hashlib.sha256(value).hexdigest() != row['sha256']:
@@ -130,7 +193,36 @@ def verified_members(raw, expected):
         return manifest, values
 
 
-def build(target=TARGET, h_commit='HEAD', worktree_harness=False):
+def verify_tree(root, groups=VM_GROUPS, fmt=VM_FORMAT):
+    """Per-file check of an extracted VM bundle against its bundle-manifest.json: same inventory (nothing added or missing),
+    sizes and hashes, safe paths, no links. vm_run.sh runs it before anything in the tree is executed."""
+    root = Path(root)
+    manifest = json.loads((root / 'bundle-manifest.json').read_text(encoding='utf-8'))
+    files = manifest['files']
+    if manifest['format'] != fmt or digest(json.dumps(files, separators=(',', ':')).encode()) != manifest['treeSha256']:
+        raise ValueError('BRIDGE_TREE_HASH')
+    found = set()
+    for path in root.rglob('*'):
+        if path.is_symlink():
+            raise ValueError('BRIDGE_LINK_OR_DIRECTORY')
+        if path.is_file():
+            found.add(path.relative_to(root).as_posix())
+    if found != {'bundle-manifest.json', *(row['path'] for row in files)}:
+        raise ValueError('BRIDGE_INVENTORY')
+    for row in files:
+        group, _, name = row['path'].partition('/')
+        if group not in groups or not safe(name):
+            raise ValueError('BRIDGE_UNSAFE_PATH')
+        value = (root / row['path']).read_bytes()
+        if len(value) != row['bytes'] or digest(value) != row['sha256']:
+            raise ValueError('BRIDGE_FILE_HASH')
+    return manifest
+
+
+def build(target=TARGET, h_commit=V1_H_COMMIT, worktree_harness=False, unpinned=False):
+    """The v1 notebook is e0e8937 with its own harness; anything else (a newer H, a worktree harness) is refused unless unpinned."""
+    if not unpinned and (git('rev-parse', h_commit).decode().strip() != V1_H_COMMIT or worktree_harness):
+        raise ValueError('BRIDGE_V1_PINNED: bridge-m-h-kaggle-v1 is the e0e8937 study; use --vm for newer revisions (--unpinned for a local experiment)')
     raw, manifest = pack(h_commit, worktree_harness)
     expected = digest(raw)
     verified_members(raw, expected)
@@ -219,8 +311,18 @@ display(FileLink(summary['download']))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--h-commit', default='HEAD')
-    parser.add_argument('--target', type=Path, default=TARGET)
-    parser.add_argument('--worktree-harness', action='store_true', help='local dry runs only')
+    parser.add_argument('--h-commit', help='the notebook H (default and only value for v1: e0e8937, see --unpinned), or H1 with --vm (default HEAD)')
+    parser.add_argument('--target', type=Path, help='default: the v1 notebook, or the VM bundle with --vm')
+    parser.add_argument('--worktree-harness', action='store_true', help='harness from the working tree: local dry runs only')
+    parser.add_argument('--vm', action='store_true', help=f'pack the {VM_STUDY} source bundle (M, H0, H1) instead of the notebook')
+    parser.add_argument('--h0-commit', default=H0_COMMIT, help='with --vm: the anchor revision (default e0e8937)')
+    parser.add_argument('--unpinned', action='store_true', help='v1 notebook from another H or a worktree harness: local experiments, still named v1')
+    parser.add_argument('--verify-extracted', type=Path, metavar='DIR', help='check an extracted VM bundle against its manifest and exit')
     args = parser.parse_args()
-    print(json.dumps(build(args.target, args.h_commit, args.worktree_harness), indent=2))
+    if args.verify_extracted:
+        checked = verify_tree(args.verify_extracted)
+        print(json.dumps({'verified': True, 'files': len(checked['files']), 'h0Commit': checked['h0Commit'], 'h1Commit': checked['h1Commit']}, indent=2))
+    elif args.vm:
+        print(json.dumps(build_vm(args.target or VM_TARGET, args.h_commit or 'HEAD', args.h0_commit, args.worktree_harness), indent=2))
+    else:
+        print(json.dumps(build(args.target or TARGET, args.h_commit or V1_H_COMMIT, args.worktree_harness, args.unpinned), indent=2))
