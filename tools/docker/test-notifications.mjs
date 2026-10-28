@@ -124,7 +124,7 @@ try {
   assert.equal(expect(await request('/notifications/unread-count',owner.token),200).unread,0);
   passed('Login uses RSA; notification unread endpoint returns 200 instead of 503');
   const pet=expect(await request('/pets',owner.token,'POST',{name:'A01 synthetic pet',species:'dog'}),201).pet;
-  const appointmentKey=randomUUID(),appointmentBody={petId:pet.id,type:'spa_bath',date:new Date(Date.now()+30*86400000).toISOString().slice(0,10),time:'10:00',serviceName:'A01 fixture'};
+  const appointmentKey=randomUUID(),appointmentBody={petId:pet.id,type:'spa_bath',date:new Date(Date.now()+30*86400000).toISOString().slice(0,10),time:'10:30',serviceName:'A01 fixture'};
   const appointment=expect(await request('/appointments',owner.token,'POST',appointmentBody,appointmentKey),201).appointment;
   const findAppointment=async()=>expect(await request('/notifications',adminToken),200).items.filter(n=>n.relatedAppointmentId===appointment.id);
   const notices=await until(async()=>{const rows=await findAppointment();return rows.length?rows:false;},'outbox delivery');
