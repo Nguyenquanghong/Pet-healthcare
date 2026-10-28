@@ -11,10 +11,22 @@ from uuid import uuid4
 from zipfile import ZipFile
 
 sys.path.insert(0, str(Path(__file__).parent))
-from cqrs_source import REPO, make_bundle, read_bundle
+from cqrs_source import BASELINE, REPO, git, make_bundle, read_bundle
 from make_cqrs_notebook import build
 
 
+def q6_bundle_buildable():
+    """make_bundle needs HEAD on the Q6 review baseline and the CQRS read-worker source in the worktree."""
+    try:
+        head = git(REPO, 'rev-parse', 'HEAD').decode().strip()
+    except ValueError:
+        return False
+    return head == BASELINE and (REPO / 'services/clinic/src/readWorker.ts').is_file()
+
+
+@unittest.skipUnless(q6_bundle_buildable(),
+                     'make_bundle pins HEAD to the Q6 baseline 3e88d7e and needs services/clinic/src/readWorker.ts, '
+                     'source removed from main in be2267b; CQRS sources reproducible from tag cqrs-projection-archive-20261028')
 class NotebookTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

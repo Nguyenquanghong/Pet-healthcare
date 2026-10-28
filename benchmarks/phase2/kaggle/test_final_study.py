@@ -10,6 +10,13 @@ from test_list_study import qh_member, pcn_member
 POLICY = json.loads(make_final_policy.TARGET.read_text(encoding='utf-8'))
 BASE = {'admin-list': 100}
 
+# The F-vs-O controller packs the activity bench collector sources, which were
+# removed from main together with the CQRS read projection.
+BENCH_SOURCES = ('tools/phase2/cqrs/activity/bench/collector.mjs',
+                 'tools/phase2/cqrs/activity/bench/collector-cli.mjs',
+                 'tools/phase2/cqrs/activity/bench/profile.mjs')
+MISSING_SOURCES = [name for name in BENCH_SOURCES if not (make_final_policy.REPO / name).is_file()]
+
 
 def blocks(maker, by_config, key='k1', count=3, per_block=None):
     out = []
@@ -103,6 +110,11 @@ class ControllerTests(unittest.TestCase):
         self.assertIn('benchmarks/phase2/kaggle/list_trial.py', base.OVERLAY)
         self.assertIs(base.ev, fe)
         self.assertIs(base.Study, final_study.Study)
+
+    @unittest.skipIf(MISSING_SOURCES, 'source removed from main in be2267b; study reproducible from tag cqrs-projection-archive-20261028')
+    def test_controller_source_files_exist(self):
+        import final_study
+        base = final_study.base
         for name in (*base.OVERLAY, *base.BENCH, *base.CONTROLLER):
             self.assertTrue((make_final_policy.REPO / name).is_file(), name)
 

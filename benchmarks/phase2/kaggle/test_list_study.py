@@ -5,9 +5,14 @@ from pathlib import Path
 import unittest
 
 import list_evaluate as ev
+import make_list_notebook
 import make_list_policy
 
 POLICY = json.loads((make_list_policy.REPO / 'phase2-plan/cqrs/list-study/cqrs-list-matched-kaggle-v1.policy.json').read_text(encoding='utf-8'))
+# The list notebook bundle packs the Q6 v9 source zip (a gitignored test-results artifact that is no
+# longer on disk, never committed so not in any tag) and the activity bench collector/profile tools
+# removed from main in be2267b (kept in tag cqrs-projection-archive-20261028).
+MISSING_SOURCES = [name for name in make_list_notebook.NAMES if not (make_list_policy.REPO / name).is_file()]
 QH_OPS = ('owner-list', 'admin-list', 'admin-search', 'admin-unbilled', 'owner-calendar', 'admin-calendar', 'admin-filter', 'admin-page')
 
 
@@ -223,6 +228,9 @@ class BlockControlTests(unittest.TestCase):
 
 
 class NotebookBundleTests(unittest.TestCase):
+    @unittest.skipIf(MISSING_SOURCES,
+                     'source removed from main in be2267b; study reproducible from tag cqrs-projection-archive-20261028 '
+                     '(the untracked Q6 v9 source zip is not in the tag); missing: ' + ', '.join(MISSING_SOURCES))
     def test_bundle_verifies_and_rejects_tampering_and_unsafe_paths(self):
         import io, zipfile
         import make_list_notebook as nb

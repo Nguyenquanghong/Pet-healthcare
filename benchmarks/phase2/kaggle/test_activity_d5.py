@@ -31,6 +31,14 @@ with patch.dict(sys.modules, {'pwd': types.SimpleNamespace()} if sys.platform ==
 builder = module('make_activity_d5_notebook')
 FIXTURES = REPO / 'test-results/phase2/cqrs/activity/d5-20261021' / ('py-fixtures-' + uuid.uuid4().hex)
 
+# The D5 bundle packs every file in the D4 development manifest plus builder.EXTRA.
+# Most of the missing ones were removed from main in be2267b (CQRS read projection and
+# the activity bench/kaggleD5 sources; kept in tag cqrs-projection-archive-20261028).
+# Some bundled files were also removed earlier in 31a7429, e26ce03 and 27bc7aa, which the tag does not restore.
+_D4_MANIFEST = REPO / 'phase2-plan/cqrs/clinic-activity/evidence/d4-development-manifest.json'
+MISSING_SOURCES = sorted(name for name in {*(row['path'] for row in json.loads(_D4_MANIFEST.read_text(encoding='utf-8'))['files']), *builder.EXTRA}
+                         if not (REPO / name).is_file())
+
 
 class D5Tests(unittest.TestCase):
     @classmethod
@@ -67,6 +75,8 @@ class D5Tests(unittest.TestCase):
         p1 = native.environment_profile(proc, v1)
         self.assertEqual((p1['cpuMax'], p1['memoryMax'], p1['cgroupVersion']), ('-1 100000', '9223372036854771712', 1))
 
+    @unittest.skipIf(MISSING_SOURCES, 'source removed from main in be2267b (study reproducible from tag cqrs-projection-archive-20261028 only for the files that commit removed; some bundled files were also removed in 31a7429, e26ce03, 27bc7aa); '
+                    + '%d bundled files missing' % len(MISSING_SOURCES))
     def test_bundle_round_trip_contains_runtime_sources_and_rejects_tampering(self):
         raw, manifest = builder.source_bundle()
         expected = builder.digest(raw)
