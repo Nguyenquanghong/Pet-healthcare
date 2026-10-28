@@ -12,8 +12,8 @@ try{
     const strict=process.env.PHASE2_RUNTIME_REQUIRED==='1';
     if(strict&&(!verify||!process.env.JWT_KEY_ID||process.env.JWT_PRIVATE_KEY||process.env.JWT_SECRET))throw new Error('VERIFIER_ONLY_CONFIGURATION_REQUIRED');
     if(strict&&!process.env.CORE_SERVICE_URL)throw new Error('CORE_DIRECTORY_URL_REQUIRED');
-    const scopes=strict?{billing:credential('CLINIC_BILLING_TOKEN'),bootstrap:credential('CLINIC_BOOTSTRAP_TOKEN'),evidence:credential('CORE_BILLING_EVIDENCE_TOKEN')}:undefined;
-    if(scopes&&new Set([...Object.values(scopes),credential('CORE_DIRECTORY_TOKEN')]).size!==4)throw new Error('DISTINCT_SERVICE_CREDENTIALS_REQUIRED');
+    const scopes=strict?{billing:credential('CLINIC_BILLING_TOKEN'),evidence:credential('CORE_BILLING_EVIDENCE_TOKEN')}:undefined;
+    if(scopes&&new Set([...Object.values(scopes),credential('CORE_DIRECTORY_TOKEN')]).size!==3)throw new Error('DISTINCT_SERVICE_CREDENTIALS_REQUIRED');
     const source=process.env.CORE_SERVICE_URL?new CoreDirectory(process.env.CORE_SERVICE_URL,strict?credential('CORE_DIRECTORY_TOKEN'):process.env.CORE_DIRECTORY_TOKEN??process.env.CLINIC_SERVICE_TOKEN??'',scopes):undefined;
     const runtime=verify?clinicRuntime(db,verify):undefined;
     // Medical image bucket (AQ-09). Misconfiguration fails startup; an unreachable

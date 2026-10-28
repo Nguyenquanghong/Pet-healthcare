@@ -14,11 +14,11 @@ export class CoreDirectory {
   // Every Clinic request needs Core; when Core hangs, fail at once instead of
   // holding each request for its 2 s timeout (one breaker per process).
   readonly breaker=new CircuitBreaker('core-directory',integer('CORE_DIRECTORY_BREAKER_FAILURES',5,1,100),integer('CORE_DIRECTORY_BREAKER_OPEN_MS',5000,100,60000));
-  constructor(url:string,private readonly credential:string,private readonly scopes?:{billing:string;bootstrap:string;evidence:string}) {
+  constructor(url:string,private readonly credential:string,private readonly scopes?:{billing:string;evidence:string}) {
     this.origin=new URL(url);
     if(!['http:','https:'].includes(this.origin.protocol)||this.origin.pathname!=='/'||this.origin.search||this.origin.hash||this.origin.username||this.origin.password||credential.length<32||credential.length>512)throw new Error('INVALID_DIRECTORY_CONFIGURATION');
   }
-  acceptsService(token:unknown,scope:'billing'|'bootstrap'='billing'){const expected=this.scopes?.[scope]??this.credential;return typeof token==='string'&&token.length<=512&&timingSafeEqual(createHash('sha256').update(token).digest(),createHash('sha256').update(expected).digest());}
+  acceptsService(token:unknown){const expected=this.scopes?.billing??this.credential;return typeof token==='string'&&token.length<=512&&timingSafeEqual(createHash('sha256').update(token).digest(),createHash('sha256').update(expected).digest());}
   async operationEvidence(operationId:string):Promise<{state:'PREPARING'|'COMMITTED'|'ABORTED';appointmentId:string;invoiceId?:string|null}>{
     try{return await this.breaker.run(async()=>{const res=await fetch(new URL('/internal/billing-operations/'+encodeURIComponent(operationId),this.origin),{headers:{...traceHeaders(),'X-Service-Token':this.scopes?.evidence??this.credential},redirect:'error',signal:AbortSignal.timeout(2000)});if(res.status!==200)throw res.status>=500?new Error():new CoreResponded();const value=await res.json();if(value.operationId!==operationId||!['PREPARING','COMMITTED','ABORTED'].includes(value.state)||typeof value.appointmentId!=='string'||!value.appointmentId||value.appointmentId.length>128||value.state==='COMMITTED'&&(typeof value.invoiceId!=='string'||!value.invoiceId||value.invoiceId.length>128))throw new Error();return value;},coreFailure);}catch{throw new BusinessError(503,'Core terminal evidence unavailable. Reservation remains held.');}
   }

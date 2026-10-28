@@ -17,7 +17,6 @@ services:
       CORE_DIRECTORY_TOKEN: ${CORE_DIRECTORY_TOKEN:?Prepare phase2 configuration}
       CORE_BILLING_EVIDENCE_TOKEN: ${CORE_BILLING_EVIDENCE_TOKEN:?Prepare phase2 configuration}
       CLINIC_BILLING_TOKEN: ${CLINIC_BILLING_TOKEN:?Prepare phase2 configuration}
-      CLINIC_BOOTSTRAP_TOKEN: ${CLINIC_BOOTSTRAP_TOKEN:?Prepare phase2 configuration}
     depends_on:
       clinic-api:
         condition: service_healthy
@@ -90,7 +89,6 @@ services:
       CORE_DIRECTORY_TOKEN: ${CORE_DIRECTORY_TOKEN:?Prepare phase2 configuration}
       CORE_BILLING_EVIDENCE_TOKEN: ${CORE_BILLING_EVIDENCE_TOKEN:?Prepare phase2 configuration}
       CLINIC_BILLING_TOKEN: ${CLINIC_BILLING_TOKEN:?Prepare phase2 configuration}
-      CLINIC_BOOTSTRAP_TOKEN: ${CLINIC_BOOTSTRAP_TOKEN:?Prepare phase2 configuration}
       REDIS_URL: redis://redis:6379
       RATE_LIMIT_NAMESPACE: nipopeto.local.v1
       RATE_LIMIT_KEY_SECRET: ${RATE_LIMIT_KEY_SECRET:?Prepare phase2 configuration}

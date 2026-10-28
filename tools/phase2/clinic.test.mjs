@@ -344,3 +344,46 @@ test('P01: allowedActions in Clinic responses follow the role, and the server ac
   // Guards over linked data are not in the list: the record now blocks the reopen with a 409 that says why.
   assert.match(status(await request(`/api/appointments/${a.id}/undo-status`,{method:'POST',token:tokens.admin,body:{expectedRevision:a.statusRevision,reason:'P01 fixture'}}),409).error,/bệnh án/);
 });
+test('CQRS cleanup migration: fence and source-acl triggers are gone, a frozen rebuild run blocks no write, open read-changed outbox rows are closed',async()=>{
+  const hooks=await clinic.$queryRaw`SELECT c.relname||'.'||t.tgname AS hook FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace ns ON ns.oid=c.relnamespace WHERE ns.nspname=current_schema() AND NOT t.tgisinternal AND t.tgname IN ('read_rebuild_fence','appointment_query_source_membership','appointment_query_source_acl') ORDER BY 1`;
+  assert.deepEqual(hooks,[]);
+  const fence=await clinic.$queryRaw`SELECT count(*)::int AS n FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname=current_schema() AND p.proname='clinic_read_rebuild_fence'`;
+  assert.equal(fence[0].n,0);
+  // The 'projection' and 'directory' epoch triggers and their shared function are deliberately kept.
+  const keptHooks=await clinic.$queryRaw`SELECT t.tgname AS name FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace ns ON ns.oid=c.relnamespace WHERE ns.nspname=current_schema() AND NOT t.tgisinternal AND t.tgname IN ('appointment_query_projection','appointment_query_directory') ORDER BY 1`;
+  assert.deepEqual(keptHooks.map(r=>r.name),['appointment_query_directory','appointment_query_projection']);
+  const bump=await clinic.$queryRaw`SELECT count(*)::int AS n FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname=current_schema() AND p.proname='appointment_query_epoch_bump'`;
+  assert.equal(bump[0].n,1);
+  // The old fence refused every write to these tables while a frozen run owned by another backend existed.
+  const epoch=async()=>(await clinic.appointmentQueryEpoch.findUniqueOrThrow({where:{scope:'source-acl'}})).revision;
+  const before=await epoch(),runId=randomUUID(),consumerName='cqrs-cleanup-'+run;
+  // A pet of this test only: the shared pet already holds 08:30 from the first test. Like the P01 test, the
+  // pet and its appointment stay (run-unique data; nothing else in this file removes its own).
+  const frozenPet=await core.pet.create({data:{ownerId:owner,name:'Frozen run pet '+run,species:'dog',allergies:[]}});
+  await clinic.readRebuildRun.create({data:{id:runId,generation:'frozen-'+runId,ownerPid:1,frozen:true}});
+  try{
+    await create('08:30',{petId:frozenPet.id});
+    status(await request('/api/medical-records',{method:'POST',token:tokens.doctor,key:randomUUID(),body:record(null,{title:'Frozen run '+run})}),201);
+    await clinic.inboxEvent.create({data:{consumerName,eventId:randomUUID()}});
+    assert.equal(await epoch(),before,'an appointment insert no longer bumps the source-acl epoch');
+  }finally{
+    await clinic.inboxEvent.deleteMany({where:{consumerName}});
+    await clinic.readRebuildRun.delete({where:{id:runId}});
+  }
+  // Run the migration's own UPDATE on rows shaped like the leftovers. nextAttemptAt is in the future so no relay claims them.
+  const sql=readFileSync('services/clinic/prisma/migrations/20261028000100_retire_cqrs_database_hooks/migration.sql','utf8');
+  const close=/UPDATE "OutboxEvent"[^;]*;/.exec(sql)?.[0];
+  assert.ok(close,'the migration closes retired outbox rows');
+  const envelope=eventType=>({eventId:randomUUID(),eventType,schemaVersion:1,producer:'clinic',aggregateType:'appointment',aggregateId:run,aggregateVersion:1});
+  const retired=randomUUID(),kept=randomUUID(),later=new Date(Date.now()+3600000);
+  await clinic.outboxEvent.createMany({data:[{id:retired,envelope:envelope('clinic.appointment-read-changed.v1'),nextAttemptAt:later},{id:kept,envelope:envelope('notification.requested.v1'),nextAttemptAt:later}]});
+  try{
+    await clinic.$executeRawUnsafe(close);
+    const rows=await clinic.outboxEvent.findMany({where:{id:{in:[retired,kept]}},select:{id:true,publishedAt:true}});
+    assert.equal(rows.length,2,'the rows are kept');
+    // publishedAt is TIMESTAMP(3) holding UTC, so Prisma's Date must be close to the clock whatever the session timezone.
+    const closedAt=rows.find(r=>r.id===retired).publishedAt;
+    assert.ok(closedAt&&Math.abs(Date.now()-closedAt.getTime())<10000,'the retired event type is marked published now, in UTC: '+closedAt?.toISOString());
+    assert.equal(rows.find(r=>r.id===kept).publishedAt,null,'other event types stay open');
+  }finally{await clinic.outboxEvent.deleteMany({where:{id:{in:[retired,kept]}}});}
+});

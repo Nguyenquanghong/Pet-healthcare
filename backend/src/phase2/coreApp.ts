@@ -41,7 +41,7 @@ export function createCoreApp(db: PrismaClient, config: {notificationUrl?:string
   const jwt = asymmetricConfig();
   if(process.env.PHASE2_RUNTIME_REQUIRED==='1'){
     if(!jwt?.privateKey||!jwt.keyId)throw new Error('CORE_RSA_SIGNING_CONFIGURATION_REQUIRED');
-    const scoped=['CORE_DIRECTORY_TOKEN','CORE_BILLING_EVIDENCE_TOKEN','CLINIC_BILLING_TOKEN','CLINIC_BOOTSTRAP_TOKEN','CORE_NOTIFICATION_SEND_TOKEN'].map(credential);
+    const scoped=['CORE_DIRECTORY_TOKEN','CORE_BILLING_EVIDENCE_TOKEN','CLINIC_BILLING_TOKEN','CORE_NOTIFICATION_SEND_TOKEN'].map(credential);
     if(new Set(scoped).size!==scoped.length)throw new Error('DISTINCT_SERVICE_CREDENTIALS_REQUIRED');
     if(!config.clinicUrl||!config.notificationUrl)throw new Error('SPLIT_SERVICE_URLS_REQUIRED');
   }

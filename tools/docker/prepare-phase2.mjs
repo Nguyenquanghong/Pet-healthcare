@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { prepareNotifications } from './prepare-notifications.mjs';
 
 export const phase2Keys = ['CLINIC_POSTGRES_PASSWORD', 'CORE_DIRECTORY_TOKEN',
-  'CORE_BILLING_EVIDENCE_TOKEN', 'CLINIC_BILLING_TOKEN', 'CLINIC_BOOTSTRAP_TOKEN',
+  'CORE_BILLING_EVIDENCE_TOKEN', 'CLINIC_BILLING_TOKEN',
   'RATE_LIMIT_KEY_SECRET', 'OBSERVABILITY_TOKEN'];
 export function preparePhase2(path) {
   const env = parseEnv(readFileSync(path, 'utf8'));
