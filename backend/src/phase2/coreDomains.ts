@@ -42,7 +42,7 @@ import { passwordAdapter, tokenAdapter } from '../infrastructure/security/authAd
 import { qrTokenAdapter } from '../infrastructure/security/qrToken.js';
 import { BusinessError } from '../domain/error.js';
 import { serviceVersion } from '../lib/version.js';
-import { currentRequestId, isTransientFailure, reportUnexpected } from '@nipopeto/runtime';
+import { currentRequestId, isTransientFailure, reportUnexpected, requestFault } from '@nipopeto/runtime';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { createAppointmentsRouter } from '../routes/appointments.js';
 import { createAuthRouter } from '../routes/auth.js';
@@ -171,13 +171,13 @@ export function createCoreDomains(client: PrismaClient) {
       res.status(error.status).json({ error: error.message });
       return;
     }
-    const bodyError = error as { type?: string } | null;
-    if (bodyError?.type === 'entity.parse.failed') {
-      res.status(400).json({ error: 'Request body must be valid JSON.' });
-      return;
-    }
-    if (bodyError?.type === 'entity.too.large') {
-      res.status(413).json({ error: 'Request body is too large.' });
+    const fault = requestFault(error, {
+      invalid: 'Request body must be valid JSON.',
+      large: 'Request body is too large.',
+      other: 'Request body could not be read.',
+    });
+    if (fault) {
+      res.status(fault.status).json(fault.body);
       return;
     }
     if (isTransientFailure(error)) {

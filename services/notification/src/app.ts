@@ -4,7 +4,7 @@ import { ApiError, Notifications, type Actor } from './notifications.js';
 import { ManualSend } from './manualSend.js';
 import type { SendAuthorization } from './coreAuthorization.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
-import { currentRequestId, isTransientFailure, reportUnexpected, requestActor } from '@nipopeto/runtime';
+import { currentRequestId, isTransientFailure, reportUnexpected, requestActor, requestFault } from '@nipopeto/runtime';
 import { sessionRevoked } from './sessions.js';
 
 export function createApp(
@@ -84,12 +84,15 @@ export function createApp(
       res.end();
       return;
     }
+    const fault = requestFault(error, {
+      invalid: 'Request body must be valid JSON.',
+      large: 'Request body is too large.',
+      other: 'Request body could not be read.',
+    });
     if (error instanceof ApiError) {
       if (error.status === 503) res.setHeader('Retry-After', '1');
       res.status(error.status).json({ error: error.message });
-    } else if (error?.type === 'entity.parse.failed')
-      res.status(400).json({ error: 'Request body must be valid JSON.' });
-    else if (error?.type === 'entity.too.large') res.status(413).json({ error: 'Request body is too large.' });
+    } else if (fault) res.status(fault.status).json(fault.body);
     else if (isTransientFailure(error)) {
       res.setHeader('Retry-After', '1');
       res.status(503).json({ error: 'Notification service unavailable.' });

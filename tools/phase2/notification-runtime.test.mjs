@@ -189,6 +189,14 @@ test('manual send checks current Core staff/recipient and validation; failures c
   const key = randomUUID(); requireStatus(await send(base, staleToken, key), 403);
   assert.equal(await notification.requestDedup.count({ where: { actorId: withdrawn.id, key } }), 0);
 });
+test('a body the parser refuses is the caller\'s 4xx with fixed text, never a 500: unsupported charset, through Core and straight to Notification', async () => {
+  const body = { recipientOwnerId: owner, title: run, message: 'Charset fixture' };
+  const latin1 = { 'Content-Type': 'application/json; charset=latin1' };
+  const viaCore = await request('/api/notifications/send', { method: 'POST', token: tokens.admin, key: randomUUID(), body, headers: latin1 });
+  assert.deepEqual([viaCore.status, viaCore.body], [415, { error: 'Request unavailable or invalid.' }]);
+  const direct = await request('/api/notifications/send', { method: 'POST', token: tokens.admin, key: randomUUID(), body, headers: latin1, base: notificationUrl });
+  assert.deepEqual([direct.status, direct.body], [415, { error: 'Request body could not be read.' }]);
+});
 test('Core outage fails new manual send closed; cached response survives timeout/retry; DB fault rolls back dedup/effect', async () => {
   const key = randomUUID(), body = { recipientOwnerId: owner, title: run, message: 'Outage fixture' };
   const original = requireStatus(await request('/api/notifications/send', { method: 'POST', token: tokens.staff, key, body }), 201);

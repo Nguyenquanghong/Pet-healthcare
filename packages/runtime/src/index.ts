@@ -6,3 +6,4 @@ export * from './http.js';
 export * from './shutdown.js';
 export * from './circuitBreaker.js';
 export * from './failures.js';
+export * from './requestFault.js';

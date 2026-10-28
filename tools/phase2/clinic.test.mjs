@@ -406,6 +406,15 @@ test('blob store: 5xx, 408 and 429 and a refused connection are transient; every
   const refused=await operations.put().then(()=>assert.fail('connected'),e=>e);
   assert.equal(isTransientFailure(refused),true,'nothing listens: a network error is transient');
 });
+test('a body the parser refuses is the caller\'s 4xx with fixed text, never a 500: unsupported charset on the Core gateway and on both Clinic processes',async()=>{
+  const logged=[];
+  for(const [base,path] of [[coreUrl,'/api/appointments'],...bases.map(b=>[b,'/api/appointments'])]){
+    const r=await fetch(base+path,{method:'POST',headers:{Authorization:'Bearer '+tokens.owner,'Content-Type':'application/json; charset=latin1','Idempotency-Key':randomUUID()},body:JSON.stringify(appointment('09:00'))});
+    logged.push([r.status,await r.json()]);
+  }
+  assert.deepEqual(logged,[[415,{error:'Request unavailable or invalid.'}],...Array(2).fill([415,{error:'Request body could not be read.'}])]);// the gateway in front of Clinic keeps its own text
+  status(await request('/api/appointments',{base:bases[0],method:'POST',key:randomUUID(),headers:{'Content-Type':'application/json; charset=utf-8'},body:{}}),422);// utf-8 still reaches validation
+});
 test('classifier on real Prisma errors: a raw-query deadlock, serialization failure or lock timeout is transient, a syntax error is not',async()=>{
   const raise=state=>clinic.$queryRawUnsafe(`DO $$ BEGIN RAISE EXCEPTION 'p2010 fixture' USING ERRCODE='${state}'; END $$`).then(()=>assert.fail('no error for '+state),e=>e);
   for(const state of ['40001','40P01','55P03','57014','53300']){const error=await raise(state);assert.equal(error.code,'P2010');assert.equal(error.meta.code,state);assert.equal(isTransientFailure(error),true,state);}
