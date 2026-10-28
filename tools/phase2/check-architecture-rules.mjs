@@ -19,6 +19,8 @@
 //  8. Booking lifecycle rules come from one table in @nipopeto/contracts (P01).
 //  9. Clinic's deferred list reads (authorized after their query) are GET handlers
 //     that answer through authorizedRead, and the gate only opens for GET.
+// 10. No two .ts files in services/*/src or backend/src/phase2 are identical: a copy
+//     belongs in packages/runtime or packages/messaging.
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -357,6 +359,30 @@ rule('deferred-reads-via-authorized-read',()=>{
   return paths+' deferred paths, all GET via authorizedRead';
 });
 
+// ---- 10. No duplicated service modules (C) ------------------------------------
+// auth.ts and composition.ts were byte-identical in Clinic and Notification until they moved
+// into packages/runtime. Identical content in two places is shared code waiting to drift.
+const lf = source => source.replace(/\r\n/g, '\n');
+export function duplicateModules(modules){
+  const groups=new Map();
+  for(const {file,source} of modules){const key=lf(source);groups.set(key,[...(groups.get(key)??[]),file]);}
+  return [...groups.values()].filter(group=>group.length>1).map(group=>group.join(' = '));
+}
+rule('no-duplicated-service-modules',()=>{
+  const dirs=[...readdirSync(resolve(root,'services'),{withFileTypes:true}).filter(e=>e.isDirectory()).map(e=>'services/'+e.name+'/src'),'backend/src/phase2'];
+  const modules=dirs.flatMap(d=>files(resolve(root,d))).filter(f=>f.endsWith('.ts')&&!f.split(sep).includes('dist')).map(f=>({file:relative(root,f).split(sep).join('/'),source:readFileSync(f,'utf8')}));
+  assert.ok(modules.length>=40,'found the service modules ('+modules.length+')');
+  const copies=duplicateModules(modules);
+  assert.deepEqual(copies,[],'identical modules (move the shared code into packages/runtime or packages/messaging): '+copies.join('; '));
+  // negative fixtures: a copy of a real module under another name, with either line ending
+  const [first]=modules,copy={file:'services/notification/src/copied.ts',source:first.source};
+  assert.deepEqual(duplicateModules([...modules,copy]),[first.file+' = '+copy.file]);
+  assert.deepEqual(duplicateModules([...modules,{...copy,source:lf(first.source).replace(/\n/g,'\r\n')}]),[first.file+' = '+copy.file]);
+  assert.deepEqual(duplicateModules([{file:'a.ts',source:'x\ny'},{file:'b.ts',source:'x\r\ny'},{file:'c.ts',source:'x\ny '}]),['a.ts = b.ts']);
+  assert.deepEqual(duplicateModules(modules.slice(0,5)),[]);
+  return modules.length+' modules, none identical';
+});
+
 await envelopeCheck;
 await lifecycleCheck;
 await grantsCheck;
@@ -366,4 +392,4 @@ await categoryCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, negative fixtures.\n');
+else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, no duplicated service modules, negative fixtures.\n');

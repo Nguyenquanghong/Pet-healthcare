@@ -1,10 +1,9 @@
 import { createApp } from './app.js';
-import { actorVerifier } from './auth.js';
-import { createDependencies } from './composition.js';
-import { credential, installShutdown } from '@nipopeto/runtime';
+import { PrismaClient } from './generated/client/index.js';
+import { actorVerifier, credential, installShutdown, prismaClient } from '@nipopeto/runtime';
 import { CoreSendAuthorization } from './coreAuthorization.js';
 import { notificationRuntime } from './runtime.js';
-const { db } = createDependencies();
+const db = prismaClient(PrismaClient);
 try {
   await db.$connect();
   const verify = process.env.JWT_PUBLIC_KEY

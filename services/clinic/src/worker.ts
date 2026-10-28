@@ -7,15 +7,15 @@ import {
   requireBrokerConfig,
   startWorker,
 } from '@nipopeto/messaging';
-import { createDependencies } from './composition.js';
+import { PrismaClient } from './generated/client/index.js';
 import { ClinicInbox } from './inbox.js';
 import { OutboxRelay } from './relay.js';
 import { DirectorySync } from './directorySync.js';
 import { classifyClinicFailure } from './messagingErrors.js';
-import { withRequestId, eventCorrelation, integer } from '@nipopeto/runtime';
+import { withRequestId, eventCorrelation, integer, prismaClient } from '@nipopeto/runtime';
 import { blobStoreConfigured, blobStoreFromEnv } from './blobStore.js';
 import { drainBlobCleanup } from './blobCleanup.js';
-const { db } = createDependencies();
+const db = prismaClient(PrismaClient);
 await startWorker('clinic', async signal => {
   try {
     if (!process.env.CORE_SERVICE_URL && process.env.CLINIC_PROOF_ONLY !== '1')

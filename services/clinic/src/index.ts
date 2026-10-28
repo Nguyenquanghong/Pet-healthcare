@@ -1,11 +1,10 @@
 import { createApp } from './app.js';
-import { actorVerifier } from './auth.js';
-import { createDependencies } from './composition.js';
-import { credential, installShutdown } from '@nipopeto/runtime';
+import { PrismaClient } from './generated/client/index.js';
+import { actorVerifier, credential, installShutdown, prismaClient } from '@nipopeto/runtime';
 import { CoreDirectory } from './directory.js';
 import { clinicRuntime } from './runtime.js';
 import { S3BlobStore, blobStoreFromEnv } from './blobStore.js';
-const { db } = createDependencies();
+const db = prismaClient(PrismaClient);
 try {
   await db.$connect();
   const verify = process.env.JWT_PUBLIC_KEY

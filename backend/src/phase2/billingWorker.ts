@@ -4,8 +4,8 @@ import { PrismaClient } from '@prisma/client';
 import { delay, reconnect, startWorker } from '@nipopeto/messaging';
 import { asymmetricConfig } from '../lib/token.js';
 import { AppointmentInvoiceBilling, ClinicBillingRemote } from './appointmentBilling.js';
-import { databaseUrl, runtimeEnabled } from '@nipopeto/runtime';
-const db = new PrismaClient(runtimeEnabled() ? { datasourceUrl: databaseUrl() } : undefined);
+import { prismaClient, serviceOrigin } from '@nipopeto/runtime';
+const db = prismaClient(PrismaClient);
 await startWorker('core-billing', async signal => {
   try {
     const url = process.env.CLINIC_SERVICE_URL,
@@ -14,16 +14,7 @@ await startWorker('core-billing', async signal => {
       throw new Error('BILLING_SIGNING_KEY_ID_REQUIRED');
     if (!url || !credential || credential.length < 32 || credential.length > 512 || !asymmetricConfig()?.privateKey)
       throw new Error('BILLING_RUNTIME_CONFIGURATION_REQUIRED');
-    const target = new URL(url);
-    if (
-      !['http:', 'https:'].includes(target.protocol) ||
-      target.username ||
-      target.password ||
-      target.pathname !== '/' ||
-      target.search ||
-      target.hash
-    )
-      throw new Error('INVALID_CLINIC_SERVICE_URL');
+    const target = serviceOrigin(url, 'INVALID_CLINIC_SERVICE_URL');
     await db.$connect();
     const worker = randomUUID(),
       billing = new AppointmentInvoiceBilling(db, new ClinicBillingRemote(target, credential));

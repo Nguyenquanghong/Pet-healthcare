@@ -25,7 +25,8 @@ export function requestActor(req: Pick<Request, 'headers'>, verify: Verifier): A
     throw new Error('INVALID_ACTOR');
   }
 }
-export function publicVerifier(config: { publicKey: string; issuer: string; audience: string; keyId?: string }) {
+type VerifierConfig = { publicKey: string; issuer: string; audience: string; keyId?: string };
+export function publicVerifier(config: VerifierConfig) {
   const key = createPublicKey(config.publicKey);
   if (
     key.asymmetricKeyType !== 'rsa' ||
@@ -57,4 +58,8 @@ export function publicVerifier(config: { publicKey: string; issuer: string; audi
       throw new Error('INVALID_ACTOR');
     return { sub: p.sub, role: p.role };
   };
+}
+// The services' verifier: JWT_KEY_ID, when set, pins the key id.
+export function actorVerifier(config: VerifierConfig) {
+  return publicVerifier({ ...config, ...(process.env.JWT_KEY_ID ? { keyId: process.env.JWT_KEY_ID } : {}) });
 }

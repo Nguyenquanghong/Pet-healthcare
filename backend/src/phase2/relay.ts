@@ -1,74 +1,48 @@
-import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '../generated/phase2-core/index.js';
-import { ConfirmPublisher, type Topology } from '@nipopeto/messaging';
-type Claimed = { id: string; envelope: unknown; attempts: number };
-// batchSize/persistent default to the original one-event, one-connection relay;
-// the runtime notification worker enables both (same fix as the Clinic relay,
-// list study v1 K3-F1). Batches need a store with claimBatch.
-export type RelayOptions = { batchSize?: number; persistent?: boolean };
-export class OutboxRelay {
-  private readonly store: OutboxStore;
-  private readonly publisher: ConfirmPublisher;
-  private readonly batchSize: number;
+import { BaseOutboxRelay, type ClaimedOutbox, type OutboxRelayStore, type RelayOptions } from '@nipopeto/messaging';
+export type { RelayOptions };
+// Batches need a store with claimBatch. The loop is shared with Clinic in @nipopeto/messaging.
+class CoreRelayStore implements OutboxRelayStore {
+  constructor(
+    private readonly store: OutboxStore,
+    private readonly scope: string | null,
+    private readonly createdAfter: string | null,
+  ) {}
+  async claim(leaseOwner: string, limit: number): Promise<ClaimedOutbox[]> {
+    if (limit > 1) return this.store.claimBatch!(leaseOwner, this.scope, this.createdAfter, limit);
+    const one = await this.store.claim(leaseOwner, this.scope, this.createdAfter);
+    return one ? [one] : [];
+  }
+  async markPublished(ids: string[], leaseOwner: string) {
+    for (const id of ids) await this.store.markPublished(id, leaseOwner);
+  }
+  retry(id: string, leaseOwner: string, nextAttemptAt: Date) {
+    return this.store.retry(id, leaseOwner, nextAttemptAt);
+  }
+}
+export class OutboxRelay extends BaseOutboxRelay {
   // createdAfter (ISO instant) is a guarded-test scope like scopeAggregateId: a
   // run relays only its own rows from a shared trial schema.
   constructor(
     db: PrismaClient | OutboxStore,
     brokerUrl: string,
-    private readonly scopeAggregateId?: string,
-    private readonly createdAfter?: string,
+    scopeAggregateId?: string,
+    createdAfter?: string,
     options: RelayOptions = {},
   ) {
-    this.store = 'claim' in db ? db : new ProofOutboxStore(db);
-    this.batchSize = options.batchSize ?? 1;
-    if (
-      !Number.isSafeInteger(this.batchSize) ||
-      this.batchSize < 1 ||
-      this.batchSize > 500 ||
-      (this.batchSize > 1 && !this.store.claimBatch)
-    )
-      throw new Error('INVALID_RELAY_BATCH');
-    this.publisher = new ConfirmPublisher(brokerUrl, 'core-relay', options.persistent ?? false);
-  }
-  get connection() {
-    return this.publisher.connection;
-  }
-  close() {
-    return this.publisher.close();
-  }
-  private async claim(leaseOwner: string): Promise<Claimed[]> {
-    const scope = this.scopeAggregateId ?? null,
-      after = this.createdAfter ?? null;
-    if (this.batchSize > 1) return this.store.claimBatch!(leaseOwner, scope, after, this.batchSize);
-    const one = await this.store.claim(leaseOwner, scope, after);
-    return one ? [one] : [];
-  }
-  async once(workerId: string, destination: string | Topology, afterConfirm?: () => void) {
-    const started = performance.now();
-    const leaseOwner = `${workerId}:${randomUUID()}`;
-    const claimed = await this.claim(leaseOwner);
-    if (!claimed.length) return false;
-    const { confirmed, failed, error } = await this.publisher.publish(claimed, destination, started);
-    if (confirmed.length) {
-      afterConfirm?.();
-      for (const id of confirmed) await this.store.markPublished(id, leaseOwner);
-    }
-    if (failed.length) {
-      if (!afterConfirm)
-        for (const row of claimed.filter(r => failed.includes(r.id)))
-          await this.store.retry(
-            row.id,
-            leaseOwner,
-            new Date(Date.now() + Math.min(60000, 1000 * 2 ** Math.min(row.attempts, 6))),
-          );
-      throw error;
-    }
-    return true;
+    const store: OutboxStore = 'claim' in db ? db : new ProofOutboxStore(db);
+    if ((options.batchSize ?? 1) > 1 && !store.claimBatch) throw new Error('INVALID_RELAY_BATCH');
+    super(new CoreRelayStore(store, scopeAggregateId ?? null, createdAfter ?? null), brokerUrl, 'core-relay', options);
   }
 }
 export interface OutboxStore {
-  claim(leaseOwner: string, scope: string | null, createdAfter?: string | null): Promise<Claimed | null>;
-  claimBatch?(leaseOwner: string, scope: string | null, createdAfter: string | null, limit: number): Promise<Claimed[]>;
+  claim(leaseOwner: string, scope: string | null, createdAfter?: string | null): Promise<ClaimedOutbox | null>;
+  claimBatch?(
+    leaseOwner: string,
+    scope: string | null,
+    createdAfter: string | null,
+    limit: number,
+  ): Promise<ClaimedOutbox[]>;
   markPublished(id: string, leaseOwner: string): Promise<void>;
   retry(id: string, leaseOwner: string, nextAttemptAt: Date): Promise<void>;
 }

@@ -1,7 +1,6 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
-import { createHash, timingSafeEqual } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import { createApp } from '../app.js';
 import { asymmetricConfig, verifyToken } from '../lib/token.js';
@@ -10,7 +9,7 @@ import { mountAppointmentBilling } from './billingApi.js';
 import { mountDashboards } from './dashboardApi.js';
 import { coreRuntime } from './runtime.js';
 import { createCoreDomains } from './coreDomains.js';
-import { credential } from '@nipopeto/runtime';
+import { acceptsCredential, credential, serviceOrigin } from '@nipopeto/runtime';
 import { serviceProxy } from './serviceProxy.js';
 import { allows, deniedMessage } from '@nipopeto/contracts';
 import { createAuthRouter } from '../routes/auth.js';
@@ -87,17 +86,7 @@ export function createCoreApp(
     (!jwt?.privateKey || !config.clinicToken || config.clinicToken.length < 32 || config.clinicToken.length > 512)
   )
     throw new Error('SPLIT_CLINIC_CONFIGURATION_REQUIRED');
-  const clinic = config.clinicUrl ? new URL(config.clinicUrl) : null;
-  if (
-    clinic &&
-    (!['http:', 'https:'].includes(clinic.protocol) ||
-      clinic.username ||
-      clinic.password ||
-      clinic.pathname !== '/' ||
-      clinic.search ||
-      clinic.hash)
-  )
-    throw new Error('INVALID_CLINIC_SERVICE_URL');
+  const clinic = config.clinicUrl ? serviceOrigin(config.clinicUrl, 'INVALID_CLINIC_SERVICE_URL') : null;
   mountDashboards(app, db, Boolean(clinic));
   if (clinic) {
     app.use(
@@ -124,32 +113,16 @@ export function createCoreApp(
       config.notificationToken.length > 512)
   )
     throw new Error('SPLIT_NOTIFICATION_CONFIGURATION_REQUIRED');
-  const target = config.notificationUrl ? new URL(config.notificationUrl) : null;
-  if (
-    target &&
-    (!['http:', 'https:'].includes(target.protocol) ||
-      target.username ||
-      target.password ||
-      target.pathname !== '/' ||
-      target.search ||
-      target.hash)
-  )
-    throw new Error('INVALID_NOTIFICATION_SERVICE_URL');
+  const target = config.notificationUrl
+    ? serviceOrigin(config.notificationUrl, 'INVALID_NOTIFICATION_SERVICE_URL')
+    : null;
 
   app.post('/internal/notifications/authorize-send', express.json({ limit: '8kb' }), async (req, res) => {
     if (!config.notificationToken || config.notificationToken.length < 32) {
       res.status(503).json({ error: 'Internal authorization unavailable.' });
       return;
     }
-    const credential = req.headers['x-service-token'];
-    if (
-      typeof credential !== 'string' ||
-      credential.length > 512 ||
-      !timingSafeEqual(
-        createHash('sha256').update(credential).digest(),
-        createHash('sha256').update(config.notificationToken).digest(),
-      )
-    ) {
+    if (!acceptsCredential(req.headers['x-service-token'], config.notificationToken)) {
       res.status(401).json({ error: 'Service authentication required.' });
       return;
     }

@@ -1,5 +1,5 @@
 import { ApiError, type Actor } from './notifications.js';
-import { traceHeaders } from '@nipopeto/runtime';
+import { serviceOrigin, traceHeaders } from '@nipopeto/runtime';
 import { deniedMessage } from '@nipopeto/contracts';
 
 export interface SendAuthorization {
@@ -12,18 +12,8 @@ export class CoreSendAuthorization implements SendAuthorization {
     private readonly credential: string,
     private readonly timeoutMs = 2000,
   ) {
-    this.target = new URL(coreUrl);
-    if (
-      !['http:', 'https:'].includes(this.target.protocol) ||
-      this.target.pathname !== '/' ||
-      this.target.username ||
-      this.target.password ||
-      this.target.search ||
-      this.target.hash ||
-      credential.length < 32 ||
-      credential.length > 512 ||
-      timeoutMs < 1
-    )
+    this.target = serviceOrigin(coreUrl, 'INVALID_CORE_AUTH_CONFIGURATION');
+    if (credential.length < 32 || credential.length > 512 || timeoutMs < 1)
       throw new Error('INVALID_CORE_AUTH_CONFIGURATION');
   }
   async authorize(actor: Actor, recipientOwnerId: string, actorToken: string) {

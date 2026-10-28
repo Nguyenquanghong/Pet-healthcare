@@ -3,10 +3,10 @@ import { PrismaClient } from '@prisma/client';
 import { declareTopology, delay, reconnect, requireBrokerConfig, startWorker } from '@nipopeto/messaging';
 import { OutboxRelay } from './relay.js';
 import { RuntimeOutboxStore } from '../infrastructure/persistence/runtimeOutboxStore.js';
-import { databaseUrl, integer, runtimeEnabled } from '@nipopeto/runtime';
+import { integer, prismaClient } from '@nipopeto/runtime';
 import { HotelPendingExpiryService } from '../application/services/hotelPendingExpiry.js';
 import { PrismaHotelPendingExpiryStore } from '../infrastructure/persistence/hotelPendingExpiryStore.js';
-const db = new PrismaClient(runtimeEnabled() ? { datasourceUrl: databaseUrl() } : undefined);
+const db = prismaClient(PrismaClient);
 await startWorker('core', async signal => {
   try {
     await db.$connect();

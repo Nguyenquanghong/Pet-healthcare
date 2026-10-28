@@ -1,23 +1,18 @@
 import type { Express, Request, Response } from 'express';
 import express from 'express';
-import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Pet, Prisma, PrismaClient } from '@prisma/client';
 import type { Role } from '../domain/auth.js';
 import { issuedBeforePasswordChange, verifyToken } from '../lib/token.js';
 import { ownerDto, petDto } from '../lib/serialize.js';
+import { acceptsCredential } from '@nipopeto/runtime';
 
 export function mountDirectory(app: Express, db: PrismaClient, credential?: string) {
   app.use('/internal/directory', (req, res, next) => {
-    const token = req.headers['x-service-token'];
     if (!credential || credential.length < 32 || credential.length > 512) {
       res.status(503).json({ error: 'Directory authorization unavailable.' });
       return;
     }
-    if (
-      typeof token !== 'string' ||
-      token.length > 512 ||
-      !timingSafeEqual(createHash('sha256').update(token).digest(), createHash('sha256').update(credential).digest())
-    ) {
+    if (!acceptsCredential(req.headers['x-service-token'], credential)) {
       res.status(401).json({ error: 'Service authentication required.' });
       return;
     }

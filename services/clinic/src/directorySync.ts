@@ -1,6 +1,6 @@
 import type { DirectoryEntry } from '@nipopeto/contracts';
 import type { ProjectionEntry } from './inbox.js';
-import { traceHeaders } from '@nipopeto/runtime';
+import { serviceOrigin, traceHeaders } from '@nipopeto/runtime';
 import { TransientError } from '@nipopeto/messaging';
 // P03: Core not answering, or not yet at the event's version, heals with a retry.
 export class DirectorySync {
@@ -9,18 +9,8 @@ export class DirectorySync {
     url: string,
     private readonly token: string,
   ) {
-    this.origin = new URL(url);
-    if (
-      !['http:', 'https:'].includes(this.origin.protocol) ||
-      this.origin.pathname !== '/' ||
-      this.origin.search ||
-      this.origin.hash ||
-      this.origin.username ||
-      this.origin.password ||
-      token.length < 32 ||
-      token.length > 512
-    )
-      throw new Error('INVALID_DIRECTORY_SYNC_CONFIGURATION');
+    this.origin = serviceOrigin(url, 'INVALID_DIRECTORY_SYNC_CONFIGURATION');
+    if (token.length < 32 || token.length > 512) throw new Error('INVALID_DIRECTORY_SYNC_CONFIGURATION');
   }
   async page(kind: string, cursor?: string, id?: string) {
     const url = new URL('/internal/directory/export', this.origin);
