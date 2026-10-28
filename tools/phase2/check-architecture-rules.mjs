@@ -394,7 +394,8 @@ const CLINIC_HTTP_FILES = new Map([
   ['blobStore.ts', 'S3-compatible object storage (not Core)'],
 ]);
 const withoutComments = source => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-const HTTP_CALL = /(?:^|[^\w$])fetch\s*\(|from\s*['"](?:node:)?https?['"]|from\s*['"](?:undici|axios|node-fetch|got)['"]/;
+// A call to fetch, any reference to globalThis.fetch, or a static, dynamic or required import of an HTTP/socket client module.
+const HTTP_CALL = /(?:^|[^\w$])fetch\s*\(|\bglobalThis\s*(?:\.\s*fetch\b|\[\s*['"]fetch['"])|\b(?:from|import|require)\s*\(?\s*['"](?:(?:node:)?(?:https?|http2|net|tls)|undici|axios|node-fetch|got)['"]/;
 export function unconfinedHttpCalls(modules, allowed = CLINIC_HTTP_FILES) {
   return modules.filter(m => !allowed.has(m.file) && HTTP_CALL.test(withoutComments(m.source))).map(m => m.file);
 }
@@ -412,7 +413,21 @@ rule('clinic-core-calls-confined', () => {
   assert.deepEqual(at('application/services/x.ts', 'await globalThis.fetch(url)'), ['application/services/x.ts']);
   assert.deepEqual(at('x.ts', "import { request } from 'node:https';"), ['x.ts']);
   assert.deepEqual(at('x.ts', "import axios from 'axios';"), ['x.ts']);
+  for (const source of [
+    "import { connect } from 'node:net';",
+    "import tls from 'tls';",
+    "import { connect } from 'node:http2';",
+    "import { request } from 'undici';",
+    "const net = await import('node:net');",
+    "const tls = require('node:tls');",
+    "import 'node:net';",
+    'const get = globalThis.fetch;',
+    "const get = globalThis['fetch'];",
+  ])
+    assert.deepEqual(at('x.ts', source), ['x.ts'], source);
   assert.deepEqual(at('directory.ts', 'await fetch(url)'), []);
+  assert.deepEqual(at('x.ts', "import { netmask } from './net.js'; const text = 'node:net'; const a = globalThis.fetchedAt;"), []);
+  assert.deepEqual(at('x.ts', '// import net from "node:net"' + String.fromCharCode(10) + '/* globalThis.fetch */'), []);
   assert.deepEqual(at('x.ts', '// fetch(url) is what directory.ts does' + String.fromCharCode(10) + '/* fetch(url) */' + String.fromCharCode(10) + 'const fetched = refetch(url);'), []);
   assert.deepEqual(at('x.ts', "const a = 'http://x'; // fetch(a)"), []);
   return modules.length + ' modules; HTTP only in ' + [...CLINIC_HTTP_FILES.keys()].join(', ');
