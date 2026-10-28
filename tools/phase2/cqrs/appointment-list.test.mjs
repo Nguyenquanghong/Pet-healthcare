@@ -43,19 +43,21 @@ function matches(row,where){
     return value===condition;
   });
 }
+// Prisma queries are lazy until the transaction runs them; a thenable keeps the call order honest for both transaction forms.
+const lazy=methods=>Object.fromEntries(Object.entries(methods).map(([name,fn])=>[name,query=>({then:(resolve,reject)=>fn(query).then(resolve,reject)})]));
 function fixture(input=rows){
   const calls=[],lookups=[];
-  const tx={appointment:{
+  const tx={appointment:lazy({
     groupBy:async query=>{calls.push(['groupBy',query]);const counts={};for(const row of input.filter(r=>matches(r,query.where)))counts[row.status]=(counts[row.status]??0)+1;return Object.entries(counts).map(([status,_count])=>({status,_count}));},
     count:async query=>{calls.push(['count',query]);return input.filter(r=>matches(r,query.where)).length;},
     findMany:async query=>{calls.push(['findMany',query]);return input.filter(r=>matches(r,query.where)).sort((a,b)=>{
       for(const order of query.orderBy){const [key,direction]=Object.entries(order)[0];const x=key==='status'?statuses.indexOf(a[key]):a[key],y=key==='status'?statuses.indexOf(b[key]):b[key];if(x<y)return direction==='asc'?-1:1;if(x>y)return direction==='asc'?1:-1;}return 0;
     }).slice(query.skip,query.skip+query.take).map(({reservations,...row})=>row);},
-  },directoryProjection:{
+  }),directoryProjection:lazy({
     findMany:async query=>{calls.push(['directorySearch',query]);return projections.filter(row=>matches(row,query.where)).map(row=>Object.fromEntries(Object.keys(query.select).map(key=>[key,row[key]])));},
     findUnique:async query=>{calls.push(['directoryVersion',query]);return{sourceVersion:3,deletedAt:query.where.kind_id.id==='pet-c'?new Date():null};},
-  }};
-  const db={$transaction:async(work,options)=>{calls.push(['transaction',options]);return work(tx);}};
+  })};
+  const db={appointment:tx.appointment,directoryProjection:tx.directoryProjection,$transaction:async(work,options)=>{calls.push(['transaction',options]);return Array.isArray(work)?Promise.all(work):work(tx);}};
   const directory={lookup:async(petIds,ownerIds)=>{lookups.push({petIds,ownerIds});return{pets:pets.filter(p=>petIds.includes(p.id)),owners:[ownerA,ownerB].filter(o=>ownerIds.includes(o.id))};},pet:async id=>pets.find(p=>p.id===id)};
   return{db,calls,directory,lookups};
 }
