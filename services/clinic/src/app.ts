@@ -6,7 +6,7 @@ import type { MedicalRecordValue } from './application/ports/medicalRecords.js';
 import { authorize } from './domain/authorization.js';
 import { imageRetentionMs } from './blobCleanup.js';
 import { objectInput,calendarDate,requiredText } from './domain/validation.js';
-import { CoreDirectory, RequestDirectory } from './directory.js';
+import { CoreDirectory, RequestDirectory, DeferredDirectory, failClosed } from './directory.js';
 import { AppointmentService } from './application/services/appointments.js';
 import { MedicalRecordsService,medicalFields } from './application/services/medicalRecords.js';
 import { appointmentTypes } from './application/ports/appointments.js';
@@ -61,6 +61,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   router.use((req,res,next)=>{if(!verify||!source){res.status(503).json({error:'Clinic authentication or directory is not configured.'});return;}const bearer=req.headers.authorization;if(!bearer?.startsWith('Bearer ')||bearer.length>8192){res.status(401).json({error:'Authentication required.'});return;}try{res.locals.actor=requestActor(req,verify);next();}catch{res.status(401).json({error:'Invalid or expired token.'});}});
   router.use(express.json({limit:'8mb'}));
   router.use((req,_res,next)=>{if(req.path==='/dashboard/clinic/activity')authorize(_res.locals.actor,'clinic-activity.read');next();});
+  const deferredReads=new Set(['/appointments','/medical-records','/medical-records/images']);
   router.use(async(req,res,next)=>{
     const actor=res.locals.actor as Actor;
     if(req.path.startsWith('/medical-records')&&req.method!=='GET')authorize(actor,'medical-record.write');
@@ -81,7 +82,10 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
       }
       if(!row)throw new BusinessError(404,'Clinic resource not found.');add(row.petId);
     }
-    const token=req.headers.authorization!.slice(7),snapshot=await source!.request(actor,token,{petIds:[...new Set(petIds)],...(req.body?.doctorId?{doctorId:req.body.doctorId}:{})});
+    const token=req.headers.authorization!.slice(7);
+    // Deferred authorization: these list GETs query first and ask Core once afterwards (authorizedRead). Every other route, and any state but a closed breaker, asks Core before touching the database.
+    if(req.method==='GET'&&deferredReads.has(req.path)&&source!.breaker?.state==='closed'){const directory=new DeferredDirectory(source!,actor,token,[...new Set(petIds)]);failClosed(res,directory);res.locals.directory=directory;next();return;}
+    const snapshot=await source!.request(actor,token,{petIds:[...new Set(petIds)],...(req.body?.doctorId?{doctorId:req.body.doctorId}:{})});
     res.locals.directory=new RequestDirectory(source!,actor,token,snapshot);next();
   });
   const appointment=(res:express.Response,bound?:Parameters<typeof appointmentDependencies>[2])=>new AppointmentService(appointmentDependencies(db,res.locals.directory,bound),new BookingLifecycleService(new Lifecycle(db,res.locals.directory,bound)));
@@ -94,16 +98,23 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
     const versions=tokens?.verify(header,res.locals.actor)??{};
     const consistency=req.headers['x-clinic-read-consistency'];
     if(consistency!==undefined&&consistency!=='authoritative')throw new BusinessError(422,'Invalid Clinic read consistency.');
-    if(serving){const result=await serving.read(run,versions,consistency==='authoritative'||req.query.mode==='unbilled');res.setHeader('X-Clinic-Read-Source',result.source);if(result.generation)res.setHeader('X-Clinic-Projection-Generation',result.generation);if(result.degraded)res.setHeader('X-Service-Degraded','clinic-read');res.json(result.data);}
-    else{res.setHeader('X-Clinic-Read-Source','authoritative');res.json(await run(appointmentQueries));}
+    if(serving){const result=await serving.read(run,versions,consistency==='authoritative'||req.query.mode==='unbilled');res.setHeader('X-Clinic-Read-Source',result.source);if(result.generation)res.setHeader('X-Clinic-Projection-Generation',result.generation);if(result.degraded)res.setHeader('X-Service-Degraded','clinic-read');return result.data;}
+    res.setHeader('X-Clinic-Read-Source','authoritative');return await run(appointmentQueries);
   });
+  // A deferred list answers only after Core authorized the request; a Core refusal (401/403/503) outranks a local error.
+  const authorizedRead=async(res:express.Response,compute:()=>Promise<unknown>)=>{
+    const directory=res.locals.directory,settle=()=>directory instanceof DeferredDirectory?directory.settle():undefined;
+    let body:unknown;
+    try{body=await compute();}catch(error){await settle();throw error;}
+    await settle();res.json(body);
+  };
   const sendMutation=(res:express.Response,result:{response:unknown;versions:ReadVersions},status=200)=>{
     res.setHeader('Cache-Control','no-store');
     if(tokens&&Object.keys(result.versions).length)res.setHeader('X-Clinic-Read-Token',tokens.issue(res.locals.actor,result.versions));
     res.status(status).json(result.response);
   };
-  router.get('/appointments',async(req,res)=>read(req,res,reader=>reader.list(res.locals.actor,res.locals.directory,req.query)));
-  router.get('/appointments/calendar',async(req,res)=>read(req,res,reader=>reader.calendar(res.locals.actor,{month:req.query.month,category:req.query.category})));
+  router.get('/appointments',async(req,res)=>authorizedRead(res,()=>read(req,res,reader=>reader.list(res.locals.actor,res.locals.directory,req.query))));
+  router.get('/appointments/calendar',async(req,res)=>res.json(await read(req,res,reader=>reader.calendar(res.locals.actor,{month:req.query.month,category:req.query.category}))));
   router.get('/appointments/availability',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await appointment(res).availability(res.locals.actor,req.query));});
   router.post('/appointments',async(req,res)=>{
     const result=await deduplicated(db,res.locals.actor.sub,'appointment.create',req.headers['idempotency-key'],normalizeCreate(req.body,false),async tx=>{const row=await appointment(res,tx).create(res.locals.actor,req.body);return{resourceId:row.id,appointmentId:row.id,response:{appointment:appointmentDto(row,res.locals.actor)}};},true);sendMutation(res,result as {response:unknown;versions:ReadVersions},201);
@@ -117,12 +128,12 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   router.get('/appointments/:id/status-history',async(req,res)=>res.json(await appointment(res).history(res.locals.actor,req.params.id)));
   router.post('/appointments/:id/undo-status',async(req,res)=>change(req,res,'undoStatus'));
   router.post('/appointments/:id/reminder',async(req,res)=>{await appointment(res).sendReminder(res.locals.actor,req.params.id);res.status(201).json({message:'Reminder request accepted.'});});
-  router.get('/medical-records',async(req,res)=>res.json(await list(db,'medicalRecords',res.locals.actor,res.locals.directory,req.query)));
+  router.get('/medical-records',async(req,res)=>authorizedRead(res,()=>list(db,'medicalRecords',res.locals.actor,res.locals.directory,req.query)));
   router.post('/medical-records',async(req,res)=>{const result=await deduplicated(db,res.locals.actor.sub,'medical-record.create',req.headers['idempotency-key'],normalizeCreate(req.body,true),async tx=>{const row=await medical(res,tx).create(res.locals.actor,req.body);return{resourceId:row.id,appointmentId:row.appointmentId,response:{record:medicalRecordDto(row)}};},true);sendMutation(res,result as {response:unknown;versions:ReadVersions},201);});
   router.patch('/medical-records/:id',async(req,res)=>res.json({record:medicalRecordDto(await medicalMutation(db,req.params.id,tx=>medical(res,tx).update(res.locals.actor,req.params.id,req.body??{})))}));
   router.delete('/medical-records/:id',async(req,res)=>{await medicalMutation(db,req.params.id,tx=>medical(res,tx).delete(res.locals.actor,req.params.id,req.query.expectedRevision));res.status(204).end();});
   router.get('/medical-records/:id/history',async(req,res)=>res.json({items:await medical(res).history(res.locals.actor,req.params.id)}));
-  router.get('/medical-records/images',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await list(db,'medicalImages',res.locals.actor,res.locals.directory,req.query,blobs));});
+  router.get('/medical-records/images',async(req,res)=>{res.setHeader('Cache-Control','no-store');await authorizedRead(res,()=>list(db,'medicalImages',res.locals.actor,res.locals.directory,req.query,blobs));});
   router.post('/medical-records/images',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.status(201).json({image:await medical(res).createImage(res.locals.actor,req.body)});});
   router.delete('/medical-records/images/:id',async(req,res)=>{await medical(res).deleteImage(res.locals.actor,req.params.id);res.status(204).end();});
   router.post('/medical-records/images/:id/restore',async(req,res)=>{await medical(res).restoreImage(res.locals.actor,req.params.id);res.status(204).end();});
@@ -142,7 +153,8 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   app.use('/api',router);
   app.use((_req,res)=>res.status(404).json({error:'Clinic route not found.'}));
   // A stale medical record edit returns the stored record, so the editor can keep its draft and show what changed.
-  const errors:ErrorRequestHandler=(error,_req,res,_next)=>{if(res.headersSent){res.end();return;}if(error instanceof BusinessError){if(error.status===503)res.setHeader('Retry-After','1');res.status(error.status).json({error:error.message,...(error.code?{code:error.code}:{}),...(error instanceof StaleRevision?{current:medicalRecordDto(error.current as MedicalRecordValue)}:{})});}else if(error?.type==='entity.parse.failed')res.status(400).json({error:'Invalid JSON.'});else if(error?.type==='entity.too.large')res.status(413).json({error:'Request too large.'});else if(error?.code==='P2025')res.status(404).json({error:'Clinic resource not found.'});else res.status(503).json({error:'Clinic unavailable. Retry the same request key.'});};app.use(errors);return app;
+  // A deferred read that fails before Core was asked still owes the caller Core's answer: settle first, and a refusal replaces the local error.
+  const errors:ErrorRequestHandler=async(error,_req,res,_next)=>{const directory=res.locals.directory;if(directory instanceof DeferredDirectory&&!directory.settled)try{await directory.settle();}catch(refusal){error=refusal;}if(res.headersSent){res.end();return;}if(error instanceof BusinessError){if(error.status===503)res.setHeader('Retry-After','1');res.status(error.status).json({error:error.message,...(error.code?{code:error.code}:{}),...(error instanceof StaleRevision?{current:medicalRecordDto(error.current as MedicalRecordValue)}:{})});}else if(error?.type==='entity.parse.failed')res.status(400).json({error:'Invalid JSON.'});else if(error?.type==='entity.too.large')res.status(413).json({error:'Request too large.'});else if(error?.code==='P2025')res.status(404).json({error:'Clinic resource not found.'});else res.status(503).json({error:'Clinic unavailable. Retry the same request key.'});};app.use(errors);return app;
 }
 // Hash only fields the use case consumes, with its defaults/trim semantics.
 function normalizeCreate(input:Record<string,unknown>,record:boolean){

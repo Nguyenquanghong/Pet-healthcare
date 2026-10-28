@@ -14,7 +14,7 @@ type CalendarDatabase = { appointment: Pick<PrismaClient['appointment'], 'groupB
 const spa = ['spa_bath', 'spa_grooming', 'spa_combo'] as const;
 
 export class AuthoritativeAppointmentQueries implements AppointmentQueries {
-  constructor(private readonly db: CalendarDatabase & Pick<PrismaClient, '$transaction'>) {}
+  constructor(private readonly db: CalendarDatabase & Pick<PrismaClient, '$transaction' | 'appointment' | 'directoryProjection'>) {}
 
   list(actor: Actor, directory: AppointmentQueryDirectory, raw: Record<string, unknown>): Promise<AppointmentListResult> {
     return list(this.db, 'appointments', actor, directory, raw);

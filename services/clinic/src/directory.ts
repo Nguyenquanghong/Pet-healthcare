@@ -1,8 +1,10 @@
+import type { Response } from 'express';
 import type { Actor } from './domain/auth.js';
 import { BusinessError } from './domain/error.js';
 import {createHash,timingSafeEqual} from 'node:crypto';
 import { traceHeaders, CircuitBreaker, integer } from '@nipopeto/runtime';
 import type { PetSnapshot, OwnerSnapshot, DirectorySnapshot, DirectoryLookup } from './application/ports/directory.js';
+import type { AppointmentQueryDirectory } from './application/ports/appointmentQueries.js';
 export type { PetSnapshot, OwnerSnapshot, DirectorySnapshot } from './application/ports/directory.js';
 // Core answered (a business refusal); the dependency is healthy for the breaker.
 class CoreResponded extends Error {}
@@ -66,4 +68,33 @@ export class RequestDirectory implements DirectoryLookup {
     const owners=[...new Set([...wantedOwners,...pets.map(p=>p.ownerId)])].map(id=>this.owners.get(id)!);
     return{actor:this.snapshot.actor,pets,owners};
   }
+}
+// Deferred authorization for list GETs: the query runs first, then Core is asked once for the
+// initial pet plus the page's pets and owners (one memoized authorize). Core's answer still
+// outranks everything: authorizedRead (app.ts) calls settle() before it sends or rethrows.
+export class DeferredDirectory implements AppointmentQueryDirectory {
+  private opened?:Promise<RequestDirectory>;
+  private answered=false;
+  constructor(private readonly source:CoreDirectory,readonly actor:Actor,readonly token:string,private readonly initialPetIds:string[]){}
+  // True once Core authorized this request; a response may only be sent after that.
+  get settled(){return this.answered;}
+  private open(petIds:string[]=[],ownerIds:string[]=[]){
+    return this.opened??=this.source.request(this.actor,this.token,{petIds:[...new Set([...this.initialPetIds,...petIds])],ownerIds:[...new Set(ownerIds)]}).then(snapshot=>{this.answered=true;return new RequestDirectory(this.source,this.actor,this.token,snapshot);});
+  }
+  async pet(id:string){return (await this.open()).pet(id);}
+  async lookup(petIds:string[],ownerIds:string[]):Promise<DirectorySnapshot>{
+    // Over Core's 100-id limit: authorize the initial pet alone, then let lookup fetch the rest.
+    const fits=new Set([...this.initialPetIds,...petIds]).size<=100&&new Set(ownerIds).size<=100;
+    return (await (fits?this.open(petIds,ownerIds):this.open())).lookup(petIds,ownerIds);
+  }
+  async settle(){await this.open();}
+}
+// Fail closed: a deferred route never sends a 2xx before Core authorized the request. If a handler
+// skips authorizedRead, its answer becomes a 503.
+export function failClosed(res:Response,directory:{readonly settled:boolean}){
+  const send=res.send.bind(res);
+  res.send=((body?:unknown)=>{
+    if(res.statusCode<300&&!directory.settled){res.status(503).setHeader('Retry-After','1');res.type('json');return send(JSON.stringify({error:'Core directory unavailable. Retry the same request key.'}));}
+    return send(body);
+  }) as typeof res.send;
 }

@@ -309,6 +309,22 @@ test('AQ-05 password change revokes earlier sessions on Core and on direct Clini
   await sleep(1100);const fresh=signToken(id,'staff');
   for(const base of [coreUrl,bases[0]])status(await request('/api/appointments?pageSize=1',{base,token:fresh}),200);
 });
+test('AQ-05 deferred list authorization: a revoked token gets 401 from every list on an empty page, with or without petId; an owner cannot name another owner\'s pet (403)',async()=>{
+  // The lists query first and ask Core once afterwards; the answer must still be Core's, never an empty page.
+  const id=randomUUID();await core.user.create({data:{id,role:'staff',fullName:'AQ-05 deferred staff '+run,passwordHash:'fixture',passwordSalt:'fixture'}});
+  const old=signToken(id,'staff'),iat=JSON.parse(Buffer.from(old.split('.')[1],'base64url').toString()).iat,empty='?q=aq05-nomatch-'+run;
+  const lists=['/api/appointments','/api/medical-records','/api/medical-records/images'];
+  for(const base of [coreUrl,bases[0],bases[1]])for(const path of lists){status(await request(path+empty,{base,token:old}),200);status(await request(path+'?petId='+pet.id,{base,token:old}),200);}
+  await core.user.update({where:{id},data:{passwordChangedAt:new Date((iat+1)*1000)}});
+  for(const base of [coreUrl,bases[0],bases[1]])for(const path of lists)for(const query of [empty,'?petId='+pet.id,'','?pageSize=0']){
+    const r=await request(path+query,{base,token:old});assert.equal(r.status,401,base+path+query+' '+JSON.stringify(r.body));assert.match(r.body.error,/password was changed/i);assert.ok(!('items' in r.body)&&!('related' in r.body),'nothing from the query is returned');
+  }
+  // Owner A names owner B's pet: Core refuses (403), also when the page would have been empty.
+  for(const base of [coreUrl,bases[0],bases[1]])for(const path of lists)for(const query of ['?petId='+otherPet.id,'?petId='+otherPet.id+'&pageSize=0']){
+    const r=await request(path+query,{base,token:tokens.owner});assert.equal(r.status,403,base+path+query+' '+JSON.stringify(r.body));
+  }
+  for(const path of lists)status(await request(path+'?petId='+pet.id,{base:bases[0],token:tokens.other}),403);
+});
 test('P01: allowedActions in Clinic responses follow the role, and the server accepts each listed move',async()=>{
   const p=await core.pet.create({data:{ownerId:owner,name:'P01 pet '+run,species:'dog',allergies:[]}});
   const actions=a=>a.allowedActions.map(x=>x.kind+(x.to?':'+x.to:'')+(x.name?'@'+x.name:''));

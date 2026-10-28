@@ -16,6 +16,9 @@
 //  7. Every notification type Core/Clinic/Notification send has an inbox tab in
 //     @nipopeto/contracts, every listed type is really sent, and the OpenAPI tab
 //     enums (gateway and Notification service) equal the contract's tabs.
+//  8. Booking lifecycle rules come from one table in @nipopeto/contracts (P01).
+//  9. Clinic's deferred list reads (authorized after their query) are GET handlers
+//     that answer through authorizedRead, and the gate only opens for GET.
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -319,6 +322,42 @@ const lifecycleCheck=(existsSync(built)?import(pathToFileURL(built).href):Promis
     return LIFECYCLE_SERVICES.length+' services, '+checked+' SQL predicates';
   }),error=>rule('lifecycle-from-table',()=>{throw error;}));
 
+// ---- 9. Deferred list reads answer through authorizedRead (B) -------------------
+// A path in Clinic's `deferredReads` is authorized by Core only after its query ran.
+// That is safe because authorizedRead settles (and lets a Core refusal win) before
+// it answers, so every deferred path must be a GET handled through it, and the gate
+// that skips the up-front authorize must require GET.
+export function deferredReadViolations(source){
+  const found=[],declared=source.match(/\bconst deferredReads\s*=\s*new Set\(\s*\[([^\]]*)\]\s*\)/);
+  if(!declared)return ['no deferredReads set'];
+  const paths=[...declared[1].matchAll(/'([^']+)'/g)].map(m=>m[1]);
+  if(!paths.length)found.push('deferredReads is empty');
+  if(!/req\.method\s*===\s*'GET'\s*&&\s*deferredReads\.has\(/.test(source))found.push('the deferred gate does not require GET');
+  for(const path of paths){
+    const marker=`router.get('${path}',`,start=source.indexOf(marker);
+    if(start<0){found.push(path+': no router.get handler');continue;}
+    const rest=source.slice(start+marker.length),end=rest.search(/\r?\n\s*(router|app)\./),handler=end<0?rest:rest.slice(0,end);
+    if(!/\bauthorizedRead\(/.test(handler))found.push(path+': GET handler does not use authorizedRead');
+  }
+  return found;
+}
+rule('deferred-reads-via-authorized-read',()=>{
+  const source=read('services/clinic/src/app.ts'),bad=deferredReadViolations(source);
+  assert.deepEqual(bad,[],'deferred list reads without authorizedRead: '+bad.join('; '));
+  const paths=[...source.match(/\bconst deferredReads\s*=\s*new Set\(\s*\[([^\]]*)\]\s*\)/)[1].matchAll(/'([^']+)'/g)].length;
+  // negative fixtures
+  const gate="if(req.method==='GET'&&deferredReads.has(req.path)&&source.breaker.state==='closed'){next();}";
+  const good=`const deferredReads=new Set(['/a']);${gate}\nrouter.get('/a',async(req,res)=>authorizedRead(res,()=>list()));\nrouter.get('/b',async(req,res)=>res.json(1));`;
+  assert.deepEqual(deferredReadViolations(good),[]);
+  assert.deepEqual(deferredReadViolations(good.replace('authorizedRead(res,()=>list())','res.json(await list())')),['/a: GET handler does not use authorizedRead']);
+  assert.deepEqual(deferredReadViolations(good.replace("new Set(['/a'])","new Set(['/a','/c'])")),['/c: no router.get handler']);
+  assert.deepEqual(deferredReadViolations(good.replace("router.get('/a'","router.post('/a'")),['/a: no router.get handler']);
+  assert.deepEqual(deferredReadViolations(good.replace("req.method==='GET'&&","")),['the deferred gate does not require GET']);
+  assert.deepEqual(deferredReadViolations(good.replace('const deferredReads','const eagerReads')),['no deferredReads set']);
+  assert.deepEqual(deferredReadViolations(good.replace("router.get('/a',async(req,res)=>authorizedRead(res,()=>list()));\nrouter.get('/b',async(req,res)=>res.json(1));","router.get('/a',async(req,res)=>res.json(1));\nrouter.get('/b',async(req,res)=>authorizedRead(res,()=>list()));")),['/a: GET handler does not use authorizedRead'],'authorizedRead on the next route does not count');
+  return paths+' deferred paths, all GET via authorizedRead';
+});
+
 await envelopeCheck;
 await lifecycleCheck;
 await grantsCheck;
@@ -328,4 +367,4 @@ await categoryCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, negative fixtures.\n');
+else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, negative fixtures.\n');
