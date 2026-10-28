@@ -12,6 +12,10 @@ from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 sys.path.insert(0, str(Path(__file__).parent))
 import cqrs_source as source
 
+# make_bundle packs the Q6 review tree and refuses any HEAD but the baseline; on later commits (and on
+# main after be2267b removed the CQRS sources) the suite can only run from a checkout of BASELINE.
+HEAD = source.git(source.REPO, 'rev-parse', 'HEAD').decode().strip()
+
 
 def write_zip(path, payload):
     with ZipFile(path, 'x', ZIP_DEFLATED) as archive:
@@ -21,6 +25,7 @@ def write_zip(path, payload):
             archive.writestr(entry, data)
 
 
+@unittest.skipIf(HEAD != source.BASELINE, f'needs a checkout of the Q6 baseline {source.BASELINE[:7]}; HEAD is {HEAD[:7]}')
 class SourceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
