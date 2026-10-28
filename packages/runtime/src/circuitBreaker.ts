@@ -12,6 +12,19 @@ export class CircuitOpenError extends Error {
   }
 }
 
+// Every breaker registers itself so the /metrics exporter can read its state (pet_circuit_*).
+// Weak references: a breaker nobody uses any more drops out of the report.
+const registry = new Set<WeakRef<CircuitBreaker>>();
+export function circuitBreakers(): CircuitBreaker[] {
+  const live: CircuitBreaker[] = [];
+  for (const ref of registry) {
+    const breaker = ref.deref();
+    if (breaker) live.push(breaker);
+    else registry.delete(ref);
+  }
+  return live;
+}
+
 export class CircuitBreaker {
   private current: CircuitState = 'closed';
   private failures = 0;
@@ -36,6 +49,7 @@ export class CircuitBreaker {
       openMs < 1
     )
       throw new Error('INVALID_CIRCUIT_BREAKER');
+    registry.add(new WeakRef(this));
   }
 
   get state(): CircuitState {

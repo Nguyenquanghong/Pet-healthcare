@@ -59,6 +59,8 @@ const read = path => readFileSync(resolve(root, path), 'utf8');
     "gauge('dlq_ready', 1); gauge('queue_ready', 1); lines.push(`pet_http_duration_seconds_count{${labels}} ${n}`); lines.push(`pet_${name}{${label}} 1`);",
   ]);
   assert.deepEqual([...exported].sort(), ['pet_dlq_ready', 'pet_http_duration_seconds_count', 'pet_queue_ready']);
+  // Per-target breaker series carry an extra label, so they are written out like the histogram.
+  assert.ok(exportedMetrics(['lines.push(`pet_circuit_open{${label},target="${target}"} ${c.open}`)']).has('pet_circuit_open'));
   const rule = (metric, condition = `${metric} > 0`) => ({ name: 'Rule' + metric, metric, service: ['clinic'], condition, threshold: 0, for: '1m', why: 'x' });
   const check = (...rules) => problems({ rules }, exported);
   assert.deepEqual(check(rule('pet_dlq_ready')), []);

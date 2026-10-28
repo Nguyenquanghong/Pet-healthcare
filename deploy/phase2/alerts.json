@@ -74,7 +74,7 @@
       "condition": "sum by (service) (rate(pet_http_duration_seconds_count{status=~\"5..\"}[5m])) / sum by (service) (rate(pet_http_duration_seconds_count[5m])) > 0.05",
       "threshold": 0.05,
       "for": "5m",
-      "why": "More than 1 in 20 responses failing for 5 min is a user-visible outage at any scale. Core answers 503 while a gateway circuit breaker to Clinic or Notification is open, so this rule is also the only alert for an open breaker (see 'gaps')."
+      "why": "More than 1 in 20 responses failing for 5 min is a user-visible outage at any scale. Core answers 503 while a gateway circuit breaker to Clinic or Notification is open; CircuitOpen names the breaker."
     },
     {
       "name": "HttpLatencyP95High",
@@ -104,6 +104,15 @@
       "why": "A broker outage does not make the API unready, because events wait in the outbox. It is a warning rather than an outage; OutboxLagHigh and OutboxPendingHigh fire next if it lasts."
     },
     {
+      "name": "CircuitOpen",
+      "metric": "pet_circuit_open",
+      "service": ["core", "clinic"],
+      "condition": "pet_circuit_open > 0",
+      "threshold": 0,
+      "for": "1m",
+      "why": "1 while a circuit breaker is open or half-open, labelled with its target: clinic-gateway and notification-gateway on core, core-directory on clinic. A breaker opens after 5 consecutive dependency failures and probes again every 5 s, so a value that holds for a minute means the probes keep failing: the dependency is down, not blipping. It returns to 0 after the first successful call, so it can stay 1 on a quiet system until the next request. pet_circuit_opened_total and pet_circuit_rejected_total show how often it opened and how many calls it refused."
+    },
+    {
       "name": "DatabaseLockWaits",
       "metric": "pet_db_lock_waits",
       "service": ["core", "clinic", "notification"],
@@ -113,10 +122,5 @@
       "why": "Counts sessions of the service's own database role waiting on a lock. A few are normal; more than 5 for 2 min is a pile-up, for example behind an ACCESS EXCLUSIVE lock held by a migration (deploy/phase2/migration-a-runbook.md)."
     }
   ],
-  "gaps": [
-    {
-      "signal": "circuit breaker state",
-      "why": "CircuitBreaker keeps its state and opened/rejected counters in memory (packages/runtime/src/circuitBreaker.ts) and logs CIRCUIT_OPEN, CIRCUIT_HALF_OPEN and CIRCUIT_CLOSED to stderr, but nothing exports them in /metrics, so no metric rule can be written. Until a gauge is added through the runtime 'extras' option, Http5xxRatioHigh on core and a log search for CIRCUIT_OPEN are the only signals."
-    }
-  ]
+  "gaps": []
 }
