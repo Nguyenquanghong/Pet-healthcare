@@ -4,15 +4,15 @@ import { useSession } from "../store/SessionContext";
 import { useDataRefresh, queryScopes } from "../store/DataRefreshContext";
 import {ApiError} from '../utils/apiError';
 
-export type QueryOptions = { enabled?: boolean; debounceMs?: number; refreshOnTick?: boolean; pollMs?: number; consistency?: 'authoritative'; clearOnAuthError?: boolean };
+export type QueryOptions = { enabled?: boolean; debounceMs?: number; refreshOnTick?: boolean; pollMs?: number; clearOnAuthError?: boolean };
 type QueryState<T> = { key: string; data: T | undefined; loading: boolean; error: string; asOf?: string };
 
 // One request lifecycle for lists and detail/aggregate queries; callers own their data.
-export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, refreshOnTick = false, pollMs, consistency, clearOnAuthError = false }: QueryOptions = {}) {
+export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, refreshOnTick = false, pollMs, clearOnAuthError = false }: QueryOptions = {}) {
   const { authRole, sessionKey } = useSession();
   const refresh = useDataRefresh();
   const token = authToken.get();
-  const key = JSON.stringify([url, sessionKey, authRole, enabled, consistency, clearOnAuthError]);
+  const key = JSON.stringify([url, sessionKey, authRole, enabled, clearOnAuthError]);
   const [state, setState] = useState<QueryState<T>>({ key, data: undefined, loading: enabled, error: "" });
   const currentKey = useRef(key); currentKey.current = key;
   const mounted = useRef(false);
@@ -32,7 +32,7 @@ export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, re
       loading: previous.key !== key || previous.data === undefined, error: "" }));
     const promise = (async () => {
       try {
-        const result = await apiClient.get<T>(url, { signal: AbortSignal.any([active.signal, AbortSignal.timeout(15_000)]), ...(consistency ? {headers:{'X-Clinic-Read-Consistency':consistency}} : {}) });
+        const result = await apiClient.get<T>(url, { signal: AbortSignal.any([active.signal, AbortSignal.timeout(15_000)]) });
         if (!isCurrent() || active.signal.aborted) return undefined;
         setState({ key, data: result, loading: false, error: "", asOf: new Date().toISOString() });
         return result;
@@ -49,7 +49,7 @@ export function useApiQuery<T>(url: string, { enabled = true, debounceMs = 0, re
     })();
     flight.current = { key, sequence: request, promise };
     return promise;
-  }, [url, enabled, key, token, consistency, clearOnAuthError]);
+  }, [url, enabled, key, token, clearOnAuthError]);
 
   const reload = useCallback(() => {
     if (!mounted.current || key !== currentKey.current || token !== authToken.get()) return Promise.resolve(undefined);

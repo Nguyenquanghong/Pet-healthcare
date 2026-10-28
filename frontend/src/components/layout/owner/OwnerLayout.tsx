@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { OwnerSidebar } from "./OwnerSidebar";
 import { OwnerTopbar } from "./OwnerTopbar";
 import { useAppStore } from "../../../store/AppStoreProvider";
-import {ClinicSavedChanges} from '../../ui/ClinicSavedChanges';
 
 interface OwnerLayoutProps {
   title: string;
@@ -19,7 +18,7 @@ export function OwnerLayout({ title, children }: OwnerLayoutProps) {
         {isLoading && <div className="h-0.5 w-full animate-pulse bg-primary" aria-label="Loading" />}
         <div className="mx-auto flex w-full max-w-[1480px] flex-1 flex-col px-4 pb-24 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pb-6">
           {error && <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>}
-          <ClinicSavedChanges />{children}
+          {children}
         </div>
       </main>
     </div>

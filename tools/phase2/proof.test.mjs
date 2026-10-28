@@ -42,7 +42,7 @@ test.after(async () => {
   try {
     if (channel) {
       // P03: with the retry queues each consumer declared for its delays.
-      const routed = ['routes', 'workers', 'identity'].flatMap(name => { const t = topology(`p2.${name}.${run}`); return topologyQueues(t, [t.clinic, t.clinicRead, t.notification, t.identity]); });
+      const routed = ['routes', 'workers', 'identity'].flatMap(name => { const t = topology(`p2.${name}.${run}`); return topologyQueues(t, [t.clinic, t.notification, t.identity]); });
       for (const q of new Set([...extraQueues, queue, ...brokerQueues(`p2.proof.${run}`), ...routed])) {
         const state = await channel.checkQueue(q);
         if (state.messageCount) retained.push(q); else await channel.deleteQueue(q);

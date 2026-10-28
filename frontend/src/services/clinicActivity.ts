@@ -21,7 +21,7 @@ export function activityUrl(f: ActivityFilters) {
 }
 export function activityDrilldown(date: string, category: ActivityCategory, status?: AppointmentStatus) {
   if (!validActivityDay(date) || !['all','clinic','spa'].includes(category) || status && !activityStatuses.includes(status)) throw new Error('Invalid activity drilldown');
-  const p = new URLSearchParams({activity:'1', date, consistency:'authoritative'});
+  const p = new URLSearchParams({activity:'1', date});
   if (category !== 'all') p.set('category', category === 'clinic' ? 'medical' : 'spa');
   if (status) p.set('status', status);
   return '/admin/appointments?' + p.toString();
@@ -31,7 +31,6 @@ export function readActivityDrilldown(search: string) {
   const date = p.get('date') ?? '', category = p.get('category') ?? 'all', status = p.get('status') ?? 'all';
   const error = active && (!validActivityDay(date) || !['all','medical','spa'].includes(category)
     || status !== 'all' && !activityStatuses.includes(status as AppointmentStatus)
-    || p.get('consistency') !== 'authoritative'
     || [...p.keys()].some(key => p.getAll(key).length !== 1)) ? 'Bộ lọc từ thống kê không hợp lệ. Vui lòng chọn lại ngày trên dashboard.' : '';
   return {active, error, date: active ? date : '', category: (active ? category : 'all') as 'all'|'medical'|'spa', status: active ? status : 'all'};
 }

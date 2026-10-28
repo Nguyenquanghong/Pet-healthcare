@@ -98,7 +98,7 @@ export function AdminAppointmentsPage() {
     setTimeout(() => setToastMsg(""), 3500);
   };
 
-  const list = usePagedList<Appointment>("/appointments", { q: searchQuery, status: filterStatus, category: serviceFilter, date: dateFilter === "today" ? todayStr : dateFilter === "custom" ? customDate : undefined }, !drilldown.error, { pollMs: 5000, consistency:drilldown.active?'authoritative':undefined });
+  const list = usePagedList<Appointment>("/appointments", { q: searchQuery, status: filterStatus, category: serviceFilter, date: dateFilter === "today" ? todayStr : dateFilter === "custom" ? customDate : undefined }, !drilldown.error, { pollMs: 5000 });
   const appointments = list.items, filteredAppointments = appointments, pets = list.related.pets, owners = list.related.owners;
 
   const handleStatusUpdate = (id: string, status: AppointmentStatus) => {

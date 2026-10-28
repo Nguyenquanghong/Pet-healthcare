@@ -28,9 +28,7 @@ const urls={core:'postgresql://p2_core:p2_core_fixture_only@127.0.0.1:55432/p2_c
 const core=new CoreClient({datasourceUrl:urls.core}),clinic=new ClinicClient({datasourceUrl:urls.clinic});
 const notification=new NotificationClient({datasourceUrl:urls.notification});
 const run=randomUUID(),owner=randomUUID(),other=randomUUID(),admin=randomUUID(),credential='p4-test-'+randomUUID();
-const q5Races=process.env.CQRS_Q5_RACES==='1',racePairs=q5Races?JSON.parse(readFileSync('phase2-plan/cqrs/acceptance.json','utf8')).correctness.racePairsPerScenario:2;
-assert.ok(Number.isSafeInteger(racePairs)&&racePairs>=2&&racePairs%2===0);
-const raceEvidence={run,pairs:racePairs,prepareUndo:[],commitAbort:[]};
+const racePairs=2;
 const broker='amqp://p2_test:p2_broker_fixture_only@127.0.0.1:5679',routes=topology('p4.billing.'+run),handles=[],coreBases=[],clinicBases=[];
 const keys=generateKeyPairSync('rsa',{modulusLength:2048}),tokens={},actor={sub:admin,role:'admin'};
 let sourceServer,sourceUrl,sourcePort,pet,remote,billing,connection,channel,declared=false;
@@ -47,7 +45,6 @@ const body=a=>({type:'appointment',relatedId:a.id,subtotal:123456,taxAmount:1234
 async function appointment(type='general_checkup'){
   const p=await core.pet.create({data:{ownerId:owner,name:'P4 '+randomUUID(),species:'dog',allergies:[]}});
   const a=await clinic.appointment.create({data:{petId:p.id,ownerId:owner,type,serviceName:'P4 service '+run,clinicName:'Fixture',appointmentDate:new Date('2026-10-12T00:00:00Z'),appointmentTime:'10:00',status:'completed',statusRevision:1,createdBy:'staff'}});
-  await clinic.clinicReadRevision.create({data:{kind:'appointment',aggregateId:a.id,version:1}});
   await clinic.bookingStatusEvent.create({data:{kind:'appointment',bookingId:a.id,revision:1,action:'transition',fromStatus:'in_progress',toStatus:'completed',actorId:admin,actorName:'Fixture',actorRole:'admin'}});return a;
 }
 async function operation(a){const op=await billing.begin(actor,body(a),randomUUID());await core.appointmentBillingOperation.update({where:{id:op.id},data:{expectedRevision:a.statusRevision}});return billing.read(op.id);}
@@ -68,9 +65,8 @@ test.before(async()=>{
   connection=await amqp.connect(broker);connection.on('error',()=>{});channel=await connection.createChannel();await declareTopology(broker,routes);declared=true;
 });
 test.after(async()=>{
-  if(q5Races){const dir='test-results/phase2/cqrs/q5-billing-'+run;mkdirSync(dir,{recursive:true});writeFileSync(dir+'/races.json',JSON.stringify(raceEvidence,null,2));console.log(JSON.stringify({q5BillingRun:run,prepareUndoPairs:raceEvidence.prepareUndo.length,commitAbortPairs:raceEvidence.commitAbort.length,artifact:dir}));}
   for(const h of handles.reverse())await h.stop();await close(sourceServer);
-  if(channel&&declared&&!q5Races)for(const name of topologyQueues(routes,[routes.notification,routes.identity,routes.clinic])){try{const q=await channel.checkQueue(name);if(q.messageCount===0&&q.consumerCount===0)await channel.deleteQueue(name);}catch{break;}}
+  if(channel&&declared)for(const name of topologyQueues(routes,[routes.notification,routes.identity,routes.clinic])){try{const q=await channel.checkQueue(name);if(q.messageCount===0&&q.consumerCount===0)await channel.deleteQueue(name);}catch{break;}}
   try{await channel?.close();}catch{}try{await connection?.close();}catch{}
   await Promise.all([core.$disconnect(),clinic.$disconnect(),notification.$disconnect()]);
 });
@@ -109,7 +105,6 @@ test('prepare versus real HTTP undo: SQL barriers prove both lock orders on actu
   const b=await appointment(),otherOp=await operation(b);let release,entered;const barrier=new Promise(r=>release=r),acquired=new Promise(r=>entered=r);
   const holding=clinic.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM appointments WHERE id=${b.id} FOR UPDATE`;entered();await barrier;},{timeout:20000});await acquired;
   const wins=undo(b);await lockWait(clinic,'appointments',1);const loses=reservation.prepare(otherOp.id,b.id,b.statusRevision,actor).catch(e=>e);await lockWait(clinic,'appointments',2);release();await holding;status(await wins,200);assert.equal((await loses).status,409);assert.equal(await clinic.appointmentReservation.count({where:{appointmentId:b.id}}),0);
-  raceEvidence.prepareUndo.push({pair:pair*2,winner:'prepare',status:'PASS'},{pair:pair*2+1,winner:'undo',status:'PASS'});
  }
 });
 
@@ -123,7 +118,6 @@ test('commit versus abort under operation lock: both terminal winners, rollback,
     const finalize=action==='commit'?'commit':'release';status(await request('/internal/billing-reservations/'+op.id+'/'+finalize,{base:clinicBases[0],method:'POST',service:credential,token:null,body:{}}),200);
     const r=await clinic.appointmentReservation.findUniqueOrThrow({where:{operationId:op.id}});assert.equal(r.state,action==='commit'?'INVOICED':'RELEASED');
     assert.equal((await billing.terminal(op.id,'commit',s)).state,one.state);
-    raceEvidence.commitAbort.push({pair:pair*2+(action==='commit'?0:1),winner:action,status:'PASS'});
   }
  }
   const a=await appointment(),op=await operation(a),s=await remote.prepare(op,actor);

@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 export * from './permissions.js';
 export * from './notificationCategories.js';
 export * from './bookingLifecycle.js';
-export const eventTypes = ['notification.requested.v1', 'billing.invoice-issued.v1', 'billing.operation-aborted.v1', 'directory.owner-upserted.v1', 'directory.pet-upserted.v1', 'directory.staff-upserted.v1', 'clinic.appointment-read-changed.v1', 'identity.sessions-revoked.v1'] as const;
+export const eventTypes = ['notification.requested.v1', 'billing.invoice-issued.v1', 'billing.operation-aborted.v1', 'directory.owner-upserted.v1', 'directory.pet-upserted.v1', 'directory.staff-upserted.v1', 'identity.sessions-revoked.v1'] as const;
 export type EventType = typeof eventTypes[number];
 // F7: the event types each consumer applies, named one by one. A new type reaches a
 // consumer only once it is listed here and the consumer handles it explicitly.
@@ -12,7 +12,6 @@ export const consumedEvents = {
   notification: ['notification.requested.v1'],
   identity: ['identity.sessions-revoked.v1'],
   clinic: ['directory.owner-upserted.v1', 'directory.pet-upserted.v1', 'directory.staff-upserted.v1', 'billing.invoice-issued.v1', 'billing.operation-aborted.v1'],
-  'clinic-read-v1': ['clinic.appointment-read-changed.v1'],
 } as const satisfies Record<string, readonly EventType[]>;
 export type EventConsumer = keyof typeof consumedEvents;
 // Types that moved to another consumer's queue. The old consumer still applies those
@@ -50,14 +49,6 @@ export function parseEnvelope(raw: string): Envelope {
     || !Number.isSafeInteger(e.aggregateVersion) || e.aggregateVersion < 1 || !Number.isFinite(Date.parse(e.occurredAt))
     || !['eventId', 'aggregateType', 'aggregateId', 'correlationId'].every(k => typeof e[k] === 'string' && e[k].length > 0 && e[k].length <= 128)
     || !e.payload || typeof e.payload !== 'object' || Array.isArray(e.payload)) throw new Error('INVALID_ENVELOPE');
-  if (e.eventType === 'clinic.appointment-read-changed.v1') {
-    const p = e.payload;
-    if (e.producer !== 'clinic' || e.aggregateType !== 'appointment' || e.aggregateVersion > 2147483647
-      || p.appointmentId !== e.aggregateId || p.sourceVersion !== e.aggregateVersion || typeof p.deleted !== 'boolean'
-      || Object.keys(p).length !== 3 || !Object.keys(p).every(k => ['appointmentId','sourceVersion','deleted'].includes(k))
-      || !Object.keys(e).every(k => ['eventId','eventType','schemaVersion','producer','aggregateType','aggregateId','aggregateVersion','occurredAt','correlationId','payload'].includes(k))) throw new Error('INVALID_APPOINTMENT_READ_CHANGE');
-    return e;
-  }
   if (e.eventType.startsWith('directory.')) {
     const p = e.payload;
     if (e.producer !== 'core' || p.id !== e.aggregateId || p.sourceVersion !== e.aggregateVersion

@@ -14,11 +14,8 @@ import {legacyFixture} from './p7-fixture.mjs';
 import {catalogs,sourceNames,digest,readRows} from './p7-manifest.mjs';
 import {seal,exportMigration,buildMigration,inspectMigration,importMigration,validateMigration,assertFrozenSource} from './p7-migration.mjs';
 import {freezeLegacy,rollbackBeforeOpen,targetPermissions,openTarget,pauseTarget,forwardFix,cutoverState} from './p7-cutover.mjs';
-import {initializeAppointmentProjection} from '../../services/clinic/dist/readRevision.js';
-import {AppointmentProjector} from '../../services/clinic/dist/appointmentProjector.js';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test');assertTestProject();
-process.env.CLINIC_READ_PROJECTION='on';// the P7 rehearsal covers the maintained projection (default is off)
 const invocation=randomUUID(),contextFile='test-results/phase2/p7-'+invocation+'-context.json',handles=[],tokens={},ports={},origins={};
 const broker='amqp://p2_test:p2_broker_fixture_only@127.0.0.1:5679',prefix='p7.migration.'+invocation,routes=topology(prefix);
 const keys=generateKeyPairSync('rsa',{modulusLength:2048}),secretNames=['CORE_DIRECTORY_TOKEN','CORE_BILLING_EVIDENCE_TOKEN','CLINIC_BILLING_TOKEN','CLINIC_BOOTSTRAP_TOKEN','CORE_NOTIFICATION_SEND_TOKEN'];
@@ -120,7 +117,6 @@ test('fault rolls back one service import; journaled resume preserves hashes, hi
   const report=await importMigration(ctx,snapshot);assert.ok(Object.values(report.validation).every(r=>r.exact));await importMigration(ctx,snapshot);
   await withDatabase(ctx,'core',async c=>{for(const name of ['Appointment','MedicalRecord','MedicalImage','Notification'])assert.equal((await readRows(c,catalogs.core[name])).length,0);},{admin:true});
   assert.equal(await db.clinic.appointmentReservation.count({where:{state:'INVOICED'}}),2);
-  assert.equal(await db.clinic.clinicReadRevision.count({where:{kind:'appointment',version:1,deleted:false}}),await db.clinic.appointment.count());
   const [seq]=await withDatabase(ctx,'core',c=>c.$queryRaw`SELECT last_value::text AS value FROM runtime.invoice_transfer_code_seq`,{admin:true});assert.ok(BigInt(seq.value)>=9002n);
   const nulls=await db.core.$queryRaw`SELECT id,bank_transfer_details IS NULL AS sql_null,bank_transfer_details='null'::jsonb AS json_null FROM runtime.invoices`;assert.ok(nulls.find(r=>r.id===fixture.invoices[0].id).sql_null);assert.equal(nulls.find(r=>r.id===fixture.invoices[2].id).json_null,true);
   writeFileSync(resolve(artifacts,'migration-report.json'),JSON.stringify(report,null,2));
@@ -155,8 +151,6 @@ test('opening target preserves old invoice/activation contracts and completes a 
   const email='p7_new_'+ctx.run.slice(0,8)+'@example.test';status(await request('/api/auth/owner/register',{method:'POST',token:null,body:{fullName:'P7 newly registered',email,password:fixture.password,confirmPassword:fixture.password}}),201);
   const login=status(await request('/api/auth/owner/login',{method:'POST',token:null,body:{email,password:fixture.password}}),200);newOwner=login.user.id;tokens.new=login.token;
   newPet=status(await request('/api/pets',{method:'POST',token:tokens.new,body:{name:'P7 new pet',species:'cat'}}),201).pet;
-  const [readPrivileges]=await db.clinic.$queryRaw`SELECT has_table_privilege(current_user,'runtime."ClinicReadRevision"','INSERT') AS "canInsert",has_table_privilege(current_user,'runtime."ClinicReadRevision"','DELETE') AS "canDelete",has_table_privilege(current_user,'runtime."ReadProjectionControl"','UPDATE') AS "canSwitch"`;
-  assert.deepEqual(readPrivileges,{canInsert:true,canDelete:false,canSwitch:false});
   const today=new Date(Date.now()+7*3600000).toISOString().slice(0,10);newAppointment=status(await request('/api/appointments',{method:'POST',token:tokens.new,key:randomUUID(),body:{petId:newPet.id,date:today,time:'15:00',type:'general_checkup',serviceName:'P7 fresh visit'}}),201).appointment;
   for(const state of ['confirmed','checked_in'])newAppointment=status(await request('/api/appointments/'+newAppointment.id+'/status',{method:'PATCH',token:tokens.admin,body:{status:state,expectedRevision:newAppointment.statusRevision}}),200).appointment;
   status(await request('/api/medical-records',{method:'POST',token:tokens.admin,key:randomUUID(),body:{petId:newPet.id,appointmentId:newAppointment.id,doctorId:fixture.users.doctor.id,title:'P7 new record',visitDate:today,diagnosis:'Synthetic',treatment:'Synthetic'}}),201);
@@ -195,28 +189,4 @@ test('concurrent pause and forward-fix wait on an actual SQL barrier and leave l
   const [grant]=await db.core.$queryRaw`SELECT has_table_privilege(current_user,'runtime.daily_care_notes','UPDATE') AS writable`;assert.equal(grant.writable,gate.state==='TARGET_OPEN');
   await assert.rejects(()=>rollbackBeforeOpen(ctx),/ROLLBACK_AFTER_OPEN/);await assert.rejects(()=>db.legacy.$executeRaw`UPDATE runtime.daily_care_notes SET note=note`);
   await forwardFix(ctx);await startWorkers();await configureGateway('target',false);await settled();
-});
-
-test('non-owner Clinic projector locks control and commits rows but cannot switch serving mode; pause revokes column grants',async()=>{
-  await configureGateway('target',true);await settled();for(const h of workerHandles.reverse())await h.stop();workerHandles=[];
-  const generation=randomUUID();
-  const [fenceAcl]=await db.clinic.$queryRaw`SELECT has_table_privilege(current_user,'runtime."ReadRebuildRun"','SELECT') AS "canRead",has_table_privilege(current_user,'runtime."ReadRebuildRun"','UPDATE') AS "canWrite"`;
-  assert.deepEqual(fenceAcl,{canRead:true,canWrite:false});
-  await assert.rejects(()=>db.clinic.readRebuildRun.create({data:{id:randomUUID(),generation:randomUUID(),ownerPid:1}}),/permission denied/);
-  await withDatabase(ctx,'clinic',admin=>initializeAppointmentProjection(admin,generation),{admin:true});
-  const changes=await db.clinic.outboxEvent.findMany();
-  const event=changes.map(row=>row.envelope).find(e=>e.eventType==='clinic.appointment-read-changed.v1'&&e.aggregateId===newAppointment.id);
-  assert.ok(event);
-  const projector=new AppointmentProjector(db.clinic);
-  assert.equal(await projector.apply(JSON.stringify(event)),true);
-  const row=await db.clinic.appointmentReadRow.findUniqueOrThrow({where:{generation_appointmentId:{generation,appointmentId:newAppointment.id}}});
-  const revision=await db.clinic.clinicReadRevision.findUniqueOrThrow({where:{kind_aggregateId:{kind:'appointment',aggregateId:newAppointment.id}}});
-  assert.equal(row.sourceVersion,revision.version);assert.equal(row.billingInvoiced,true);
-  await assert.rejects(()=>db.clinic.$executeRaw`UPDATE "ReadProjectionControl" SET "servingMode"='projection' WHERE "projectionName"='appointments'`,/permission denied/);
-  await assert.rejects(()=>db.clinic.$executeRaw`UPDATE "ReadProjectionControl" SET "activeGenerationId"=${generation} WHERE "projectionName"='appointments'`,/permission denied/);
-  await pauseTarget(ctx);
-  const [privileges]=await db.clinic.$queryRaw`SELECT has_column_privilege(current_user,'runtime."ReadProjectionControl"','lockAnchor','UPDATE') AS "canLock"`;
-  assert.equal(privileges.canLock,false);
-  await assert.rejects(()=>projector.apply(JSON.stringify(event)),/permission denied/);
-  await forwardFix(ctx);assert.equal(await projector.apply(JSON.stringify(event)),false);
 });

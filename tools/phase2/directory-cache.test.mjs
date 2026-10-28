@@ -114,7 +114,7 @@ async function serve(db,source){
 }
 const routes=[{name:'appointments',path:'/api/appointments',data:'appointments'},{name:'medical-records',path:'/api/medical-records',data:'records'},{name:'medical-records/images',path:'/api/medical-records/images',data:'images'}];
 
-test('a list GET asks Core once, after its query: routes x {empty, data, petId, 422, DB failure, version header}',async()=>{
+test('a list GET asks Core once, after its query: routes x {empty, data, petId, 422, DB failure, retired read header}',async()=>{
   const core=await fakeCore(),source=directoryTo(core.url);
   const cases=[
     {name:'empty page',query:'',status:200,petIds:[],ownerIds:[]},
@@ -123,7 +123,7 @@ test('a list GET asks Core once, after its query: routes x {empty, data, petId, 
     {name:'petId, data page (no duplicate pet)',query:'?petId=one',data:true,status:200,petIds:['one'],ownerIds:['owner'],pet:'one'},
     {name:'invalid pageSize (422 after Core agreed)',query:'?pageSize=0',status:422,petIds:[],ownerIds:[]},
     {name:'database failure (503 after Core agreed)',query:'',fail:true,status:503,petIds:[],ownerIds:[]},
-    {name:'version header (only the appointment list reads it)',query:'',headers:{'x-clinic-min-version':'x'},status:route=>route.name==='appointments'?422:200,petIds:[],ownerIds:[]},
+    {name:'retired read-version header (ignored)',query:'',headers:{'x-clinic-min-version':'x'},status:200,petIds:[],ownerIds:[]},
   ];
   try{
     for(const route of routes)for(const c of cases){

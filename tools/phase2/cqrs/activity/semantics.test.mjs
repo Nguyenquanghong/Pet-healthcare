@@ -102,7 +102,8 @@ test('UI presets use Vietnam business date and only daily scoped authoritative d
   assert.deepEqual(activityPreset('12months','2030-10-20'),{from:'2029-11-01',to:'2030-10-20',groupBy:'month'});
   const link=activityDrilldown('2030-10-20','clinic','cancelled'),read=readActivityDrilldown(link.split('?')[1]);
   assert.equal(read.category,'medical');assert.equal(read.status,'cancelled');assert.equal(read.date,'2030-10-20');assert.equal(read.error,'');
-  assert.match(readActivityDrilldown('activity=1&date=2030-02-30&consistency=authoritative').error,/./);
+  assert.match(readActivityDrilldown('activity=1&date=2030-02-30').error,/./);
+  assert.equal(readActivityDrilldown('activity=1&date=2030-10-20&consistency=authoritative').error,'','links saved before the read projection was removed still open');
   assert.equal(validActivityFilters({from:'2028-01-01',to:'2028-12-31',groupBy:'day',category:'all'}),true);
 });
 test('seeded 10k fixture covers types/statuses, hot and empty buckets, valid ownership and unique slots',()=>{
@@ -111,4 +112,11 @@ test('seeded 10k fixture covers types/statuses, hot and empty buckets, valid own
   assert.equal(new Set(a.appointments.map(r=>[r.petId,r.appointmentDate,r.appointmentTime].join('|'))).size,10000);
   const pets=new Map(a.pets.map(p=>[p.id,p]));assert.ok(a.appointments.every(r=>pets.get(r.petId).ownerId===r.ownerId));
   const hot=a.appointments.filter(r=>r.appointmentDate==='2030-10-20').length;assert.ok(hot>10&&hot<100);assert.ok(!a.appointments.some(r=>r.appointmentDate==='2030-10-13'));
+});
+test('the read projection is gone: only source and cached construct, and the response has no generation',async()=>{
+  for(const mode of ['summary','control','projection'])assert.throws(()=>new ClinicActivityQueries(database([]).db,mode),/INVALID_CLINIC_ACTIVITY_MODE/,mode);
+  for(const mode of ['source','cached'])assert.equal(new ClinicActivityQueries(database([]).db,mode).mode,mode);
+  const r=await new ClinicActivityQueries(database([group('2030-10-20','completed',1)]).db,'cached').read(filter());
+  assert.deepEqual(Object.keys(r.meta).sort(),['cacheComputedAt','degraded','freshness','generatedAt','reason','source']);
+  assert.deepEqual([r.meta.source,r.meta.degraded,r.meta.reason],['source',false,null]);
 });

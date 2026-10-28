@@ -7,7 +7,7 @@ export function logEvent(service:string,event:Envelope,status:string,started=per
   try{process.stdout.write(JSON.stringify({service,eventId:id(event.eventId),correlationId:id(event.correlationId),eventType:event.eventType,status,latencyMs:Math.round(performance.now()-started)})+'\n');}catch{}
 }
 export type ConsumerName = EventConsumer;
-export const topology = (prefix = 'nipopeto.v1') => ({ exchange: `${prefix}.events`, notification: `${prefix}.notification`, identity: `${prefix}.identity`, clinic: `${prefix}.clinic`, clinicRead: `${prefix}.clinic-read-v1` });
+export const topology = (prefix = 'nipopeto.v1') => ({ exchange: `${prefix}.events`, notification: `${prefix}.notification`, identity: `${prefix}.identity`, clinic: `${prefix}.clinic` });
 export type Topology = ReturnType<typeof topology>;
 export async function declareTopology(brokerUrl: string, t: Topology) {
   const connection = await amqp.connect(brokerUrl, { timeout: 5000 });
@@ -15,7 +15,7 @@ export async function declareTopology(brokerUrl: string, t: Topology) {
   try {
     const channel = await connection.createChannel();
     await channel.assertExchange(t.exchange, 'topic', { durable: true });
-    for (const consumer of ['notification', 'identity', 'clinic', 'clinicRead'] as const) {
+    for (const consumer of ['notification', 'identity', 'clinic'] as const) {
       await channel.assertQueue(t[consumer], { durable: true });
       await channel.assertQueue(`${t[consumer]}.dlq`, { durable: true });
     }
@@ -25,7 +25,6 @@ export async function declareTopology(brokerUrl: string, t: Topology) {
     await channel.bindQueue(t.identity, t.exchange, 'identity.sessions-revoked.v1');
     await channel.bindQueue(t.clinic, t.exchange, 'directory.#');
     await channel.bindQueue(t.clinic, t.exchange, 'billing.#');
-    await channel.bindQueue(t.clinicRead, t.exchange, 'clinic.appointment-read-changed.v1');
   } finally { await connection.close(); }
 }
 // Confirm and mandatory-return detection are both required.
@@ -132,7 +131,7 @@ export function retryTarget(queue: string, attempt: number, kind: FailureKind, d
 }
 // The queues a service's runtime reports in /metrics (queue_ready, retry_ready, dlq_ready).
 export const runtimeQueues = (consumers: readonly ConsumerQueue[]) => ({ consumers, retrySuffixes: retryDelays().map(ms => retryQueue('', ms)) });
-type ConsumerQueue = 'notification' | 'identity' | 'clinic' | 'clinic-read-v1';
+type ConsumerQueue = 'notification' | 'identity' | 'clinic';
 export interface ConsumerOptions {
   // Delay before each retry; default BROKER_RETRY_DELAYS_MS, else defaultRetryDelaysMs.
   retryDelaysMs?: readonly number[];

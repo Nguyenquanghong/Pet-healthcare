@@ -6,6 +6,6 @@ export type ClinicActivity = {
   period: ActivityFilters & {timezone: string}; previousPeriod: {from: string; to: string};
   current: Counts & {byType: {type: AppointmentType; total: number}[]; buckets: {from: string; to: string; total: number; byStatus: Record<AppointmentStatus, number>}[]};
   previous: Counts; comparison: {totalDelta: number; totalDeltaPercent: number | null};
-  meta: {source: 'source' | 'cached' | 'summary'; generatedAt: string; degraded: boolean; reason: string | null;
+  meta: {source: 'source' | 'cached'; generatedAt: string; degraded: boolean; reason: string | null;
     freshness: {state: 'current' | 'within-policy' | 'unknown'}};
 };

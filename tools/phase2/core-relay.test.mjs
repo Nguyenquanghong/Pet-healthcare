@@ -40,7 +40,7 @@ test.before(async () => {
 });
 test.after(async () => {
   try {
-    for (const name of topologyQueues(routes, [routes.notification, routes.identity, routes.clinic, routes.clinicRead])) await channel.deleteQueue(name).catch(() => {});
+    for (const name of topologyQueues(routes, [routes.notification, routes.identity, routes.clinic])) await channel.deleteQueue(name).catch(() => {});
     await channel.deleteExchange(routes.exchange).catch(() => {});
   } finally { await channel?.close().catch(() => {}); await connection?.close().catch(() => {}); await db.$disconnect(); }
 });
