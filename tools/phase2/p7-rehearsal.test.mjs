@@ -18,7 +18,7 @@ import {freezeLegacy,rollbackBeforeOpen,targetPermissions,openTarget,pauseTarget
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test');assertTestProject();
 const invocation=randomUUID(),contextFile='test-results/phase2/p7-'+invocation+'-context.json',handles=[],tokens={},ports={},origins={};
 const broker='amqp://p2_test:p2_broker_fixture_only@127.0.0.1:5679',prefix='p7.migration.'+invocation,routes=topology(prefix);
-const keys=generateKeyPairSync('rsa',{modulusLength:2048}),secretNames=['CORE_DIRECTORY_TOKEN','CORE_BILLING_EVIDENCE_TOKEN','CLINIC_BILLING_TOKEN','CLINIC_BOOTSTRAP_TOKEN','CORE_NOTIFICATION_SEND_TOKEN'];
+const keys=generateKeyPairSync('rsa',{modulusLength:2048}),secretNames=['CORE_DIRECTORY_TOKEN','CORE_BILLING_EVIDENCE_TOKEN','CLINIC_BILLING_TOKEN','CORE_NOTIFICATION_SEND_TOKEN'];
 const secrets=Object.fromEntries(secretNames.map(name=>[name,'p7-'+randomUUID()]));
 const common={PHASE2_RUNTIME_REQUIRED:'1',JWT_PUBLIC_KEY:keys.publicKey.export({type:'spki',format:'pem'}).toString(),JWT_PRIVATE_KEY:'',JWT_SECRET:'',JWT_KEY_ID:'p7-test-1',JWT_ISSUER:'p7-core',JWT_AUDIENCE:'pet-healthcare',REDIS_URL:'redis://127.0.0.1:6389',RATE_LIMIT_NAMESPACE:'p7-'+invocation,RATE_LIMIT_KEY_SECRET:'p7-key-'+randomUUID(),OBSERVABILITY_TOKEN:'p7-observe-'+randomUUID(),BROKER_URL:broker,BROKER_PREFIX:prefix,DB_POOL_LIMIT:'2',TRUST_PROXY_HOPS:'',TRUST_PROXY_CIDRS:'',CLINIC_SERVICE_TOKEN:'',NOTIFICATION_SERVICE_TOKEN:'',...Object.fromEntries(secretNames.map(n=>[n,''])),PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',VNPAY_TMN_CODE:'',VNPAY_HASH_SECRET:'',BANK_TRANSFER_ENABLED:'false'};
 let ctx,fixture,snapshot,expected,db={},nginx,gateway,artifacts,legacyApi,coreApi,clinicApi,notificationApi,declared=false,mode='legacy',maintenance=false,workerHandles=[],newInvoice,newAppointment,newPet,newOwner;
@@ -47,7 +47,7 @@ async function configureGateway(nextMode,paused){
 }
 async function startTargets(){
   coreApi=await child('backend/dist/src/index.js',{...secrets,JWT_PRIVATE_KEY:keys.privateKey.export({type:'pkcs8',format:'pem'}).toString(),DATABASE_URL:url(ctx,'core'),PORT:String(ports.core),SERVICE_INSTANCE_ID:'p7-core',CLINIC_SERVICE_URL:origins.clinic,NOTIFICATION_SERVICE_URL:origins.notification},'core-api',h=>fetch(h.base+'/health/ready').then(r=>r.status===200).catch(()=>false));
-  clinicApi=await child('services/clinic/dist/index.js',{CORE_DIRECTORY_TOKEN:secrets.CORE_DIRECTORY_TOKEN,CORE_BILLING_EVIDENCE_TOKEN:secrets.CORE_BILLING_EVIDENCE_TOKEN,CLINIC_BILLING_TOKEN:secrets.CLINIC_BILLING_TOKEN,CLINIC_BOOTSTRAP_TOKEN:secrets.CLINIC_BOOTSTRAP_TOKEN,CORE_SERVICE_URL:origins.core,DATABASE_URL:url(ctx,'clinic'),PORT:String(ports.clinic)},'clinic-api',h=>fetch(h.base+'/health/ready').then(r=>r.status===200).catch(()=>false));
+  clinicApi=await child('services/clinic/dist/index.js',{CORE_DIRECTORY_TOKEN:secrets.CORE_DIRECTORY_TOKEN,CORE_BILLING_EVIDENCE_TOKEN:secrets.CORE_BILLING_EVIDENCE_TOKEN,CLINIC_BILLING_TOKEN:secrets.CLINIC_BILLING_TOKEN,CORE_SERVICE_URL:origins.core,DATABASE_URL:url(ctx,'clinic'),PORT:String(ports.clinic)},'clinic-api',h=>fetch(h.base+'/health/ready').then(r=>r.status===200).catch(()=>false));
   notificationApi=await child('services/notification/dist/index.js',{CORE_NOTIFICATION_SEND_TOKEN:secrets.CORE_NOTIFICATION_SEND_TOKEN,CORE_SERVICE_URL:origins.core,DATABASE_URL:url(ctx,'notification'),PORT:String(ports.notification)},'notification-api',h=>fetch(h.base+'/health/ready').then(r=>r.status===200).catch(()=>false));
 }
 async function startWorkers(){

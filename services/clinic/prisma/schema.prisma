@@ -277,8 +277,10 @@ model RequestDedup {
 // cqrs-projection-archive-20261028). ClinicReadRevision, ReadProjectionGeneration,
 // ReadProjectionControl, AppointmentReadRow, AppointmentDailySummary, ClinicActivityControl and
 // ReadRebuildRun stay only because their migrations are history; no application code reads or
-// writes them.
-// AppointmentQueryEpoch is still maintained by database triggers.
+// writes them. Migration 20261028000100 dropped their database hooks (the read_rebuild_fence
+// triggers and the source-acl epoch triggers) and closed the open read-changed outbox rows.
+// AppointmentQueryEpoch: nothing reads it; its 'projection' and 'directory' rows are still
+// bumped by their triggers.
 // Independent read version: reservation/note changes are not statusRevision.
 // No source FK: tombstones must survive a future supported source deletion.
 model ClinicReadRevision {

@@ -3,26 +3,27 @@ import {catalogs,targets,sourceNames} from './p7-manifest.mjs';
 import {validateMigration,assertFrozenSource} from './p7-migration.mjs';
 
 const targetKinds=['core','clinic','notification'];
-// AppointmentQueryEpoch: read by the aggregate cache, written only by its
-// SECURITY DEFINER trigger, so runtime gets SELECT and no DML. The same holds for
-// the P10 scheduling policy (migration seed) and slot tables (appointment_schedule_sync).
+// AppointmentQueryEpoch: written only by its SECURITY DEFINER triggers, so runtime gets
+// SELECT and no DML (nothing reads it since the CQRS read projection was removed).
+// The same holds for the P10 scheduling policy (migration seed) and slot tables
+// (appointment_schedule_sync). ClinicReadRevision, AppointmentReadRow and
+// AppointmentDailySummary are retired projection history: runtime keeps SELECT on
+// them and receives no write grant.
 const schedulingTables=['AppointmentResourceGroup','AppointmentTypePolicy','AppointmentSlotUsage','AppointmentPetSlot','AppointmentDoctorSlot'];
 function runtimeTables(kind){const names=[...targets[kind],...(kind==='clinic'?['OutboxEvent','RequestDedup','ClinicReadRevision','AppointmentReadRow','AppointmentDailySummary','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','MedicalRecordRevision','AppointmentQueryEpoch','BlobCleanup','MedicalImageDeletion',...schedulingTables]:kind==='notification'?['RequestDedup','SessionRevocation']:[])];return [...new Set(names.map(n=>catalogs[kind][n].table))];}
 // Exact runtime ACL statements. role/schema must already be quoted identifiers.
 // Exported so guarded trial harnesses test these grants, not a copied variant.
 export function runtimeGrantStatements(kind,role,write,schema='runtime'){
   const q=t=>schema+'.'+ident(t),statements=[`REVOKE ALL ON ALL TABLES IN SCHEMA ${schema} FROM ${role}`];
-  // Table-level REVOKE does not revoke column-level grants from a prior open.
+  // Table-level REVOKE does not revoke column-level grants from a prior open. The projection that
+  // needed UPDATE ("lockAnchor") is gone and nothing grants it now; this clears one an older open left.
   if(kind==='clinic')statements.push(`REVOKE UPDATE ("lockAnchor") ON ${q('ReadProjectionControl')} FROM ${role}`);
   statements.push(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA ${schema} FROM ${role}`);
   statements.push(`GRANT SELECT ON ${runtimeTables(kind).map(q).concat(schema+'."_prisma_migrations"').join(',')} TO ${role}`);
   if(write){
-    const writable=runtimeTables(kind).filter(t=>kind!=='clinic'||!['ClinicReadRevision','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','AppointmentDailySummary','medical_record_revisions','medical_image_deletions','AppointmentQueryEpoch',...schedulingTables.map(n=>catalogs.clinic[n].table)].includes(t));
+    const writable=runtimeTables(kind).filter(t=>kind!=='clinic'||!['ClinicReadRevision','AppointmentReadRow','ReadProjectionGeneration','ReadProjectionControl','ClinicActivityControl','ReadRebuildRun','AppointmentDailySummary','medical_record_revisions','medical_image_deletions','AppointmentQueryEpoch',...schedulingTables.map(n=>catalogs.clinic[n].table)].includes(t));
     statements.push(`GRANT INSERT,UPDATE,DELETE ON ${writable.map(q).join(',')} TO ${role}`);
-    if(kind==='clinic')statements.push(`GRANT INSERT,UPDATE ON ${q('ClinicReadRevision')} TO ${role}`,`GRANT UPDATE ("lockAnchor") ON ${q('ReadProjectionControl')} TO ${role}`,
-      // Projector counters: atomic upsert/decrement only, zero rows are kept.
-      // Activity serving mode is operator-owned; runtime only reads it.
-      `GRANT INSERT,UPDATE ON ${q('AppointmentDailySummary')} TO ${role}`,
+    if(kind==='clinic')statements.push(
       // AQ-15 audit history is append-only for the runtime role.
       `GRANT INSERT ON ${q('medical_record_revisions')} TO ${role}`,`GRANT INSERT ON ${q('medical_image_deletions')} TO ${role}`);
     if(kind==='core')statements.push(`GRANT USAGE,SELECT ON SEQUENCE ${schema}.invoice_transfer_code_seq TO ${role}`);

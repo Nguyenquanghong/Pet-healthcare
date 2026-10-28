@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from './generated/client/index.js';
 import { ConfirmPublisher, type Topology } from '@nipopeto/messaging';
 // batchSize/persistent default to the original one-event, one-connection relay.
-// The worker enables both: each appointment write stores two events, and a fresh
-// AMQP connection per event capped the relay near 11 events/s (list study K3-F1).
+// The worker enables both: a fresh AMQP connection per event capped the relay near
+// 11 events/s (list study K3-F1, when each appointment write also stored a read-changed
+// event for the CQRS projection that has since been removed). The only event Clinic
+// writes now is notification.requested.v1; batching still saves the connection per event.
 export type RelayOptions = { batchSize?: number; persistent?: boolean };
 type Claimed = { id: string; envelope: unknown; attempts: number };
 export class OutboxRelay {
