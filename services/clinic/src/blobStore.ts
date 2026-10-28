@@ -2,6 +2,7 @@ import { createHash, createHmac } from 'node:crypto';
 import { BusinessError } from './domain/error.js';
 import type { BlobStore } from './application/ports/blobs.js';
 import { serviceOrigin } from '@nipopeto/runtime';
+import { TransientError } from '@nipopeto/messaging';
 export type { BlobStore };
 
 // AQ-09 Claim Check + Valet Key. Medical image bytes live in an S3-compatible
@@ -102,12 +103,12 @@ export class S3BlobStore implements BlobStore {
       await this.ensureBucket();
       response = await this.send('PUT', this.path(key), body, contentType);
     }
-    if (!response.ok) throw new Error('BLOB_PUT_FAILED_' + response.status);
+    if (!response.ok) throw new TransientError('BLOB_PUT_FAILED_' + response.status);
   }
   async remove(key: string) {
     const response = await this.send('DELETE', this.path(key));
     // Already gone is the desired end state.
-    if (!response.ok && response.status !== 404) throw new Error('BLOB_DELETE_FAILED_' + response.status);
+    if (!response.ok && response.status !== 404) throw new TransientError('BLOB_DELETE_FAILED_' + response.status);
   }
   // ListObjectsV2, for the operator tool's orphan report; never on the request path.
   async list(prefix: string) {
@@ -121,7 +122,7 @@ export class S3BlobStore implements BlobStore {
         prefix,
         ...(token ? { 'continuation-token': token } : {}),
       });
-      if (!response.ok) throw new Error('BLOB_LIST_FAILED_' + response.status);
+      if (!response.ok) throw new TransientError('BLOB_LIST_FAILED_' + response.status);
       const xml = await response.text();
       for (const [, entry] of xml.matchAll(/<Contents>(.*?)<\/Contents>/gs))
         found.push({
@@ -135,14 +136,14 @@ export class S3BlobStore implements BlobStore {
   }
   async check() {
     const response = await this.send('HEAD', this.path());
-    if (!response.ok) throw new Error('BLOB_BUCKET_UNAVAILABLE_' + response.status);
+    if (!response.ok) throw new TransientError('BLOB_BUCKET_UNAVAILABLE_' + response.status);
   }
   async ensureBucket() {
     const head = await this.send('HEAD', this.path());
     if (head.ok) return;
-    if (head.status !== 404) throw new Error('BLOB_BUCKET_UNAVAILABLE_' + head.status);
+    if (head.status !== 404) throw new TransientError('BLOB_BUCKET_UNAVAILABLE_' + head.status);
     const created = await this.send('PUT', this.path());
-    if (!created.ok && created.status !== 409) throw new Error('BLOB_BUCKET_CREATE_FAILED_' + created.status);
+    if (!created.ok && created.status !== 409) throw new TransientError('BLOB_BUCKET_CREATE_FAILED_' + created.status);
   }
   // Presigned GET (SigV4 query string). Only `host` is signed, against the
   // browser-facing endpoint, so the URL is a bearer for exactly this object and TTL.

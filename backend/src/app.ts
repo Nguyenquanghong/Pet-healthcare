@@ -43,6 +43,7 @@ import { databaseHealthCheck } from "./infrastructure/persistence/healthReposito
 import { passwordAdapter, tokenAdapter } from "./infrastructure/security/authAdapters.js";
 import { qrTokenAdapter } from "./infrastructure/security/qrToken.js";
 import { BusinessError } from "./domain/error.js";
+import { serviceVersion } from "./lib/version.js";
 import { requireAuth, requirePermission } from "./middleware/auth.js";
 import { createAppointmentsRouter } from "./routes/appointments.js";
 import { createAuthRouter } from "./routes/auth.js";
@@ -90,9 +91,9 @@ export function createApp(client: PrismaClient) {
   app.get("/api/health", async (_req, res) => {
     try {
       await checkDatabase();
-      res.json({ status: "ok", service: "NIPOPETO API", version: "2.0.0", database: "connected" });
+      res.json({ status: "ok", service: "NIPOPETO API", version: serviceVersion, database: "connected" });
     } catch {
-      res.status(503).json({ status: "degraded", service: "NIPOPETO API", version: "2.0.0", database: "disconnected" });
+      res.status(503).json({ status: "degraded", service: "NIPOPETO API", version: serviceVersion, database: "disconnected" });
     }
   });
 

@@ -229,6 +229,7 @@ export class BaseOutboxRelay {
 // ---- P03: retry without blocking the queue -----------------------------------------
 // A failure retry can heal: a dependency not answering, a timeout, a lost connection.
 export class TransientError extends Error {
+  override readonly name = 'TransientError';
   constructor(readonly code: string) {
     super(code);
   }
