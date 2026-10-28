@@ -20,7 +20,7 @@ let connection, channel, foreignPending, clock = Date.now() - 3600000;
 const report = { run, cases: {} };
 
 const notification = (scope, i) => ({ eventId: randomUUID(), eventType: 'notification.requested.v1', schemaVersion: 1, producer: 'clinic', aggregateType: 'notification', aggregateId: scope, aggregateVersion: 1, occurredAt: new Date().toISOString(), correlationId: run, payload: { notificationId: randomUUID(), recipientOwnerId: randomUUID(), title: 'Relay fixture ' + i, message: 'Relay fixture' } });
-const readChanged = (scope, version) => ({ eventId: randomUUID(), eventType: 'clinic.appointment-read-changed.v1', schemaVersion: 1, producer: 'clinic', aggregateType: 'appointment', aggregateId: scope, aggregateVersion: version, occurredAt: new Date().toISOString(), correlationId: run, payload: { appointmentId: scope, sourceVersion: version, deleted: false } });
+const billingAborted = (scope, version) => ({ eventId: randomUUID(), eventType: 'billing.operation-aborted.v1', schemaVersion: 1, producer: 'core', aggregateType: 'billing-operation', aggregateId: scope, aggregateVersion: version, occurredAt: new Date().toISOString(), correlationId: run, payload: { operationId: scope } });
 // Strictly increasing createdAt gives a deterministic claim order.
 async function seed(envelopes) {
   const rows = envelopes.map(envelope => ({ id: envelope.eventId, envelope, createdAt: new Date(clock += 1) }));
@@ -44,7 +44,7 @@ test.before(async () => {
 });
 test.after(async () => {
   try {
-    for (const name of topologyQueues(routes, [routes.notification, routes.identity, routes.clinic, routes.clinicRead])) await channel.deleteQueue(name).catch(() => {});
+    for (const name of topologyQueues(routes, [routes.notification, routes.identity, routes.clinic])) await channel.deleteQueue(name).catch(() => {});
     await channel.deleteExchange(routes.exchange).catch(() => {});
     mkdirSync('test-results/phase2', { recursive: true });
     writeFileSync(`test-results/phase2/clinic-relay-${run}.json`, JSON.stringify(report, null, 2));
@@ -53,7 +53,7 @@ test.after(async () => {
 
 test('batched persistent relay publishes each claimed event once, in claim order, over one reused connection', async () => {
   const scope = randomUUID(), envelopes = [];
-  for (let i = 0; i < 60; i++) envelopes.push(notification(scope, i), readChanged(scope, i + 1));
+  for (let i = 0; i < 60; i++) envelopes.push(notification(scope, i), billingAborted(scope, i + 1));
   const ids = await seed(envelopes);
   const relay = new OutboxRelay(db, broker, scope, { batchSize: 50, persistent: true });
   try {
@@ -66,16 +66,16 @@ test('batched persistent relay publishes each claimed event once, in claim order
   assert.equal(relay.connection, undefined);
   const rows = await rowsOf(ids);
   assert.ok(rows.every(r => r.publishedAt && r.leaseOwner === null && r.leaseUntil === null && r.attempts === 1 && r.lastErrorCode === null));
-  await settle(routes.clinicRead, 60);
-  const notified = await take(routes.notification), read = await take(routes.clinicRead);
+  await settle(routes.clinic, 60);
+  const notified = await take(routes.notification), billed = await take(routes.clinic);
   assert.deepEqual(notified, envelopes.filter(e => e.eventType.startsWith('notification')).map(e => e.eventId), 'notification queue keeps claim order, no duplicates');
-  assert.deepEqual(read, envelopes.filter(e => e.eventType.startsWith('clinic.')).map(e => e.eventId), 'read queue keeps aggregateVersion order');
+  assert.deepEqual(billed, envelopes.filter(e => e.eventType.startsWith('billing.')).map(e => e.eventId), 'clinic queue keeps aggregateVersion order');
 });
 
 test('unroutable events in a batch are retried with backoff while routable ones are marked published', async () => {
-  const scope = randomUUID(), good = [notification(scope, 0), notification(scope, 1), notification(scope, 2)], bad = [readChanged(scope, 1), readChanged(scope, 2)];
+  const scope = randomUUID(), good = [notification(scope, 0), notification(scope, 1), notification(scope, 2)], bad = [billingAborted(scope, 1), billingAborted(scope, 2)];
   const ids = await seed([good[0], bad[0], good[1], bad[1], good[2]]);
-  await channel.unbindQueue(routes.clinicRead, routes.exchange, 'clinic.appointment-read-changed.v1');
+  await channel.unbindQueue(routes.clinic, routes.exchange, 'billing.#');
   const relay = new OutboxRelay(db, broker, scope, { batchSize: 10, persistent: true });
   try {
     await assert.rejects(relay.once('relay-unroutable', routes), /UNROUTABLE/);
@@ -88,13 +88,13 @@ test('unroutable events in a batch are retried with backoff while routable ones 
       assert.ok(r.nextAttemptAt > new Date(), 'backoff before retry'); assert.equal(r.attempts, 1);
     }
     assert.equal(await relay.once('relay-unroutable', routes), false, 'backed-off rows are not reclaimed early');
-    await channel.bindQueue(routes.clinicRead, routes.exchange, 'clinic.appointment-read-changed.v1');
+    await channel.bindQueue(routes.clinic, routes.exchange, 'billing.#');
     await db.outboxEvent.updateMany({ where: { id: { in: bad.map(e => e.eventId) } }, data: { nextAttemptAt: new Date() } });
     assert.equal(await drain(relay, 'relay-unroutable'), 1);
   } finally { await relay.close(); }
   assert.ok((await rowsOf(bad.map(e => e.eventId))).every(r => r.publishedAt && r.attempts === 2));
-  await settle(routes.clinicRead, 2);
-  assert.equal((await take(routes.notification)).length, 3); assert.equal((await take(routes.clinicRead)).length, 2);
+  await settle(routes.clinic, 2);
+  assert.equal((await take(routes.notification)).length, 3); assert.equal((await take(routes.clinic)).length, 2);
 });
 
 test('an invalid envelope in a batch is retried alone; valid neighbours are published', async () => {
@@ -111,7 +111,7 @@ test('an invalid envelope in a batch is retried alone; valid neighbours are publ
 });
 
 test('broker unreachable: the whole batch is released for retry and nothing is marked published', async () => {
-  const scope = randomUUID(), ids = await seed([notification(scope, 0), notification(scope, 1), readChanged(scope, 1)]);
+  const scope = randomUUID(), ids = await seed([notification(scope, 0), notification(scope, 1), billingAborted(scope, 1)]);
   const relay = new OutboxRelay(db, 'amqp://p2_test:p2_broker_fixture_only@127.0.0.1:1', scope, { batchSize: 10, persistent: true });
   await assert.rejects(relay.once('relay-down', routes));
   assert.equal(relay.connection, undefined);
@@ -119,8 +119,8 @@ test('broker unreachable: the whole batch is released for retry and nothing is m
   await db.outboxEvent.updateMany({ where: { id: { in: ids } }, data: { nextAttemptAt: new Date() } });
   const healthy = new OutboxRelay(db, broker, scope, { batchSize: 10, persistent: true });
   try { assert.equal(await drain(healthy, 'relay-down'), 1); } finally { await healthy.close(); }
-  await settle(routes.clinicRead, 1);
-  assert.equal((await take(routes.notification)).length, 2); assert.equal((await take(routes.clinicRead)).length, 1);
+  await settle(routes.clinic, 1);
+  assert.equal((await take(routes.notification)).length, 2); assert.equal((await take(routes.clinic)).length, 1);
 });
 
 test('crash after confirm (afterConfirm throws) keeps the batch leased, unmarked and closes the connection', async () => {
@@ -161,12 +161,12 @@ test('default options keep the original one-event, one-connection relay', async 
 test('throughput: batched persistent relay outpaces the one-event relay on the same broker and DB', { timeout: 300000 }, async () => {
   const measure = async (options, n) => {
     const scope = randomUUID(), envelopes = [];
-    for (let i = 0; i < n / 2; i++) envelopes.push(notification(scope, i), readChanged(scope, i + 1));
+    for (let i = 0; i < n / 2; i++) envelopes.push(notification(scope, i), billingAborted(scope, i + 1));
     await seed(envelopes);
     const relay = new OutboxRelay(db, broker, scope, options), started = performance.now();
     try { await drain(relay, 'relay-throughput'); } finally { await relay.close(); }
     const seconds = (performance.now() - started) / 1000;
-    await settle(routes.clinicRead, n / 2); await take(routes.notification); await take(routes.clinicRead);
+    await settle(routes.clinic, n / 2); await take(routes.notification); await take(routes.clinic);
     return { events: n, seconds: Math.round(seconds * 100) / 100, eventsPerSecond: Math.round(n / seconds) };
   };
   const original = await measure({}, 400), batched = await measure({ batchSize: 50, persistent: true }, 2000);

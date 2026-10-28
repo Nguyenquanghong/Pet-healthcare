@@ -273,6 +273,12 @@ model RequestDedup {
  @@unique([actorId,operationType,key])
 }
 
+// RETIRED 2026-10-28: the CQRS read projection was removed from the code (git tag
+// cqrs-projection-archive-20261028). ClinicReadRevision, ReadProjectionGeneration,
+// ReadProjectionControl, AppointmentReadRow, AppointmentDailySummary, ClinicActivityControl and
+// ReadRebuildRun stay only because their migrations are history; no application code reads or
+// writes them.
+// AppointmentQueryEpoch is still maintained by database triggers.
 // Independent read version: reservation/note changes are not statusRevision.
 // No source FK: tombstones must survive a future supported source deletion.
 model ClinicReadRevision {

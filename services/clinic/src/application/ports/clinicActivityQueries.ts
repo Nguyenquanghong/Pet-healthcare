@@ -19,11 +19,11 @@ export type ActivityBusiness = {
   previous: ActivityCounts;
   comparison: {totalDelta: number; totalDeltaPercent: number | null};
 };
-// Metadata reflects the path actually used for the whole response. generation is
-// only set for summary; source/cached never mix with summary in one response.
+// Metadata reflects the path actually used for the whole response: one fresh source
+// snapshot (source) or a cached one (cached). degraded/reason remain for response compatibility (always false/null).
 export type ActivityResponse = ActivityBusiness & {meta: {
-  source: 'source' | 'cached' | 'summary'; generation: string | null; generatedAt: string; cacheComputedAt: string | null;
+  source: 'source' | 'cached'; generatedAt: string; cacheComputedAt: string | null;
   freshness: {state: 'current' | 'within-policy'; checkedAt: string; observedLagMs: number | null};
   degraded: boolean; reason: string | null;
 }};
-export type ActivityMode = 'source' | 'cached' | 'summary';
+export type ActivityMode = 'source' | 'cached';

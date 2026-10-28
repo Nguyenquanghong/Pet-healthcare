@@ -729,21 +729,6 @@
               }
             },
             "headers": {
-              "X-Clinic-Read-Source": {
-                "schema": {
-                  "type": "string",
-                  "enum": [
-                    "authoritative",
-                    "projection"
-                  ]
-                }
-              },
-              "X-Clinic-Projection-Generation": {
-                "schema": {
-                  "type": "string"
-                },
-                "description": "Present only for projected reads."
-              },
               "Cache-Control": {
                 "schema": {
                   "type": "string"
@@ -760,10 +745,10 @@
             "description": "Actor or scope forbidden."
           },
           "422": {
-            "description": "Invalid query or read token."
+            "description": "Invalid query."
           },
           "503": {
-            "description": "Unavailable or bounded fallback full. No empty-success response.",
+            "description": "Unavailable. No empty-success response.",
             "headers": {
               "Retry-After": {
                 "schema": {
@@ -781,7 +766,7 @@
             "BearerAuth": []
           }
         ],
-        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page. Clinic projection mode is eventual without a read token. Owner/existence authorization always uses current source. Unbilled queries remain authoritative. Invalid/expired read tokens return 422 with code CLINIC_READ_TOKEN_INVALID; actor/role/scope mismatch returns 403. Retry only the GET without a token and with authoritative consistency after token expiry. Bounded whole-query fallback may return 503 with Retry-After.",
+        "description": "Paginated JSON envelope. Rows use a stable order with id as a tie-breaker. Count, filters and page share a Repeatable Read transaction. related contains only relations needed by this page. Counts are independent of the selected status/page. Owner/existence authorization always uses current source.",
         "parameters": [
           {
             "$ref": "#/components/parameters/Page"
@@ -843,28 +828,6 @@
               "maxLength": 128
             },
             "description": "unbilled: eligible sources with no existing invoice."
-          },
-          {
-            "in": "header",
-            "name": "X-Clinic-Min-Version",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "maxLength": 4096
-            },
-            "description": "Clinic-signed read token or comma-separated bundle: at most 16 tokens/unique appointment IDs and 4096 bytes total, actor/role bound, TTL 600 seconds. Never an authorization credential."
-          },
-          {
-            "in": "header",
-            "name": "X-Clinic-Read-Consistency",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "authoritative"
-              ]
-            },
-            "description": "Force whole-query authoritative read, subject to fallback admission budget."
           }
         ]
       },
@@ -882,15 +845,6 @@
                 "schema": {
                   "$ref": "#/components/schemas/AppointmentEnvelope"
                 }
-              }
-            },
-            "headers": {
-              "X-Clinic-Read-Token": {
-                "schema": {
-                  "type": "string",
-                  "maxLength": 4096
-                },
-                "description": "Optional signed committed appointment revision; replay retains original versions with refreshed expiry. Historical dedup rows may omit it. Store only in current session; do not log."
               }
             }
           },
@@ -988,15 +942,6 @@
                   "$ref": "#/components/schemas/AppointmentEnvelope"
                 }
               }
-            },
-            "headers": {
-              "X-Clinic-Read-Token": {
-                "schema": {
-                  "type": "string",
-                  "maxLength": 4096
-                },
-                "description": "Optional signed committed appointment revision; replay retains original versions with refreshed expiry. Historical dedup rows may omit it. Store only in current session; do not log."
-              }
             }
           },
           "401": {
@@ -1044,15 +989,6 @@
                   "$ref": "#/components/schemas/AppointmentEnvelope"
                 }
               }
-            },
-            "headers": {
-              "X-Clinic-Read-Token": {
-                "schema": {
-                  "type": "string",
-                  "maxLength": 4096
-                },
-                "description": "Optional signed committed appointment revision; replay retains original versions with refreshed expiry. Historical dedup rows may omit it. Store only in current session; do not log."
-              }
             }
           },
           "401": {
@@ -1099,15 +1035,6 @@
                 "schema": {
                   "$ref": "#/components/schemas/AppointmentEnvelope"
                 }
-              }
-            },
-            "headers": {
-              "X-Clinic-Read-Token": {
-                "schema": {
-                  "type": "string",
-                  "maxLength": 4096
-                },
-                "description": "Optional signed committed appointment revision; replay retains original versions with refreshed expiry. Historical dedup rows may omit it. Store only in current session; do not log."
               }
             }
           },
@@ -1276,15 +1203,6 @@
                 "schema": {
                   "$ref": "#/components/schemas/MedicalRecordEnvelope"
                 }
-              }
-            },
-            "headers": {
-              "X-Clinic-Read-Token": {
-                "schema": {
-                  "type": "string",
-                  "maxLength": 4096
-                },
-                "description": "Optional signed committed appointment revision; replay retains original versions with refreshed expiry. Historical dedup rows may omit it. Store only in current session; do not log."
               }
             }
           },
@@ -3570,15 +3488,6 @@
                   }
                 }
               }
-            },
-            "headers": {
-              "X-Clinic-Read-Token": {
-                "schema": {
-                  "type": "string",
-                  "maxLength": 4096
-                },
-                "description": "Optional signed committed appointment revision; replay retains original versions with refreshed expiry. Historical dedup rows may omit it. Store only in current session; do not log."
-              }
             }
           },
           "default": {
@@ -4239,28 +4148,6 @@
               ]
             },
             "description": "Service group."
-          },
-          {
-            "in": "header",
-            "name": "X-Clinic-Min-Version",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "maxLength": 4096
-            },
-            "description": "Clinic-signed read token or comma-separated bundle: at most 16 tokens/unique appointment IDs and 4096 bytes total, actor/role bound, TTL 600 seconds. Never an authorization credential."
-          },
-          {
-            "in": "header",
-            "name": "X-Clinic-Read-Consistency",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "authoritative"
-              ]
-            },
-            "description": "Force whole-query authoritative read, subject to fallback admission budget."
           }
         ],
         "responses": {
@@ -4278,21 +4165,6 @@
               }
             },
             "headers": {
-              "X-Clinic-Read-Source": {
-                "schema": {
-                  "type": "string",
-                  "enum": [
-                    "authoritative",
-                    "projection"
-                  ]
-                }
-              },
-              "X-Clinic-Projection-Generation": {
-                "schema": {
-                  "type": "string"
-                },
-                "description": "Present only for projected reads."
-              },
               "Cache-Control": {
                 "schema": {
                   "type": "string"
@@ -4309,10 +4181,10 @@
             "description": "Actor or scope forbidden."
           },
           "422": {
-            "description": "Invalid query or read token."
+            "description": "Invalid query."
           },
           "503": {
-            "description": "Unavailable or bounded fallback full. No empty-success response.",
+            "description": "Unavailable. No empty-success response.",
             "headers": {
               "Retry-After": {
                 "schema": {
@@ -4325,7 +4197,7 @@
             "$ref": "#/components/responses/ApiError"
           }
         },
-        "description": " Clinic projection mode is eventual without a read token. Owner/existence authorization always uses current source. Unbilled queries remain authoritative. Invalid/expired read tokens return 422 with code CLINIC_READ_TOKEN_INVALID; actor/role/scope mismatch returns 403. Retry only the GET without a token and with authoritative consistency after token expiry. Bounded whole-query fallback may return 503 with Retry-After."
+        "description": "Owner/existence authorization always uses current source."
       }
     },
     "/invoices/summary": {
@@ -4649,7 +4521,7 @@
           "Dashboard"
         ],
         "summary": "Current appointment activity for the currently authorized admin only",
-        "description": "Split Clinic only. Appointment DATE and current status; cancelled/no_show included in total. Inclusive period up to 366 days, adjacent equal-day previous period in the same read-only snapshot. Rates are ratios or null; totalDeltaPercent is percent or null when previous=0. Unknown/repeated/non-string parameters return 422. Clients cannot select a reader. Source/cached mode is server-configured; cache TTL is absolute 5s. Does not enable projected appointment lists.",
+        "description": "Split Clinic only. Appointment DATE and current status; cancelled/no_show included in total. Inclusive period up to 366 days, adjacent equal-day previous period in the same read-only snapshot. Rates are ratios or null; totalDeltaPercent is percent or null when previous=0. Unknown/repeated/non-string parameters return 422. Clients cannot select a reader. Source/cached mode is server-configured; cache TTL is absolute 5s.",
         "security": [
           {
             "BearerAuth": []
@@ -4706,38 +4578,13 @@
         ],
         "responses": {
           "200": {
-            "description": "Activity from one source snapshot, an absolute-TTL cached snapshot or a verified V2 daily summary; ineligible summary falls back to the whole source response",
+            "description": "Activity from one source snapshot or an absolute-TTL cached snapshot",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "enum": [
                     "no-store"
-                  ]
-                }
-              },
-              "X-Clinic-Read-Source": {
-                "schema": {
-                  "type": "string",
-                  "enum": [
-                    "source",
-                    "cached",
-                    "summary"
-                  ]
-                }
-              },
-              "X-Clinic-Projection-Generation": {
-                "description": "Set only when meta.source is summary",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "X-Service-Degraded": {
-                "description": "clinic-activity when meta.degraded is true",
-                "schema": {
-                  "type": "string",
-                  "enum": [
-                    "clinic-activity"
                   ]
                 }
               }
@@ -8547,7 +8394,6 @@
             "additionalProperties": false,
             "required": [
               "source",
-              "generation",
               "generatedAt",
               "cacheComputedAt",
               "freshness",
@@ -8559,13 +8405,8 @@
                 "type": "string",
                 "enum": [
                   "source",
-                  "cached",
-                  "summary"
+                  "cached"
                 ]
-              },
-              "generation": {
-                "type": "string",
-                "nullable": true
               },
               "generatedAt": {
                 "type": "string",

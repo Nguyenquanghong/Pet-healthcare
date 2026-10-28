@@ -1,29 +1,32 @@
 import { ApiError, ApiErrorCode, httpStatusToErrorCode } from "../utils/apiError";
-import {clinicReadState} from './clinicReadState';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:5000/api" : "/api")).replace(/\/$/, "");
 const TOKEN_KEY = "nipopeto_access_token";
 
+// Requests carry the signal of the session they started in: a login, logout or token
+// change aborts whatever is still in flight, so a late answer never lands in a new session.
+let session: string | null = null;
+let sessionController = new AbortController();
+function syncSession(token: string | null) {
+  if (token !== session) { sessionController.abort(); sessionController = new AbortController(); session = token; }
+}
+
 export const authToken = {
   get: () => sessionStorage.getItem(TOKEN_KEY),
-  set: (token: string) => {sessionStorage.setItem(TOKEN_KEY, token);clinicReadState.sync(token);},
-  clear: () => {sessionStorage.removeItem(TOKEN_KEY);clinicReadState.sync(null);},
+  set: (token: string) => {sessionStorage.setItem(TOKEN_KEY, token);syncSession(token);},
+  clear: () => {sessionStorage.removeItem(TOKEN_KEY);syncSession(null);},
 };
 
-export async function request<T>(endpoint: string, options: RequestInit = {},retried=false): Promise<T> {
+export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = authToken.get();
-  clinicReadState.sync(token);
-  const epoch=clinicReadState.epoch(),sessionSignal=clinicReadState.signal();
-  const method=options.method??'GET';
-  const clinicRead=method==='GET'&&/^\/appointments(?:\?|$|\/calendar(?:\?|$))/.test(endpoint);
-  const clinicWrite=method!=='GET'&&(/^\/appointments(?:\/|$)/.test(endpoint)&&!endpoint.endsWith('/reminder')||endpoint==='/medical-records'&&method==='POST');
+  syncSession(token);
+  const sessionSignal = sessionController.signal;
   const response = await fetch(`${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`, {
     ...options,
     signal: AbortSignal.any([options.signal??AbortSignal.timeout(15000),sessionSignal]),
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(clinicRead?clinicReadState.headers():{}),
       ...(options.headers || {}),
     },
   }).catch((error) => {
@@ -32,18 +35,9 @@ export async function request<T>(endpoint: string, options: RequestInit = {},ret
 
   const data = response.status === 204 ? null : await response.json().catch(() => null);
   if(sessionSignal.aborted||token!==authToken.get())throw new DOMException('Session changed','AbortError');
-  if(clinicRead&&!retried&&response.status===422&&data?.code==='CLINIC_READ_TOKEN_INVALID'){
-    clinicReadState.expired();return request<T>(endpoint,options,true);
-  }
   if (!response.ok) {
     throw new ApiError(httpStatusToErrorCode(response.status), response.status, data?.error || "Backend request failed.", data);
   }
-  if(clinicRead&&epoch!==clinicReadState.epoch()){
-    if(!retried)return request<T>(endpoint,options,true);
-    throw new DOMException('A newer mutation superseded this read','AbortError');
-  }
-  if(clinicWrite)clinicReadState.mutation(response.headers.get('X-Clinic-Read-Token'),data);
-  if(clinicRead)clinicReadState.confirmed(data);
   return data as T;
 }
 

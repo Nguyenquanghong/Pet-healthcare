@@ -98,7 +98,7 @@ const envelopeCheck=existsSync(built)?import(pathToFileURL(built).href).then(({p
 }):Promise.resolve(rule('envelope-version-enforced',()=>{throw new Error('build packages/contracts first (npm run build -w @nipopeto/contracts)');}));
 
 // ---- 3. Gateways ---------------------------------------------------------------
-const GATEWAYS=['deploy/phase2/nginx.split.conf.example','benchmarks/phase2/kaggle/stack.mjs','tools/phase2/cqrs/activity/kaggleD5.mjs'];
+const GATEWAYS=['deploy/phase2/nginx.split.conf.example','benchmarks/phase2/kaggle/stack.mjs'];
 export const blocksInternal=source=>/location\s+~\s+\^\/\(internal\|metrics\|health\)\s*\{\s*return\s+404;\s*\}/.test(source);
 rule('gateway-hides-internal-routes',()=>{
   const missing=GATEWAYS.filter(g=>!blocksInternal(read(g)));
@@ -188,7 +188,7 @@ const permissionCheck=(existsSync(built)?import(pathToFileURL(built).href):Promi
 // consumer, and every billing type Clinic consumes has an explicit outcome, so a new
 // billing event cannot be read as an abort by default.
 const clinicBilling=resolve(root,'services/clinic/dist/billingEvents.js');
-const consumerQueues={notification:'notification',identity:'identity',clinic:'clinic','clinic-read-v1':'clinicRead'};
+const consumerQueues={notification:'notification',identity:'identity',clinic:'clinic'};
 // P03: a draining type moved to another consumer's queue; the old queue no longer receives it.
 export function consumerGaps({eventTypes,consumedEvents,drainingEvents={}},bound,outcomes){
   const gaps=[];

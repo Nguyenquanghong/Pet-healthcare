@@ -9,11 +9,11 @@ import {signToken,verifyToken} from '../../../../backend/dist/src/lib/token.js';
 
 test('activity contract/current-admin authorization and cache hits work directly and through real Core proxy',{timeout:30000},async(t)=>{
   const keys=generateKeyPairSync('rsa',{modulusLength:2048});
-  const names=['JWT_PRIVATE_KEY','JWT_PUBLIC_KEY','JWT_ISSUER','JWT_AUDIENCE','JWT_KEY_ID','PHASE2_RUNTIME_REQUIRED','CLINIC_ACTIVITY_MODE','CLINIC_READ_MODE'];
+  const names=['JWT_PRIVATE_KEY','JWT_PUBLIC_KEY','JWT_ISSUER','JWT_AUDIENCE','JWT_KEY_ID','PHASE2_RUNTIME_REQUIRED','CLINIC_ACTIVITY_MODE'];
   const previous=Object.fromEntries(names.map(k=>[k,process.env[k]]));
   const servers=[];
   t.after(async()=>{for(const server of servers){server.closeAllConnections();if(server.listening)await new Promise(r=>server.close(r));}for(const k of names)if(previous[k]===undefined)delete process.env[k];else process.env[k]=previous[k];});
-  Object.assign(process.env,{JWT_PRIVATE_KEY:keys.privateKey.export({type:'pkcs8',format:'pem'}).toString(),JWT_PUBLIC_KEY:keys.publicKey.export({type:'spki',format:'pem'}).toString(),JWT_ISSUER:'activity-test',JWT_AUDIENCE:'activity-test',JWT_KEY_ID:'activity-test',CLINIC_ACTIVITY_MODE:'cached',CLINIC_READ_MODE:'authoritative'});delete process.env.PHASE2_RUNTIME_REQUIRED;
+  Object.assign(process.env,{JWT_PRIVATE_KEY:keys.privateKey.export({type:'pkcs8',format:'pem'}).toString(),JWT_PUBLIC_KEY:keys.publicKey.export({type:'spki',format:'pem'}).toString(),JWT_ISSUER:'activity-test',JWT_AUDIENCE:'activity-test',JWT_KEY_ID:'activity-test',CLINIC_ACTIVITY_MODE:'cached'});delete process.env.PHASE2_RUNTIME_REQUIRED;
   const accounts=new Map(['admin','owner','staff','doctor'].map(role=>[role,{id:role,role,fullName:'Fixture '+role}]));let denyCore=false,failSql=false,queries=0;
   const coreDb={user:{findUnique:async({where})=>{if(denyCore)throw new Error('PRIVATE_DB');return accounts.get(where.id)??null;},findMany:async()=>[]},pet:{findMany:async()=>[]},$transaction:fn=>fn(coreDb)};
   const clinicDb={$transaction:async(fn,opts)=>{assert.equal(opts.isolationLevel,'RepeatableRead');return fn({$executeRawUnsafe:async()=>0,$queryRaw:async()=>{queries++;if(failSql)throw new Error('PRIVATE_SQL');return [{date:'2030-10-20',type:'general_checkup',status:'completed',n:4n}];}});}};
@@ -29,7 +29,7 @@ test('activity contract/current-admin authorization and cache hits work directly
   const get=(base,role='admin',query=q,headers={},path='/api/dashboard/clinic/activity')=>fetch(base+path+'?'+query,{headers:{...(role?{Authorization:'Bearer '+(tokens[role]??'bad')}:{}),...headers},signal:AbortSignal.timeout(5000)});
   try{
     const direct=await get(clinicUrl),body=await direct.json();assert.equal(direct.status,200);assert.equal(direct.headers.get('cache-control'),'no-store');assert.equal(body.current.total,4);assert.equal(body.current.buckets.length,30);assert.equal(body.meta.source,'source');
-    const proxied=await get(coreUrl),cached=await proxied.json();assert.equal(proxied.status,200);assert.equal(cached.meta.source,'cached');assert.equal(proxied.headers.get('x-clinic-read-source'),'cached');assert.equal(proxied.headers.get('cache-control'),'no-store');
+    const proxied=await get(coreUrl),cached=await proxied.json();assert.equal(proxied.status,200);assert.equal(cached.meta.source,'cached');assert.equal(proxied.headers.get('cache-control'),'no-store');
     assert.deepEqual(cached.current,body.current);assert.equal(queries,1);
     const forged=await get(coreUrl,'admin',q,{'X-Clinic-Read-Consistency':'projection','X-Clinic-Activity-Mode':'source'});
     assert.equal(forged.status,200);assert.equal((await forged.json()).meta.source,'cached');assert.equal(queries,1);

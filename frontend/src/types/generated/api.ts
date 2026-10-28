@@ -725,8 +725,7 @@ export interface ApiSchemas {
       totalDeltaPercent: number | null;
     };
     meta: {
-      source: "source" | "cached" | "summary";
-      generation: string | null;
+      source: "source" | "cached";
       generatedAt: string;
       cacheComputedAt: string | null;
       freshness: {

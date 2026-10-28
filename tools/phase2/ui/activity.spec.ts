@@ -45,7 +45,6 @@ test('activity shows loading/error/zero separately and drills into exact daily a
   await expect.poll(()=>state.lists.length).toBeGreaterThan(0);
   const list=state.lists.at(-1)!;
   expect(list.url.searchParams.get('date')).toBe('2030-10-20');expect(list.url.searchParams.get('category')).toBe('medical');expect(list.url.searchParams.get('status')).toBe('cancelled');
-  expect(list.headers['x-clinic-read-consistency']).toBe('authoritative');
 });
 test('late filter responses never replace the newer query; hidden polling stops and logout clears activity',async({page,context})=>{
   const state=await fixture(context);state.hold=true;
@@ -86,16 +85,12 @@ test('a revoked activity role clears previously displayed aggregates on the next
   await expect(section.getByRole('alert')).toContainText('Chưa cập nhật được hoạt động khám và Spa');
   await expect(section.getByText('Tổng lịch',{exact:true})).toHaveCount(0);
 });
-test('summary and degraded fallback metadata show the updating note with the same totals; authoritative source does not',async({page,context})=>{
+test('cached metadata shows the updating note with the same totals; a fresh source snapshot does not',async({page,context})=>{
   const state=await fixture(context);await page.clock.install();await page.goto('/admin');
   const section=page.getByRole('region',{name:'Hoạt động khám và Spa'}),note=section.getByText('Số liệu tổng hợp đang cập nhật.',{exact:true});
   const total=section.getByText('Tổng lịch',{exact:true}).locator('..');
   await expect(total).toContainText('7');await expect(note).toHaveCount(0);
-  state.meta={source:'summary',generation:'d4-private-generation-7f3a',generatedAt:new Date().toISOString(),cacheComputedAt:null,degraded:false,reason:null,freshness:{state:'within-policy',checkedAt:new Date().toISOString(),observedLagMs:0}};
+  state.meta={source:'cached',generatedAt:new Date().toISOString(),cacheComputedAt:new Date().toISOString(),degraded:false,reason:null,freshness:{state:'within-policy',checkedAt:new Date().toISOString(),observedLagMs:2000}};
   await page.clock.fastForward(20000);await expect(note).toBeVisible();await expect(total).toContainText('7');
-  // Queue/generation/reason are diagnostics only; never shown to the admin.
-  await expect(section.getByText('d4-private-generation-7f3a')).toHaveCount(0);
-  state.meta={source:'source',generation:null,generatedAt:new Date().toISOString(),cacheComputedAt:null,degraded:true,reason:'summary_drift',freshness:{state:'current',checkedAt:new Date().toISOString(),observedLagMs:null}};
-  await page.clock.fastForward(20000);await expect(note).toBeVisible();await expect(section.getByText('summary_drift')).toHaveCount(0);await expect(total).toContainText('7');
   state.meta=undefined;await page.clock.fastForward(20000);await expect(note).toHaveCount(0);
 });

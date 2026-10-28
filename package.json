@@ -14,11 +14,6 @@
   "scripts": {
     "cqrs:test:integration": "node tools/phase2/cqrs/postgres-parity.mjs",
     "cqrs:profile": "node tools/phase2/cqrs/profile-reader.mjs",
-    "cqrs:test:projector": "node tools/phase2/cqrs/run-projector.mjs",
-    "cqrs:test:rebuild": "node tools/phase2/cqrs/run-rebuild.mjs",
-    "cqrs:test:read-path": "node tools/phase2/cqrs/run-read-path.mjs",
-    "cqrs:test:fault": "node tools/phase2/cqrs/run-fault.mjs",
-    "cqrs:rebuild": "node tools/phase2/cqrs/rebuild.mjs",
     "cqrs:test:unit": "tsc -p packages/contracts/tsconfig.json && tsc -p packages/messaging/tsconfig.json && tsc -p services/clinic/tsconfig.json && node --test --test-isolation=none tools/phase2/cqrs/*.test.mjs",
     "test:docker:phase2": "node tools/docker/test-notifications.mjs --phase2",
     "docker:prepare-phase2": "node tools/docker/prepare-phase2.mjs",
@@ -63,13 +58,7 @@
     "activity:build": "npm run build -w @nipopeto/runtime && npm run build -w @nipopeto/contracts && npm run build -w @nipopeto/messaging && npm run build --ignore-scripts -w backend && npm run build --ignore-scripts -w @nipopeto/clinic",
     "activity:test:unit": "npm run activity:build && node --test --test-isolation=none --test-concurrency=1 tools/phase2/cqrs/activity/*.test.mjs",
     "activity:test:ui": "npm run activity:build && npm run build -w frontend && playwright test --config tools/phase2/playwright.config.ts activity.spec.ts",
-    "activity:test:postgres": "node tools/phase2/cqrs/activity/postgres.integration.mjs",
-    "activity:test:summary": "node tools/phase2/cqrs/activity/run-summary-projector.mjs",
-    "activity:test:summary-rebuild": "node tools/phase2/cqrs/activity/run-summary-projector.mjs --run-rebuild",
-    "activity:test:summary-reader": "node tools/phase2/cqrs/activity/run-summary-projector.mjs --run-reader",
-    "activity:test:e2e": "node --import tsx tools/phase2/cqrs/activity/run-e2e.mjs",
-    "activity:test:fault": "node tools/phase2/cqrs/activity/run-summary-projector.mjs --run-fault",
-    "activity:test:smoke": "node tools/phase2/cqrs/activity/run-summary-projector.mjs --run-smoke"
+    "activity:test:postgres": "node tools/phase2/cqrs/activity/postgres.integration.mjs"
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",

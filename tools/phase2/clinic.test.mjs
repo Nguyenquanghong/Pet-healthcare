@@ -151,7 +151,7 @@ test('Clinic API commit survives broker outage; built relay/inbox deliver notifi
   let a;try{a=await create('12:00');status(await request(`/api/appointments/${a.id}/reminder`,{method:'POST',token:tokens.staff}),201);assert.equal((await clinic.appointment.findUniqueOrThrow({where:{id:a.id}})).status,'pending');assert.equal(await core.appointment.count({where:{id:a.id}}),0);}finally{docker('up','-d','--wait','rabbitmq');stopped=false;connection=await connect();channel=await connection.createConfirmChannel();channel.on('error',()=>{});}
   const consumer=await processHandle('services/notification/dist/worker.js',{BROKER_URL:broker,BROKER_PREFIX:prefix,DATABASE_URL:urls.notification});
   const events=await clinic.outboxEvent.findMany({where:{envelope:{path:['payload','relatedAppointmentId'],equals:a.id}}});assert.equal(events.length,2);
-  // CLINIC_READ_PROJECTION defaults to off: no read revision and no read-changed event for the write path.
+  // The retired read projection (see the cqrs-projection-archive tag): the write path leaves no read revision and no read-changed event.
   assert.equal(await clinic.clinicReadRevision.count({where:{aggregateId:a.id}}),0);
   assert.equal(await clinic.outboxEvent.count({where:{AND:[{envelope:{path:['eventType'],equals:'clinic.appointment-read-changed.v1'}},{envelope:{path:['aggregateId'],equals:a.id}}]}}),0);
   await until(async()=>{for(const e of events)if(!await notification.notification.findUnique({where:{id:e.envelope.payload.notificationId}}))return false;return true;},'notification catch-up');

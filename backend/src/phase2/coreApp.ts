@@ -37,7 +37,7 @@ export function createCoreApp(db: PrismaClient, config: {notificationUrl?:string
 }) {
   const app = express(); app.disable('x-powered-by');
   const origins = process.env.CORS_ORIGIN?.split(',').map(value => value.trim()).filter(Boolean);
-  app.use(helmet()); app.use(cors({ origin: origins?.length ? origins : false, credentials: true, exposedHeaders:['X-Clinic-Read-Token','X-Clinic-Read-Source','X-Clinic-Projection-Generation','X-Service-Degraded','Retry-After'] }));
+  app.use(helmet()); app.use(cors({ origin: origins?.length ? origins : false, credentials: true, exposedHeaders:['X-Service-Degraded','Retry-After'] }));
   const jwt = asymmetricConfig();
   if(process.env.PHASE2_RUNTIME_REQUIRED==='1'){
     if(!jwt?.privateKey||!jwt.keyId)throw new Error('CORE_RSA_SIGNING_CONFIGURATION_REQUIRED');
@@ -55,8 +55,8 @@ export function createCoreApp(db: PrismaClient, config: {notificationUrl?:string
   mountDashboards(app,db,Boolean(clinic));
   if(clinic){
     app.use([...clinicPrefixes],express.json({limit:'8mb'}),serviceProxy({name:'clinic',origin:clinic,prefixes:clinicPrefixes,
-      forwardRequestHeaders:['authorization','idempotency-key','x-clinic-min-version','x-clinic-read-consistency'],
-      forwardResponseHeaders:['x-service-instance','x-service-degraded','retry-after','x-clinic-read-token','x-clinic-read-source','x-clinic-projection-generation','cache-control'],
+      forwardRequestHeaders:['authorization','idempotency-key'],
+      forwardResponseHeaders:['x-service-instance','x-service-degraded','retry-after','cache-control'],
       timeoutMs:6000,unavailableMessage:'Clinic service unavailable. Retry the same request key.',notFoundMessage:'Clinic route not found.'}));
     mountAppointmentBilling(app,db,clinic,config.clinicToken!,config.evidenceToken);
   }

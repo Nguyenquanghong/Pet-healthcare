@@ -59,7 +59,7 @@ const rawGet = (base, path, token) => new Promise((resolve, reject) => {
 test('Clinic routes: allowed headers go both ways, body and status pass through, private headers never do', async () => {
   await gateway({}, async ({ base, token, state }) => {
     state.reply = () => ({ status: 409, body: { error: 'Fixture conflict', code: 'MEDICAL_RECORD_STALE' }, headers: {
-      'X-Service-Instance': 'replica-1', 'X-Service-Degraded': 'projection', 'Retry-After': '2', 'X-Clinic-Read-Token': 'read-token',
+      'X-Service-Instance': 'replica-1', 'X-Service-Degraded': 'clinic', 'Retry-After': '2', 'X-Clinic-Read-Token': 'read-token',
       'X-Clinic-Read-Source': 'authoritative', 'X-Clinic-Projection-Generation': 'g1', 'Cache-Control': 'no-store',
       'X-Service-Token': 'private-fixture', 'Set-Cookie': 'internal=private' } });
     const res = await fetch(base + '/api/medical-records/r1', { method: 'PATCH', headers: {
@@ -68,14 +68,16 @@ test('Clinic routes: allowed headers go both ways, body and status pass through,
     assert.equal(res.status, 409);
     assert.deepEqual(await res.json(), { error: 'Fixture conflict', code: 'MEDICAL_RECORD_STALE' });
     assert.equal(res.headers.get('x-service-instance'), 'clinic:replica-1');
-    for (const [name, value] of [['x-service-degraded', 'projection'], ['retry-after', '2'], ['x-clinic-read-token', 'read-token'], ['x-clinic-read-source', 'authoritative'], ['x-clinic-projection-generation', 'g1'], ['cache-control', 'no-store']]) assert.equal(res.headers.get(name), value, name);
+    for (const [name, value] of [['x-service-degraded', 'clinic'], ['retry-after', '2'], ['cache-control', 'no-store']]) assert.equal(res.headers.get(name), value, name);
+    for (const name of ['x-clinic-read-token', 'x-clinic-read-source', 'x-clinic-projection-generation']) assert.equal(res.headers.get(name), null, name + ' is no longer a Clinic response header');
     assert.equal(res.headers.get('x-service-token'), null);
     assert.equal(res.headers.get('set-cookie'), null);
     const [call] = state.calls;
     assert.equal(call.method, 'PATCH'); assert.equal(call.url, '/api/medical-records/r1');
     assert.deepEqual(JSON.parse(call.body), { title: 'T', expectedRevision: 3 });
     assert.equal(call.headers['content-type'], 'application/json');
-    for (const [name, value] of [['authorization', `Bearer ${token}`], ['idempotency-key', 'key-1'], ['x-clinic-min-version', 'v1'], ['x-clinic-read-consistency', 'strong']]) assert.equal(call.headers[name], value, name);
+    for (const [name, value] of [['authorization', `Bearer ${token}`], ['idempotency-key', 'key-1']]) assert.equal(call.headers[name], value, name);
+    assert.equal(call.headers['x-clinic-min-version'], undefined); assert.equal(call.headers['x-clinic-read-consistency'], undefined);
     assert.equal(call.headers['x-service-token'], undefined); assert.equal(call.headers.cookie, undefined);
     state.reply = () => ({ status: 204 });
     const deleted = await fetch(base + '/api/medical-records/r1?expectedRevision=4', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });

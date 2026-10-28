@@ -16,7 +16,7 @@ test('consumes admits only the listed types, not a family prefix', () => {
   assert.equal(consumes('clinic', 'notification.requested.v1'), false);
   assert.equal(consumes('identity', 'identity.sessions-revoked.v1'), true);
   assert.equal(consumes('identity', 'notification.requested.v1'), false);
-  assert.equal(consumes('clinic-read-v1', 'directory.pet-upserted.v1'), false);
+  assert.equal(consumes('notification', 'directory.pet-upserted.v1'), false);
 });
 
 test('P03: a draining type belongs to another consumer and is still applied by the old one', () => {

@@ -15,42 +15,22 @@ import { appointmentDependencies, medicalDependencies, Lifecycle, medicalMutatio
 import { appointmentDto, medicalRecordDto } from './lib/serialize.js';
 import { deduplicated } from './dedup.js';
 import { list } from './infrastructure/queries/authoritativeLists.js';
-import { selectAppointmentQueries } from './application/queries/appointments.js';
 import { AuthoritativeAppointmentQueries } from './infrastructure/queries/authoritativeAppointments.js';
-import { ShadowAppointmentQueries } from './infrastructure/queries/shadowAppointments.js';
-import { ServingAppointmentQueries } from './infrastructure/queries/servingAppointments.js';
-import { ReadFreshness } from './readFreshness.js';
-import {readDiagnostics,diagnosticOperation} from './readDiagnostics.js';
-import { ReadTokens,committedVersions,type ReadVersions } from './readToken.js';
 import {bootstrap} from './bootstrap.js';
 import {parseActivityFilter} from './application/queries/clinicActivity.js';
-import {ClinicActivityQueries,type SummaryEligibility} from './infrastructure/queries/clinicActivity.js';
+import {ClinicActivityQueries} from './infrastructure/queries/clinicActivity.js';
 import {mountBilling} from './billingApi.js';
-import {assertReadProjectionConfig} from './readProjection.js';
 import {blobStoreFromEnv,type BlobStore} from './blobStore.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
 import { requestActor } from '@nipopeto/runtime';
 
-export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?:CoreDirectory,runtime?:ServiceRuntime,readFreshness?:ReadFreshness,activityEvidence?:SummaryEligibility,blobs:BlobStore=blobStoreFromEnv()){
-  assertReadProjectionConfig();
+export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?:CoreDirectory,runtime?:ServiceRuntime,blobs:BlobStore=blobStoreFromEnv()){
   imageRetentionMs(); // AQ-09: an invalid MEDICAL_IMAGE_RETENTION_DAYS fails at startup, not at the first delete
   const app=express();app.disable('x-powered-by');
   const authoritative=new AuthoritativeAppointmentQueries(db);
-  // Activity mode is server configuration (fixed or operator control), never a
-  // client parameter; it is independent of CLINIC_READ_MODE for lists.
-  const activity=new ClinicActivityQueries(db,(process.env.CLINIC_ACTIVITY_MODE??'source') as 'source',undefined,undefined,activityEvidence);
+  // Activity mode is server configuration (source or cached), never a client parameter.
+  const activity=new ClinicActivityQueries(db,(process.env.CLINIC_ACTIVITY_MODE??'source') as 'source'|'cached');
   app.locals.activity=activity;
-  const shadow=process.env.CLINIC_READ_MODE==='shadow'?new ShadowAppointmentQueries(authoritative,db,Number(process.env.CLINIC_SHADOW_EVERY??20)):undefined;
-  const projected=process.env.CLINIC_READ_MODE==='projection';
-  const secret=process.env.CLINIC_READ_TOKEN_SECRET;
-  if(projected&&!secret)throw new Error('CLINIC_READ_TOKEN_SECRET_REQUIRED');
-  if(secret&&['JWT_SECRET','JWT_PRIVATE_KEY','JWT_PUBLIC_KEY','CORE_DIRECTORY_TOKEN','CLINIC_SERVICE_TOKEN','CLINIC_BILLING_TOKEN','CLINIC_BOOTSTRAP_TOKEN','CORE_BILLING_EVIDENCE_TOKEN','RATE_LIMIT_KEY_SECRET','OBSERVABILITY_TOKEN'].some(key=>process.env[key]===secret))throw new Error('DISTINCT_READ_TOKEN_CREDENTIAL_REQUIRED');
-  const tokens=secret?new ReadTokens(secret):undefined;
-  const slots=Number(process.env.CLINIC_PROJECTION_SLOTS??1);
-  const serving=projected?new ServingAppointmentQueries(db,readFreshness??new ReadFreshness(db,undefined,undefined,undefined,{perAggregateLag:true}),undefined,undefined,slots):undefined;
-  const appointmentQueries=selectAppointmentQueries(authoritative,projected?'authoritative':process.env.CLINIC_READ_MODE,shadow);
-  app.locals.appointmentShadow=shadow;
-  app.locals.appointmentServing=serving;
   runtime?.install(app);
   mountBilling(app,db,verify,source);
   app.get('/health/live',(_req,res)=>res.json({service:'clinic',status:'alive'}));
@@ -89,17 +69,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   });
   const appointment=(res:express.Response,bound?:Parameters<typeof appointmentDependencies>[2])=>new AppointmentService(appointmentDependencies(db,res.locals.directory,bound),new BookingLifecycleService(new Lifecycle(db,res.locals.directory,bound)));
   const medical=(res:express.Response,bound?:Parameters<typeof medicalDependencies>[3])=>new MedicalRecordsService(medicalDependencies(db,res.locals.directory,blobs,bound));
-  const read=async(req:express.Request,res:express.Response,run:(reader:typeof appointmentQueries)=>Promise<unknown>)=>readDiagnostics.run(diagnosticOperation(res.locals.actor.role==='owner',req.path.endsWith('/calendar'),req.query),async diagnosticId=>{
-    if(diagnosticId!==undefined)res.setHeader('X-Clinic-Read-Diagnostic-Id',String(diagnosticId));
-    res.setHeader('Cache-Control','no-store');
-    const header=req.headers['x-clinic-min-version'];
-    if(header!==undefined&&!tokens)throw Object.assign(new BusinessError(422,'Clinic read tokens are not configured.'),{code:'CLINIC_READ_TOKEN_INVALID'});
-    const versions=tokens?.verify(header,res.locals.actor)??{};
-    const consistency=req.headers['x-clinic-read-consistency'];
-    if(consistency!==undefined&&consistency!=='authoritative')throw new BusinessError(422,'Invalid Clinic read consistency.');
-    if(serving){const result=await serving.read(run,versions,consistency==='authoritative'||req.query.mode==='unbilled');res.setHeader('X-Clinic-Read-Source',result.source);if(result.generation)res.setHeader('X-Clinic-Projection-Generation',result.generation);if(result.degraded)res.setHeader('X-Service-Degraded','clinic-read');return result.data;}
-    res.setHeader('X-Clinic-Read-Source','authoritative');return await run(appointmentQueries);
-  });
+  const read=async(run:(reader:AuthoritativeAppointmentQueries)=>Promise<unknown>,res:express.Response)=>{res.setHeader('Cache-Control','no-store');return await run(authoritative);};
   // A deferred list answers only after Core authorized the request; a Core refusal (401/403/503) outranks a local error.
   const authorizedRead=async(res:express.Response,compute:()=>Promise<unknown>)=>{
     const directory=res.locals.directory,settle=()=>directory instanceof DeferredDirectory?directory.settle():undefined;
@@ -107,19 +77,15 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
     try{body=await compute();}catch(error){await settle();throw error;}
     await settle();res.json(body);
   };
-  const sendMutation=(res:express.Response,result:{response:unknown;versions:ReadVersions},status=200)=>{
-    res.setHeader('Cache-Control','no-store');
-    if(tokens&&Object.keys(result.versions).length)res.setHeader('X-Clinic-Read-Token',tokens.issue(res.locals.actor,result.versions));
-    res.status(status).json(result.response);
-  };
-  router.get('/appointments',async(req,res)=>authorizedRead(res,()=>read(req,res,reader=>reader.list(res.locals.actor,res.locals.directory,req.query))));
-  router.get('/appointments/calendar',async(req,res)=>res.json(await read(req,res,reader=>reader.calendar(res.locals.actor,{month:req.query.month,category:req.query.category}))));
+  const sendMutation=(res:express.Response,response:unknown,status=200)=>{res.setHeader('Cache-Control','no-store');res.status(status).json(response);};
+  router.get('/appointments',async(req,res)=>authorizedRead(res,()=>read(reader=>reader.list(res.locals.actor,res.locals.directory,req.query),res)));
+  router.get('/appointments/calendar',async(req,res)=>res.json(await read(reader=>reader.calendar(res.locals.actor,{month:req.query.month,category:req.query.category}),res)));
   router.get('/appointments/availability',async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await appointment(res).availability(res.locals.actor,req.query));});
   router.post('/appointments',async(req,res)=>{
-    const result=await deduplicated(db,res.locals.actor.sub,'appointment.create',req.headers['idempotency-key'],normalizeCreate(req.body,false),async tx=>{const row=await appointment(res,tx).create(res.locals.actor,req.body);return{resourceId:row.id,appointmentId:row.id,response:{appointment:appointmentDto(row,res.locals.actor)}};},true);sendMutation(res,result as {response:unknown;versions:ReadVersions},201);
+    const result=await deduplicated(db,res.locals.actor.sub,'appointment.create',req.headers['idempotency-key'],normalizeCreate(req.body,false),async tx=>{const row=await appointment(res,tx).create(res.locals.actor,req.body);return{resourceId:row.id,response:{appointment:appointmentDto(row,res.locals.actor)}};});sendMutation(res,result,201);
   });
   const change=async(req:express.Request,res:express.Response,action:'changeStatus'|'reschedule'|'cancel'|'undoStatus')=>{
-    const result=await db.$transaction(async tx=>{const row=await appointment(res,tx)[action](res.locals.actor,String(req.params.id),req.body??{});return {response:{appointment:appointmentDto(row,res.locals.actor)},versions:await committedVersions(tx,row.id)};});sendMutation(res,result);
+    const result=await db.$transaction(async tx=>{const row=await appointment(res,tx)[action](res.locals.actor,String(req.params.id),req.body??{});return {appointment:appointmentDto(row,res.locals.actor)};});sendMutation(res,result);
   };
   router.patch('/appointments/:id/status',async(req,res)=>change(req,res,'changeStatus'));
   router.patch('/appointments/:id/reschedule',async(req,res)=>change(req,res,'reschedule'));
@@ -128,7 +94,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
   router.post('/appointments/:id/undo-status',async(req,res)=>change(req,res,'undoStatus'));
   router.post('/appointments/:id/reminder',async(req,res)=>{await appointment(res).sendReminder(res.locals.actor,req.params.id);res.status(201).json({message:'Reminder request accepted.'});});
   router.get('/medical-records',async(req,res)=>authorizedRead(res,()=>list(db,'medicalRecords',res.locals.actor,res.locals.directory,req.query)));
-  router.post('/medical-records',async(req,res)=>{const result=await deduplicated(db,res.locals.actor.sub,'medical-record.create',req.headers['idempotency-key'],normalizeCreate(req.body,true),async tx=>{const row=await medical(res,tx).create(res.locals.actor,req.body);return{resourceId:row.id,appointmentId:row.appointmentId,response:{record:medicalRecordDto(row)}};},true);sendMutation(res,result as {response:unknown;versions:ReadVersions},201);});
+  router.post('/medical-records',async(req,res)=>{const result=await deduplicated(db,res.locals.actor.sub,'medical-record.create',req.headers['idempotency-key'],normalizeCreate(req.body,true),async tx=>{const row=await medical(res,tx).create(res.locals.actor,req.body);return{resourceId:row.id,response:{record:medicalRecordDto(row)}};});sendMutation(res,result,201);});
   router.patch('/medical-records/:id',async(req,res)=>res.json({record:medicalRecordDto(await medicalMutation(db,req.params.id,tx=>medical(res,tx).update(res.locals.actor,req.params.id,req.body??{})))}));
   router.delete('/medical-records/:id',async(req,res)=>{await medicalMutation(db,req.params.id,tx=>medical(res,tx).delete(res.locals.actor,req.params.id,req.query.expectedRevision));res.status(204).end();});
   router.get('/medical-records/:id/history',async(req,res)=>res.json({items:await medical(res).history(res.locals.actor,req.params.id)}));
@@ -142,7 +108,7 @@ export function createApp(db:PrismaClient,verify?: (token:string)=>Actor,source?
     // operation itself, independently of the early exact-path rejection above.
     authorize(res.locals.actor,'clinic-activity.read');
     const filter=parseActivityFilter(req.query);
-    try{const result=await activity.read(filter);res.setHeader('X-Clinic-Read-Source',result.meta.source);if(result.meta.generation)res.setHeader('X-Clinic-Projection-Generation',result.meta.generation);if(result.meta.degraded)res.setHeader('X-Service-Degraded','clinic-activity');res.json(result);}
+    try{res.json(await activity.read(filter));}
     catch(error){if(error instanceof BusinessError)throw error;throw new BusinessError(503,'Clinic activity is unavailable. Retry later.');}
   });
   app.use('/api',router);
