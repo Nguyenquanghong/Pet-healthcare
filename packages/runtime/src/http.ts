@@ -6,6 +6,7 @@ import express from 'express';
 import type { Server } from 'node:http';
 import amqp from 'amqplib';
 import { SharedLimiter, type Bucket } from './limiter.js';
+import { circuitBreakers } from './circuitBreaker.js';
 import { acceptsCredential, credential, integer, runtimeEnabled } from './config.js';
 import type { Actor } from './jwt.js';
 import { requestActor } from './jwt.js';
@@ -440,6 +441,21 @@ export class ServiceRuntime {
       gauge('billing_oldest_seconds', this.own.billingAgeSeconds);
       gauge('db_lock_waits', this.own.dbLockWaits);
     }
+    // 1 while a breaker is open or half-open (its probe has not yet succeeded), 0 once closed.
+    const circuits = new Map<string, { open: number; opened: number; rejected: number }>();
+    for (const breaker of circuitBreakers()) {
+      const c = circuits.get(breaker.target) ?? { open: 0, opened: 0, rejected: 0 };
+      c.open = Math.max(c.open, breaker.state === 'closed' ? 0 : 1);
+      c.opened += breaker.counters.opened;
+      c.rejected += breaker.counters.rejected;
+      circuits.set(breaker.target, c);
+    }
+    for (const [target, c] of circuits)
+      lines.push(
+        `pet_circuit_open{${label},target="${target}"} ${c.open}`,
+        `pet_circuit_opened_total{${label},target="${target}"} ${c.opened}`,
+        `pet_circuit_rejected_total{${label},target="${target}"} ${c.rejected}`,
+      );
     for (const [k, v] of Object.entries(this.options.extras?.() ?? {})) {
       if (/^[a-z_]{1,60}$/.test(k)) gauge(k, v);
     }
