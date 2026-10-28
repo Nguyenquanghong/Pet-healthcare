@@ -7,6 +7,7 @@
 export type CircuitState = 'closed' | 'open' | 'half-open';
 
 export class CircuitOpenError extends Error {
+  override readonly name = 'CircuitOpenError';
   constructor(readonly target: string) {
     super('CIRCUIT_OPEN');
   }

@@ -5,7 +5,7 @@ import {execFileSync,spawn} from 'node:child_process';
 import {randomUUID,generateKeyPairSync} from 'node:crypto';
 import {once} from 'node:events';
 import {createServer} from 'node:net';
-import {request as httpRequest} from 'node:http';
+import {request as httpRequest,createServer as createHttpServer} from 'node:http';
 import {PrismaClient as CoreClient} from '@prisma/client';
 import {PrismaClient as ClinicClient} from '../../services/clinic/src/generated/client/index.js';
 import {PrismaClient as NotificationClient} from '../../services/notification/src/generated/client/index.js';
@@ -18,6 +18,7 @@ import {OutboxRelay as CoreRelay} from '../../backend/dist/src/phase2/relay.js';
 import {RuntimeOutboxStore} from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';
 import {OutboxRelay as ClinicRelay} from '../../services/clinic/dist/relay.js';
 import {topology,declareTopology,publishConfirmed} from '@nipopeto/messaging';
+import {isTransientFailure} from '@nipopeto/runtime';
 import amqp from 'amqplib';
 import {readFileSync} from 'node:fs';
 import {blobTestEnv} from './blob-test.mjs';
@@ -386,4 +387,29 @@ test('CQRS cleanup migration: fence and source-acl triggers are gone, a frozen r
     assert.ok(closedAt&&Math.abs(Date.now()-closedAt.getTime())<10000,'the retired event type is marked published now, in UTC: '+closedAt?.toISOString());
     assert.equal(rows.find(r=>r.id===kept).publishedAt,null,'other event types stay open');
   }finally{await clinic.outboxEvent.deleteMany({where:{id:{in:[retired,kept]}}});}
+});
+test('blob store: 5xx, 408 and 429 and a refused connection are transient; every other refusal is not, so it answers 500',async()=>{
+  const answers={};
+  const stub=createHttpServer((req,res)=>{res.statusCode=answers[req.method]??200;res.end('<ListBucketResult></ListBucketResult>');});
+  stub.listen(0,'127.0.0.1');await once(stub,'listening');
+  const store=blobStoreFromEnv({...blobTestEnv,BLOB_ENDPOINT:'http://127.0.0.1:'+stub.address().port});
+  const operations={put:()=>store.put('images/x',Buffer.from('x'),'image/png'),remove:()=>store.remove('images/x'),list:()=>store.list('images/'),check:()=>store.check(),ensureBucket:()=>store.ensureBucket()};
+  const method={put:'PUT',remove:'DELETE',list:'GET',check:'HEAD',ensureBucket:'HEAD'};
+  const failure=async(operation,code)=>{answers[method[operation]]=code;return operations[operation]().then(()=>assert.fail(operation+' '+code+' resolved'),e=>e);};
+  try{
+    for(const operation of Object.keys(operations)){
+      for(const code of [500,502,503,504,408,429]){const error=await failure(operation,code);assert.equal(isTransientFailure(error),true,operation+' '+code);assert.match(error.message,new RegExp('_'+code+'$'));}
+      for(const code of [400,401,403,405,409,413,422]){const error=await failure(operation,code);assert.equal(isTransientFailure(error),false,operation+' '+code);assert.match(error.message,new RegExp('_'+code+'$'));}
+    }
+    answers.DELETE=404;await operations.remove();// already gone is the desired end state
+  }finally{stub.closeAllConnections();await close(stub);}
+  const refused=await operations.put().then(()=>assert.fail('connected'),e=>e);
+  assert.equal(isTransientFailure(refused),true,'nothing listens: a network error is transient');
+});
+test('classifier on real Prisma errors: a raw-query deadlock, serialization failure or lock timeout is transient, a syntax error is not',async()=>{
+  const raise=state=>clinic.$queryRawUnsafe(`DO $$ BEGIN RAISE EXCEPTION 'p2010 fixture' USING ERRCODE='${state}'; END $$`).then(()=>assert.fail('no error for '+state),e=>e);
+  for(const state of ['40001','40P01','55P03','57014','53300']){const error=await raise(state);assert.equal(error.code,'P2010');assert.equal(error.meta.code,state);assert.equal(isTransientFailure(error),true,state);}
+  for(const state of ['42601','23505']){const error=await raise(state);assert.equal(error.meta.code,state);assert.equal(isTransientFailure(error),false,state);}
+  const syntax=await clinic.$queryRawUnsafe('SELEC 1').then(()=>assert.fail('parsed'),e=>e);
+  assert.equal(syntax.meta.code,'42601');assert.equal(isTransientFailure(syntax),false);
 });
