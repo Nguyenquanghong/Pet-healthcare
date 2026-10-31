@@ -7,7 +7,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          # Exact version: a floating 24 moved to 24.22.1 and its undici failed an internal
+          # assert in the migration proof. Raise this on purpose, not by runner update.
+          node-version: 24.21.0
           cache: npm
       - run: npm ci
       - run: npm test

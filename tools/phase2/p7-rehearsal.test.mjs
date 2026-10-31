@@ -43,7 +43,8 @@ async function configureGateway(nextMode,paused){
   else execFileSync(binary,[...args,'-s','reload'],{stdio:'pipe'});
   // After a reload the old worker can still accept a connection or two with the previous
   // config (a write would get its maintenance 503), so require a run of fresh markers.
-  let fresh=0;await until(async()=>{try{fresh=(await fetch(gateway+'/api/openapi.json')).headers.get('x-p7-gateway')===marker?fresh+1:0;}catch{fresh=0;}return fresh>=5;},'gateway_'+marker);
+  // The body is read so no unread response is left paused when nginx closes the connection (keepalive_timeout 0).
+  let fresh=0;await until(async()=>{try{const r=await fetch(gateway+'/api/openapi.json'),served=r.headers.get('x-p7-gateway');await r.arrayBuffer();fresh=served===marker?fresh+1:0;}catch{fresh=0;}return fresh>=5;},'gateway_'+marker);
 }
 async function startTargets(){
   coreApi=await child('backend/dist/src/index.js',{...secrets,JWT_PRIVATE_KEY:keys.privateKey.export({type:'pkcs8',format:'pem'}).toString(),DATABASE_URL:url(ctx,'core'),PORT:String(ports.core),SERVICE_INSTANCE_ID:'p7-core',CLINIC_SERVICE_URL:origins.clinic,NOTIFICATION_SERVICE_URL:origins.notification},'core-api',h=>fetch(h.base+'/health/ready').then(r=>r.status===200).catch(()=>false));
