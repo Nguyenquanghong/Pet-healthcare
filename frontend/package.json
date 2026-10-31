@@ -9,20 +9,20 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "lucide-react": "latest",
+    "@vitejs/plugin-react": "6.1.0",
+    "lucide-react": "1.33.0",
     "qrcode-generator": "2.0.4",
-    "react": "latest",
-    "react-dom": "latest",
-    "react-router-dom": "latest",
-    "vite": "latest"
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-router-dom": "7.18.2",
+    "vite": "8.2.2"
   },
   "devDependencies": {
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "autoprefixer": "latest",
-    "postcss": "latest",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "autoprefixer": "10.5.4",
+    "postcss": "8.5.26",
     "tailwindcss": "^3.4.17",
-    "typescript": "latest"
+    "typescript": "7.0.2"
   }
 }
