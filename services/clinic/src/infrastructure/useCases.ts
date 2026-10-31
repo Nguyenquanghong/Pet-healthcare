@@ -3,6 +3,7 @@ import type { Actor } from '../domain/auth.js';
 import type { AppointmentQueries } from '../application/ports/appointmentQueries.js';
 import type { ReservationBilling } from '../application/ports/billing.js';
 import type { ReadinessProbe } from '../application/ports/readiness.js';
+import type { ScopeLookup } from '../application/ports/requestScope.js';
 import { AppointmentService } from '../application/services/appointments.js';
 import { BookingLifecycleService } from '../application/services/bookingLifecycle.js';
 import { MedicalRecordsService } from '../application/services/medicalRecords.js';
@@ -15,6 +16,7 @@ import { deduplicated } from './persistence/dedup.js';
 import { medicalDependencies, medicalMutation } from './persistence/medicalRepository.js';
 import { PrismaReadiness } from './persistence/readiness.js';
 import { AppointmentBilling } from './persistence/runtimeBilling.js';
+import { PrismaScopeLookup } from './persistence/scopeLookup.js';
 import { AuthoritativeAppointmentQueries } from './queries/authoritativeAppointments.js';
 import { list } from './queries/authoritativeLists.js';
 import { ClinicActivityQueries } from './queries/clinicActivity.js';
@@ -55,6 +57,7 @@ export function clinicUseCases(db: ClinicDatabase, blobs: BlobStore) {
     bootstrap: (actor: Actor, directory: RequestDirectory) => bootstrap(db, actor, directory),
     billing: new AppointmentBilling(db) as ReservationBilling,
     readiness: new PrismaReadiness(db) as ReadinessProbe,
+    scopeLookup: new PrismaScopeLookup(db) as ScopeLookup,
   };
 }
 export type UseCases = ReturnType<typeof clinicUseCases>;

@@ -5,7 +5,7 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "lines": 314
+        "lines": 247
       }
     },
     "S2": {
@@ -54,7 +54,7 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "lines": 4
+        "lines": 0
       }
     },
     "S9": {
