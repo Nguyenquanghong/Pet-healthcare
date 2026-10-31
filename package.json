@@ -62,8 +62,8 @@
     "activity:test:unit": "npm run activity:build && node --test --test-isolation=none --test-concurrency=1 tools/phase2/cqrs/activity/*.test.mjs",
     "activity:test:ui": "npm run activity:build && npm run build -w frontend && playwright test --config tools/phase2/playwright.config.ts activity.spec.ts",
     "activity:test:postgres": "node tools/phase2/cqrs/activity/postgres.integration.mjs",
-    "format:phase2": "prettier --write \"services/*/src/**/*.ts\" \"backend/src/{composition,gateway,workers,routes/internal}/**/*.ts\" \"backend/src/routes/dashboard.ts\" \"backend/src/middleware/currentAccount.ts\" \"backend/src/infrastructure/persistence/{appointmentBilling,billing}.ts\" \"packages/*/src/**/*.ts\"",
-    "format:check:phase2": "prettier --check \"services/*/src/**/*.ts\" \"backend/src/{composition,gateway,workers,routes/internal}/**/*.ts\" \"backend/src/routes/dashboard.ts\" \"backend/src/middleware/currentAccount.ts\" \"backend/src/infrastructure/persistence/{appointmentBilling,billing}.ts\" \"packages/*/src/**/*.ts\""
+    "format:phase2": "prettier --write \"services/*/src/**/*.ts\" \"backend/src/**/*.ts\" \"packages/*/src/**/*.ts\"",
+    "format:check:phase2": "prettier --check \"services/*/src/**/*.ts\" \"backend/src/**/*.ts\" \"packages/*/src/**/*.ts\""
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",

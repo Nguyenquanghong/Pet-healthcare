@@ -1,6 +1,6 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
-import type { CounterOwnerData, OwnerRepository } from "../../application/ports/owners.js";
-import { BusinessError } from "../../domain/error.js";
+import { Prisma, type PrismaClient } from '@prisma/client';
+import type { CounterOwnerData, OwnerRepository } from '../../application/ports/owners.js';
+import { BusinessError } from '../../domain/error.js';
 
 export class PrismaOwnerRepository implements OwnerRepository {
   constructor(private readonly client: PrismaClient) {}
@@ -18,10 +18,10 @@ export class PrismaOwnerRepository implements OwnerRepository {
   async createCounterOwner(data: CounterOwnerData) {
     try {
       // A counter profile has no login credential; an empty hash can never verify.
-      return await this.client.user.create({ data: { ...data, role: "owner", passwordHash: "", passwordSalt: "" } });
+      return await this.client.user.create({ data: { ...data, role: 'owner', passwordHash: '', passwordSalt: '' } });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")
-        throw new BusinessError(409, "Đã có hồ sơ dùng số điện thoại hoặc email này. Hãy tìm và chọn khách đã có.");
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')
+        throw new BusinessError(409, 'Đã có hồ sơ dùng số điện thoại hoặc email này. Hãy tìm và chọn khách đã có.');
       throw error;
     }
   }

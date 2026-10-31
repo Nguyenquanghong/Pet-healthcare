@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from '@prisma/client';
 
 export function databaseHealthCheck(client: PrismaClient) {
   return async () => {

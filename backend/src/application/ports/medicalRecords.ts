@@ -1,29 +1,55 @@
-import type { Actor } from "../../domain/auth.js";
+import type { Actor } from '../../domain/auth.js';
 export type MedicalRecordValue = {
-  id: string; petId: string; ownerId: string; appointmentId: string | null;
-  doctorName: string; visitDate: Date; title: string; symptoms: string | null;
-  diagnosis: string; treatment: string; medications: string | null;
-  vaccineName: string | null; followUpDate: Date | null;
+  id: string;
+  petId: string;
+  ownerId: string;
+  appointmentId: string | null;
+  doctorName: string;
+  visitDate: Date;
+  title: string;
+  symptoms: string | null;
+  diagnosis: string;
+  treatment: string;
+  medications: string | null;
+  vaccineName: string | null;
+  followUpDate: Date | null;
   weightKg: number | { toString(): string } | null;
   temperatureC: number | { toString(): string } | null;
-  heartRateBpm: number | null; internalNote: string | null;
-  createdAt: Date; updatedAt: Date;
+  heartRateBpm: number | null;
+  internalNote: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 export type MedicalImageValue = {
-  id: string; petId: string; title: string; imageUrl: string; mimeType: string; createdAt: Date;
+  id: string;
+  petId: string;
+  title: string;
+  imageUrl: string;
+  mimeType: string;
+  createdAt: Date;
 };
 
 export type MedicalWrite = {
-  petId: string; ownerId: string; appointmentId: string | null;
-  doctorName: string; visitDate: Date; title: string; symptoms: string | null;
-  diagnosis: string; treatment: string; medications: string | null;
-  vaccineName: string | null; followUpDate: Date | null;
-  weightKg?: number | null; temperatureC?: number | null; heartRateBpm?: number | null;
+  petId: string;
+  ownerId: string;
+  appointmentId: string | null;
+  doctorName: string;
+  visitDate: Date;
+  title: string;
+  symptoms: string | null;
+  diagnosis: string;
+  treatment: string;
+  medications: string | null;
+  vaccineName: string | null;
+  followUpDate: Date | null;
+  weightKg?: number | null;
+  temperatureC?: number | null;
+  heartRateBpm?: number | null;
   internalNote: string | null;
 };
 
-export type MedicalUpdate = Partial<Omit<MedicalWrite, "petId" | "ownerId" | "appointmentId">>;
+export type MedicalUpdate = Partial<Omit<MedicalWrite, 'petId' | 'ownerId' | 'appointmentId'>>;
 
 export interface MedicalRecordRepository {
   list(ownerId?: string, petId?: string): Promise<MedicalRecordValue[]>;
@@ -39,7 +65,16 @@ export interface MedicalRecordRepository {
 }
 
 export interface MedicalNotificationWriter {
-  create(draft: { recipientOwnerId: string; recipientRole: string; type: string; title: string; message: string; actionUrl: string; relatedPetId: string; relatedAppointmentId: string | null }): Promise<void>;
+  create(draft: {
+    recipientOwnerId: string;
+    recipientRole: string;
+    type: string;
+    title: string;
+    message: string;
+    actionUrl: string;
+    relatedPetId: string;
+    relatedAppointmentId: string | null;
+  }): Promise<void>;
 }
 
 export interface MedicalTransaction {

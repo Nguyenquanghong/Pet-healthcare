@@ -1,5 +1,18 @@
-export type PaymentAttemptValue = { id: string; invoiceId: string; amount: number | { toString(): string }; status: string; createdAt: Date; expiresAt: Date };
-export type PaymentResult = { reference: string; amount: number; success: boolean; transactionNo: string; responseCode: string };
+export type PaymentAttemptValue = {
+  id: string;
+  invoiceId: string;
+  amount: number | { toString(): string };
+  status: string;
+  createdAt: Date;
+  expiresAt: Date;
+};
+export type PaymentResult = {
+  reference: string;
+  amount: number;
+  success: boolean;
+  transactionNo: string;
+  responseCode: string;
+};
 export type IpnReply = { RspCode: string; Message: string };
 export interface PaymentGateway {
   enabled(): boolean;
