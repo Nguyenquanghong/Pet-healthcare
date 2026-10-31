@@ -4,7 +4,12 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # Same paths the split gateway hides (deploy/phase2/nginx.split.conf.example); never the SPA fallback.
+    location ~ ^/(internal|metrics|health) { return 404; }
+
     location /api/ {
+        # Medical images are base64 JSON, up to 5 MB of file (about 7 MB); Core and Clinic accept 8 MB.
+        client_max_body_size 8m;
         proxy_pass http://api:${API_PORT};
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
