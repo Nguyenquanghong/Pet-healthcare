@@ -1,4 +1,7 @@
 import type { Actor } from '../../domain/auth.js';
+import type { InvoiceLine } from '../../domain/billing/charges.js';
+
+export type { InvoiceLine };
 
 export type InvoiceValue = {
   id: string;
@@ -54,7 +57,6 @@ export type InvoiceSource = {
   amount?: number;
   serviceType?: string;
 };
-export type InvoiceLine = { description: string; quantity: number; unitPrice: number; amount: number };
 export type InvoiceCreateData = {
   type: InvoiceType;
   ownerId: string;
