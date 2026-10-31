@@ -4,3 +4,5 @@
 f8f9445742cda5c97fc4e1519af1c87ee6aa9486
 # Pure move: the Clinic modules go to their layers and lib/serialize to application (no logic change)
 ab8657bd3102d61f351a7e8fc93a271acb0e40d7
+# Pure move: Core backend/src/phase2 is dissolved into composition, gateway, workers, routes/internal and the layers (no logic change)
+bbcc5a77f842abf90a954b580723d0c3b3bbc926
