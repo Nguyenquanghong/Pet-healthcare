@@ -2,11 +2,12 @@ import type { PrismaClient, Prisma } from '../../generated/client/index.js';
 import type { Actor } from '../../domain/auth.js';
 import { BusinessError } from '../../domain/error.js';
 import type { BillingSourceSnapshot, CoreState } from '@nipopeto/contracts';
+import type { ReservationBilling } from '../../application/ports/billing.js';
 
 function permitted(actor: Actor, ownerId: string) {
   if (actor.role === 'owner' && actor.sub !== ownerId) throw new BusinessError(404, 'Billing source not found.');
 }
-export class AppointmentBilling {
+export class AppointmentBilling implements ReservationBilling {
   constructor(private readonly db: PrismaClient) {}
   async source(appointmentId: string, actor: Actor): Promise<BillingSourceSnapshot> {
     const a = await this.db.appointment.findUnique({ where: { id: appointmentId } });
@@ -81,6 +82,9 @@ export class AppointmentBilling {
     if (evidence.state === 'PREPARING') return this.db.appointmentReservation.findUnique({ where: { operationId } });
     const terminal = { ...evidence, state: evidence.state };
     return this.db.$transaction(tx => applyBillingTerminal(tx, operationId, terminal));
+  }
+  async reservation(operationId: string) {
+    return this.db.appointmentReservation.findUnique({ where: { operationId } });
   }
 }
 

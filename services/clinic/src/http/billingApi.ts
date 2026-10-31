@@ -1,18 +1,16 @@
 import express from 'express';
-import type { PrismaClient } from '../generated/client/index.js';
 import type { Actor } from '../domain/auth.js';
 import { BusinessError } from '../domain/error.js';
+import type { ReservationBilling } from '../application/ports/billing.js';
 import type { CoreDirectory } from '../infrastructure/core/directory.js';
-import { AppointmentBilling } from '../infrastructure/persistence/runtimeBilling.js';
 
 export function mountBilling(
   app: express.Express,
-  db: PrismaClient,
+  billing: ReservationBilling,
   verify: ((token: string) => Actor) | undefined,
   source: CoreDirectory | undefined,
 ) {
-  const router = express.Router(),
-    billing = new AppointmentBilling(db);
+  const router = express.Router();
   router.use((req, res, next) => {
     if (!/^\/billing-(sources|reservations)(\/|$)/.test(req.path)) {
       next('router');
@@ -61,7 +59,7 @@ export function mountBilling(
     res.json({ snapshot });
   });
   router.get('/billing-reservations/:operationId', async (req, res) => {
-    const r = await db.appointmentReservation.findUnique({ where: { operationId: id(req.params.operationId) } });
+    const r = await billing.reservation(id(req.params.operationId));
     if (!r) throw new BusinessError(404, 'Reservation not found.');
     res.json({
       operationId: r.operationId,

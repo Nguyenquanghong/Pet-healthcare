@@ -1,5 +1,4 @@
 import express, { type ErrorRequestHandler } from 'express';
-import type { PrismaClient } from './generated/client/index.js';
 import type { Actor } from './domain/auth.js';
 import { BusinessError, StaleRevision } from './domain/error.js';
 import type { MedicalRecordValue } from './application/ports/medicalRecords.js';
@@ -7,27 +6,18 @@ import { authorize } from './domain/authorization.js';
 import { imageRetentionMs } from './infrastructure/blob/blobCleanup.js';
 import { objectInput, calendarDate, requiredText } from './domain/validation.js';
 import { CoreDirectory, RequestDirectory, DeferredDirectory, failClosed } from './infrastructure/core/directory.js';
-import { AppointmentService } from './application/services/appointments.js';
-import { MedicalRecordsService, medicalFields } from './application/services/medicalRecords.js';
+import { medicalFields } from './application/services/medicalRecords.js';
 import { appointmentTypes } from './application/ports/appointments.js';
-import { BookingLifecycleService } from './application/services/bookingLifecycle.js';
-import { appointmentDependencies } from './infrastructure/persistence/appointmentRepository.js';
-import { medicalDependencies, medicalMutation } from './infrastructure/persistence/medicalRepository.js';
-import { Lifecycle } from './infrastructure/persistence/bookingLifecycleRepository.js';
 import { appointmentDto, medicalRecordDto } from './application/serialize.js';
-import { deduplicated } from './infrastructure/persistence/dedup.js';
-import { list } from './infrastructure/queries/authoritativeLists.js';
-import { AuthoritativeAppointmentQueries } from './infrastructure/queries/authoritativeAppointments.js';
-import { bootstrap } from './infrastructure/persistence/bootstrap.js';
 import { parseActivityFilter } from './application/queries/clinicActivity.js';
-import { ClinicActivityQueries } from './infrastructure/queries/clinicActivity.js';
 import { mountBilling } from './http/billingApi.js';
 import { blobStoreFromEnv, type BlobStore } from './infrastructure/blob/blobStore.js';
+import { clinicUseCases, type ClinicDatabase, type Tx, type UseCases } from './infrastructure/useCases.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
 import { currentRequestId, isTransientFailure, reportUnexpected, requestActor, requestFault } from '@nipopeto/runtime';
 
 export function createApp(
-  db: PrismaClient,
+  db: ClinicDatabase,
   verify?: (token: string) => Actor,
   source?: CoreDirectory,
   runtime?: ServiceRuntime,
@@ -36,19 +26,14 @@ export function createApp(
   imageRetentionMs(); // AQ-09: an invalid MEDICAL_IMAGE_RETENTION_DAYS fails at startup, not at the first delete
   const app = express();
   app.disable('x-powered-by');
-  const authoritative = new AuthoritativeAppointmentQueries(db);
-  // Activity mode is server configuration (source or cached), never a client parameter.
-  const activity = new ClinicActivityQueries(db, (process.env.CLINIC_ACTIVITY_MODE ?? 'source') as 'source' | 'cached');
-  app.locals.activity = activity;
+  const useCases = clinicUseCases(db, blobs);
+  app.locals.activity = useCases.activity;
   runtime?.install(app);
-  mountBilling(app, db, verify, source);
+  mountBilling(app, useCases.billing, verify, source);
   app.get('/health/live', (_req, res) => res.json({ service: 'clinic', status: 'alive' }));
   app.get('/health/ready', async (_req, res) => {
     try {
-      await db.appointment.count();
-      await db.medicalRecord.count();
-      await db.medicalImage.count();
-      await db.requestDedup.count();
+      await useCases.readiness.check();
       res.json({ service: 'clinic', status: 'ready' });
     } catch {
       res.status(503).json({ service: 'clinic', status: 'unavailable' });
@@ -142,16 +127,11 @@ export function createApp(
     res.locals.directory = new RequestDirectory(source!, actor, token, snapshot);
     next();
   });
-  const appointment = (res: express.Response, bound?: Parameters<typeof appointmentDependencies>[2]) =>
-    new AppointmentService(
-      appointmentDependencies(db, res.locals.directory, bound),
-      new BookingLifecycleService(new Lifecycle(db, res.locals.directory, bound)),
-    );
-  const medical = (res: express.Response, bound?: Parameters<typeof medicalDependencies>[3]) =>
-    new MedicalRecordsService(medicalDependencies(db, res.locals.directory, blobs, bound));
-  const read = async (run: (reader: AuthoritativeAppointmentQueries) => Promise<unknown>, res: express.Response) => {
+  const appointment = (res: express.Response, bound?: Tx) => useCases.appointment(res.locals.directory, bound);
+  const medical = (res: express.Response, bound?: Tx) => useCases.medical(res.locals.directory, bound);
+  const read = async (run: (reader: UseCases['appointmentReads']) => Promise<unknown>, res: express.Response) => {
     res.setHeader('Cache-Control', 'no-store');
-    return await run(authoritative);
+    return await run(useCases.appointmentReads);
   };
   // A deferred list answers only after Core authorized the request; a Core refusal (401/403/503) outranks a local error.
   const authorizedRead = async (res: express.Response, compute: () => Promise<unknown>) => {
@@ -187,8 +167,7 @@ export function createApp(
     res.json(await appointment(res).availability(res.locals.actor, req.query));
   });
   router.post('/appointments', async (req, res) => {
-    const result = await deduplicated(
-      db,
+    const result = await useCases.createOnce(
       res.locals.actor.sub,
       'appointment.create',
       req.headers['idempotency-key'],
@@ -205,7 +184,7 @@ export function createApp(
     res: express.Response,
     action: 'changeStatus' | 'reschedule' | 'cancel' | 'undoStatus',
   ) => {
-    const result = await db.$transaction(async tx => {
+    const result = await useCases.transaction(async tx => {
       const row = await appointment(res, tx)[action](res.locals.actor, String(req.params.id), req.body ?? {});
       return { appointment: appointmentDto(row, res.locals.actor) };
     });
@@ -223,11 +202,10 @@ export function createApp(
     res.status(201).json({ message: 'Reminder request accepted.' });
   });
   router.get('/medical-records', async (req, res) =>
-    authorizedRead(res, () => list(db, 'medicalRecords', res.locals.actor, res.locals.directory, req.query)),
+    authorizedRead(res, () => useCases.list('medicalRecords', res.locals.actor, res.locals.directory, req.query)),
   );
   router.post('/medical-records', async (req, res) => {
-    const result = await deduplicated(
-      db,
+    const result = await useCases.createOnce(
       res.locals.actor.sub,
       'medical-record.create',
       req.headers['idempotency-key'],
@@ -242,14 +220,14 @@ export function createApp(
   router.patch('/medical-records/:id', async (req, res) =>
     res.json({
       record: medicalRecordDto(
-        await medicalMutation(db, req.params.id, tx =>
+        await useCases.medicalMutation(req.params.id, tx =>
           medical(res, tx).update(res.locals.actor, req.params.id, req.body ?? {}),
         ),
       ),
     }),
   );
   router.delete('/medical-records/:id', async (req, res) => {
-    await medicalMutation(db, req.params.id, tx =>
+    await useCases.medicalMutation(req.params.id, tx =>
       medical(res, tx).delete(res.locals.actor, req.params.id, req.query.expectedRevision),
     );
     res.status(204).end();
@@ -259,9 +237,7 @@ export function createApp(
   );
   router.get('/medical-records/images', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    await authorizedRead(res, () =>
-      list(db, 'medicalImages', res.locals.actor, res.locals.directory, req.query, blobs),
-    );
+    await authorizedRead(res, () => useCases.list('medicalImages', res.locals.actor, res.locals.directory, req.query));
   });
   router.post('/medical-records/images', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -277,7 +253,7 @@ export function createApp(
   });
   router.get('/dashboard/clinic', async (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ ...(await bootstrap(db, res.locals.actor, res.locals.directory)), asOf: new Date().toISOString() });
+    res.json({ ...(await useCases.bootstrap(res.locals.actor, res.locals.directory)), asOf: new Date().toISOString() });
   });
   router.get('/dashboard/clinic/activity', async (req, res) => {
     // Express also matches trailing slashes/case variants; authorize the matched
@@ -285,7 +261,7 @@ export function createApp(
     authorize(res.locals.actor, 'clinic-activity.read');
     const filter = parseActivityFilter(req.query);
     try {
-      res.json(await activity.read(filter));
+      res.json(await useCases.activity.read(filter));
     } catch (error) {
       if (error instanceof BusinessError) throw error;
       throw new BusinessError(503, 'Clinic activity is unavailable. Retry later.');
