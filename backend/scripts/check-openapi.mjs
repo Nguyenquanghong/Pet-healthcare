@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import SwaggerParser from "@apidevtools/swagger-parser";
 
@@ -28,8 +28,11 @@ for (const [file, mount] of Object.entries(mounts)) {
   }
 }
 const documented = new Set();
-const clinicSource=readFileSync(resolve(backend,'../services/clinic/src/app.ts'),'utf8');
-for(const match of clinicSource.matchAll(/\brouter\.(get|post|patch|put|delete)\(\s*['"]([^'"]+)['"]/g)){
+// Clinic declares each route as an element of its registry, `{ method: 'get', path: '/x', ...`, in http/routes/*.ts.
+const clinicRoutes=resolve(backend,'../services/clinic/src/http/routes');
+const clinicRouteFiles=readdirSync(clinicRoutes).filter(file=>file.endsWith('.ts')).sort();
+assert.ok(clinicRouteFiles.length>0,'Clinic route files not found');
+for(const file of clinicRouteFiles)for(const match of readFileSync(resolve(clinicRoutes,file),'utf8').matchAll(/\{\s*method:\s*'(get|post|patch|put|delete)',\s*path:\s*'([^']+)'/g)){
   runtime.add(`${match[1].toUpperCase()} /api${match[2].replace(/:([A-Za-z][\w]*)/g,'{$1}')}`);
 }
 // Core entrypoint composes the independently owned Notification public router.

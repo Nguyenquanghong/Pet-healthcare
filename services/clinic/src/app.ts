@@ -1,20 +1,20 @@
-import express, { type ErrorRequestHandler } from 'express';
+import express from 'express';
 import type { Actor } from './domain/auth.js';
-import { BusinessError, StaleRevision } from './domain/error.js';
-import type { MedicalRecordValue } from './application/ports/medicalRecords.js';
+import { BusinessError } from './domain/error.js';
 import { authorize } from './domain/authorization.js';
 import { imageRetentionMs } from './infrastructure/blob/blobCleanup.js';
-import { objectInput, calendarDate, requiredText } from './domain/validation.js';
+import { objectInput } from './domain/validation.js';
 import { CoreDirectory, RequestDirectory, DeferredDirectory, failClosed } from './infrastructure/core/directory.js';
-import { medicalFields } from './application/services/medicalRecords.js';
-import { appointmentTypes } from './application/ports/appointments.js';
-import { appointmentDto, medicalRecordDto } from './application/serialize.js';
-import { parseActivityFilter } from './application/queries/clinicActivity.js';
 import { mountBilling } from './http/billingApi.js';
+import { errorHandler } from './http/errors.js';
+import { appointmentRoutes } from './http/routes/appointments.js';
+import { dashboardRoutes } from './http/routes/dashboard.js';
+import { medicalRecordRoutes } from './http/routes/medicalRecords.js';
+import { mountRoutes } from './http/scope.js';
 import { blobStoreFromEnv, type BlobStore } from './infrastructure/blob/blobStore.js';
-import { clinicUseCases, type ClinicDatabase, type Tx, type UseCases } from './infrastructure/useCases.js';
+import { clinicUseCases, type ClinicDatabase } from './infrastructure/useCases.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
-import { currentRequestId, isTransientFailure, reportUnexpected, requestActor, requestFault } from '@nipopeto/runtime';
+import { requestActor } from '@nipopeto/runtime';
 
 export function createApp(
   db: ClinicDatabase,
@@ -66,8 +66,20 @@ export function createApp(
     if (req.path === '/dashboard/clinic/activity') authorize(_res.locals.actor, 'clinic-activity.read');
     next();
   });
-  const deferredReads = new Set(['/appointments', '/medical-records', '/medical-records/images']);
-  router.use(async (req, res, next) => {
+  router.use(legacyRequestScope(db, source));
+  mountRoutes(router, [...appointmentRoutes(useCases), ...medicalRecordRoutes(useCases), ...dashboardRoutes(useCases)]);
+  app.use('/api', router);
+  app.use((_req, res) => res.status(404).json({ error: 'Clinic route not found.' }));
+  app.use(errorHandler);
+  return app;
+}
+
+const deferredReads = new Set(['/appointments', '/medical-records', '/medical-records/images']);
+// What decides, from the URL alone, which pets and which doctor Core is asked about before a handler runs. The routes
+// already declare what this reads from the path (resource, writePermission, deferred, ignoreQueryPetId, trimBodyPetId);
+// the commit that makes them the source replaces this function.
+function legacyRequestScope(db: ClinicDatabase, source: CoreDirectory | undefined): express.RequestHandler {
+  return async (req, res, next) => {
     const actor = res.locals.actor as Actor;
     if (req.path.startsWith('/medical-records') && req.method !== 'GET') authorize(actor, 'medical-record.write');
     if (req.body === undefined && ['POST', 'PATCH', 'PUT'].includes(req.method)) req.body = {};
@@ -126,230 +138,5 @@ export function createApp(
     });
     res.locals.directory = new RequestDirectory(source!, actor, token, snapshot);
     next();
-  });
-  const appointment = (res: express.Response, bound?: Tx) => useCases.appointment(res.locals.directory, bound);
-  const medical = (res: express.Response, bound?: Tx) => useCases.medical(res.locals.directory, bound);
-  const read = async (run: (reader: UseCases['appointmentReads']) => Promise<unknown>, res: express.Response) => {
-    res.setHeader('Cache-Control', 'no-store');
-    return await run(useCases.appointmentReads);
   };
-  // A deferred list answers only after Core authorized the request; a Core refusal (401/403/503) outranks a local error.
-  const authorizedRead = async (res: express.Response, compute: () => Promise<unknown>) => {
-    const directory = res.locals.directory,
-      settle = () => (directory instanceof DeferredDirectory ? directory.settle() : undefined);
-    let body: unknown;
-    try {
-      body = await compute();
-    } catch (error) {
-      await settle();
-      throw error;
-    }
-    await settle();
-    res.json(body);
-  };
-  const sendMutation = (res: express.Response, response: unknown, status = 200) => {
-    res.setHeader('Cache-Control', 'no-store');
-    res.status(status).json(response);
-  };
-  router.get('/appointments', async (req, res) =>
-    authorizedRead(res, () => read(reader => reader.list(res.locals.actor, res.locals.directory, req.query), res)),
-  );
-  router.get('/appointments/calendar', async (req, res) =>
-    res.json(
-      await read(
-        reader => reader.calendar(res.locals.actor, { month: req.query.month, category: req.query.category }),
-        res,
-      ),
-    ),
-  );
-  router.get('/appointments/availability', async (req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-    res.json(await appointment(res).availability(res.locals.actor, req.query));
-  });
-  router.post('/appointments', async (req, res) => {
-    const result = await useCases.createOnce(
-      res.locals.actor.sub,
-      'appointment.create',
-      req.headers['idempotency-key'],
-      normalizeCreate(req.body, false),
-      async tx => {
-        const row = await appointment(res, tx).create(res.locals.actor, req.body);
-        return { resourceId: row.id, response: { appointment: appointmentDto(row, res.locals.actor) } };
-      },
-    );
-    sendMutation(res, result, 201);
-  });
-  const change = async (
-    req: express.Request,
-    res: express.Response,
-    action: 'changeStatus' | 'reschedule' | 'cancel' | 'undoStatus',
-  ) => {
-    const result = await useCases.transaction(async tx => {
-      const row = await appointment(res, tx)[action](res.locals.actor, String(req.params.id), req.body ?? {});
-      return { appointment: appointmentDto(row, res.locals.actor) };
-    });
-    sendMutation(res, result);
-  };
-  router.patch('/appointments/:id/status', async (req, res) => change(req, res, 'changeStatus'));
-  router.patch('/appointments/:id/reschedule', async (req, res) => change(req, res, 'reschedule'));
-  router.patch('/appointments/:id/cancel', async (req, res) => change(req, res, 'cancel'));
-  router.get('/appointments/:id/status-history', async (req, res) =>
-    res.json(await appointment(res).history(res.locals.actor, req.params.id)),
-  );
-  router.post('/appointments/:id/undo-status', async (req, res) => change(req, res, 'undoStatus'));
-  router.post('/appointments/:id/reminder', async (req, res) => {
-    await appointment(res).sendReminder(res.locals.actor, req.params.id);
-    res.status(201).json({ message: 'Reminder request accepted.' });
-  });
-  router.get('/medical-records', async (req, res) =>
-    authorizedRead(res, () => useCases.list('medicalRecords', res.locals.actor, res.locals.directory, req.query)),
-  );
-  router.post('/medical-records', async (req, res) => {
-    const result = await useCases.createOnce(
-      res.locals.actor.sub,
-      'medical-record.create',
-      req.headers['idempotency-key'],
-      normalizeCreate(req.body, true),
-      async tx => {
-        const row = await medical(res, tx).create(res.locals.actor, req.body);
-        return { resourceId: row.id, response: { record: medicalRecordDto(row) } };
-      },
-    );
-    sendMutation(res, result, 201);
-  });
-  router.patch('/medical-records/:id', async (req, res) =>
-    res.json({
-      record: medicalRecordDto(
-        await useCases.medicalMutation(req.params.id, tx =>
-          medical(res, tx).update(res.locals.actor, req.params.id, req.body ?? {}),
-        ),
-      ),
-    }),
-  );
-  router.delete('/medical-records/:id', async (req, res) => {
-    await useCases.medicalMutation(req.params.id, tx =>
-      medical(res, tx).delete(res.locals.actor, req.params.id, req.query.expectedRevision),
-    );
-    res.status(204).end();
-  });
-  router.get('/medical-records/:id/history', async (req, res) =>
-    res.json({ items: await medical(res).history(res.locals.actor, req.params.id) }),
-  );
-  router.get('/medical-records/images', async (req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-    await authorizedRead(res, () => useCases.list('medicalImages', res.locals.actor, res.locals.directory, req.query));
-  });
-  router.post('/medical-records/images', async (req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-    res.status(201).json({ image: await medical(res).createImage(res.locals.actor, req.body) });
-  });
-  router.delete('/medical-records/images/:id', async (req, res) => {
-    await medical(res).deleteImage(res.locals.actor, req.params.id);
-    res.status(204).end();
-  });
-  router.post('/medical-records/images/:id/restore', async (req, res) => {
-    await medical(res).restoreImage(res.locals.actor, req.params.id);
-    res.status(204).end();
-  });
-  router.get('/dashboard/clinic', async (_req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-    res.json({ ...(await useCases.bootstrap(res.locals.actor, res.locals.directory)), asOf: new Date().toISOString() });
-  });
-  router.get('/dashboard/clinic/activity', async (req, res) => {
-    // Express also matches trailing slashes/case variants; authorize the matched
-    // operation itself, independently of the early exact-path rejection above.
-    authorize(res.locals.actor, 'clinic-activity.read');
-    const filter = parseActivityFilter(req.query);
-    try {
-      res.json(await useCases.activity.read(filter));
-    } catch (error) {
-      if (error instanceof BusinessError) throw error;
-      throw new BusinessError(503, 'Clinic activity is unavailable. Retry later.');
-    }
-  });
-  app.use('/api', router);
-  app.use((_req, res) => res.status(404).json({ error: 'Clinic route not found.' }));
-  // A stale medical record edit returns the stored record, so the editor can keep its draft and show what changed.
-  // A deferred read that fails before Core was asked still owes the caller Core's answer: settle first, and a refusal replaces the local error.
-  const errors: ErrorRequestHandler = async (error, _req, res, _next) => {
-    const directory = res.locals.directory;
-    if (directory instanceof DeferredDirectory && !directory.settled)
-      try {
-        await directory.settle();
-      } catch (refusal) {
-        error = refusal;
-      }
-    if (res.headersSent) {
-      res.end();
-      return;
-    }
-    const fault = requestFault(error, {
-      invalid: 'Invalid JSON.',
-      large: 'Request too large.',
-      other: 'Request body could not be read.',
-    });
-    if (error instanceof BusinessError) {
-      if (error.status === 503) res.setHeader('Retry-After', '1');
-      res.status(error.status).json({
-        error: error.message,
-        ...(error.code ? { code: error.code } : {}),
-        ...(error instanceof StaleRevision ? { current: medicalRecordDto(error.current as MedicalRecordValue) } : {}),
-      });
-    } else if (fault) res.status(fault.status).json(fault.body);
-    else if (error?.code === 'P2025') res.status(404).json({ error: 'Clinic resource not found.' });
-    else if (isTransientFailure(error)) {
-      res.setHeader('Retry-After', '1');
-      res.status(503).json({ error: 'Clinic unavailable. Retry the same request key.' });
-    } else res.status(500).json(reportUnexpected('clinic', error, currentRequestId()));
-  };
-  app.use(errors);
-  return app;
-}
-// Hash only fields the use case consumes, with its defaults/trim semantics.
-function normalizeCreate(input: Record<string, unknown>, record: boolean) {
-  if (record) return { petId: requiredText(input.petId, 'Pet', 200), ...medicalFields(input) };
-  const names = record
-    ? [
-        'petId',
-        'appointmentId',
-        'doctorName',
-        'visitDate',
-        'title',
-        'symptoms',
-        'diagnosis',
-        'treatment',
-        'medications',
-        'vaccineName',
-        'followUpDate',
-        'weightKg',
-        'temperatureC',
-        'heartRateBpm',
-        'internalNote',
-      ]
-    : ['petId', 'type', 'date', 'time', 'serviceName', 'doctorId', 'clinicName', 'ownerNote'];
-  const value: Record<string, unknown> = {};
-  for (const k of names) {
-    const v = input[k];
-    value[k] =
-      typeof v === 'string' ? (record || ['serviceName', 'ownerNote'].includes(k) ? v.trim() : v) : (v ?? null);
-  }
-  if (!record) {
-    value.type = value.type || 'other';
-    value.clinicName = value.clinicName || 'Nippon Pet Care';
-    value.ownerNote = value.ownerNote || null;
-    value.doctorId = value.doctorId || null;
-  }
-  if (
-    !appointmentTypes.includes(value.type as (typeof appointmentTypes)[number]) ||
-    typeof value.time !== 'string' ||
-    !/^([01]\d|2[0-3]):[0-5]\d$/.test(value.time)
-  )
-    throw new BusinessError(422, 'Invalid appointment service or time.');
-  calendarDate(value.date, 'Appointment date');
-  requiredText(value.serviceName, 'Service');
-  // Calendar validation stays independent of current time: a committed retry
-  // remains replayable tomorrow. The use case checks Vietnam today on creation.
-  for (const k of ['doctorId', 'clinicName', 'ownerNote'])
-    if (value[k] !== null && typeof value[k] !== 'string') throw new BusinessError(422, `Invalid ${k}.`);
-  return value;
 }
