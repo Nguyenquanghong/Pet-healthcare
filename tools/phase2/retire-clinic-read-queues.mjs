@@ -3,7 +3,7 @@
 // declares it, but RabbitMQ keeps the durable queues until someone deletes them:
 //   <prefix>.clinic-read-v1, <prefix>.clinic-read-v1.dlq,
 //   <prefix>.clinic-read-v1.retry.{1000,5000,30000,120000,600000}ms
-// Same naming as topology() / retryQueue() in packages/messaging/src/index.ts.
+// Same naming as topology() / retryQueue() in packages/messaging/src/retry.ts and topology.ts.
 //
 //   BROKER_URL=<amqp url> BROKER_PREFIX=<prefix> node tools/phase2/retire-clinic-read-queues.mjs [--dry-run | --apply]
 //

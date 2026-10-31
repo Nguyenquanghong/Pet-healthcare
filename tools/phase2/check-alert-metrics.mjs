@@ -1,7 +1,7 @@
 // Fitness function: every alert rule in deploy/phase2/alerts.json refers to a metric that
 // /metrics really exports, and the rules are documented. Read-only; no build needed.
 //
-// The exporter is ServiceRuntime.metrics() in packages/runtime/src/http.ts. It prints
+// The exporter is renderMetrics() in packages/runtime/src/metrics.ts (ServiceRuntime.metrics() calls it). It prints
 // `pet_<name>` for each gauge('<name>', ...) and writes the pet_http_duration_seconds_*
 // histogram lines literally. Core's extra hash_* gauges (backend/src/phase2/runtime.ts) are
 // built at run time and are not alerted on, so that file is not an exporter source here.
@@ -11,7 +11,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const root = resolve(import.meta.dirname, '../..');
-export const exporterFiles = ['packages/runtime/src/http.ts'];
+export const exporterFiles = ['packages/runtime/src/metrics.ts'];
 export const alertsFile = 'deploy/phase2/alerts.json';
 export const documentFile = 'docs/phase2-architecture/10-observability.md';
 const services = ['core', 'clinic', 'notification'];

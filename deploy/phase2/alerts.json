@@ -2,7 +2,7 @@
   "version": 1,
   "scale": "Course project, about 100 users. Every threshold and 'for' is a proposal to tune after the first load run, not a measured SLO.",
   "scrape": "GET /metrics on core, clinic and notification with header x-service-token = OBSERVABILITY_TOKEN. Every name is the exported Prometheus name, with the pet_ prefix and a service label.",
-  "checkedBy": "tools/phase2/check-alert-metrics.mjs (npm run arch:check): each metric must be exported by packages/runtime/src/http.ts.",
+  "checkedBy": "tools/phase2/check-alert-metrics.mjs (npm run arch:check): each metric must be exported by packages/runtime/src/metrics.ts.",
   "rules": [
     {
       "name": "DlqNotEmpty",

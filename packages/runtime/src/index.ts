@@ -7,3 +7,4 @@ export * from './shutdown.js';
 export * from './circuitBreaker.js';
 export * from './failures.js';
 export * from './requestFault.js';
+export { acceptRequestId, currentRequestId, eventCorrelation, traceHeaders, withRequestId } from './requestContext.js';
