@@ -25,6 +25,8 @@
 //     (the Core calls, ADR-P13) and blobStore.ts (object storage, not Core).
 // 12. Structure ratchet: the measured structure metrics (tools/phase2/arch-metrics.mjs) never get
 //     worse than tools/phase2/arch-baseline.json; an improvement passes and asks to lower the baseline.
+// 13. Shared packages (contracts excepted) name no service route: no literal path under /api/, /auth/ or /public/.
+// 14. Every createRuntime call site in the services names limitRules (an empty list is an explicit choice).
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -435,6 +437,75 @@ rule('clinic-core-calls-confined', () => {
   return modules.length + ' modules; HTTP only in ' + [...CLINIC_HTTP_FILES.keys()].join(', ');
 });
 
+// ---- 13. Shared packages carry no business route -------------------------------------------
+// packages/* (the declaration of the API in contracts excepted) never name a route of a service: a literal path under
+// /api/, /auth/ or /public/, as a string or inside a regular expression. A service tells the shared runtime its own
+// limit rules, body limits and metric labels (RuntimeOptions). The bare mount prefix '/api' is not a route.
+const BUSINESS_ROUTE_LITERAL = /(?<![\w.$])\\?\/(?:api|auth|public)\\?\//;
+export function businessRouteLiterals(modules) {
+  return modules.flatMap(m =>
+    withoutComments(m.source)
+      .split('\n')
+      .flatMap((line, i) => (BUSINESS_ROUTE_LITERAL.test(line) ? [m.file + ':' + (i + 1)] : [])),
+  );
+}
+rule('shared-packages-no-business-routes', () => {
+  const packages = readdirSync(resolve(root, 'packages'), { withFileTypes: true }).filter(e => e.isDirectory() && e.name !== 'contracts').map(e => e.name);
+  const modules = packages.flatMap(name => files(resolve(root, 'packages', name, 'src')).filter(f => f.endsWith('.ts')).map(f => ({ file: relative(root, f).split(sep).join('/'), source: readFileSync(f, 'utf8') })));
+  assert.ok(modules.length >= 20 && packages.includes('runtime') && packages.includes('messaging'), 'found the shared package modules (' + modules.length + ')');
+  const found = businessRouteLiterals(modules);
+  assert.deepEqual(found, [], 'a shared package names a service route (pass it from the service through RuntimeOptions): ' + found.join(', '));
+  // negative fixtures
+  const at = source => businessRouteLiterals([{ file: 'x.ts', source }]);
+  for (const source of [
+    "app.use('/api/auth', express.json());",
+    'if (p.startsWith("/public/pets/")) return 1;',
+    'const route = `/api/pets/${id}`;',
+    'const fixed = /^\\/api\\/(pets|owners)$/;',
+    'const login = /^\\/auth\\/(owner|admin)\\/login$/;',
+    "return req.path === '/auth/me/password';",
+    "const p = '/api/health';\nconst q = '/api/auth/login';",
+  ])
+    assert.notDeepEqual(at(source), [], source);
+  assert.deepEqual(at("const r = '/api/pets/x'; const l = 3;\nconst bad = '/auth/x';"), ['x.ts:1', 'x.ts:2']);
+  for (const source of [
+    "app.use('/api', limiter);",
+    "const prefix = '/api';",
+    "import { x } from '../auth/token.js';",
+    "import { y } from './api/client.js';",
+    "const a = '/health/live', b = '/internal/', c = '/metrics';",
+    "// the route '/api/auth/login' is Core's",
+    '/* /public/pets/:token is Core\'s, and so is /api/pets/ */',
+    "const note = 'authentication';",
+  ])
+    assert.deepEqual(at(source), [], source);
+  return modules.length + ' modules in ' + packages.join(', ') + '; no route literal';
+});
+
+// ---- 14. Every service passes its limit rules to the runtime -----------------------------------
+// RuntimeOptions.limitRules is required, and createRuntime refuses to start without it; this rule makes the omission
+// visible before anything runs: each createRuntime call site in the services names limitRules (an empty list is a choice).
+const CREATE_RUNTIME = /\bcreateRuntime\s*\(/;
+export function runtimesWithoutLimitRules(modules) {
+  return modules.filter(m => CREATE_RUNTIME.test(withoutComments(m.source)) && !/\blimitRules\s*:/.test(withoutComments(m.source))).map(m => m.file);
+}
+rule('services-declare-limit-rules', () => {
+  const modules = ['backend/src', ...readdirSync(resolve(root, 'services'), { withFileTypes: true }).filter(e => e.isDirectory()).map(e => 'services/' + e.name + '/src')]
+    .flatMap(d => files(resolve(root, d)).filter(f => f.endsWith('.ts')).map(f => ({ file: relative(root, f).split(sep).join('/'), source: readFileSync(f, 'utf8') })));
+  const sites = modules.filter(m => CREATE_RUNTIME.test(withoutComments(m.source)));
+  assert.ok(sites.length >= 3, 'found the createRuntime call sites of Core, Clinic and Notification (' + sites.map(m => m.file).join(', ') + ')');
+  const missing = runtimesWithoutLimitRules(modules);
+  assert.deepEqual(missing, [], 'createRuntime without limitRules (pass [] if the service has no rule of its own): ' + missing.join(', '));
+  // negative fixtures
+  const at = source => runtimesWithoutLimitRules([{ file: 'x.ts', source }]);
+  assert.deepEqual(at("createRuntime({ service: 'core', verify, probe })"), ['x.ts']);
+  assert.deepEqual(at("createRuntime({ service: 'core', verify, probe, // limitRules: coreLimitRules,\n })"), ['x.ts'], 'a commented rule list is not a rule list');
+  assert.deepEqual(at("createRuntime({ service: 'clinic', verify, limitRules: [], probe })"), []);
+  assert.deepEqual(at("createRuntime({ service: 'core', verify,\n limitRules: coreLimitRules })"), []);
+  assert.deepEqual(at("const unrelated = 1;"), []);
+  return sites.length + ' call sites: ' + sites.map(m => m.file).join(', ');
+});
+
 // ---- 12. Structure ratchet ---------------------------------------------------------------
 // Each non-manual metric has a direction ("lower" or "higher" is better). Worse than the baseline fails; better passes
 // and reminds to lower the baseline so the gain cannot be lost later. Manual metrics are declared, never compared.
@@ -502,4 +573,4 @@ await categoryCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, no duplicated service modules, Clinic HTTP calls confined, structure ratchet, negative fixtures.\n');
+else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, no duplicated service modules, Clinic HTTP calls confined, shared packages without business routes, services declare limit rules, structure ratchet, negative fixtures.\n');
