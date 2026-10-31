@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "metrics": {
+    "S1": {
+      "kind": "measured",
+      "better": "lower",
+      "values": {
+        "lines": 1840
+      }
+    },
+    "S2": {
+      "kind": "measured",
+      "better": "lower",
+      "values": {
+        "edges": 16
+      }
+    },
+    "S3": {
+      "kind": "measured",
+      "better": "lower",
+      "values": {
+        "files": 14,
+        "lines": 1679
+      }
+    },
+    "S4": {
+      "kind": "measured",
+      "better": "lower",
+      "values": {
+        "sites": 3
+      }
+    },
+    "S5": {
+      "kind": "derived",
+      "better": "lower",
+      "values": {
+        "legacyAppTests": 19
+      }
+    },
+    "S6": {
+      "kind": "manual",
+      "declared": {
+        "configurations": 7,
+        "variants": 4
+      }
+    },
+    "S7": {
+      "kind": "manual",
+      "declared": {
+        "omissionStillRuns": true
+      }
+    },
+    "S8": {
+      "kind": "measured",
+      "better": "lower",
+      "values": {
+        "lines": 10
+      }
+    },
+    "S9": {
+      "kind": "measured",
+      "better": "lower",
+      "values": {
+        "longest": 303,
+        "over100": 9,
+        "over80": 15
+      }
+    },
+    "S10": {
+      "kind": "derived",
+      "better": "lower",
+      "values": {
+        "functions": 3
+      }
+    },
+    "S11": {
+      "kind": "measured",
+      "better": "lower",
+      "values": {
+        "files": 12,
+        "lines": 835
+      }
+    },
+    "S12": {
+      "kind": "derived",
+      "better": "lower",
+      "values": {
+        "files": 2,
+        "branches": 1
+      }
+    },
+    "S13": {
+      "kind": "derived",
+      "better": "higher",
+      "values": {
+        "rules": 1
+      }
+    },
+    "S14": {
+      "kind": "measured",
+      "better": "lower",
+      "values": {
+        "files": 4
+      }
+    },
+    "S15": {
+      "kind": "measured",
+      "better": "lower",
+      "values": {
+        "windowsOutsideLegacy": 91,
+        "windowsAll": 104
+      }
+    },
+    "S16": {
+      "kind": "measured",
+      "better": "lower",
+      "values": {
+        "files": 4,
+        "largest": 1025
+      }
+    },
+    "S17": {
+      "kind": "manual",
+      "declared": {
+        "runs": 0
+      }
+    }
+  }
+}

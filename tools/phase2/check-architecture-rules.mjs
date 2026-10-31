@@ -23,6 +23,8 @@
 //     belongs in packages/runtime or packages/messaging.
 // 11. Clinic reaches other systems over HTTP only from directory.ts and directorySync.ts
 //     (the Core calls, ADR-P13) and blobStore.ts (object storage, not Core).
+// 12. Structure ratchet: the measured structure metrics (tools/phase2/arch-metrics.mjs) never get
+//     worse than tools/phase2/arch-baseline.json; an improvement passes and asks to lower the baseline.
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -433,6 +435,54 @@ rule('clinic-core-calls-confined', () => {
   return modules.length + ' modules; HTTP only in ' + [...CLINIC_HTTP_FILES.keys()].join(', ');
 });
 
+// ---- 12. Structure ratchet ---------------------------------------------------------------
+// Each non-manual metric has a direction ("lower" or "higher" is better). Worse than the baseline fails; better passes
+// and reminds to lower the baseline so the gain cannot be lost later. Manual metrics are declared, never compared.
+const {measure}=await import(pathToFileURL(resolve(root,'tools/phase2/arch-metrics.mjs')).href);
+const RATCHET_FIX='node tools/phase2/arch-metrics.mjs --write-baseline';
+export function ratchetFindings(current,baseline){
+  const worse=[],better=[],stale=[];
+  for(const [id,m] of Object.entries(current.metrics)){
+    if(m.kind==='manual')continue;
+    const base=baseline.metrics[id];
+    if(!base||base.kind==='manual'){stale.push(id+': not in the baseline');continue;}
+    if(base.better!==m.better)stale.push(id+': direction is '+m.better+' in the metric but '+base.better+' in the baseline');
+    for(const [key,value] of Object.entries(m.values)){
+      const was=base.values?.[key];
+      if(typeof was!=='number'){stale.push(id+'.'+key+': not in the baseline');continue;}
+      const delta=m.better==='lower'?value-was:was-value;
+      if(delta>0)worse.push(id+'.'+key+' '+was+' -> '+value+' ('+m.better+' is better)');
+      else if(delta<0)better.push(id+'.'+key+' '+was+' -> '+value);
+    }
+    for(const key of Object.keys(base.values??{}))if(!(key in m.values))stale.push(id+'.'+key+': in the baseline but no longer measured');
+  }
+  for(const id of Object.keys(baseline.metrics))if(!(id in current.metrics))stale.push(id+': in the baseline but no longer measured');
+  return {worse,better,stale};
+}
+rule('structure-ratchet',()=>{
+  const current=measure(root),baseline=JSON.parse(read('tools/phase2/arch-baseline.json')),{worse,better,stale}=ratchetFindings(current,baseline);
+  assert.deepEqual(worse,[],'structure got worse than tools/phase2/arch-baseline.json: '+worse.join('; '));
+  assert.deepEqual(stale,[],'baseline out of step with the metrics (run '+RATCHET_FIX+'): '+stale.join('; '));
+  // negative fixtures
+  const fx=(better,values)=>({metrics:{S:{kind:'measured',better,values}}});
+  assert.deepEqual(ratchetFindings(fx('lower',{n:5}),fx('lower',{n:4})).worse,['S.n 4 -> 5 (lower is better)']);
+  assert.deepEqual(ratchetFindings(fx('higher',{n:3}),fx('higher',{n:4})).worse,['S.n 4 -> 3 (higher is better)']);
+  assert.deepEqual(ratchetFindings(fx('lower',{n:3}),fx('lower',{n:4})),{worse:[],better:['S.n 4 -> 3'],stale:[]});
+  assert.deepEqual(ratchetFindings(fx('higher',{n:5}),fx('higher',{n:4})).better,['S.n 4 -> 5']);
+  assert.deepEqual(ratchetFindings(fx('lower',{n:4}),fx('lower',{n:4})),{worse:[],better:[],stale:[]});
+  assert.equal(ratchetFindings(fx('lower',{n:4,m:1}),fx('lower',{n:4})).stale.length,1,'a new value needs a baseline');
+  assert.equal(ratchetFindings(fx('lower',{n:4}),fx('lower',{n:4,m:1})).stale.length,1,'a dropped value leaves the baseline stale');
+  assert.equal(ratchetFindings({metrics:{}},fx('lower',{n:4})).stale.length,1,'a dropped metric leaves the baseline stale');
+  assert.equal(ratchetFindings(fx('lower',{n:4}),{metrics:{}}).stale.length,1,'a new metric needs a baseline');
+  assert.equal(ratchetFindings(fx('lower',{n:4}),fx('higher',{n:4})).stale.length,1,'the direction cannot be flipped in the baseline alone');
+  assert.deepEqual(ratchetFindings({metrics:{S:{kind:'manual',declared:{x:2}}}},{metrics:{S:{kind:'manual',declared:{x:1}}}}),{worse:[],better:[],stale:[]});
+  // the real measurement against a baseline made stricter by one
+  const strict=structuredClone(baseline),first=Object.values(strict.metrics).find(m=>m.kind!=='manual'&&m.better==='lower'&&Object.values(m.values).some(v=>v>0));
+  const key=Object.keys(first.values).find(k=>first.values[k]>0);first.values[key]-=1;
+  assert.equal(ratchetFindings(current,strict).worse.length,1,'a stricter baseline must fail');
+  return Object.values(current.metrics).filter(m=>m.kind!=='manual').length+' metrics held'+(better.length?'; improved, lower the baseline ('+RATCHET_FIX+'): '+better.join(', '):'');
+});
+
 await envelopeCheck;
 await lifecycleCheck;
 await grantsCheck;
@@ -442,4 +492,4 @@ await categoryCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, no duplicated service modules, Clinic HTTP calls confined, negative fixtures.\n');
+else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, no duplicated service modules, Clinic HTTP calls confined, structure ratchet, negative fixtures.\n');
