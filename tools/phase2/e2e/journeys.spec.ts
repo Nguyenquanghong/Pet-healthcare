@@ -65,8 +65,11 @@ test('public rescue UI exposes only allowed profile and delivers report through 
 });
 
 test('paged pet selector keeps a page-two selection; debounced search and server filters use real page data',async({page})=>{
-  const f=fixture();await login(page);await page.goto('/owner/spa-booking');const select=page.getByRole('combobox',{name:'Thú cưng *',exact:true}),nav=select.locator('xpath=../..').getByRole('navigation',{name:'Phân trang',exact:true});await expect(select.locator('option')).toHaveCount(21);await nav.getByRole('button',{name:'Trang sau',exact:true}).click();await expect(nav).toContainText('Trang 2/2');await select.selectOption(f.pets[0].id);await nav.getByRole('button',{name:'Trang trước',exact:true}).click();await expect(select).toHaveValue(f.pets[0].id);await expect(select.locator('option').first()).not.toHaveValue(f.pets[0].id);
-  const calls=network(page),input=page.getByRole('textbox',{name:'Thú cưng * — tìm kiếm',exact:true});await input.fill('P');await input.fill('P5');await input.fill(f.pets[0].name);await expect(nav).toContainText('1–1 / 1 kết quả');expect(calls.filter(r=>r.path==='/api/pets')).toHaveLength(1);await expect(select).toHaveValue(f.pets[0].id);
+  const f=fixture();await login(page);await page.goto('/owner/spa-booking');const select=page.getByRole('combobox',{name:'Thú cưng *',exact:true}),nav=select.locator('xpath=../..').getByRole('navigation',{name:'Phân trang',exact:true});await expect(select.locator('option')).toHaveCount(21);await nav.getByRole('button',{name:'Trang sau',exact:true}).click();await expect(nav).toContainText('Trang 2/2');await select.selectOption(f.pets[0].id);
+  // Going back loads page one plus the selected pet's detail. Both must land before counting, or they join the search's calls.
+  const pets=(param:string,value:string)=>page.waitForResponse(r=>{const url=new URL(r.url());return url.pathname==='/api/pets'&&url.searchParams.get(param)===value;}),pageOne=Promise.all([pets('page','1'),pets('id',f.pets[0].id)]);
+  await nav.getByRole('button',{name:'Trang trước',exact:true}).click();await pageOne;await expect(select).toHaveValue(f.pets[0].id);await expect(select.locator('option').first()).not.toHaveValue(f.pets[0].id);
+  const calls=network(page),input=page.getByRole('textbox',{name:'Thú cưng * — tìm kiếm',exact:true});await input.fill('P');await input.fill('P5');await input.fill(f.pets[0].name);await expect(nav).toContainText('1–1 / 1 kết quả');expect(calls.filter(r=>r.path==='/api/pets').map(r=>new URLSearchParams(r.query).get('q'))).toEqual([f.pets[0].name]);await expect(select).toHaveValue(f.pets[0].id);
 });
 
 test('Vietnam date boundary is preserved in default forms and calendar request range',async({page})=>{
