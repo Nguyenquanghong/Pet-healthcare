@@ -1,7 +1,9 @@
 // Architecture fitness functions not covered by check-boundaries.mjs (inter-service
 // imports/SQL/clients) or backend/scripts/check-architecture.mjs (Core layering):
-//  1. Clinic layering: domain/ and application/ never import Express, Prisma, the
-//     generated client, amqplib, infrastructure or adapter modules.
+//  1. Service layering (SERVICE_LAYERS, Clinic): each layer of src imports only the layers its row allows
+//     (domain and application never reach Express, Prisma, the generated client, amqplib, infrastructure or http;
+//     infrastructure never reaches http; http never reaches a storage or messaging client); a directory the table
+//     does not name (lib/) and a root file that is not an entry fail.
 //  2. Event contracts: every declared eventType is `<domain>.<name>.vN`, has a queue
 //     binding; producers only emit declared types; parseEnvelope rejects other
 //     schema versions and undeclared types (run against the built contracts).
@@ -19,7 +21,8 @@
 //  8. Booking lifecycle rules come from one table in @nipopeto/contracts (P01).
 //  9. Clinic's deferred list reads (authorized after their query, `deferred: true` in the route registry)
 //     are GET handlers that answer through authorizedRead, they are exactly the three of ADR-P12, and the
-//     gate only opens for GET on the exact path with a closed breaker and fails closed.
+//     gate (one && condition, read without comments) only opens for GET on the exact path with a closed breaker
+//     and fails closed; mountRoutes puts the PEP of each route before its handler.
 // 10. No two .ts files in services/*/src or backend/src/phase2 are identical: a copy
 //     belongs in packages/runtime or packages/messaging.
 // 11. Clinic reaches other systems over HTTP only from infrastructure/core/directory.ts and
@@ -29,6 +32,8 @@
 //     worse than tools/phase2/arch-baseline.json; an improvement passes and asks to lower the baseline.
 // 13. Shared packages (contracts excepted) name no service route: no literal path under /api/, /auth/ or /public/.
 // 14. Every createRuntime call site in the services names limitRules (an empty list is an explicit choice).
+// 15. Clinic's routes are declared only as elements of the registry (http/routes), each naming its resource: no
+//     router.get/post/patch/put/delete/all in http/routes, http/scope.ts or app.ts.
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -43,29 +48,66 @@ const withoutComments = source => source.replace(/\/\*[\s\S]*?\*\//g, '').replac
 const results=[];
 const rule=(name,fn)=>{try{const detail=fn();results.push({rule:name,status:'PASS',detail});}catch(error){results.push({rule:name,status:'FAIL',detail:error.message});}};
 
-// ---- 1. Clinic layering --------------------------------------------------------
+// ---- 1. Service layering -------------------------------------------------------
+// A service's src is layered: domain <- application <- infrastructure, the http layer above them, and the entry files in the
+// root, which compose everything. The table names, per layer, the layers it may import and the packages it may not; a directory
+// the table does not name (lib/) and a root file that is not an entry fail, so a new place for code is a decision made here.
 const clinicSrc=resolve(root,'services/clinic/src');
 const FORBIDDEN=/^(express|@prisma\/client|amqplib|ioredis|redis|pg)$|generated\//;
-export function layerViolations(file,source,src=clinicSrc){
-  const layer=relative(src,file).split(sep)[0],allowed=layer==='domain'?['domain']:['domain','application'],found=[];
+export const SERVICE_LAYERS={
+  clinic:{
+    entries:['index.ts','worker.ts','runtime.ts','app.ts'],
+    allowed:{
+      domain:['domain'],
+      application:['domain','application'],
+      infrastructure:['domain','application','infrastructure','generated'],
+      http:['domain','application','http','infrastructure'],
+      '(root)':['domain','application','infrastructure','http','generated','(root)'],
+    },
+    // http answers requests through the use cases: express is its own, a storage or messaging client is not.
+    forbidden:{domain:FORBIDDEN,application:FORBIDDEN,http:/^(@prisma\/client|amqplib|ioredis|redis|pg)$|generated\//},
+  },
+};
+export function layerViolations(file,source,src=clinicSrc,{entries,allowed,forbidden}=SERVICE_LAYERS.clinic){
+  const layerOf=path=>{const parts=relative(src,path).split(sep);return parts.length>1?parts[0]:'(root)';};
+  const layer=layerOf(file),found=[];
+  if(!(layer in allowed))return [layer+'/ is not a layer of this service'];
+  if(layer==='(root)'&&!entries.includes(relative(src,file)))found.push(relative(src,file)+' is in the src root but is not an entry file');
   for(const m of source.matchAll(/(?:from\s*|import\s*\(|require\s*\()(['"])([^'"]+)\1/g)){
     const spec=m[2];
-    if(FORBIDDEN.test(spec)){found.push(spec);continue;}
-    if(spec.startsWith('.')){const target=relative(src,resolve(dirname(file),spec)).split(sep)[0];if(!allowed.includes(target))found.push(spec);}
+    if(forbidden[layer]?.test(spec)){found.push(spec);continue;}
+    if(spec.startsWith('.')){const target=layerOf(resolve(dirname(file),spec));if(!allowed[layer].includes(target))found.push(spec+' ('+layer+' may not import '+target+')');}
   }
   return found;
 }
-rule('clinic-layering',()=>{
-  const scanned=['domain','application'].flatMap(l=>files(resolve(clinicSrc,l))).filter(f=>f.endsWith('.ts'));
+rule('service-layering',()=>{
+  const scanned=files(clinicSrc).filter(f=>f.endsWith('.ts')),{entries}=SERVICE_LAYERS.clinic;
   const bad=scanned.flatMap(f=>layerViolations(f,readFileSync(f,'utf8')).map(s=>relative(root,f)+' -> '+s));
   assert.deepEqual(bad,[],'layer violations: '+bad.join(', '));
+  const gone=entries.filter(e=>!scanned.some(f=>relative(clinicSrc,f)===e));
+  assert.deepEqual(gone,[],'entry files that no longer exist (remove them from SERVICE_LAYERS): '+gone.join(', '));
   // negative fixtures
+  const at=(file,source)=>layerViolations(resolve(clinicSrc,file),source);
   assert.ok(layerViolations(resolve(clinicSrc,'application/x.ts'),"import type { X } from '../directory.js'").length);
   assert.ok(layerViolations(resolve(clinicSrc,'application/x.ts'),"import { PrismaClient } from '../generated/client/index.js'").length);
   assert.ok(layerViolations(resolve(clinicSrc,'application/x.ts'),"import express from 'express'").length);
   assert.ok(layerViolations(resolve(clinicSrc,'domain/x.ts'),"import { a } from '../application/ports/a.js'").length);
   assert.equal(layerViolations(resolve(clinicSrc,'application/x.ts'),"import { a } from '../domain/a.js'").length,0);
-  return scanned.length+' files';
+  assert.equal(at('infrastructure/x.ts',"import { a } from '../http/a.js'").length,1,'infrastructure does not import http');
+  assert.equal(at('http/x.ts',"import { PrismaClient } from '../generated/client/index.js'").length,1,'http does not import the generated client');
+  assert.equal(at('http/x.ts',"import { PrismaClient } from '@prisma/client'").length,1,'http does not import a storage client');
+  assert.equal(at('http/x.ts',"import { connect } from 'amqplib'").length,1,'http does not import a messaging client');
+  assert.equal(at('http/x.ts',"import { a } from '../app.js'").length,1,'http does not import the root');
+  assert.equal(at('application/x.ts',"import { a } from '../infrastructure/a.js'").length,1,'application does not import infrastructure');
+  assert.equal(at('domain/x.ts',"import { a } from '../http/a.js'").length,1,'domain does not import http');
+  assert.deepEqual(at('lib/x.ts','export const a = 1;'),['lib/ is not a layer of this service'],'a directory that is not a layer');
+  assert.equal(at('stray.ts','export const a = 1;').length,1,'a root file that is not an entry');
+  assert.equal(at('stray.ts',"import { a } from './domain/a.js'").length,1,'a root file that is not an entry, whatever it imports');
+  assert.deepEqual(at('http/x.ts',"import express from 'express'; import { a } from '../infrastructure/a.js'; import { b } from './b.js'; import { c } from '../domain/c.js';"),[],'http: express, infrastructure, its own layer, domain');
+  assert.deepEqual(at('infrastructure/x.ts',"import { P } from '../generated/client/index.js'; import { a } from '../application/a.js'; import { b } from './core/b.js'; import pg from 'pg';"),[],'infrastructure: the generated client, application, itself, a storage client');
+  assert.deepEqual(at('app.ts',"import { a } from './http/a.js'; import { b } from './infrastructure/b.js'; import { P } from './generated/client/index.js'; import { c } from './runtime.js';"),[],'an entry imports every layer');
+  assert.deepEqual(at('index.ts',"import { createApp } from './app.js';"),[],'an entry imports an entry');
+  return scanned.length+' files, '+entries.length+' entries';
 });
 
 // ---- 2. Event contracts --------------------------------------------------------
@@ -579,10 +621,55 @@ rule('services-declare-limit-rules', () => {
   return sites.length + ' call sites: ' + sites.map(m => m.file).join(', ');
 });
 
+// ---- 15. Clinic routes are declared with their scope (K2) ---------------------------------
+// Every Clinic route is an element of the registry (http/routes/*.ts) that mountRoutes mounts behind its PEP; a route declared any
+// other way would run without the scope its URL names. So the registry files, http/scope.ts and app.ts call no router.get, post,
+// patch, put, delete or all (router.use stays: it is the middleware before the routes, and mountRoutes reaches the router as
+// router[route.method]), and every element names its `resource` before its handler (assertRoutes refuses one at startup; this
+// refuses it before the server starts). http/billingApi.ts is not scanned: the internal billing API is service-to-service, outside the PEP.
+const ROUTER_METHOD_CALL=/\brouter\s*\.\s*(?:get|post|patch|put|delete|all)\s*\(/g;
+const ROUTE_ELEMENT=/\{\s*method:\s*'(?:get|post|patch|put|delete|all)'\s*,/g;
+const lineOf=(source,index)=>source.slice(0,index).split('\n').length;
+export const routeElements=source=>[...withoutComments(source).matchAll(ROUTE_ELEMENT)];
+export function routeScopeViolations(source){
+  const code=withoutComments(source),found=[],starts=routeElements(source);
+  for(const m of code.matchAll(ROUTER_METHOD_CALL))found.push('line '+lineOf(code,m.index)+': '+m[0].replace(/\s+/g,'')+' declares a route outside the registry');
+  starts.forEach((m,i)=>{
+    const text=code.slice(m.index,starts[i+1]?.index??code.length),declaration=text.split(/\bhandler\b/)[0];
+    if(!/\bresource\s*:/.test(declaration))found.push('line '+lineOf(code,m.index)+': route '+(text.match(/\bmethod:\s*'(\w+)'/)?.[1]??'?')+' '+(text.match(/\bpath:\s*'([^']+)'/)?.[1]??'?')+' declares no resource');
+  });
+  return found;
+}
+rule('clinic-routes-declare-scope',()=>{
+  const routeFiles=readdirSync(resolve(clinicSrc,'http/routes')).filter(f=>f.endsWith('.ts')).sort().map(f=>'http/routes/'+f);
+  const scanned=[...routeFiles,'http/scope.ts','app.ts'],sources=scanned.map(f=>({file:f,source:readFileSync(resolve(clinicSrc,f),'utf8')}));
+  const bad=sources.flatMap(({file,source})=>routeScopeViolations(source).map(v=>file+' '+v));
+  assert.deepEqual(bad,[],'Clinic routes declared outside the registry or without a resource: '+bad.join('; '));
+  const elements=sources.reduce((n,{source})=>n+routeElements(source).length,0);
+  assert.ok(elements>=21,'found the route elements of the registry ('+elements+')');
+  assert.ok(!scanned.includes('http/billingApi.ts')&&existsSync(resolve(clinicSrc,'http/billingApi.ts')),'the billing API is left out on purpose');
+  // negative fixtures
+  const element=(rest,method='get',path='/x')=>`  { method: '${method}', path: '${path}', ${rest} },\n`,registry=(...entries)=>`export const routes = (u) => [\n${entries.join('')}];\n`;
+  const scope=source=>routeScopeViolations(source);
+  assert.deepEqual(scope(registry(element("resource: 'none', handler: async () => 1"),element("resource: 'appointment', handler: async () => 2",'patch','/x/:id'))),[],'a correct registry');
+  assert.deepEqual(scope(registry(element("handler: async () => 1"))),['line 2: route get /x declares no resource'],'no resource');
+  assert.deepEqual(scope(registry(element("resource: 'none', handler: async () => 1"),element('handler: async () => 2','post','/y'))),['line 3: route post /y declares no resource'],'only the second element lacks it');
+  assert.deepEqual(scope(registry(element("handler: async () => ({ resource: 'none' })"))),['line 2: route get /x declares no resource'],'a resource inside the handler is not the declaration');
+  assert.deepEqual(scope(registry(element("/* resource: 'none', */ handler: async () => 1"))),['line 2: route get /x declares no resource'],'a resource in a comment');
+  assert.deepEqual(scope(registry(element("handler"))),['line 2: route get /x declares no resource'],'a shorthand handler without a resource');
+  assert.deepEqual(scope("router.get('/x', handler);"),['line 1: router.get( declares a route outside the registry'],'router.get directly');
+  for(const method of ['post','patch','put','delete','all'])assert.equal(scope(`router.${method}('/x', handler);`).length,1,'router.'+method);
+  assert.equal(scope("router . get ('/x', handler);").length,1,'router.get with spaces');
+  assert.deepEqual(scope("router.use(express.json({ limit: '8mb' }));\nrouter[route.method](route.path, pep(route, deps), route.handler);\n// router.get('/x', handler);\n/* router.post('/y', handler) */"),[],'router.use, router[method] and a comment are not declarations');
+  assert.deepEqual(scope("export type ClinicRoute = {\n  method: 'get' | 'post' | 'patch' | 'delete';\n  path: string;\n  handler: express.RequestHandler;\n};"),[],'the type of an element is not an element');
+  assert.deepEqual(scope("app.get('/health/live', (_req, res) => res.json({}));"),[],'app.get is not router.get');
+  return elements+' route elements in '+scanned.length+' files, each with a resource; no router.get/post/patch/put/delete/all';
+});
+
 // ---- 12. Structure ratchet ---------------------------------------------------------------
 // Each non-manual metric has a direction ("lower" or "higher" is better). Worse than the baseline fails; better passes
 // and reminds to lower the baseline so the gain cannot be lost later. Manual metrics are declared, never compared.
-const {measure,ciJobsRunning,LEGACY_APP,PRODUCTION_APP}=await import(pathToFileURL(resolve(root,'tools/phase2/arch-metrics.mjs')).href);
+const {measure,baselineOf,ciJobsRunning,LEGACY_APP,PRODUCTION_APP}=await import(pathToFileURL(resolve(root,'tools/phase2/arch-metrics.mjs')).href);
 const RATCHET_FIX='node tools/phase2/arch-metrics.mjs --write-baseline';
 export function ratchetFindings(current,baseline){
   const worse=[],better=[],stale=[];
@@ -630,8 +717,10 @@ rule('structure-ratchet',()=>{
   assert.ok(LEGACY_APP.test("const {createApp}=await import('../../backend/dist/src/app.js');")&&LEGACY_APP.test("import { createApp } from '../src/app.js';"));
   assert.ok(!LEGACY_APP.test("const {createApp}=await import('../../services/clinic/dist/app.js');"),'a service app is not the monolith');
   assert.ok(PRODUCTION_APP.test("const {createCoreApp}=await import('../../backend/dist/src/phase2/coreApp.js');")&&!PRODUCTION_APP.test("import('../../backend/dist/src/app.js')"));
-  // the real measurement against a baseline made stricter by one
-  const strict=structuredClone(baseline),first=Object.values(strict.metrics).find(m=>m.kind!=='manual'&&m.better==='lower'&&Object.values(m.values).some(v=>v>0));
+  // the real measurement against a baseline made stricter by one: the baseline of the measurement itself with one value one lower,
+  // so the result does not depend on how far the committed baseline lags behind the code (an improvement passes)
+  assert.deepEqual(ratchetFindings(current,baselineOf(current)),{worse:[],better:[],stale:[]},'a baseline written from the measurement holds');
+  const strict=structuredClone(baselineOf(current)),first=Object.values(strict.metrics).find(m=>m.kind!=='manual'&&m.better==='lower'&&Object.values(m.values).some(v=>v>0));
   const key=Object.keys(first.values).find(k=>first.values[k]>0);first.values[key]-=1;
   assert.equal(ratchetFindings(current,strict).worse.length,1,'a stricter baseline must fail');
   return Object.values(current.metrics).filter(m=>m.kind!=='manual').length+' metrics held'+(better.length?'; improved, lower the baseline ('+RATCHET_FIX+'): '+better.join(', '):'');
@@ -646,4 +735,4 @@ await categoryCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write('Architecture rules PASS: layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, no duplicated service modules, Clinic HTTP calls confined, shared packages without business routes, services declare limit rules, structure ratchet, negative fixtures.\n');
+else process.stdout.write(`Architecture rules PASS (${results.length} rules): service layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, Clinic routes declare their scope, no duplicated service modules, Clinic HTTP calls confined, shared packages without business routes, services declare limit rules, structure ratchet, negative fixtures.\n`);

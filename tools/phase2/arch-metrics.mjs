@@ -177,9 +177,20 @@ export function measure(root=defaultRoot){
   const legacyTests=testFiles.filter(f=>LEGACY_APP.test(text(f))),productionTests=testFiles.filter(f=>PRODUCTION_APP.test(text(f)));
   put('S5','Test files on the monolith createApp, not the production composition','derived','lower',{legacyAppTests:legacyTests.length},{onProductionComposition:productionTests.map(rel),legacyAppTests:legacyTests.map(rel)},{note:'counts files importing backend app.js; the plan asks for a list chosen in K3'});
 
-  // S6, S7, S13 (rule part), S17: not measurable by machine.
+  // S6: not measurable by machine (declared, never compared).
   put('S6','Routing configurations and variants','manual',null,undefined,'plan section 3 F1: 7 configurations, 4 variants; gateway-routes-single-source (K5) will measure it',{declared:{configurations:7,variants:4}});
-  put('S7','A Clinic route may omit its resource lookup and still run','manual',null,undefined,'true until the scope registry (K2) makes the app refuse to start; then a rule can measure it',{declared:{omissionStillRuns:true}});
+
+  // S7: Clinic routes that escape the scope registry. A route is an element of the registry (http/routes) that mountRoutes mounts behind
+  // its PEP: a direct router.get(...) is a route the registry does not know, and an element without `resource` leaves the scope of its URL
+  // undecided (assertRoutes refuses it only when the server starts). Same reading as the rule clinic-routes-declare-scope.
+  const scopeFiles=[...walk(abs('services/clinic/src/http/routes')),abs('services/clinic/src/http/scope.ts'),abs('services/clinic/src/app.ts')].filter(f=>existsSync(f));
+  const routerCalls=[],withoutResource=[],lineOf=(code,index)=>code.slice(0,index).split('\n').length;
+  for(const f of scopeFiles){
+    const code=sanitize(text(f)),starts=[...code.matchAll(/\{\s*method:\s*(['"`])\s*\1\s*,/g)];
+    for(const m of code.matchAll(/\brouter\s*\.\s*(?:get|post|patch|put|delete)\s*\(/g))routerCalls.push(rel(f)+':'+lineOf(code,m.index));
+    starts.forEach((m,i)=>{if(!/\bresource\s*:/.test(code.slice(m.index,starts[i+1]?.index??code.length).split(/\bhandler\b/)[0]))withoutResource.push(rel(f)+':'+lineOf(code,m.index));});
+  }
+  put('S7','Clinic routes declared outside the registry or without a resource','derived','lower',{undeclared:routerCalls.length+withoutResource.length},{routerCalls,withoutResource},{note:'router.get/post/patch/put/delete( calls in http/routes, http/scope.ts and app.ts, plus registry elements with no resource: (rule clinic-routes-declare-scope)'});
 
   // S8: Prisma calls in Clinic's HTTP layer.
   const httpFiles=[abs('services/clinic/src/app.ts'),...walk(abs('services/clinic/src/http'))].filter(f=>existsSync(f)).map(rel),PRISMA_LINE=/\b(?:db|tx|prisma)\.(?:\$\w+|[a-z]\w*\.[a-z]\w*)\s*\(/;
