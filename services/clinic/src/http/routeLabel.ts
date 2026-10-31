@@ -5,12 +5,13 @@
 // whole policy.
 export function clinicRouteLabel(p: string): string | undefined {
   const fixed =
-    /^\/api\/(dashboard\/clinic|appointments\/(calendar|availability)|medical-records\/images|appointments|medical-records)$/;
+    /^\/api\/(dashboard\/clinic(\/activity)?|appointments\/(calendar|availability)|medical-records\/images|appointments|medical-records)$/;
   if (fixed.test(p)) return p;
   const item = p.match(
     /^\/api\/(appointments|medical-records)\/[^/]{1,200}(\/(status|reschedule|cancel|status-history|history|undo-status|reminder))?$/,
   );
   if (item) return `/api/${item[1]}/:id${item[2] ?? ''}`;
-  if (/^\/api\/medical-records\/images\/[^/]{1,200}$/.test(p)) return '/api/medical-records/images/:id';
+  const image = p.match(/^\/api\/medical-records\/images\/[^/]{1,200}(\/restore)?$/);
+  if (image) return `/api/medical-records/images/:id${image[1] ?? ''}`;
   return undefined;
 }

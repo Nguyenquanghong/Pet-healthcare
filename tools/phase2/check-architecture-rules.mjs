@@ -17,8 +17,9 @@
 //     @nipopeto/contracts, every listed type is really sent, and the OpenAPI tab
 //     enums (gateway and Notification service) equal the contract's tabs.
 //  8. Booking lifecycle rules come from one table in @nipopeto/contracts (P01).
-//  9. Clinic's deferred list reads (authorized after their query) are GET handlers
-//     that answer through authorizedRead, and the gate only opens for GET.
+//  9. Clinic's deferred list reads (authorized after their query, `deferred: true` in the route registry)
+//     are GET handlers that answer through authorizedRead, they are exactly the three of ADR-P12, and the
+//     gate only opens for GET on the exact path with a closed breaker and fails closed.
 // 10. No two .ts files in services/*/src or backend/src/phase2 are identical: a copy
 //     belongs in packages/runtime or packages/messaging.
 // 11. Clinic reaches other systems over HTTP only from infrastructure/core/directory.ts and
@@ -331,39 +332,68 @@ const lifecycleCheck=(existsSync(built)?import(pathToFileURL(built).href):Promis
   }),error=>rule('lifecycle-from-table',()=>{throw error;}));
 
 // ---- 9. Deferred list reads answer through authorizedRead (B) -------------------
-// A path in Clinic's `deferredReads` is authorized by Core only after its query ran.
-// That is safe because authorizedRead settles (and lets a Core refusal win) before
-// it answers, so every deferred path must be a GET handled through it, and the gate
-// that skips the up-front authorize must require GET.
-export function deferredReadViolations(source){
-  const found=[],declared=source.match(/\bconst deferredReads\s*=\s*new Set\(\s*\[([^\]]*)\]\s*\)/);
-  if(!declared)return ['no deferredReads set'];
-  const paths=[...declared[1].matchAll(/'([^']+)'/g)].map(m=>m[1]);
-  if(!paths.length)found.push('deferredReads is empty');
-  if(!/req\.method\s*===\s*'GET'\s*&&\s*deferredReads\.has\(/.test(source))found.push('the deferred gate does not require GET');
-  for(const path of paths){
-    const marker=`router.get('${path}',`,start=source.indexOf(marker);
-    if(start<0){found.push(path+': no router.get handler');continue;}
-    const rest=source.slice(start+marker.length),end=rest.search(/\r?\n\s*(router|app)\./),handler=end<0?rest:rest.slice(0,end);
-    if(!/\bauthorizedRead\(/.test(handler))found.push(path+': GET handler does not use authorizedRead');
+// A route declared `deferred: true` in Clinic's registry is authorized by Core only after its query ran. That is safe
+// because authorizedRead settles (and lets a Core refusal win) before it answers, so every deferred route must be a GET
+// whose own handler uses it, the deferred routes must be exactly the three of ADR-P12, and the gate that skips the
+// up-front authorize must require GET, the exact path and a closed breaker, and fail closed.
+export const DEFERRED_PATHS=['/appointments','/medical-records','/medical-records/images'];
+// The gate is still the `deferredReads` set of app.ts. The commit that moves it into http/scope.ts reads that file instead,
+// swaps the first two conditions for `route.deferred` and `req.path === route.path`, and drops the set comparison below.
+const DEFERRED_GATE=[
+  [/req\.method\s*===\s*'GET'\s*&&\s*deferredReads\.has\(/,'the deferred gate does not require GET'],
+  [/deferredReads\.has\(\s*req\.path\s*\)/,'the deferred gate does not match the exact path'],
+  [/breaker\?\.state\s*===\s*'closed'/,'the deferred gate does not require a closed breaker'],
+  [/\bfailClosed\(/,'the deferred gate does not fail closed'],
+];
+// A route element is `{ method: 'get', path: '/x', ...` up to the next element (or the end of the array): its handler is in it.
+export function deferredRouteViolations(routeSource,gateSource){
+  const found=[],elements=routeSource.split(/\{\s*method:\s*'/).slice(1).map(text=>{
+    const part=text.split(/\r?\n\s*\];/)[0],head=part.match(/^(\w+)',\s*path:\s*'([^']+)'/);
+    return {method:head?.[1],path:head?.[2],deferred:/\bdeferred:\s*true\b/.test(part),part};
+  });
+  if(!elements.length)found.push('no route elements found');
+  const deferred=elements.filter(e=>e.deferred);
+  for(const e of deferred){
+    const name=(e.method??'?').toUpperCase()+' '+(e.path??'?');
+    if(e.method!=='get')found.push(name+': deferred is only for GET');
+    else if(!/\bauthorizedRead\(/.test(e.part))found.push(name+': GET handler does not use authorizedRead');
+  }
+  const paths=deferred.map(e=>e.path),missing=DEFERRED_PATHS.filter(p=>!paths.includes(p)),extra=paths.filter(p=>!DEFERRED_PATHS.includes(p));
+  if(missing.length)found.push('deferred route missing: '+missing.join(', '));
+  if(extra.length)found.push('deferred route not in ADR-P12: '+extra.join(', '));
+  for(const [pattern,message] of DEFERRED_GATE)if(!pattern.test(gateSource))found.push(message);
+  const declared=gateSource.match(/\bconst deferredReads\s*=\s*new Set\(\s*\[([^\]]*)\]\s*\)/);
+  if(!declared)found.push('no deferredReads set in the gate');
+  else{
+    const gate=[...declared[1].matchAll(/'([^']+)'/g)].map(m=>m[1]);
+    if([...gate].sort().join()!==[...paths].sort().join())found.push('deferredReads ('+gate.join(', ')+') differs from the deferred routes ('+paths.join(', ')+')');
   }
   return found;
 }
 rule('deferred-reads-via-authorized-read',()=>{
-  const source=read('services/clinic/src/app.ts'),bad=deferredReadViolations(source);
-  assert.deepEqual(bad,[],'deferred list reads without authorizedRead: '+bad.join('; '));
-  const paths=[...source.match(/\bconst deferredReads\s*=\s*new Set\(\s*\[([^\]]*)\]\s*\)/)[1].matchAll(/'([^']+)'/g)].length;
-  // negative fixtures
-  const gate="if(req.method==='GET'&&deferredReads.has(req.path)&&source.breaker.state==='closed'){next();}";
-  const good=`const deferredReads=new Set(['/a']);${gate}\nrouter.get('/a',async(req,res)=>authorizedRead(res,()=>list()));\nrouter.get('/b',async(req,res)=>res.json(1));`;
-  assert.deepEqual(deferredReadViolations(good),[]);
-  assert.deepEqual(deferredReadViolations(good.replace('authorizedRead(res,()=>list())','res.json(await list())')),['/a: GET handler does not use authorizedRead']);
-  assert.deepEqual(deferredReadViolations(good.replace("new Set(['/a'])","new Set(['/a','/c'])")),['/c: no router.get handler']);
-  assert.deepEqual(deferredReadViolations(good.replace("router.get('/a'","router.post('/a'")),['/a: no router.get handler']);
-  assert.deepEqual(deferredReadViolations(good.replace("req.method==='GET'&&","")),['the deferred gate does not require GET']);
-  assert.deepEqual(deferredReadViolations(good.replace('const deferredReads','const eagerReads')),['no deferredReads set']);
-  assert.deepEqual(deferredReadViolations(good.replace("router.get('/a',async(req,res)=>authorizedRead(res,()=>list()));\nrouter.get('/b',async(req,res)=>res.json(1));","router.get('/a',async(req,res)=>res.json(1));\nrouter.get('/b',async(req,res)=>authorizedRead(res,()=>list()));")),['/a: GET handler does not use authorizedRead'],'authorizedRead on the next route does not count');
-  return paths+' deferred paths, all GET via authorizedRead';
+  const routeDir='services/clinic/src/http/routes',routeFiles=readdirSync(resolve(root,routeDir)).filter(f=>f.endsWith('.ts')).sort();
+  const routeSource=routeFiles.map(f=>read(routeDir+'/'+f)).join('\n'),gateSource=read('services/clinic/src/app.ts'),bad=deferredRouteViolations(routeSource,gateSource);
+  assert.deepEqual(bad,[],'deferred list reads that break the contract: '+bad.join('; '));
+  // negative fixtures: one reason each
+  const via='authorizedRead(res, () => list())',get=(path,deferred,handler)=>`  { method: 'get', path: '${path}', resource: 'none',${deferred?' deferred: true,':''} handler: async (req, res) => ${handler} },\n`;
+  const routesOf=(...entries)=>`export const routes = (u) => [\n${entries.join('')}];\n`;
+  const three=DEFERRED_PATHS.map(p=>get(p,true,via)),next=get('/dashboard/clinic',false,'res.json(1)'),goodRoutes=routesOf(...three,next);
+  const goodGate="const deferredReads = new Set(['/appointments', '/medical-records', '/medical-records/images']);\nif (req.method === 'GET' && deferredReads.has(req.path) && source.breaker?.state === 'closed') { failClosed(res, d); next(); }";
+  const reasons=(routes,gate=goodGate)=>deferredRouteViolations(routes,gate);
+  assert.deepEqual(reasons(goodRoutes),[]);
+  assert.deepEqual(reasons(routesOf(get('/appointments',true,'res.json(await list())'),...three.slice(1),next)),['GET /appointments: GET handler does not use authorizedRead']);
+  assert.deepEqual(reasons(routesOf(...three.slice(0,2),get('/medical-records/images',true,'res.json(1)'),get('/dashboard/clinic',false,via))),['GET /medical-records/images: GET handler does not use authorizedRead'],'authorizedRead on the next route does not count');
+  assert.deepEqual(reasons(routesOf(...three.slice(0,2),get('/medical-records/images',true,'res.json(1)'))+'const helper = () => authorizedRead(res, () => list());\n'),['GET /medical-records/images: GET handler does not use authorizedRead'],'authorizedRead after the array does not count');
+  assert.deepEqual(reasons(routesOf(...three,`  { method: 'post', path: '/appointments/x', resource: 'none', deferred: true, handler: async (req, res) => ${via} },\n`)).slice(0,1),['POST /appointments/x: deferred is only for GET']);
+  assert.deepEqual(reasons(routesOf(...three,get('/dashboard/clinic',true,via))).slice(0,1),['deferred route not in ADR-P12: /dashboard/clinic']);
+  assert.deepEqual(reasons(routesOf(...three.slice(0,2),get('/medical-records/images',false,via),next)).slice(0,1),['deferred route missing: /medical-records/images']);
+  assert.deepEqual(reasons(goodRoutes,goodGate.replace("req.method === 'GET' && ",'')),['the deferred gate does not require GET']);
+  assert.deepEqual(reasons(goodRoutes,goodGate.replace('deferredReads.has(req.path)','deferredReads.has(req.originalUrl)')),['the deferred gate does not match the exact path']);
+  assert.deepEqual(reasons(goodRoutes,goodGate.replace(" && source.breaker?.state === 'closed'",'')),['the deferred gate does not require a closed breaker']);
+  assert.deepEqual(reasons(goodRoutes,goodGate.replace('failClosed(res, d); ','')),['the deferred gate does not fail closed']);
+  assert.deepEqual(reasons(goodRoutes,goodGate.replace('const deferredReads','const eagerReads')),['no deferredReads set in the gate']);
+  assert.deepEqual(reasons('export const routes = [];\n').slice(0,1),['no route elements found']);
+  return DEFERRED_PATHS.length+' deferred routes, all GET via authorizedRead; the gate needs GET, the exact path and a closed breaker';
 });
 
 // ---- 10. No duplicated service modules (C) ------------------------------------
