@@ -17,6 +17,7 @@ const checks=[
   {name:'document links',protects:'NFR12 (reproducible handoff)',command:[process.execPath,'tools/phase2/check-document-links.mjs']},
   {name:'alert rules reference real metrics',protects:'NFR12, ops',command:[process.execPath,'tools/phase2/check-alert-metrics.mjs']},
   {name:'permission matrix over HTTP (4 roles x every guard)',protects:'AQ-05, NFR04',command:[process.execPath,'--test','tools/phase2/permission-matrix.test.mjs']},
+  {name:'Clinic request scope (what the HTTP layer decides before a handler)',protects:'AQ-05, ADR-P12, K2',command:[process.execPath,'--test','tools/phase2/clinic-scope.test.mjs']},
   {name:'booking lifecycle matrix (every from x to, guards, roles)',protects:'P01, functional correctness',command:[process.execPath,'--test','tools/phase2/lifecycle-matrix.test.mjs']},
   {name:'frontend API types generated from OpenAPI (fresh, aliased)',protects:'AQ-07, NFR10',command:[process.execPath,'--test','tools/phase2/api-types.test.mjs']},
 ];
