@@ -166,6 +166,8 @@ export class ServiceRuntime {
       });
       res.once('close', () => clearTimeout(timer));
       if (this.stopping) {
+        // Without this a polling client keeps its connection, and with it the drain, open until the deadline.
+        res.set('Connection', 'close');
         res.status(503).json({ error: 'Service is draining.' });
         return;
       }
@@ -541,8 +543,12 @@ export class ServiceRuntime {
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => server.closeAllConnections(), deadline);
       timer.unref();
+      // A connection busy now goes idle once its request ends, so closing idle ones a single time is not enough.
+      const sweep = setInterval(() => server.closeIdleConnections(), 100);
+      sweep.unref();
       server.close(e => {
         clearTimeout(timer);
+        clearInterval(sweep);
         e ? reject(e) : resolve();
       });
       server.closeIdleConnections();
