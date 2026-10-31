@@ -38,6 +38,8 @@ import {pathToFileURL} from 'node:url';
 const root=resolve(import.meta.dirname,'../..');
 const read=path=>readFileSync(resolve(root,path),'utf8');
 const files=dir=>readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.name==='generated'?[]:e.isDirectory()?files(resolve(dir,e.name)):[resolve(dir,e.name)]);
+// A rule that reads code must not be satisfied by text a comment holds: every pattern runs on the source without comments.
+const withoutComments = source => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 const results=[];
 const rule=(name,fn)=>{try{const detail=fn();results.push({rule:name,status:'PASS',detail});}catch(error){results.push({rule:name,status:'FAIL',detail:error.message});}};
 
@@ -339,15 +341,25 @@ const lifecycleCheck=(existsSync(built)?import(pathToFileURL(built).href):Promis
 export const DEFERRED_PATHS=['/appointments','/medical-records','/medical-records/images'];
 // The gate is the policy enforcement point of http/scope.ts: it reads the declaration of the route it guards, so the
 // paths that defer are the routes that say `deferred: true`, compared with the three of ADR-P12 below.
-const DEFERRED_GATE=[
+// The gate is ONE `if` whose condition joins its four terms with && and nothing else (an || between them, or the breaker
+// computed into a variable and left out of the condition, opens the gate to more than a GET on the exact path with a closed
+// breaker), and the body of that `if` fails closed. mountRoutes puts the PEP of each route before its handler. Comments are
+// not code: both sources are read without them, so a term that only a comment holds is not there.
+const DEFERRED_TERMS=[
   [/req\.method\s*===\s*'GET'\s*&&\s*route\.deferred\b/,'the deferred gate does not require GET'],
   [/req\.path\s*===\s*route\.path\b/,'the deferred gate does not match the exact path'],
   [/breaker\?\.state\s*===\s*'closed'/,'the deferred gate does not require a closed breaker'],
-  [/\bfailClosed\(/,'the deferred gate does not fail closed'],
 ];
+const DEFERRED_GATE=/\bif\s*\(\s*req\.method\s*===\s*'GET'\s*&&\s*route\.deferred\s*&&\s*req\.path\s*===\s*route\.path\s*&&\s*[\w$.!]*breaker\?\.state\s*===\s*'closed'\s*\)\s*\{/;
+const DEFERRED_SHAPE='the deferred gate is not one condition joining GET, route.deferred, the exact path and a closed breaker with &&';
+const FAIL_CLOSED=[/\bfailClosed\(/,'the deferred gate does not fail closed'];
+const MOUNT_WITH_PEP=/\brouter\[route\.method\]\(\s*route\.path\s*,\s*pep\(route\s*,[^()]*\)\s*,\s*route\.handler\s*\)/;
+const MOUNT_MESSAGE='mountRoutes does not put the pep of each route before its handler';
+// The text between the braces of the block whose `{` is at `open`; to the end of the source if it never closes.
+const blockAt=(source,open)=>{let depth=0;for(let i=open;i<source.length;i++){if(source[i]==='{')depth++;else if(source[i]==='}'&&--depth===0)return source.slice(open+1,i);}return source.slice(open+1);};
 // A route element is `{ method: 'get', path: '/x', ...` up to the next element (or the end of the array): its handler is in it.
 export function deferredRouteViolations(routeSource,gateSource){
-  const found=[],elements=routeSource.split(/\{\s*method:\s*'/).slice(1).map(text=>{
+  const gate=withoutComments(gateSource),found=[],elements=withoutComments(routeSource).split(/\{\s*method:\s*'/).slice(1).map(text=>{
     const part=text.split(/\r?\n\s*\];/)[0],head=part.match(/^(\w+)',\s*path:\s*'([^']+)'/);
     return {method:head?.[1],path:head?.[2],deferred:/\bdeferred:\s*true\b/.test(part),part};
   });
@@ -361,7 +373,11 @@ export function deferredRouteViolations(routeSource,gateSource){
   const paths=deferred.map(e=>e.path),missing=DEFERRED_PATHS.filter(p=>!paths.includes(p)),extra=paths.filter(p=>!DEFERRED_PATHS.includes(p));
   if(missing.length)found.push('deferred route missing: '+missing.join(', '));
   if(extra.length)found.push('deferred route not in ADR-P12: '+extra.join(', '));
-  for(const [pattern,message] of DEFERRED_GATE)if(!pattern.test(gateSource))found.push(message);
+  const missed=DEFERRED_TERMS.filter(([pattern])=>!pattern.test(gate)).map(([,message])=>message),open=DEFERRED_GATE.exec(gate);
+  found.push(...missed);
+  if(!open&&!missed.length)found.push(DEFERRED_SHAPE);
+  if(!FAIL_CLOSED[0].test(open?blockAt(gate,open.index+open[0].length-1):gate))found.push(FAIL_CLOSED[1]);
+  if(!MOUNT_WITH_PEP.test(gate))found.push(MOUNT_MESSAGE);
   return found;
 }
 rule('deferred-reads-via-authorized-read',()=>{
@@ -372,7 +388,9 @@ rule('deferred-reads-via-authorized-read',()=>{
   const via='authorizedRead(res, () => list())',get=(path,deferred,handler)=>`  { method: 'get', path: '${path}', resource: 'none',${deferred?' deferred: true,':''} handler: async (req, res) => ${handler} },\n`;
   const routesOf=(...entries)=>`export const routes = (u) => [\n${entries.join('')}];\n`;
   const three=DEFERRED_PATHS.map(p=>get(p,true,via)),next=get('/dashboard/clinic',false,'res.json(1)'),goodRoutes=routesOf(...three,next);
-  const goodGate="if (req.method === 'GET' && route.deferred && req.path === route.path && source.breaker?.state === 'closed') { failClosed(res, d); next(); }";
+  const gateIf="if (req.method === 'GET' && route.deferred && req.path === route.path && source.breaker?.state === 'closed') { failClosed(res, d); next(); }";
+  const mount='export function mountRoutes(router, routes, deps) { for (const route of routes) router[route.method](route.path, pep(route, deps), route.handler); }';
+  const goodGate=gateIf+'\n'+mount;
   const reasons=(routes,gate=goodGate)=>deferredRouteViolations(routes,gate);
   assert.deepEqual(reasons(goodRoutes),[]);
   assert.deepEqual(reasons(routesOf(get('/appointments',true,'res.json(await list())'),...three.slice(1),next)),['GET /appointments: GET handler does not use authorizedRead']);
@@ -387,6 +405,35 @@ rule('deferred-reads-via-authorized-read',()=>{
   assert.deepEqual(reasons(goodRoutes,goodGate.replace('req.path === route.path','req.originalUrl === route.path')),['the deferred gate does not match the exact path']);
   assert.deepEqual(reasons(goodRoutes,goodGate.replace(" && source.breaker?.state === 'closed'",'')),['the deferred gate does not require a closed breaker']);
   assert.deepEqual(reasons(goodRoutes,goodGate.replace('failClosed(res, d); ','')),['the deferred gate does not fail closed']);
+  // negative fixtures: the gate and the routes are read as code, not as text (each of these passed the rule that tested each pattern anywhere in the file)
+  const [isGet,isDeferred,isPath,isClosed]=["req.method === 'GET'",'route.deferred','req.path === route.path',"source.breaker?.state === 'closed'"],all=[isGet,isDeferred,isPath,isClosed].join(' && ');
+  const shaped=(condition,body='{ failClosed(res, d); next(); }')=>'if ('+condition+') '+body+'\n'+mount;
+  const noPath=['the deferred gate does not match the exact path'],noFail=['the deferred gate does not fail closed'];
+  assert.deepEqual(reasons(goodRoutes,shaped(all)),[],'the same gate is accepted');
+  assert.deepEqual(reasons(goodRoutes,shaped('\n  '+all.replaceAll(' && ',' &&\n  ')+'\n')),[],'the gate as Prettier wraps it is accepted');
+  assert.deepEqual(reasons(goodRoutes,shaped(all.replace(isDeferred+' && ',isDeferred+' || '))),[DEFERRED_SHAPE],'|| in place of && before the path');
+  assert.deepEqual(reasons(goodRoutes,shaped(all.replace(isPath+' && ',isPath+' || '))),[DEFERRED_SHAPE],'|| in place of && before the breaker');
+  assert.deepEqual(reasons(goodRoutes,shaped(all+' || bypass')),[DEFERRED_SHAPE],'|| after the last term');
+  assert.deepEqual(reasons(goodRoutes,'const closed = '+isClosed+';\n'+shaped([isGet,isDeferred,isPath].join(' && '))),[DEFERRED_SHAPE],'the breaker is computed into a variable and left out of the condition');
+  assert.deepEqual(reasons(goodRoutes,'const closed = '+isClosed+';\n'+shaped([isGet,isDeferred,isPath,'closed'].join(' && '))),[DEFERRED_SHAPE],'the breaker is in a variable the condition uses');
+  assert.deepEqual(reasons(goodRoutes,shaped(`${isGet} && ${isDeferred} /* && ${isPath} */ && ${isClosed}`)),noPath,'the exact path only in a block comment');
+  assert.deepEqual(reasons(goodRoutes,shaped(`\n  ${isGet} &&\n  ${isDeferred} &&\n  // ${isPath} &&\n  ${isClosed}\n`)),noPath,'the exact path only in a line comment');
+  assert.deepEqual(reasons(goodRoutes,'// '+gateIf+'\nif (route.deferred) { next(); }\n'+mount),['the deferred gate does not require GET',...noPath,'the deferred gate does not require a closed breaker',...noFail],'the whole gate in a comment while route.deferred opens it');
+  assert.deepEqual(reasons(goodRoutes,'/* '+gateIf+' */\nif (route.deferred) { failClosed(res, d); next(); }\n'+mount),['the deferred gate does not require GET',...noPath,'the deferred gate does not require a closed breaker'],'the whole gate in a block comment');
+  assert.deepEqual(reasons(goodRoutes,shaped(all,'{ /* failClosed(res, d); */ next(); }')),noFail,'failClosed in a block comment');
+  assert.deepEqual(reasons(goodRoutes,shaped(all,'{\n  // failClosed(res, d);\n  next();\n}')),noFail,'failClosed in a line comment');
+  assert.deepEqual(reasons(goodRoutes,shaped(all,'{ next(); }')+'\nfailClosed(res, d);'),noFail,'failClosed outside the body of the gate');
+  assert.deepEqual(reasons(goodRoutes,gateIf),[MOUNT_MESSAGE],'no mountRoutes');
+  assert.deepEqual(reasons(goodRoutes,gateIf+'\n'+mount.replace('pep(route, deps), ','')),[MOUNT_MESSAGE],'mountRoutes without the pep');
+  assert.deepEqual(reasons(goodRoutes,gateIf+'\n'+mount.replace('pep(route, deps), ','/* pep(route, deps), */ ')),[MOUNT_MESSAGE],'the pep only in a block comment');
+  assert.deepEqual(reasons(goodRoutes,gateIf+'\n'+mount.replace('route.handler)','route.handler); // pep(route, deps)').replace('pep(route, deps), ','')),[MOUNT_MESSAGE],'the pep only in a line comment');
+  assert.deepEqual(reasons(goodRoutes,gateIf+'\n'+mount.replace('router[','const guard = pep(route, deps); router[').replace('pep(route, deps), ','')),[MOUNT_MESSAGE],'the pep built and not mounted');
+  assert.deepEqual(reasons(goodRoutes,gateIf+'\n'+mount.replace('pep(route, deps), route.handler','route.handler, pep(route, deps)')),[MOUNT_MESSAGE],'the pep after the handler');
+  const noRead='res.json(1)',commented=handler=>routesOf(...three.slice(0,2),get('/medical-records/images',true,handler),next);
+  assert.deepEqual(reasons(commented(noRead+' /* authorizedRead(res, () => list()) */')),['GET /medical-records/images: GET handler does not use authorizedRead'],'authorizedRead only in a block comment');
+  assert.deepEqual(reasons(commented(noRead+' // authorizedRead(res, () => list())')),['GET /medical-records/images: GET handler does not use authorizedRead'],'authorizedRead only in a line comment');
+  assert.deepEqual(reasons(routesOf(...three.slice(0,2),'//'+three[2],next)),['deferred route missing: /medical-records/images'],'a deferred route commented out is not declared');
+  assert.deepEqual(reasons(routesOf(...three,'//'+get('/dashboard/clinic',true,via),next)),[],'a deferred route that only a comment declares is not there');
   assert.deepEqual(reasons('export const routes = [];\n').slice(0,1),['no route elements found']);
   return DEFERRED_PATHS.length+' deferred routes, all GET via authorizedRead; the gate needs GET, the exact path and a closed breaker';
 });
@@ -423,7 +470,6 @@ const CLINIC_HTTP_FILES = new Map([
   ['infrastructure/core/directorySync.ts', 'Core directory export for the projection'],
   ['infrastructure/blob/blobStore.ts', 'S3-compatible object storage (not Core)'],
 ]);
-const withoutComments = source => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 // A call to fetch, any reference to globalThis.fetch, or a static, dynamic or required import of an HTTP/socket client module.
 const HTTP_CALL = /(?:^|[^\w$])fetch\s*\(|\bglobalThis\s*(?:\.\s*fetch\b|\[\s*['"]fetch['"])|\b(?:from|import|require)\s*\(?\s*['"](?:(?:node:)?(?:https?|http2|net|tls)|undici|axios|node-fetch|got)['"]/;
 export function unconfinedHttpCalls(modules, allowed = CLINIC_HTTP_FILES) {

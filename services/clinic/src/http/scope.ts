@@ -28,6 +28,7 @@ export type ClinicRoute = {
 
 const RESOURCES: readonly string[] = ['none', 'appointment', 'medicalRecord', 'medicalRecordHistory', 'medicalImage'];
 const METHODS: readonly string[] = ['get', 'post', 'patch', 'delete'];
+const ID_IN_PATH = /\/:id(?:\/|$)/;
 
 // Startup refuses a registry that could leave a route without its scope. index.ts prints only a message made of
 // capitals and underscores, so the message is a constant and the route and reason travel in `cause`.
@@ -41,6 +42,10 @@ export function assertRoutes(routes: readonly ClinicRoute[]) {
     if (!METHODS.includes(route?.method)) refuse('method must be get, post, patch or delete');
     if (typeof route.path !== 'string') refuse('path must be a string');
     if (!RESOURCES.includes(route.resource)) refuse('resource must be none or the kind of resource the URL names');
+    // The resource id is always :id, so a path that names it must say what it is, and one that does not has no resource.
+    const namesId = ID_IN_PATH.test(route.path);
+    if (namesId && route.resource === 'none') refuse('the path names :id, so resource must say what the id is');
+    if (!namesId && route.resource !== 'none') refuse('resource is not none, so the path must name :id');
     if (route.deferred && (route.method !== 'get' || route.resource !== 'none'))
       refuse('deferred is only for a GET route with resource none');
     if (seen.has(name)) refuse('method and path are declared twice');
