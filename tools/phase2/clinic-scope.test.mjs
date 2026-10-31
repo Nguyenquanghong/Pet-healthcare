@@ -412,6 +412,21 @@ canonical('N3 owner GET /api/Dashboard/Clinic/Activity',{role:'owner',path:`/api
 // A reserved word as an id: the old regex looked up an image named `history`; the registry matches `/:id/history` with id `images`.
 move('N3 admin GET /api/medical-records/images/history',{path:'/api/medical-records/images/history'},{like:{path:'/api/medical-records/calendar/history'}});
 move('N3 owner GET /api/medical-records/images/history',{role:'owner',path:'/api/medical-records/images/history'},{like:{role:'owner',path:'/api/medical-records/calendar/history'}});
+// The old regex read the raw path; the registry reads what Express matched and decoded. These four were added after the golden
+// was recorded, so their `old` comes from the regex of legacyRequestScope (git show 6d42c3f:services/clinic/src/app.ts) run on a
+// build of that commit; the same build reproduces every stable case and every other `old` of this file. Two of the four reach a
+// handler once the PEP routes them: a reserved id is not looked up, so the handler answers its own 404 (as `calendar/status` does).
+const confirm={status:'confirmed',expectedRevision:0};
+// `%63` is `c`: the regex saw a resource named `%63alendar` and looked it up; the route sees the reserved id `calendar`.
+move('N3 admin PATCH /api/appointments/%63alendar/status (an encoded reserved word)',{method:'PATCH',path:'/api/appointments/%63alendar/status',body:confirm},{like:{method:'PATCH',path:'/api/appointments/calendar/status',body:confirm}});
+// The regex took `images/` for a prefix and looked up the id `status`, which this fixture says exists, so `old` shows Core asked about
+// pet-1 (a real database has no such row: the middleware would 404 with 'Clinic resource not found.' and no Core call). The route
+// `/appointments/:id/status` takes `images` for the id, a reserved word, and looks nothing up.
+move('N3 admin PATCH /api/appointments/images/status (the regex took images/ for a prefix)',{method:'PATCH',path:'/api/appointments/images/status',body:confirm},{like:{method:'PATCH',path:'/api/appointments/calendar/status',body:confirm}});
+// A URL that does not decode never matches a route with a parameter: Express fails before any PEP, and the error handler does not expose it.
+// The regex checked the write permission (403) and the body (422) first, and failed on the decode only when it reached the lookup.
+move('N3 owner PATCH /api/medical-records/%E0%A4%A (a URL that does not decode fails before the gate)',{role:'owner',method:'PATCH',path:'/api/medical-records/%E0%A4%A',body:{title:'t',expectedRevision:1}},{like:{method:'PATCH',path:'/api/medical-records/%E0%A4%A',body:{title:'t'}}});
+move('N3 admin PATCH /api/medical-records/%E0%A4%A with a body array',{method:'PATCH',path:'/api/medical-records/%E0%A4%A',body:[]},{like:{method:'PATCH',path:'/api/medical-records/%E0%A4%A',body:{title:'t'}}});
 
 // ---- replay ---------------------------------------------------------------------------------
 // The golden file was recorded once on the code before the K2 changes (`old`; `new` from `like`/`expect`/`noCore` of the cases
