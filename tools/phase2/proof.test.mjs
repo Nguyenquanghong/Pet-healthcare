@@ -7,13 +7,13 @@ import { PrismaClient as ClinicClient } from '../../services/clinic/src/generate
 import { PrismaClient as NotificationClient } from '../../services/notification/src/generated/client/index.js';
 import { CoreBilling } from '../../backend/src/phase2/billing.ts';
 import { OutboxRelay } from '../../backend/src/phase2/relay.ts';
-import { ClinicBilling } from '../../services/clinic/src/billing.ts';
+import { ClinicBilling } from '../../services/clinic/src/infrastructure/persistence/billing.ts';
 import { NotificationInbox } from '../../services/notification/src/inbox.ts';
 import amqp from 'amqplib';
 import { declareTopology, topology, publishConfirmed, consumeEvents, replayEvent, TransientError, permanentOn } from '@nipopeto/messaging';
 import { brokerQueues, topologyQueues } from './test-project.mjs';
-import { ClinicInbox } from '../../services/clinic/src/inbox.ts';
-import { OutboxRelay as ClinicRelay } from '../../services/clinic/src/relay.ts';
+import { ClinicInbox } from '../../services/clinic/src/infrastructure/messaging/inbox.ts';
+import { OutboxRelay as ClinicRelay } from '../../services/clinic/src/infrastructure/messaging/relay.ts';
 assert.equal(process.env.PHASE2_TEST_CONFIRM, 'pet-phase2-p1-test', 'Use phase2:test:integration; direct execution refused');
 const urls = Object.fromEntries(['core', 'clinic', 'notification'].map(s => [s, `postgresql://p2_${s}:p2_${s}_fixture_only@127.0.0.1:55432/p2_${s}_test?schema=p1_proof`]));
 const clients = { core: new CoreClient({ datasourceUrl: urls.core }), clinic: new ClinicClient({ datasourceUrl: urls.clinic }), notification: new NotificationClient({ datasourceUrl: urls.notification }) };

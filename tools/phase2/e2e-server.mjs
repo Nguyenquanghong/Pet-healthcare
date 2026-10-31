@@ -13,7 +13,7 @@ import { PrismaClient as Notification } from '../../services/notification/src/ge
 import { hashPasswordAsync } from '../../backend/dist/src/lib/password.js';
 import { OutboxRelay as CoreRelay } from '../../backend/dist/src/phase2/relay.js';
 import { RuntimeOutboxStore } from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';
-import { OutboxRelay as ClinicRelay } from '../../services/clinic/dist/relay.js';
+import { OutboxRelay as ClinicRelay } from '../../services/clinic/dist/infrastructure/messaging/relay.js';
 import { AppointmentInvoiceBilling, ClinicBillingRemote } from '../../backend/dist/src/phase2/appointmentBilling.js';
 import { topology, declareTopology } from '@nipopeto/messaging';
 import amqp from 'amqplib';

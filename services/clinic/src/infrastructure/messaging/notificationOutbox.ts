@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Prisma } from './generated/client/index.js';
+import type { Prisma } from '../../generated/client/index.js';
 import { parseEnvelope, type NotificationPayload, type Envelope } from '@nipopeto/contracts';
 import { currentRequestId } from '@nipopeto/runtime';
 

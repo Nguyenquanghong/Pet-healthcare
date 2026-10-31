@@ -125,7 +125,7 @@ export function ciJobsRunning(workflow,command){
 // Layer rank: an import from a lower rank to a higher one points against the dependency direction.
 const LAYERS={
   core:{dir:'backend/src',rank:{domain:0,lib:0,application:1,infrastructure:2,middleware:2,routes:3,phase2:4,'app.ts':4,'index.ts':5}},
-  clinic:{dir:'services/clinic/src',rank:{domain:0,lib:0,application:1,infrastructure:2,'(root)':3}},
+  clinic:{dir:'services/clinic/src',rank:{domain:0,application:1,infrastructure:2,http:3,'(root)':4}},
 };
 const CORE_SPLIT_ENTRIES=/^(index\.ts|phase2\/(worker|billingWorker|notificationWorker)\.ts)$/;
 // Split mode never reaches the monolith: coreApp only calls createApp without the runtime, and the clinical routers that
@@ -182,9 +182,9 @@ export function measure(root=defaultRoot){
   put('S7','A Clinic route may omit its resource lookup and still run','manual',null,undefined,'true until the scope registry (K2) makes the app refuse to start; then a rule can measure it',{declared:{omissionStillRuns:true}});
 
   // S8: Prisma calls in Clinic's HTTP layer.
-  const httpFiles=['services/clinic/src/app.ts','services/clinic/src/billingApi.ts'].filter(f=>existsSync(abs(f))),PRISMA_LINE=/\b(?:db|tx|prisma)\.(?:\$\w+|[a-z]\w*\.[a-z]\w*)\s*\(/;
+  const httpFiles=[abs('services/clinic/src/app.ts'),...walk(abs('services/clinic/src/http'))].filter(f=>existsSync(f)).map(rel),PRISMA_LINE=/\b(?:db|tx|prisma)\.(?:\$\w+|[a-z]\w*\.[a-z]\w*)\s*\(/;
   const prismaLines=httpFiles.flatMap(f=>sanitize(text(abs(f))).split('\n').flatMap((l,i)=>PRISMA_LINE.test(l)?[f+':'+(i+1)]:[]));
-  put('S8','Prisma calls in the Clinic HTTP layer (app.ts, billingApi.ts)','measured','lower',{lines:prismaLines.length},prismaLines);
+  put('S8','Prisma calls in the Clinic HTTP layer (app.ts and every file in http/)','measured','lower',{lines:prismaLines.length},prismaLines);
 
   // S9: longest named functions (backend, services and shared packages).
   const fns=backendFiles.flatMap(f=>functions(text(f)).map(fn=>({...fn,file:rel(f)}))).sort((a,b)=>b.lines-a.lines);

@@ -21,8 +21,9 @@
 //     that answer through authorizedRead, and the gate only opens for GET.
 // 10. No two .ts files in services/*/src or backend/src/phase2 are identical: a copy
 //     belongs in packages/runtime or packages/messaging.
-// 11. Clinic reaches other systems over HTTP only from directory.ts and directorySync.ts
-//     (the Core calls, ADR-P13) and blobStore.ts (object storage, not Core).
+// 11. Clinic reaches other systems over HTTP only from infrastructure/core/directory.ts and
+//     infrastructure/core/directorySync.ts (the Core calls, ADR-P13) and infrastructure/blob/blobStore.ts
+//     (object storage, not Core).
 // 12. Structure ratchet: the measured structure metrics (tools/phase2/arch-metrics.mjs) never get
 //     worse than tools/phase2/arch-baseline.json; an improvement passes and asks to lower the baseline.
 // 13. Shared packages (contracts excepted) name no service route: no literal path under /api/, /auth/ or /public/.
@@ -195,7 +196,7 @@ const permissionCheck=(existsSync(built)?import(pathToFileURL(built).href):Promi
 // Each consumer's list in contracts is bound to its queue, every declared type has a
 // consumer, and every billing type Clinic consumes has an explicit outcome, so a new
 // billing event cannot be read as an abort by default.
-const clinicBilling=resolve(root,'services/clinic/dist/billingEvents.js');
+const clinicBilling=resolve(root,'services/clinic/dist/infrastructure/messaging/billingEvents.js');
 const consumerQueues={notification:'notification',identity:'identity',clinic:'clinic'};
 // P03: a draining type moved to another consumer's queue; the old queue no longer receives it.
 export function consumerGaps({eventTypes,consumedEvents,drainingEvents={}},bound,outcomes){
@@ -393,9 +394,9 @@ rule('no-duplicated-service-modules',()=>{
 // Clinic's synchronous dependency on Core is read-only authorization and lookup. Keeping every
 // outbound HTTP call in these files means a new Core call is a visible change to this list.
 const CLINIC_HTTP_FILES = new Map([
-  ['directory.ts', 'Core authorize / lookup / terminal evidence'],
-  ['directorySync.ts', 'Core directory export for the projection'],
-  ['blobStore.ts', 'S3-compatible object storage (not Core)'],
+  ['infrastructure/core/directory.ts', 'Core authorize / lookup / terminal evidence'],
+  ['infrastructure/core/directorySync.ts', 'Core directory export for the projection'],
+  ['infrastructure/blob/blobStore.ts', 'S3-compatible object storage (not Core)'],
 ]);
 const withoutComments = source => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 // A call to fetch, any reference to globalThis.fetch, or a static, dynamic or required import of an HTTP/socket client module.
@@ -429,7 +430,8 @@ rule('clinic-core-calls-confined', () => {
     "const get = globalThis['fetch'];",
   ])
     assert.deepEqual(at('x.ts', source), ['x.ts'], source);
-  assert.deepEqual(at('directory.ts', 'await fetch(url)'), []);
+  assert.deepEqual(at('infrastructure/core/directory.ts', 'await fetch(url)'), []);
+  assert.deepEqual(at('directory.ts', 'await fetch(url)'), ['directory.ts'], 'the allowance is the path, not the file name');
   assert.deepEqual(at('x.ts', "import { netmask } from './net.js'; const text = 'node:net'; const a = globalThis.fetchedAt;"), []);
   assert.deepEqual(at('x.ts', '// import net from "node:net"' + String.fromCharCode(10) + '/* globalThis.fetch */'), []);
   assert.deepEqual(at('x.ts', '// fetch(url) is what directory.ts does' + String.fromCharCode(10) + '/* fetch(url) */' + String.fromCharCode(10) + 'const fetched = refetch(url);'), []);

@@ -1,10 +1,15 @@
 import type { Response } from 'express';
-import type { Actor } from './domain/auth.js';
-import { BusinessError } from './domain/error.js';
+import type { Actor } from '../../domain/auth.js';
+import { BusinessError } from '../../domain/error.js';
 import { acceptsCredential, traceHeaders, CircuitBreaker, integer, serviceOrigin } from '@nipopeto/runtime';
-import type { PetSnapshot, OwnerSnapshot, DirectorySnapshot, DirectoryLookup } from './application/ports/directory.js';
-import type { AppointmentQueryDirectory } from './application/ports/appointmentQueries.js';
-export type { PetSnapshot, OwnerSnapshot, DirectorySnapshot } from './application/ports/directory.js';
+import type {
+  PetSnapshot,
+  OwnerSnapshot,
+  DirectorySnapshot,
+  DirectoryLookup,
+} from '../../application/ports/directory.js';
+import type { AppointmentQueryDirectory } from '../../application/ports/appointmentQueries.js';
+export type { PetSnapshot, OwnerSnapshot, DirectorySnapshot } from '../../application/ports/directory.js';
 // Core answered (a business refusal); the dependency is healthy for the breaker.
 class CoreResponded extends Error {}
 const coreFailure = (error: unknown) => !(error instanceof BusinessError) && !(error instanceof CoreResponded);

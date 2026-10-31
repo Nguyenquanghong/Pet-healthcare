@@ -1,8 +1,8 @@
 import { allowedActions } from '@nipopeto/contracts';
-import type { AppointmentRecord } from '../application/ports/appointments.js';
+import type { AppointmentRecord } from './ports/appointments.js';
 import type { Actor } from '../domain/auth.js';
-import type { MedicalRecordValue } from '../application/ports/medicalRecords.js';
-export { medicalImageDto } from '../application/services/medicalRecords.js';
+import type { MedicalRecordValue } from './ports/medicalRecords.js';
+export { medicalImageDto } from './services/medicalRecords.js';
 const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
 // P01: allowedActions tells the viewer which buttons to offer; the server still checks.
 export function appointmentDto(item: AppointmentRecord, viewer: Pick<Actor, 'role' | 'sub'>) {

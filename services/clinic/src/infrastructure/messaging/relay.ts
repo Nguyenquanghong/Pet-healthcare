@@ -1,4 +1,4 @@
-import type { PrismaClient } from './generated/client/index.js';
+import type { PrismaClient } from '../../generated/client/index.js';
 import { BaseOutboxRelay, type ClaimedOutbox, type OutboxRelayStore, type RelayOptions } from '@nipopeto/messaging';
 export type { RelayOptions };
 // The only event Clinic writes now is notification.requested.v1; batching still saves the

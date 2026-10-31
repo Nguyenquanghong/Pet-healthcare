@@ -12,8 +12,8 @@ import {PrismaClient as ClinicClient} from '../../services/clinic/src/generated/
 import {PrismaClient as NotificationClient} from '../../services/notification/src/generated/client/index.js';
 import {createCoreApp} from '../../backend/dist/src/phase2/coreApp.js';
 import {AppointmentInvoiceBilling,ClinicBillingRemote} from '../../backend/dist/src/phase2/appointmentBilling.js';
-import {AppointmentBilling} from '../../services/clinic/dist/runtimeBilling.js';
-import {ClinicInbox} from '../../services/clinic/dist/inbox.js';
+import {AppointmentBilling} from '../../services/clinic/dist/infrastructure/persistence/runtimeBilling.js';
+import {ClinicInbox} from '../../services/clinic/dist/infrastructure/messaging/inbox.js';
 import {signToken} from '../../backend/dist/src/lib/token.js';
 import {OutboxRelay} from '../../backend/dist/src/phase2/relay.js';
 import {RuntimeOutboxStore} from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {request as httpRequest} from 'node:http';
-import {readFileSync,writeFileSync} from 'node:fs';
+import {readFileSync} from 'node:fs';
 import express from 'express';
 import {createApp} from '../../services/clinic/dist/app.js';
 import {BusinessError} from '../../services/clinic/dist/domain/error.js';
@@ -17,7 +17,6 @@ import {BusinessError} from '../../services/clinic/dist/domain/error.js';
 //             PEP_ACTIVE. New is derived from the canonical spelling of the same request, or written by hand.
 const PEP_ACTIVE=false; // the PEP commit changes exactly this line
 const GOLDEN=new URL('./clinic-scope.golden.json',import.meta.url);
-const RECORD=process.env.CLINIC_SCOPE_RECORD==='1';
 
 // ---- fake Core directory and fake database ------------------------------------------------
 const APPT='appt-1',state={mode:'ok',breaker:undefined,dbDown:false},coreCalls=[],tables=[],seen={handler:false};
@@ -414,31 +413,16 @@ canonical('N3 owner GET /api/Dashboard/Clinic/Activity',{role:'owner',path:`/api
 move('N3 admin GET /api/medical-records/images/history',{path:'/api/medical-records/images/history'},{like:{path:'/api/medical-records/calendar/history'}});
 move('N3 owner GET /api/medical-records/images/history',{role:'owner',path:'/api/medical-records/images/history'},{like:{role:'owner',path:'/api/medical-records/calendar/history'}});
 
-// ---- record or replay -----------------------------------------------------------------------
-async function recordGolden(){
-  const golden={stable:{},changed:{}};
-  for(const c of stable)golden.stable[c.name]=await run(c.steps);
-  for(const c of changed){
-    const old=await run([c.step]);
-    // `new`: a hand-written expectation, or the canonical spelling's answer measured on the same code.
-    let expected=c.expect;
-    if(!expected){expected=await run([c.like]);if(c.noCore)expected={...expected,coreCalls:[],tables:[]};}
-    assert.notDeepEqual(old,expected,c.name+': a changed case must differ between old and new (otherwise it belongs in stable)');
-    golden.changed[c.name]={old,new:expected};
-  }
-  const line=value=>JSON.stringify(value);
-  const body=['{','  "stable": {',Object.entries(golden.stable).map(([k,v])=>'    '+line(k)+': '+line(v)).join(',\n'),'  },','  "changed": {',Object.entries(golden.changed).map(([k,v])=>'    '+line(k)+': '+line(v)).join(',\n'),'  }','}',''].join('\n');
-  writeFileSync(GOLDEN,body);
-  return golden;
-}
-let golden;
-if(RECORD)golden=await recordGolden();
-else golden=JSON.parse(readFileSync(GOLDEN,'utf8'));
+// ---- replay ---------------------------------------------------------------------------------
+// The golden file was recorded once on the code before the K2 changes (`old`; `new` from `like`/`expect`/`noCore` of the cases
+// above). Record mode is gone so that a changed behavior cannot be re-recorded as the new truth.
+const golden=JSON.parse(readFileSync(GOLDEN,'utf8'));
 
 test('the golden file lists exactly the cases of this file',()=>{
   assert.deepEqual(Object.keys(golden.stable),stable.map(c=>c.name));
   assert.deepEqual(Object.keys(golden.changed),changed.map(c=>c.name));
   assert.ok(stable.length>=300,'the stable group is large enough to mean something ('+stable.length+')');
+  for(const [name,{old,new:expected}] of Object.entries(golden.changed))assert.notDeepEqual(old,expected,name+': a changed case must differ between old and new (otherwise it belongs in stable)');
 });
 test('stable: what Clinic decides before and around its handlers does not change',async t=>{
   for(const c of stable)await t.test(c.name,async()=>assert.deepEqual(await run(c.steps),golden.stable[c.name]));

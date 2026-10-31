@@ -1,7 +1,7 @@
 import type { PrismaClient } from './generated/client/index.js';
 import { createRuntime, integer, type Actor } from '@nipopeto/runtime';
 import { runtimeQueues } from '@nipopeto/messaging';
-import { clinicRouteLabel } from './infrastructure/http/routeLabel.js';
+import { clinicRouteLabel } from './http/routeLabel.js';
 export const clinicRuntime = (db: PrismaClient, verify: (token: string) => Actor) =>
   createRuntime({
     service: 'clinic',

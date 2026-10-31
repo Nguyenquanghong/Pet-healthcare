@@ -5,14 +5,14 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "lines": 1843
+        "lines": 580
       }
     },
     "S2": {
       "kind": "measured",
       "better": "lower",
       "values": {
-        "edges": 16
+        "edges": 8
       }
     },
     "S3": {

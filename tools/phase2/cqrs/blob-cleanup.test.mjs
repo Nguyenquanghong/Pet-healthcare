@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {drainBlobCleanup,imageRetentionMs} from '../../../services/clinic/dist/blobCleanup.js';
+import {drainBlobCleanup,imageRetentionMs} from '../../../services/clinic/dist/infrastructure/blob/blobCleanup.js';
 
 // AQ-09: objects of deleted images are removed by retry, never leaked, never double-failed;
 // retention: a due claim purges the tombstone row (logged) before the object, and a

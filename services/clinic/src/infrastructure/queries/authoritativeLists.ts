@@ -8,8 +8,8 @@ import {
 import type { Actor } from '../../domain/auth.js';
 import { BusinessError } from '../../domain/error.js';
 import { calendarDate } from '../../domain/validation.js';
-import { appointmentDto, medicalRecordDto, medicalImageDto } from '../../lib/serialize.js';
-import { UnconfiguredBlobStore, type BlobStore } from '../../blobStore.js';
+import { appointmentDto, medicalRecordDto, medicalImageDto } from '../../application/serialize.js';
+import { UnconfiguredBlobStore, type BlobStore } from '../blob/blobStore.js';
 import type { AppointmentListResult, AppointmentQueryDirectory } from '../../application/ports/appointmentQueries.js';
 
 export type Resource = 'appointments' | 'medicalRecords' | 'medicalImages';

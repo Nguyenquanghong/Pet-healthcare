@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import amqp from 'amqplib';
 import { PrismaClient } from '../../services/clinic/src/generated/client/index.js';
-import { OutboxRelay } from '../../services/clinic/dist/relay.js';
+import { OutboxRelay } from '../../services/clinic/dist/infrastructure/messaging/relay.js';
 import { topology, declareTopology } from '@nipopeto/messaging';
 import { topologyQueues } from './test-project.mjs';
 

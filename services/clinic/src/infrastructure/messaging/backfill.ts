@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import type { PrismaClient } from './generated/client/index.js';
+import type { PrismaClient } from '../../generated/client/index.js';
 import { ClinicInbox } from './inbox.js';
-import { DirectorySync } from './directorySync.js';
+import { DirectorySync } from '../core/directorySync.js';
 import { parseEnvelope, type Envelope } from '@nipopeto/contracts';
 
 // Declare the durable Clinic queue before calling this. Live directory events

@@ -1,6 +1,6 @@
-import type { PrismaClient } from './generated/client/index.js';
+import type { PrismaClient } from '../../generated/client/index.js';
 import { consumes, parseEnvelope, type DirectoryEntry } from '@nipopeto/contracts';
-import { applyBillingTerminal } from './runtimeBilling.js';
+import { applyBillingTerminal } from '../persistence/runtimeBilling.js';
 import { billingOutcome } from './billingEvents.js';
 export type ProjectionEntry = DirectoryEntry & { email?: string | null; microchipId?: string | null };
 export class ClinicInbox {

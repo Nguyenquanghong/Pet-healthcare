@@ -1,9 +1,9 @@
 import express from 'express';
-import type { PrismaClient } from './generated/client/index.js';
-import type { Actor } from './domain/auth.js';
-import { BusinessError } from './domain/error.js';
-import type { CoreDirectory } from './directory.js';
-import { AppointmentBilling } from './runtimeBilling.js';
+import type { PrismaClient } from '../generated/client/index.js';
+import type { Actor } from '../domain/auth.js';
+import { BusinessError } from '../domain/error.js';
+import type { CoreDirectory } from '../infrastructure/core/directory.js';
+import { AppointmentBilling } from '../infrastructure/persistence/runtimeBilling.js';
 
 export function mountBilling(
   app: express.Express,

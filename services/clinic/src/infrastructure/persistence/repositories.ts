@@ -18,10 +18,10 @@ import type {
   BookingKind,
 } from '../../application/ports/bookingLifecycle.js';
 import { appointmentSlotWrite } from './appointmentSlotConflict.js';
-import { writeNotification } from '../../notificationOutbox.js';
-import type { RequestDirectory } from '../../directory.js';
-import type { BlobStore } from '../../blobStore.js';
-import { imageRetentionMs } from '../../blobCleanup.js';
+import { writeNotification } from '../messaging/notificationOutbox.js';
+import type { RequestDirectory } from '../core/directory.js';
+import type { BlobStore } from '../blob/blobStore.js';
+import { imageRetentionMs } from '../blob/blobCleanup.js';
 
 type Client = PrismaClient | Prisma.TransactionClient;
 type ImageRow = {
