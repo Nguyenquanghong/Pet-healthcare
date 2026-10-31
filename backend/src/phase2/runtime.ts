@@ -2,10 +2,14 @@ import type { PrismaClient } from '@prisma/client';
 import { createRuntime, integer } from '@nipopeto/runtime';
 import { verifyToken } from '../lib/token.js';
 import { hashAdmission } from '../lib/password.js';
+import { coreBodyLimits, coreLimitRules, coreRouteLabel } from '../middleware/runtimeHttp.js';
 export const coreRuntime = (db: PrismaClient) =>
   createRuntime({
     service: 'core',
     verify: verifyToken,
+    limitRules: coreLimitRules,
+    routeLabel: coreRouteLabel,
+    bodyLimits: coreBodyLimits,
     extras: () =>
       Object.fromEntries(
         Object.entries(hashAdmission.stats).map(([k, v]) => [

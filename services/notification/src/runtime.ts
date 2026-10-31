@@ -1,10 +1,19 @@
 import type { PrismaClient } from './generated/client/index.js';
 import { createRuntime, type Actor } from '@nipopeto/runtime';
 import { runtimeQueues } from '@nipopeto/messaging';
+// The metric label of a route Notification serves; anything else is undefined and the runtime labels it 'unknown'.
+const notificationRouteLabel = (p: string): string | undefined => {
+  if (/^\/api\/notifications(\/(unread-count|send|read-all))?$/.test(p)) return p;
+  const item = p.match(/^\/api\/notifications\/[^/]{1,200}(\/read)?$/);
+  return item ? `/api/notifications/:id${item[1] ?? ''}` : undefined;
+};
 export const notificationRuntime = (db: PrismaClient, verify: (token: string) => Actor) =>
   createRuntime({
     service: 'notification',
     verify,
+    // Notification has no sign-in or public routes: the general per-client limit is the whole policy.
+    limitRules: [],
+    routeLabel: notificationRouteLabel,
     queues: runtimeQueues(['notification', 'identity']),
     probe: async () =>
       db.$transaction(

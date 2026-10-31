@@ -5,7 +5,7 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "lines": 1840
+        "lines": 1843
       }
     },
     "S2": {
@@ -20,7 +20,7 @@
       "better": "lower",
       "values": {
         "files": 14,
-        "lines": 1679
+        "lines": 1683
       }
     },
     "S4": {
@@ -62,15 +62,15 @@
       "better": "lower",
       "values": {
         "longest": 303,
-        "over100": 9,
-        "over80": 15
+        "over100": 8,
+        "over80": 14
       }
     },
     "S10": {
       "kind": "derived",
       "better": "lower",
       "values": {
-        "functions": 3
+        "functions": 0
       }
     },
     "S11": {
@@ -100,7 +100,7 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "files": 4
+        "files": 2
       }
     },
     "S15": {

@@ -1,6 +1,7 @@
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { circuitBreakers } from './circuitBreaker.js';
 import type { SharedLimiter } from './limiter.js';
+import { API_PREFIX } from './limitPolicy.js';
 export type OwnSnapshot = {
   pending: number;
   outboxAgeSeconds: number;
@@ -26,23 +27,18 @@ export const newHealth = (): RuntimeHealth => ({
   ownAt: 0,
   failures: 0,
 });
+const API_HEALTH = API_PREFIX + '/health';
 const buckets = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 5, 10];
-export function routeTemplate(path: string) {
-  const p = path.split('?')[0]!;
-  if (p === '/health/live' || p === '/health/ready' || p === '/api/health' || p === '/metrics') return p;
+// Maps a service's own route label function to the metric label of a request URL. The runtime's own endpoints and the
+// internal routes are labelled here; every other path is the service's to label, and an unlabelled one is 'unknown'.
+// Never use the raw path or req.route: a proxied route or a request refused before the router has none, and a raw
+// path would give every id its own series.
+export type RouteLabel = (path: string) => string | undefined;
+export function metricRoute(url: string, label?: RouteLabel) {
+  const p = url.split('?')[0]!;
+  if (p === '/health/live' || p === '/health/ready' || p === API_HEALTH || p === '/metrics') return p;
   if (p.startsWith('/internal/')) return '/internal/:scope';
-  const fixed =
-    /^\/api\/(auth\/(owner\/(login|register|activation(\/inspect)?)|admin\/login|me(\/password)?)|dashboard\/(core|clinic)|appointments\/(calendar|availability)|medical-records\/images|notifications\/(unread-count|send|read-all)|invoices\/checkout|bootstrap|analytics\/summary|openapi.json|docs|pets|owners|doctors|appointments|medical-records|hotel-bookings|notifications|invoices|operations|payments)$/;
-  if (fixed.test(p)) return p;
-  const item = p.match(
-    /^\/api\/(pets|owners|appointments|medical-records|hotel-bookings|notifications|invoices|operations)\/[^/]{1,200}(\/(status|reschedule|cancel|status-history|history|undo-status|reminder|read|pay|daily-care|activation))?$/,
-  );
-  if (item) return `/api/${item[1]}/:id${item[2] ?? ''}`;
-  if (/^\/api\/medical-records\/images\/[^/]{1,200}$/.test(p)) return '/api/medical-records/images/:id';
-  if (/^\/api\/public\/rescue\/[^/]{1,200}(\/report)?$/.test(p)) return '/api/public/rescue/:token';
-  const pet = p.match(/^\/api\/public\/pets\/[^/]{1,200}(\/rescue-reports)?$/);
-  if (pet) return '/api/public/pets/:token' + (pet[1] ?? '');
-  return 'unknown';
+  return label?.(p) ?? 'unknown';
 }
 type HttpMetric = { count: number; sum: number; counts: number[] };
 // Request count and latency histogram per method, route and status.
