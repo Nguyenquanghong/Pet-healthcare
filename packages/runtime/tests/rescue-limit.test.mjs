@@ -3,14 +3,15 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import {once} from 'node:events';
 import {ServiceRuntime} from '../dist/index.js';
+import {coreLimitRules} from '../../../backend/dist/src/middleware/runtimeHttp.js';
 
-// AQ-01 / E-b: public rescue reports get their own IP and per-token buckets.
+// AQ-01 / E-b: public rescue reports get their own IP and per-token buckets. The rule is Core's, passed in like the service does.
 const snapshot={pending:0,outboxAgeSeconds:0,outboxRetries:0,billingPending:0,billingAgeSeconds:0,dbLockWaits:0};
 async function harness(t,env={}){
   Object.assign(process.env,{OBSERVABILITY_TOKEN:'metrics-fixture-'.repeat(3),RATE_LIMIT_KEY_SECRET:'limiter-fixture-'.repeat(3),
     REDIS_URL:'redis://127.0.0.1:1',RATE_LIMIT_NAMESPACE:'rescue-limit-test'},env);
   t.after(()=>{for(const key of Object.keys(env))delete process.env[key];});
-  const rt=new ServiceRuntime({service:'core',verify:()=>({sub:'owner',role:'owner'}),probe:async()=>snapshot});
+  const rt=new ServiceRuntime({service:'core',verify:()=>({sub:'owner',role:'owner'}),probe:async()=>snapshot,limitRules:coreLimitRules});
   const spent=[];
   // localRead has the same check-all-then-increment semantics as the Redis script.
   rt.limiter.spend=async(group,buckets)=>{spent.push({group,buckets});return rt.limiter.localRead(group,buckets);};

@@ -4,72 +4,88 @@ import type { Actor } from './jwt.js';
 import { requestActor } from './jwt.js';
 import type { Bucket, SharedLimiter } from './limiter.js';
 import type { RuntimeHealth } from './metrics.js';
+// The limiter and the backlog gate are mounted under this prefix; the services' routes are declared by the services.
+export const API_PREFIX = '/api';
 export type LimitPolicy = { group: string; buckets: Bucket[]; read: boolean; local?: boolean };
-export function limitPolicy(req: Request, service: string, verify: (token: string) => Actor): LimitPolicy {
-  const ip = 'ip:' + (req.ip ?? req.socket.remoteAddress ?? 'unknown'),
-    windowMs = 900000;
-  const b = (identity: string, limit: number, window = windowMs) => ({ identity, limit, windowMs: window });
-  const limit = (name: string, defaultValue: number) => integer(name, defaultValue);
-  if (req.method === 'POST' && /^\/auth\/(owner|admin)\/login$/.test(req.path)) {
-    const raw = req.body?.email ?? req.body?.username;
-    const account = typeof raw === 'string' ? raw.trim().toLowerCase().slice(0, 254) : 'invalid';
-    return {
-      group: 'auth-login',
-      read: false,
-      buckets: [
-        b(ip, limit('AUTH_LOGIN_IP_LIMIT', 1000)),
-        b('account:' + req.path + ':' + account, limit('AUTH_LOGIN_ACCOUNT_LIMIT', 30)),
-      ],
-    };
-  }
-  if (req.method === 'POST' && req.path === '/auth/owner/register')
-    return { group: 'auth-register', read: false, buckets: [b(ip, limit('AUTH_REGISTER_IP_LIMIT', 300))] };
-  if (req.method === 'POST' && req.path.startsWith('/auth/owner/activation'))
-    return { group: 'auth-activation', read: false, buckets: [b(ip, limit('AUTH_ACTIVATION_IP_LIMIT', 300))] };
-  // AQ-01: unauthenticated rescue reports notify an owner. The token buckets cap
-  // a flood against one pet across IPs (5 per 15 minutes, 20 per day); the token
-  // is HMACed with the other keys.
-  const rescue = req.method === 'POST' ? req.path.match(/^\/public\/pets\/([^/]{1,200})\/rescue-reports$/) : null;
-  if (rescue) {
-    let token = rescue[1]!;
-    try {
-      token = decodeURIComponent(token);
-    } catch {}
-    return {
-      group: 'public-rescue',
-      read: false,
-      buckets: [
-        b(ip, limit('RESCUE_REPORT_IP_LIMIT', 20)),
-        b('rescue-token:' + token, limit('RESCUE_REPORT_TOKEN_LIMIT', 5)),
-        b('rescue-token-day:' + token, limit('RESCUE_REPORT_TOKEN_DAILY_LIMIT', 20), 86400000),
-      ],
-    };
-  }
-  let actor: Actor | undefined;
-  try {
-    actor = requestActor(req, verify);
-  } catch {}
-  const identity = actor ? 'actor:' + actor.sub : ip,
-    read = ['GET', 'HEAD'].includes(req.method);
-  if (req.method === 'POST' && req.path === '/auth/me/password')
-    return {
-      group: 'auth-password',
-      read: false,
-      buckets: [b(identity, limit('AUTH_PASSWORD_ACTOR_LIMIT', 10)), b(ip, 200)],
-    };
-  const group = service + (read ? '-read' : '-write');
-  return {
-    group,
-    read,
-    // Sign-in, activation and public pages (rescue tokens) stay on the shared limiter even for GET.
-    local: read && !/^\/+(auth|public)(\/|$)/i.test(req.path),
-    buckets: [
-      b(ip, limit(read ? 'API_READ_IP_LIMIT' : 'API_WRITE_IP_LIMIT', read ? 3000 : 1000), 60000),
-      ...(actor
-        ? [b(identity, limit(read ? 'API_READ_ACTOR_LIMIT' : 'API_WRITE_ACTOR_LIMIT', read ? 600 : 120), 60000)]
-        : []),
-    ],
+// What a rule sees of a request under the API prefix (req.path is relative to it).
+export type LimitContext = {
+  req: Request;
+  // 'ip:<address>' of the client.
+  ip: string;
+  bucket: (identity: string, limit: number, windowMs?: number) => Bucket;
+  // A threshold from the environment; an invalid value throws, and the request is refused (fail closed).
+  limit: (name: string, defaultValue: number) => number;
+  // Verified once per request; undefined when the token is missing or invalid.
+  actor: () => Actor | undefined;
+  // 'actor:<sub>' when there is an actor, else the client's ip.
+  identity: () => string;
+  // The general per-client policy: per ip and per actor, reads and writes apart. `shared` keeps a read on the shared
+  // limiter (Redis) instead of the per-instance one.
+  general: (options?: { shared?: boolean }) => LimitPolicy;
+};
+// A service's own rule for requests the general policy does not fit: a policy to apply, or undefined to pass.
+export type LimitRule = (context: LimitContext) => LimitPolicy | undefined;
+// The first rule that answers decides; with none (or an empty list) the general policy applies, so the limiter is
+// never off.
+export function limitPolicy(
+  req: Request,
+  service: string,
+  verify: (token: string) => Actor,
+  rules: readonly LimitRule[],
+): LimitPolicy {
+  const ip = 'ip:' + (req.ip ?? req.socket.remoteAddress ?? 'unknown');
+  let resolved: { actor: Actor | undefined } | undefined;
+  const actor = () => {
+    if (!resolved) {
+      try {
+        resolved = { actor: requestActor(req, verify) };
+      } catch {
+        resolved = { actor: undefined };
+      }
+    }
+    return resolved.actor;
   };
+  const identity = () => {
+    const who = actor();
+    return who ? 'actor:' + who.sub : ip;
+  };
+  const limit = (name: string, defaultValue: number) => integer(name, defaultValue);
+  const general = ({ shared = false } = {}): LimitPolicy => {
+    const read = ['GET', 'HEAD'].includes(req.method),
+      who = actor(),
+      bucket = (id: string, max: number, windowMs: number): Bucket => ({ identity: id, limit: max, windowMs });
+    return {
+      group: service + (read ? '-read' : '-write'),
+      read,
+      local: read && !shared,
+      buckets: [
+        bucket(ip, limit(read ? 'API_READ_IP_LIMIT' : 'API_WRITE_IP_LIMIT', read ? 3000 : 1000), 60000),
+        ...(who
+          ? [
+              bucket(
+                identity(),
+                limit(read ? 'API_READ_ACTOR_LIMIT' : 'API_WRITE_ACTOR_LIMIT', read ? 600 : 120),
+                60000,
+              ),
+            ]
+          : []),
+      ],
+    };
+  };
+  const context: LimitContext = {
+    req,
+    ip,
+    bucket: (id, max, windowMs = 900000) => ({ identity: id, limit: max, windowMs }),
+    limit,
+    actor,
+    identity,
+    general,
+  };
+  for (const rule of rules) {
+    const policy = rule(context);
+    if (policy) return policy;
+  }
+  return general();
 }
 export type AdmissionGate = {
   limiter: SharedLimiter;

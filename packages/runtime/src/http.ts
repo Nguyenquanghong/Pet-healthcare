@@ -9,8 +9,8 @@ import { acceptsCredential, credential, integer, runtimeEnabled } from './config
 import type { Actor } from './jwt.js';
 import { BrokerProbe } from './brokerProbe.js';
 import { closeServer } from './drain.js';
-import { limitAdmission, limitPolicy } from './limitPolicy.js';
-import { HttpMetrics, newHealth, renderMetrics, routeTemplate, type OwnSnapshot } from './metrics.js';
+import { API_PREFIX, limitAdmission, limitPolicy, type LimitRule } from './limitPolicy.js';
+import { HttpMetrics, metricRoute, newHealth, renderMetrics, type OwnSnapshot, type RouteLabel } from './metrics.js';
 import { requestScope } from './requestContext.js';
 export type { OwnSnapshot } from './metrics.js';
 // queues: the consumer queues under BROKER_PREFIX and their retry queue suffixes (P03),
@@ -20,6 +20,13 @@ export type RuntimeOptions = {
   verify: (token: string) => Actor;
   probe: () => Promise<OwnSnapshot>;
   extras?: () => Record<string, number>;
+  // The service's own rules for requests the general per-client limit does not fit (sign-in, public forms), tried in
+  // order. Required: [] says there are none and the general limit applies; leaving it out is an error in createRuntime.
+  limitRules: readonly LimitRule[];
+  // The metric label of a route the service serves, such as '/api/pets/:id'; undefined is labelled 'unknown'.
+  routeLabel?: RouteLabel;
+  // JSON bodies parsed before the limiter (so a rule can read them), each with its own size limit.
+  bodyLimits?: readonly { path: string; limit: string }[];
   queues?: { consumers: readonly string[]; retrySuffixes: readonly string[] };
   // How the readiness probe reaches the broker; tests inject a fake.
   connect?: (url: string, options: { timeout: number }) => Promise<amqp.ChannelModel>;
@@ -65,7 +72,9 @@ export class ServiceRuntime {
     this.lag.enable();
   }
   install(app: Express) {
-    const { service, verify } = this.options;
+    const { service, verify, routeLabel, bodyLimits = [] } = this.options,
+      // Only code that builds a ServiceRuntime directly (tests) can leave the rules out: the general limit applies.
+      rules = this.options.limitRules ?? [];
     app.locals.runtime = this;
     // Proxy trust is explicit CIDR/address configuration, never an unbounded hop.
     app.set(
@@ -79,7 +88,7 @@ export class ServiceRuntime {
         service,
         instance: this.instance,
         deadlineMs: this.deadlineMs,
-        routeOf: routeTemplate,
+        routeOf: url => metricRoute(url, routeLabel),
         isStopping: () => this.stopping,
         record: (method, route, status, seconds) => this.http.record(method, route, status, seconds),
       }),
@@ -111,14 +120,14 @@ export class ServiceRuntime {
       await this.refresh(true);
       if (!res.writableEnded) res.type('text/plain; version=0.0.4').send(this.metrics());
     });
-    app.use('/api/auth', express.json({ limit: '16kb' }));
+    for (const { path, limit } of bodyLimits) app.use(path, express.json({ limit }));
     app.use(
-      '/api',
+      API_PREFIX,
       limitAdmission({
         limiter: this.limiter,
         health: this.health,
         hardLimit: this.hardLimit,
-        policyOf: req => limitPolicy(req, service, verify),
+        policyOf: req => limitPolicy(req, service, verify, rules),
       }),
     );
   }
@@ -203,5 +212,7 @@ export class ServiceRuntime {
   }
 }
 export function createRuntime(options: RuntimeOptions) {
+  // A service that forgets its rules would silently lose them, so it does not start.
+  if (!Array.isArray(options.limitRules)) throw new Error('LIMIT_RULES_REQUIRED');
   return runtimeEnabled() ? new ServiceRuntime(options) : undefined;
 }

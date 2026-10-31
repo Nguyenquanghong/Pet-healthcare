@@ -8,3 +8,5 @@ export * from './circuitBreaker.js';
 export * from './failures.js';
 export * from './requestFault.js';
 export { acceptRequestId, currentRequestId, eventCorrelation, traceHeaders, withRequestId } from './requestContext.js';
+export type { LimitContext, LimitPolicy, LimitRule } from './limitPolicy.js';
+export type { RouteLabel } from './metrics.js';

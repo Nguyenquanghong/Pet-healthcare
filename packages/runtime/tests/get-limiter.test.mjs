@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { once } from 'node:events';
 import { MemoryWindows, ServiceRuntime } from '../dist/index.js';
+import { coreLimitRules } from '../../../backend/dist/src/middleware/runtimeHttp.js';
 
 // P-limiter: GET reads are counted in memory per instance; sign-in, public pages and every write keep Redis.
 const snapshot = { pending: 0, outboxAgeSeconds: 0, outboxRetries: 0, billingPending: 0, billingAgeSeconds: 0, dbLockWaits: 0 };
@@ -55,7 +56,7 @@ async function harness(t, env = {}) {
     RATE_LIMIT_NAMESPACE: 'get-limiter-test',
   }, env);
   t.after(() => { for (const key of Object.keys(env)) delete process.env[key]; });
-  const rt = new ServiceRuntime({ service: 'clinic', verify: token => ({ sub: token, role: 'owner' }), probe: async () => snapshot });
+  const rt = new ServiceRuntime({ service: 'clinic', verify: token => ({ sub: token, role: 'owner' }), probe: async () => snapshot, limitRules: coreLimitRules });
   const redis = { calls: [], down: false };
   rt.limiter.spend = async (group, buckets) => {
     redis.calls.push({ group, buckets });
