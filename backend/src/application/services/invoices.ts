@@ -3,28 +3,8 @@ import { BusinessError } from '../../domain/error.js';
 import { authorize } from '../../domain/authorization.js';
 import type { InvoiceRepository, InvoiceLine, BankTransferDetails, TransferQrGenerator } from '../ports/invoices.js';
 import pricing from '../../domain/pricing.json' with { type: 'json' };
+import { money, lines } from '../../domain/billing/charges.js';
 
-export function money(value: unknown, name: string): number {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > 9_999_999_999)
-    throw new BusinessError(422, `${name} phải là số tiền VND nguyên, không âm và không quá 9.999.999.999.`);
-  return value;
-}
-export function lines(value: unknown): InvoiceLine[] {
-  if (!Array.isArray(value) || value.length > 50) throw new BusinessError(422, 'Tối đa 50 dòng dịch vụ.');
-  return value.map(raw => {
-    if (!raw || typeof raw.description !== 'string' || !raw.description.trim() || raw.description.length > 300)
-      throw new BusinessError(422, 'Mỗi dòng cần mô tả dịch vụ (tối đa 300 ký tự).');
-    if (!Number.isSafeInteger(raw.quantity) || raw.quantity < 1 || raw.quantity > 10000)
-      throw new BusinessError(422, 'Số lượng phải từ 1 đến 10.000.');
-    const unitPrice = money(raw.unitPrice, 'Đơn giá');
-    return {
-      description: raw.description.trim(),
-      unitPrice,
-      quantity: raw.quantity,
-      amount: money(unitPrice * raw.quantity, 'Thành tiền'),
-    };
-  });
-}
 export class InvoicesService {
   constructor(
     private readonly invoices: InvoiceRepository,

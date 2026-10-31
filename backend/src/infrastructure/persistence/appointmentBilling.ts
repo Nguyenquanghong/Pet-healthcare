@@ -5,81 +5,12 @@ import type { BillingSourceSnapshot, Envelope } from '@nipopeto/contracts';
 import type { Actor } from '../../domain/auth.js';
 import { BusinessError } from '../../domain/error.js';
 import { authorize } from '../../domain/authorization.js';
-import { money, lines } from '../../application/services/invoices.js';
-import type { InvoiceLine, InvoiceValue } from '../../application/ports/invoices.js';
-import pricing from '../../domain/pricing.json' with { type: 'json' };
+import { charges, fees, type Fees } from '../../domain/billing/charges.js';
+import { isPending, terminalState } from '../../domain/billing/operation.js';
 import { signToken } from '../../lib/token.js';
 import { invoiceDto } from '../../lib/serialize.js';
 import { writeNotification } from './notificationOutbox.js';
 
-type Fees = {
-  relatedId: string;
-  items?: InvoiceLine[];
-  subtotal?: number;
-  taxAmount: number;
-  discountAmount: number;
-  notes: string | null;
-  expectedRevision?: number;
-};
-function fees(input: Record<string, unknown>, self: boolean): Fees {
-  if (
-    !input ||
-    Array.isArray(input) ||
-    input.type !== 'appointment' ||
-    typeof input.relatedId !== 'string' ||
-    !input.relatedId.trim() ||
-    input.relatedId.length > 128
-  )
-    throw new BusinessError(422, 'Invalid appointment billing source.');
-  if (self && Object.keys(input).some(k => !['type', 'relatedId'].includes(k)))
-    throw new BusinessError(422, 'Prices are calculated by the server.');
-  if (input.notes !== undefined && (typeof input.notes !== 'string' || input.notes.length > 2000))
-    throw new BusinessError(422, 'Invalid invoice notes.');
-  if (
-    input.expectedRevision !== undefined &&
-    (!Number.isSafeInteger(input.expectedRevision) ||
-      Number(input.expectedRevision) < 0 ||
-      Number(input.expectedRevision) > 2147483647)
-  )
-    throw new BusinessError(422, 'Invalid source revision.');
-  return {
-    relatedId: input.relatedId.trim(),
-    ...(!self
-      ? input.items === undefined
-        ? { subtotal: money(input.subtotal, 'Subtotal') }
-        : { items: lines(input.items) }
-      : {}),
-    taxAmount: money(input.taxAmount ?? 0, 'Tax'),
-    discountAmount: money(input.discountAmount ?? 0, 'Discount'),
-    notes: typeof input.notes === 'string' ? input.notes.trim() || null : null,
-    ...(input.expectedRevision !== undefined ? { expectedRevision: Number(input.expectedRevision) } : {}),
-  };
-}
-function charges(input: Fees, s: BillingSourceSnapshot, self: boolean) {
-  const rate = pricing.fixedSpaRates[s.type as keyof typeof pricing.fixedSpaRates];
-  if (self && !rate) throw new BusinessError(409, 'This service requires staff to settle charges.');
-  const items = self
-    ? [{ description: s.serviceName, quantity: 1, unitPrice: rate!, amount: rate! }]
-    : (input.items ?? [
-        { description: s.serviceName, quantity: 1, unitPrice: input.subtotal!, amount: input.subtotal! },
-      ]);
-  if (!items.length) throw new BusinessError(422, 'Invoice requires at least one service.');
-  const subtotal = money(
-    items.reduce((n, l) => n + l.amount, 0),
-    'Subtotal',
-  );
-  if (input.discountAmount > subtotal) throw new BusinessError(422, 'Discount exceeds subtotal.');
-  const totalAmount = money(subtotal + input.taxAmount - input.discountAmount, 'Total');
-  if (totalAmount <= 0) throw new BusinessError(422, 'Invoice total must be positive.');
-  return {
-    items,
-    subtotal,
-    taxAmount: input.taxAmount,
-    discountAmount: input.discountAmount,
-    totalAmount,
-    notes: input.notes,
-  };
-}
 export type BillingRemote = {
   source: (id: string, actor: Actor) => Promise<BillingSourceSnapshot>;
   prepare: (operation: AppointmentBillingOperation, actor: Actor) => Promise<BillingSourceSnapshot>;
@@ -225,7 +156,7 @@ export class AppointmentInvoiceBilling {
       await tx.$queryRaw`SELECT id FROM "AppointmentBillingOperation" WHERE id=${id} FOR UPDATE`;
       await afterLock?.();
       const op = await tx.appointmentBillingOperation.findUniqueOrThrow({ where: { id } });
-      if (op.state !== 'PREPARING') return op;
+      if (!isPending(op.state)) return op;
       let invoiceId: string | undefined;
       let existingCheckout = false;
       if (action === 'commit') {
@@ -270,7 +201,7 @@ export class AppointmentInvoiceBilling {
       const updated = await tx.appointmentBillingOperation.update({
         where: { id },
         data: {
-          state: action === 'commit' ? 'COMMITTED' : 'ABORTED',
+          state: terminalState(action),
           invoiceId: invoiceId ?? null,
           snapshot: snapshot ? (snapshot as unknown as Prisma.InputJsonValue) : undefined,
           terminalAt: new Date(),
@@ -299,7 +230,7 @@ export class AppointmentInvoiceBilling {
   }
   async resume(id: string) {
     let op = await this.read(id);
-    if (op.state !== 'PREPARING') return op;
+    if (!isPending(op.state)) return op;
     try {
       const actor: Actor = { sub: op.actorId, role: op.actorRole as Actor['role'] };
       await this.actor(actor);
@@ -324,7 +255,7 @@ export class AppointmentInvoiceBilling {
           data: { expectedRevision: source.revision },
         });
         op = await this.read(id);
-        if (op.state !== 'PREPARING') return op;
+        if (!isPending(op.state)) return op;
       }
       const snapshot = await this.remote.prepare(op, actor);
       const pet = await this.db.pet.findUnique({ where: { id: snapshot.petId }, select: { ownerId: true } });
@@ -379,7 +310,7 @@ export class AppointmentInvoiceBilling {
     for (const { id } of ids) {
       try {
         const op = await this.resume(id);
-        if (op.state !== 'PREPARING') {
+        if (!isPending(op.state)) {
           await this.remote.finalize(op);
           await this.db.appointmentBillingOperation.updateMany({
             where: { id, leaseOwner: workerId },
