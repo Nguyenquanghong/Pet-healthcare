@@ -19,6 +19,7 @@ const checks=[
   {name:'permission matrix over HTTP (4 roles x every guard)',protects:'AQ-05, NFR04',command:[process.execPath,'--test','tools/phase2/permission-matrix.test.mjs']},
   {name:'Clinic request scope (what the HTTP layer decides before a handler)',protects:'AQ-05, ADR-P12, K2',command:[process.execPath,'--test','tools/phase2/clinic-scope.test.mjs']},
   {name:'Clinic route registry (declared scope, assertRoutes, metric labels)',protects:'AQ-05, K2',command:[process.execPath,'--test','tools/phase2/clinic-routes.test.mjs']},
+  {name:'Core HTTP surface (production composition in 3 configurations, saga on a double)',protects:'AQ-05, K3',command:[process.execPath,'--test','tools/phase2/core-surface.test.mjs']},
   {name:'booking lifecycle matrix (every from x to, guards, roles)',protects:'P01, functional correctness',command:[process.execPath,'--test','tools/phase2/lifecycle-matrix.test.mjs']},
   {name:'frontend API types generated from OpenAPI (fresh, aliased)',protects:'AQ-07, NFR10',command:[process.execPath,'--test','tools/phase2/api-types.test.mjs']},
 ];
