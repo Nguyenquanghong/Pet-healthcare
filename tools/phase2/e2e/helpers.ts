@@ -28,9 +28,9 @@ export async function api(page:Page,path:string,{method='GET',body,role='admin',
   const r=await page.request.fetch('/api'+path,{method,headers:{Authorization:'Bearer '+token,...(key?{'Idempotency-Key':key}:{})},data:body});
   return{status:r.status(),body:r.status()===204?null:await r.json()};
 }
-export type NetworkCall = {method:string;path:string;status?:number;failure?:string;outcome:'pending'|'finished'|'failed'};
+export type NetworkCall = {method:string;path:string;query:string;status?:number;failure?:string;outcome:'pending'|'finished'|'failed'};
 export function network(page:Page){const calls:NetworkCall[]=[];const byRequest=new Map();
-  page.on('request',r=>{const path=new URL(r.url()).pathname;if(!path.startsWith('/api/'))return;const call:NetworkCall={method:r.method(),path,outcome:'pending'};calls.push(call);byRequest.set(r,call);});
+  page.on('request',r=>{const {pathname:path,search:query}=new URL(r.url());if(!path.startsWith('/api/'))return;const call:NetworkCall={method:r.method(),path,query,outcome:'pending'};calls.push(call);byRequest.set(r,call);});
   page.on('response',r=>{const call=byRequest.get(r.request());if(call)call.status=r.status();});
   page.on('requestfinished',r=>{const call=byRequest.get(r);if(call)call.outcome='finished';});
   page.on('requestfailed',r=>{const call=byRequest.get(r);if(call){call.outcome='failed';call.failure=r.failure()?.errorText??'Unknown request failure';}});return calls;
