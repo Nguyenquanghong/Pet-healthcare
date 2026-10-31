@@ -24,8 +24,8 @@ export const dashboardRoutes = (useCases: UseCases): ClinicRoute[] => [
     permission: 'clinic-activity.read',
     ignoreQueryPetId: true,
     handler: async (req, res) => {
-      // Express also matches trailing slashes/case variants; authorize the matched
-      // operation itself, independently of the early exact-path rejection above.
+      // The route's `permission` asks this before the body is read; the handler asks again, so that it never answers
+      // on the strength of the registry alone.
       authorize(res.locals.actor, 'clinic-activity.read');
       const filter = parseActivityFilter(req.query);
       try {

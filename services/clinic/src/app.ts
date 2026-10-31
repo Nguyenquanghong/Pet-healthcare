@@ -1,10 +1,7 @@
 import express from 'express';
 import type { Actor } from './domain/auth.js';
-import { BusinessError } from './domain/error.js';
-import { authorize } from './domain/authorization.js';
 import { imageRetentionMs } from './infrastructure/blob/blobCleanup.js';
-import { objectInput } from './domain/validation.js';
-import { CoreDirectory, RequestDirectory, DeferredDirectory, failClosed } from './infrastructure/core/directory.js';
+import type { CoreDirectory } from './infrastructure/core/directory.js';
 import { mountBilling } from './http/billingApi.js';
 import { errorHandler } from './http/errors.js';
 import { appointmentRoutes } from './http/routes/appointments.js';
@@ -62,81 +59,17 @@ export function createApp(
     }
   });
   router.use(express.json({ limit: '8mb' }));
-  router.use((req, _res, next) => {
-    if (req.path === '/dashboard/clinic/activity') authorize(_res.locals.actor, 'clinic-activity.read');
-    next();
-  });
-  router.use(legacyRequestScope(db, source));
-  mountRoutes(router, [...appointmentRoutes(useCases), ...medicalRecordRoutes(useCases), ...dashboardRoutes(useCases)]);
+  // Each route carries its own policy enforcement point (permission, body, pets and doctor, Core), declared in its registry.
+  mountRoutes(
+    router,
+    [...appointmentRoutes(useCases), ...medicalRecordRoutes(useCases), ...dashboardRoutes(useCases)],
+    {
+      source,
+      lookup: useCases.scopeLookup,
+    },
+  );
   app.use('/api', router);
   app.use((_req, res) => res.status(404).json({ error: 'Clinic route not found.' }));
   app.use(errorHandler);
   return app;
-}
-
-const deferredReads = new Set(['/appointments', '/medical-records', '/medical-records/images']);
-// What decides, from the URL alone, which pets and which doctor Core is asked about before a handler runs. The routes
-// already declare what this reads from the path (resource, writePermission, deferred, ignoreQueryPetId, trimBodyPetId);
-// the commit that makes them the source replaces this function.
-function legacyRequestScope(db: ClinicDatabase, source: CoreDirectory | undefined): express.RequestHandler {
-  return async (req, res, next) => {
-    const actor = res.locals.actor as Actor;
-    if (req.path.startsWith('/medical-records') && req.method !== 'GET') authorize(actor, 'medical-record.write');
-    if (req.body === undefined && ['POST', 'PATCH', 'PUT'].includes(req.method)) req.body = {};
-    if (req.body !== undefined) objectInput(req.body);
-    const petIds: string[] = [];
-    const add = (v: unknown) => {
-      if (v !== undefined && v !== null && v !== '') {
-        if (typeof v !== 'string' || v.length > 200) throw new BusinessError(422, 'Invalid pet ID.');
-        petIds.push(v);
-      }
-    };
-    if (req.method === 'GET') {
-      if (req.path !== '/dashboard/clinic/activity') {
-        const id = typeof req.query.petId === 'string' ? req.query.petId.trim() : req.query.petId;
-        if (id !== 'all') add(id);
-      }
-    } else
-      add(
-        req.path === '/medical-records' && typeof req.body?.petId === 'string'
-          ? req.body.petId.trim()
-          : req.body?.petId,
-      );
-    const match = req.path.match(/^\/(appointments|medical-records)\/(?:images\/)?([^/]+)(?:\/|$)/);
-    if (match && !['calendar', 'images', 'availability'].includes(match[2]!)) {
-      const id = decodeURIComponent(match[2]!);
-      let row: { petId: string } | null =
-        match[1] === 'appointments'
-          ? await db.appointment.findUnique({ where: { id } })
-          : req.path.startsWith('/medical-records/images/')
-            ? await db.medicalImage.findUnique({ where: { id }, select: { petId: true } })
-            : await db.medicalRecord.findUnique({ where: { id } });
-      // AQ-15: history outlives a deleted record; scope it by the pet in its last snapshot.
-      if (!row && req.method === 'GET' && req.path === `/medical-records/${match[2]}/history`) {
-        const last = await db.medicalRecordRevision.findFirst({
-          where: { recordId: id },
-          orderBy: [{ changedAt: 'desc' }, { id: 'desc' }],
-        });
-        const snapshot = (last?.before ?? last?.after) as { petId?: unknown } | null | undefined;
-        if (typeof snapshot?.petId === 'string') row = { petId: snapshot.petId };
-      }
-      if (!row) throw new BusinessError(404, 'Clinic resource not found.');
-      add(row.petId);
-    }
-    const token = req.headers.authorization!.slice(7);
-    // Deferred authorization: these list GETs query first and ask Core once afterwards (authorizedRead). Every other route, and any state but a closed breaker, asks Core before touching the database.
-    if (req.method === 'GET' && deferredReads.has(req.path) && source!.breaker?.state === 'closed') {
-      const directory = new DeferredDirectory(source!, actor, token, [...new Set(petIds)]);
-      failClosed(res, directory);
-      res.locals.directory = directory;
-      next();
-      return;
-    }
-    const snapshot = await source!.request(actor, token, {
-      petIds: [...new Set(petIds)],
-      ...(req.body?.doctorId ? { doctorId: req.body.doctorId } : {}),
-    });
-    res.locals.directory = new RequestDirectory(source!, actor, token, snapshot);
-    next();
-  };
 }

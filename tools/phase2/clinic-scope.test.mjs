@@ -15,7 +15,7 @@ import {BusinessError} from '../../services/clinic/dist/domain/error.js';
 //   changed : the N1 and N3 exceptions of phase2-plan/architecture-work/k2-design-20261031.md. Each has `old` (recorded on
 //             the code before the PEP) and `new` (the expected answer once the PEP replaces the URL regexes), chosen by
 //             PEP_ACTIVE. New is derived from the canonical spelling of the same request, or written by hand.
-const PEP_ACTIVE=false; // the PEP commit changes exactly this line
+const PEP_ACTIVE=true; // the PEP commit changes exactly this line
 const GOLDEN=new URL('./clinic-scope.golden.json',import.meta.url);
 
 // ---- fake Core directory and fake database ------------------------------------------------
@@ -365,7 +365,7 @@ move('N1 admin GET /api/nope, Core forbids',{path:'/api/nope',mode:'forbidden'},
 move('N1 admin GET /api/nope',{path:'/api/nope'},{expect:notFound});
 move('N1 admin GET /api',{path:'/api'},{expect:notFound});
 move('N1 admin GET /api/',{path:'/api/'},{expect:notFound});
-move('N1 admin POST /api/dashboard/clinic/activity (a method no route has)',{method:'POST',path:`${activity}?${window}`,body:{}},{expect:notFound});
+move('N1 admin POST /api/dashboard/clinic/activity (a method no route has)',{method:'POST',path:`${activity}?${window}`,body:{}},{expect:{...notFound,cacheControl:'no-store'}});
 move('N1 admin POST /api/nope with an array',{method:'POST',path:'/api/nope',body:[]},{expect:notFound});
 move('N1 admin POST /api/nope with petId and doctorId',{method:'POST',path:'/api/nope',body:{petId:'pet-1',doctorId:'d1'}},{expect:notFound});
 move('N1 owner POST /api/medical-records/rec-1/nope',{role:'owner',method:'POST',path:`/api/medical-records/${REC}/nope`,body:{}},{expect:notFound});
@@ -377,7 +377,7 @@ move('N1 admin DELETE /api/appointments/appt-1 (a method no route has)',{method:
 move('N1 admin PUT /api/medical-records',{method:'PUT',path:'/api/medical-records',body:{}},{expect:notFound});
 move('N1 doctor PATCH /api/appointments (a method no route has)',{role:'doctor',method:'PATCH',path:'/api/appointments',body:{}},{expect:notFound});
 move('N1 admin GET /api/dashboard/nope',{path:'/api/dashboard/nope'},{expect:notFound});
-move('N1 admin GET /api/dashboard/clinic/activity/nope',{path:'/api/dashboard/clinic/activity/nope'},{expect:notFound});
+move('N1 admin GET /api/dashboard/clinic/activity/nope',{path:'/api/dashboard/clinic/activity/nope'},{expect:{...notFound,cacheControl:'no-store'}});
 move('N1 admin GET /api/medical-records/images/img-1',{path:`/api/medical-records/images/${IMG}`},{expect:notFound});
 // OPTIONS: once routes carry their own PEP the framework answers Allow without asking Core (same answer, no Core call, no table).
 const options=(name,step)=>move(name,step,{like:{...step,mode:'ok'},noCore:true});

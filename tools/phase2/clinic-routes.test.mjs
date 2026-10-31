@@ -97,19 +97,21 @@ test('assertRoutes refuses a registry as a whole when only its last route is bad
   assert.throws(()=>assertRoutes([...registry,{...registry[0]}]),/CLINIC_ROUTE_SCOPE_REQUIRED/,'a second GET /appointments');
 });
 
+// What a route is mounted with is its path, then whatever precedes the handler (its PEP), then the handler.
 function recordingRouter(){
   const calls=[];
-  return {calls,...Object.fromEntries(['get','post','patch','delete'].map(method=>[method,(path,handler)=>calls.push({method,path,handler})]))};
+  return {calls,...Object.fromEntries(['get','post','patch','delete'].map(method=>[method,(path,...handlers)=>calls.push({method,path,handler:handlers.at(-1)})]))};
 }
+const deps={source:undefined,lookup:{}};
 test('mountRoutes mounts every route once, in registry order, with its handler last',()=>{
   const router=recordingRouter();
-  mountRoutes(router,registry);
+  mountRoutes(router,registry,deps);
   assert.deepEqual(router.calls.map(({method,path})=>method.toUpperCase()+' '+path),registry.map(name));
   assert.ok(router.calls.every((call,index)=>call.handler===registry[index].handler));
 });
 test('mountRoutes mounts nothing when a route is bad',()=>{
   const router=recordingRouter();
-  assert.throws(()=>mountRoutes(router,[ok,without('resource')]),/CLINIC_ROUTE_SCOPE_REQUIRED/);
+  assert.throws(()=>mountRoutes(router,[ok,without('resource')],deps),/CLINIC_ROUTE_SCOPE_REQUIRED/);
   assert.deepEqual(router.calls,[],'the good route before the bad one was not mounted either');
 });
 
