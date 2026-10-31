@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { once } from 'node:events';
 import { MemoryWindows, ServiceRuntime } from '../dist/index.js';
-import { coreLimitRules } from '../../../backend/dist/src/middleware/runtimeHttp.js';
+import { coreLimitRules } from '../../../backend/dist/src/composition/limitRules.js';
 
 // P-limiter: GET reads are counted in memory per instance; sign-in, public pages and every write keep Redis.
 const snapshot = { pending: 0, outboxAgeSeconds: 0, outboxRetries: 0, billingPending: 0, billingAgeSeconds: 0, dbLockWaits: 0 };

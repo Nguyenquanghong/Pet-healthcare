@@ -2,15 +2,15 @@ import { createHash, randomUUID } from 'node:crypto';
 import { Prisma, type PrismaClient, type AppointmentBillingOperation } from '@prisma/client';
 import { serviceOrigin, traceHeaders } from '@nipopeto/runtime';
 import type { BillingSourceSnapshot, Envelope } from '@nipopeto/contracts';
-import type { Actor } from '../domain/auth.js';
-import { BusinessError } from '../domain/error.js';
-import { authorize } from '../domain/authorization.js';
-import { money, lines } from '../application/services/invoices.js';
-import type { InvoiceLine, InvoiceValue } from '../application/ports/invoices.js';
-import pricing from '../domain/pricing.json' with { type: 'json' };
-import { signToken } from '../lib/token.js';
-import { invoiceDto } from '../lib/serialize.js';
-import { writeNotification } from '../infrastructure/persistence/notificationOutbox.js';
+import type { Actor } from '../../domain/auth.js';
+import { BusinessError } from '../../domain/error.js';
+import { authorize } from '../../domain/authorization.js';
+import { money, lines } from '../../application/services/invoices.js';
+import type { InvoiceLine, InvoiceValue } from '../../application/ports/invoices.js';
+import pricing from '../../domain/pricing.json' with { type: 'json' };
+import { signToken } from '../../lib/token.js';
+import { invoiceDto } from '../../lib/serialize.js';
+import { writeNotification } from './notificationOutbox.js';
 
 type Fees = {
   relatedId: string;

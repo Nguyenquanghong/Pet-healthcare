@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {createServer, request as httpRequest} from 'node:http';
 import {generateKeyPairSync} from 'node:crypto';
-import {readFileSync, writeFileSync} from 'node:fs';
-import {createCoreApp} from '../../backend/dist/src/phase2/coreApp.js';
-import {AppointmentInvoiceBilling} from '../../backend/dist/src/phase2/appointmentBilling.js';
+import {readFileSync} from 'node:fs';
+import {createCoreApp} from '../../backend/dist/src/composition/coreApp.js';
+import {AppointmentInvoiceBilling} from '../../backend/dist/src/infrastructure/persistence/appointmentBilling.js';
 import {signToken} from '../../backend/dist/src/lib/token.js';
 import {BusinessError} from '../../backend/dist/src/domain/error.js';
 
@@ -19,8 +19,8 @@ import {BusinessError} from '../../backend/dist/src/domain/error.js';
 // acct (the currentAccount branches), err (the error handlers), health, cfg (startup refusals), dir (/internal/directory),
 // send (authorize-send), bill (appointment billing over HTTP and the internal evidence route), saga (AppointmentInvoiceBilling
 // on an in-memory double: request hash, terminal transaction, resume, reconcile).
-// Record a new golden only on code whose behavior is meant to be pinned:  CORE_SURFACE_RECORD=1 node --test tools/phase2/core-surface.test.mjs
-const RECORD = process.env.CORE_SURFACE_RECORD === '1';
+// The golden file is never rewritten by the test: it was recorded once, on the code before K3 moved anything (commit C1), and a refactor of
+// K3 must leave it byte-identical. A legitimate change of behavior edits the golden file by hand, in the commit that changes the behavior.
 const GOLDEN = new URL('./core-surface.golden.json', import.meta.url);
 const OPENAPI = JSON.parse(readFileSync(new URL('../../backend/openapi.json', import.meta.url), 'utf8'));
 
@@ -711,7 +711,6 @@ for (const cfg of CONFIGS) {
 startup();
 await saga();
 
-if (RECORD) writeFileSync(GOLDEN, '{\n  "stable": {\n' + Object.entries(observed).map(([name, value]) => '    ' + JSON.stringify(name) + ': ' + JSON.stringify(value)).join(',\n') + '\n  }\n}\n');
 const golden = JSON.parse(readFileSync(GOLDEN, 'utf8')).stable;
 const plain = value => JSON.parse(JSON.stringify(value));
 const GROUPS = {sweep: 'every OpenAPI operation, three configurations, no token and admin', mw: 'middleware order: bodies, CORS, docs, 404, bootstrap', acct: 'currentAccount branches', err: 'error handlers', health: 'health and metrics',

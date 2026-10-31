@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { createServer, request as httpRequest } from 'node:http';
 import { once } from 'node:events';
-import { createCoreApp } from '../dist/src/phase2/coreApp.js';
+import { createCoreApp } from '../dist/src/composition/coreApp.js';
 import { signToken } from '../dist/src/lib/token.js';
 
 // P08 part A: the Core gateway forwards Clinic and Notification routes. These

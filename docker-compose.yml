@@ -166,7 +166,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in a private env file}
       BROKER_URL: amqp://notification:${BROKER_PASSWORD:?Prepare Notification configuration}@rabbitmq:5672
       BROKER_PREFIX: nipopeto.local.v1
-    command: ["node", "backend/dist/src/phase2/notificationWorker.js"]
+    command: ["node", "backend/dist/src/workers/notification.js"]
     depends_on:
       api:
         condition: service_healthy

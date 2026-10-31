@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { mountDirectory } from '../dist/src/phase2/directoryApi.js';
+import { mountDirectory } from '../dist/src/routes/internal/directory.js';
 import { signToken, verifyToken, issuedBeforePasswordChange } from '../dist/src/lib/token.js';
 import { ownerDto, petDto } from '../dist/src/lib/serialize.js';
 

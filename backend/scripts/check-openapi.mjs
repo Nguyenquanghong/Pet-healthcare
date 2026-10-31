@@ -16,9 +16,9 @@ const mounts = {
   payments: "/api/payments", lists: "/api",
 };
 const runtime = new Set(["GET /api/health"]);
-assert.match(readFileSync(resolve(backend,'src/phase2/billingApi.ts'),'utf8'),/app\.get\(\s*'\/api\/operations\/:id'/);
+assert.match(readFileSync(resolve(backend,'src/routes/internal/billing.ts'),'utf8'),/app\.get\(\s*'\/api\/operations\/:id'/);
 runtime.add('GET /api/operations/{id}');
-const dashboardSource=readFileSync(resolve(backend,'src/phase2/dashboardApi.ts'),'utf8');
+const dashboardSource=readFileSync(resolve(backend,'src/routes/dashboard.ts'),'utf8');
 for(const match of dashboardSource.matchAll(/app\.get\(\s*'([^']+)'/g))runtime.add('GET '+match[1]);
 for (const [file, mount] of Object.entries(mounts)) {
   const source = readFileSync(resolve(backend, "src/routes", `${file}.ts`), "utf8");
@@ -37,7 +37,7 @@ for(const file of clinicRouteFiles)for(const match of readFileSync(resolve(clini
 }
 // Core entrypoint composes the independently owned Notification public router.
 // Include routes from its source, not just its spec, in the public inventory.
-assert.match(readFileSync(resolve(backend, 'src/phase2/coreApp.ts'), 'utf8'), /app\.use\(\s*'\/api\/notifications'/);
+assert.match(readFileSync(resolve(backend, 'src/composition/coreApp.ts'), 'utf8'), /app\.use\(\s*'\/api\/notifications'/);
 assert.match(readFileSync(resolve(backend, 'src/index.ts'), 'utf8'), /createCoreApp/);
 const notificationSource = readFileSync(resolve(backend, '../services/notification/src/app.ts'), 'utf8');
 for (const match of notificationSource.matchAll(/\brouter\.(get|post|patch|put|delete)\(\s*['"]([^'"]+)['"]/g)) {

@@ -142,11 +142,11 @@ try{
   nginx=spawn('nginx',['-p',dir+'/', '-c',resolve(dir,'nginx.conf'),'-g','daemon off;'],{stdio:['ignore',nginxFd,nginxFd]});closeSync(nginxFd);
   await until(async()=>{if(nginx.exitCode!==null)throw new Error('nginx startup failed');try{return(await fetch(origins.gateway+'/api/appointments')).status===401;}catch{return false;}},'nginx');
   const workerBase={JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:'',JWT_KEY_ID:'',JWT_ISSUER:'',JWT_AUDIENCE:'',REDIS_URL:'',RATE_LIMIT_KEY_SECRET:'',OBSERVABILITY_TOKEN:''};
-  await child('core-outbox','backend/dist/src/phase2/notificationWorker.js',{...workerBase,DATABASE_URL:context.urls.core});
+  await child('core-outbox','backend/dist/src/workers/notification.js',{...workerBase,DATABASE_URL:context.urls.core});
   await child('clinic-worker','services/clinic/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.clinic,CORE_DIRECTORY_TOKEN:credentials.CORE_DIRECTORY_TOKEN});
   const notificationWorker=()=>child('notification-worker','services/notification/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.notification});
   let consumer=await notificationWorker();
-  await child('billing-worker','backend/dist/src/phase2/billingWorker.js',{...credentials,JWT_PRIVATE_KEY:privateKey,DATABASE_URL:context.urls.core});
+  await child('billing-worker','backend/dist/src/workers/billing.js',{...credentials,JWT_PRIVATE_KEY:privateKey,DATABASE_URL:context.urls.core});
   dump('ready.json',{run:context.run,cqrs,password,accounts:dataset.accounts,admin:{id:admin.id,username:admin.username},dataset:dataset.description,baseUrl:origins.gateway,metrics,metricsToken:common.OBSERVABILITY_TOKEN,processes:handles.map(h=>({name:h.name,pid:h.child.pid})),clinicReplicas:context.replicas,coreReplicas,
     // /api/notifications goes straight to Notification as in deploy/phase2/nginx.split.conf.example; earlier harness versions (Kaggle bridge v1) sent it through Core.
     gateway:{notificationsRoute:'direct-to-notification',coreUpstream:coreProxy?'Clinic and Notification reach Core through nginx upstream core_internal (keepalive 16); gateway through upstream core':'one Core, called directly',coreInstances:handles.filter(h=>/^core(-\d+)?$/.test(h.name)).map(h=>h.name)},dbCrossConnectDenied:6});

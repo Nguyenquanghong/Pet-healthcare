@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import type { PrismaClient, Prisma } from '../generated/phase2-core/index.js';
+import type { PrismaClient, Prisma } from '../../generated/phase2-core/index.js';
 import type { Envelope, ReservationSnapshot } from '@nipopeto/contracts';
 class BillingConflict extends Error {}
 type Input = {

@@ -1,8 +1,8 @@
 import express from 'express';
 import type { PrismaClient } from '@prisma/client';
-import { requireAuth } from '../middleware/auth.js';
-import { BusinessError } from '../domain/error.js';
-import { AppointmentInvoiceBilling, ClinicBillingRemote } from './appointmentBilling.js';
+import { requireAuth } from '../../middleware/auth.js';
+import { BusinessError } from '../../domain/error.js';
+import { AppointmentInvoiceBilling, ClinicBillingRemote } from '../../infrastructure/persistence/appointmentBilling.js';
 import { acceptsCredential, currentRequestId, isTransientFailure, reportUnexpected } from '@nipopeto/runtime';
 
 export function mountAppointmentBilling(

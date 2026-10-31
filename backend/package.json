@@ -18,9 +18,9 @@
     "test:architecture": "node scripts/check-architecture.mjs",
     "test:openapi": "node scripts/check-openapi.mjs",
     "check:vnpay": "node scripts/check-vnpay.mjs",
-    "worker:built": "node dist/src/phase2/worker.js",
-    "worker:notifications": "node dist/src/phase2/notificationWorker.js",
-    "worker:billing": "node dist/src/phase2/billingWorker.js"
+    "worker:built": "node dist/src/workers/outbox.js",
+    "worker:notifications": "node dist/src/workers/notification.js",
+    "worker:billing": "node dist/src/workers/billing.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

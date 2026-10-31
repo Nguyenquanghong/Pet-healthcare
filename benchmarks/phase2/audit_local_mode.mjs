@@ -6,7 +6,7 @@ import { once } from 'node:events';
 import { writeFileSync } from 'node:fs';
 import { assertTestProject } from '../../tools/phase2/test-project.mjs';
 import { PrismaClient } from '@prisma/client';
-import { createCoreApp } from '../../backend/dist/src/phase2/coreApp.js';
+import { createCoreApp } from '../../backend/dist/src/composition/coreApp.js';
 import { signToken } from '../../backend/dist/src/lib/token.js';
 import { hashPasswordAsync } from '../../backend/dist/src/lib/password.js';
 

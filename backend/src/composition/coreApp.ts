@@ -4,13 +4,13 @@ import cors from 'cors';
 import type { PrismaClient } from '@prisma/client';
 import { createApp } from '../app.js';
 import { asymmetricConfig, verifyToken } from '../lib/token.js';
-import { mountDirectory } from './directoryApi.js';
-import { mountAppointmentBilling } from './billingApi.js';
-import { mountDashboards } from './dashboardApi.js';
+import { mountDirectory } from '../routes/internal/directory.js';
+import { mountAppointmentBilling } from '../routes/internal/billing.js';
+import { mountDashboards } from '../routes/dashboard.js';
 import { coreRuntime } from './runtime.js';
 import { createCoreDomains } from './coreDomains.js';
 import { acceptsCredential, credential, requestFault, serviceOrigin } from '@nipopeto/runtime';
-import { serviceProxy } from './serviceProxy.js';
+import { serviceProxy } from '../gateway/serviceProxy.js';
 import { allows, deniedMessage } from '@nipopeto/contracts';
 import { createAuthRouter } from '../routes/auth.js';
 import { AuthService } from '../application/services/auth.js';
@@ -19,7 +19,7 @@ import { PrismaUserRepository } from '../infrastructure/persistence/userReposito
 import { PrismaOwnerActivationRepository } from '../infrastructure/persistence/ownerActivationRepository.js';
 import { activationTokenAdapter } from '../infrastructure/security/activationToken.js';
 import { passwordAdapter, tokenAdapter } from '../infrastructure/security/authAdapters.js';
-import { currentAccount } from './currentAccount.js';
+import { currentAccount } from '../middleware/currentAccount.js';
 
 // Paths the gateway forwards to Clinic; the proxy checks them again after resolving the URL.
 const clinicPrefixes = ['/api/appointments', '/api/medical-records', '/api/dashboard/clinic'] as const;

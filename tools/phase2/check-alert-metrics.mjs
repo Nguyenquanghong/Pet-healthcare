@@ -3,7 +3,7 @@
 //
 // The exporter is renderMetrics() in packages/runtime/src/metrics.ts (ServiceRuntime.metrics() calls it). It prints
 // `pet_<name>` for each gauge('<name>', ...) and writes the pet_http_duration_seconds_*
-// histogram lines literally. Core's extra hash_* gauges (backend/src/phase2/runtime.ts) are
+// histogram lines literally. Core's extra hash_* gauges (backend/src/composition/runtime.ts) are
 // built at run time and are not alerted on, so that file is not an exporter source here.
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

@@ -10,12 +10,12 @@ import {request as httpRequest,createServer as httpServer} from 'node:http';
 import {PrismaClient as CoreClient} from '@prisma/client';
 import {PrismaClient as ClinicClient} from '../../services/clinic/src/generated/client/index.js';
 import {PrismaClient as NotificationClient} from '../../services/notification/src/generated/client/index.js';
-import {createCoreApp} from '../../backend/dist/src/phase2/coreApp.js';
-import {AppointmentInvoiceBilling,ClinicBillingRemote} from '../../backend/dist/src/phase2/appointmentBilling.js';
+import {createCoreApp} from '../../backend/dist/src/composition/coreApp.js';
+import {AppointmentInvoiceBilling,ClinicBillingRemote} from '../../backend/dist/src/infrastructure/persistence/appointmentBilling.js';
 import {AppointmentBilling} from '../../services/clinic/dist/infrastructure/persistence/runtimeBilling.js';
 import {ClinicInbox} from '../../services/clinic/dist/infrastructure/messaging/inbox.js';
 import {signToken} from '../../backend/dist/src/lib/token.js';
-import {OutboxRelay} from '../../backend/dist/src/phase2/relay.js';
+import {OutboxRelay} from '../../backend/dist/src/workers/relay.js';
 import {RuntimeOutboxStore} from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';
 import {PrismaInvoiceRepository} from '../../backend/dist/src/infrastructure/persistence/invoiceRepository.js';
 import {PrismaPaymentRepository} from '../../backend/dist/src/infrastructure/persistence/paymentRepository.js';
@@ -144,7 +144,7 @@ test('before-prepare and after-HELD crash states resume through two built leased
   for(const held of [false,true]){
     const a=await appointment(),op=await operation(a);if(held)await remote.prepare(op,actor);
     if(held)await core.appointmentBillingOperation.update({where:{id:op.id},data:{leaseOwner:'dead-fixture-worker',leaseUntil:new Date(Date.now()-1)}});
-    const workers=[];for(let n=0;n<2;n++)workers.push(await child('backend/dist/src/phase2/billingWorker.js',{DATABASE_URL:urls.core,CLINIC_SERVICE_URL:clinicBases[n],BILLING_OPERATION_ID:op.id}));
+    const workers=[];for(let n=0;n<2;n++)workers.push(await child('backend/dist/src/workers/billing.js',{DATABASE_URL:urls.core,CLINIC_SERVICE_URL:clinicBases[n],BILLING_OPERATION_ID:op.id}));
     await until(async()=> {const r=await billing.read(op.id);return r.finalizedAt!==null&&r.leaseOwner===null;},'reconciler terminal/finalized');for(const w of workers)await w.stop();
     const done=await billing.read(op.id);assert.equal(done.state,'COMMITTED');assert.equal(await core.invoice.count({where:{appointmentId:a.id}}),1);assert.equal((await clinic.appointmentReservation.findUniqueOrThrow({where:{operationId:op.id}})).state,'INVOICED');assert.equal(done.leaseOwner,null);assert.equal(done.leaseUntil,null);assert.ok(done.attempts>=1);
   }
@@ -160,7 +160,7 @@ test('actual built Core killed after HELD; lost prepare response yields 202/Loca
       // A crash, not a stop: on SIGTERM Core drains and would still answer the request (202).
       if(kill){await h.kill();release();assert.ok(await sending instanceof Error);}else{const response=await sending;status(response,202);assert.equal(response.body.status,'pending');assert.equal(response.headers.get('location'),'/api/operations/'+response.body.operationId);}
       const op=await core.appointmentBillingOperation.findFirstOrThrow({where:{idempotencyKey:key}});assert.equal(op.state,'PREPARING');assert.equal((await clinic.appointmentReservation.findUniqueOrThrow({where:{operationId:op.id}})).state,'HELD');assert.equal(status(await request('/api/operations/'+op.id),200).status,'pending');
-      const worker=await child('backend/dist/src/phase2/billingWorker.js',{DATABASE_URL:urls.core,CLINIC_SERVICE_URL:clinicBases[1],BILLING_OPERATION_ID:op.id});await until(async()=> (await billing.read(op.id)).finalizedAt!==null,'crashed Core recovery');await worker.stop();
+      const worker=await child('backend/dist/src/workers/billing.js',{DATABASE_URL:urls.core,CLINIC_SERVICE_URL:clinicBases[1],BILLING_OPERATION_ID:op.id});await until(async()=> (await billing.read(op.id)).finalizedAt!==null,'crashed Core recovery');await worker.stop();
       const retry=status(await request('/api/invoices',{method:'POST',body:body(a),key}),201).invoice;assert.equal(retry.id,(await billing.read(op.id)).invoiceId);assert.equal(await core.invoice.count({where:{appointmentId:a.id}}),1);
     }finally{release();await h.stop();await close(proxy);}
   }

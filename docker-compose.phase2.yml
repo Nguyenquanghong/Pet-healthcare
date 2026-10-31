@@ -152,7 +152,7 @@ services:
       JWT_KEY_ID: ${JWT_KEY_ID:?Prepare phase2 configuration}
       CLINIC_SERVICE_URL: http://clinic-api:5101
       CLINIC_BILLING_TOKEN: ${CLINIC_BILLING_TOKEN:?Prepare phase2 configuration}
-    command: ["node", "backend/dist/src/phase2/billingWorker.js"]
+    command: ["node", "backend/dist/src/workers/billing.js"]
     depends_on:
       api:
         condition: service_healthy

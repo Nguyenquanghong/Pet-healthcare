@@ -16,7 +16,7 @@ import jwt from 'jsonwebtoken';
 import {assertTestProject,topologyQueues,waitForQueueIdle} from './test-project.mjs';
 import {declareTopology,topology} from '@nipopeto/messaging';
 import amqp from 'amqplib';
-import {OutboxRelay as CoreRelay} from '../../backend/dist/src/phase2/relay.js';
+import {OutboxRelay as CoreRelay} from '../../backend/dist/src/workers/relay.js';
 import {RuntimeOutboxStore} from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';
 import {OutboxRelay as ClinicRelay} from '../../services/clinic/dist/infrastructure/messaging/relay.js';
 import {blobTestEnv} from './blob-test.mjs';
@@ -237,7 +237,7 @@ test('registration, password change and counter activation retain the same owner
   const record=expectStatus(await request('/api/medical-records',{method:'POST',token:tokens.admin,key:randomUUID(),body:{petId:counterPet.id,appointmentId:a.id,title:'P6 history',doctorId:doctor.id,visitDate:'2044-01-02',diagnosis:'Fixture diagnosis',treatment:'Fixture treatment'}}),201).record;
   const issued=await request('/api/invoices',{method:'POST',token:tokens.admin,key:randomUUID(),body:{type:'appointment',relatedId:a.id,subtotal:95000,taxAmount:0,discountAmount:0}});assert.ok([201,202].includes(issued.status));
   const operation=await db.core.appointmentBillingOperation.findFirstOrThrow({where:{appointmentId:a.id,actorId:users.at(-1).id}});
-  await processHandle('backend/dist/src/phase2/billingWorker.js',{DATABASE_URL:urls.core,JWT_PRIVATE_KEY:keys.privateKey.export({type:'pkcs8',format:'pem'}).toString(),CLINIC_SERVICE_URL:privateProxy,CLINIC_BILLING_TOKEN:secrets.CLINIC_BILLING_TOKEN,BILLING_OPERATION_ID:operation.id},'billing-worker');
+  await processHandle('backend/dist/src/workers/billing.js',{DATABASE_URL:urls.core,JWT_PRIVATE_KEY:keys.privateKey.export({type:'pkcs8',format:'pem'}).toString(),CLINIC_SERVICE_URL:privateProxy,CLINIC_BILLING_TOKEN:secrets.CLINIC_BILLING_TOKEN,BILLING_OPERATION_ID:operation.id},'billing-worker');
   if(issued.status===202)await until(async()=>{const op=await request('/api/operations/'+operation.id,{token:tokens.admin});return op.body.status==='succeeded';},'counter invoice');
   const invoice=await db.core.invoice.findUnique({where:{appointmentId:a.id}});assert.ok(invoice);
   await until(async()=> (await db.clinic.appointmentReservation.findFirst({where:{appointmentId:a.id,state:'INVOICED'}}))?.state==='INVOICED','scoped terminal evidence finalizes reservation');
