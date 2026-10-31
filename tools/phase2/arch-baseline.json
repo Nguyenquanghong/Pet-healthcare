@@ -34,7 +34,7 @@
       "kind": "derived",
       "better": "lower",
       "values": {
-        "legacyAppTests": 19
+        "legacyAppTests": 20
       }
     },
     "S6": {
@@ -120,9 +120,10 @@
       }
     },
     "S17": {
-      "kind": "manual",
-      "declared": {
-        "runs": 0
+      "kind": "measured",
+      "better": "higher",
+      "values": {
+        "runs": 1
       }
     }
   }

@@ -16,6 +16,7 @@
     "cqrs:profile": "node tools/phase2/cqrs/profile-reader.mjs",
     "cqrs:test:unit": "tsc -p packages/contracts/tsconfig.json && tsc -p packages/messaging/tsconfig.json && tsc -p services/clinic/tsconfig.json && node --test --test-isolation=none tools/phase2/cqrs/*.test.mjs",
     "dev:seed": "node tools/phase2/dev-seed.mjs",
+    "test:docker:ingress": "node tools/docker/test-ingress.mjs",
     "test:docker:phase2": "node tools/docker/test-notifications.mjs --phase2",
     "docker:prepare-phase2": "node tools/docker/prepare-phase2.mjs",
     "test:docker:notifications": "node tools/docker/test-notifications.mjs",

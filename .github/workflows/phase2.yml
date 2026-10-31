@@ -31,3 +31,24 @@ jobs:
       - run: npm run phase2:test:e2e
       - if: always()
         run: docker compose -f deploy/phase2/compose.test.yml stop
+  # The root Compose plus the phase 2 overlay behind the frontend's nginx, on its own throwaway project. Separate from
+  # `proof` so the slow image builds do not lengthen it; nothing else sends traffic through that nginx.
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Same exact version as the proof job (see the comment there).
+          node-version: 24.21.0
+          cache: npm
+      - run: npm ci
+      # The seed needs backend/dist and the generated Prisma clients.
+      - run: npm run phase2:build
+      - run: npm run test:docker:ingress
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ingress-evidence
+          path: test-results/k0
+          if-no-files-found: ignore
