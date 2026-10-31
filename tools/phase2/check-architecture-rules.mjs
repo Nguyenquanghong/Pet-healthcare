@@ -104,7 +104,7 @@ const envelopeCheck=existsSync(built)?import(pathToFileURL(built).href).then(({p
 }):Promise.resolve(rule('envelope-version-enforced',()=>{throw new Error('build packages/contracts first (npm run build -w @nipopeto/contracts)');}));
 
 // ---- 3. Gateways ---------------------------------------------------------------
-const GATEWAYS=['deploy/phase2/nginx.split.conf.example','benchmarks/phase2/kaggle/stack.mjs'];
+const GATEWAYS=['deploy/phase2/nginx.split.conf.example','benchmarks/phase2/kaggle/stack.mjs','frontend/nginx/default.conf.template'];
 export const blocksInternal=source=>/location\s+~\s+\^\/\(internal\|metrics\|health\)\s*\{\s*return\s+404;\s*\}/.test(source);
 rule('gateway-hides-internal-routes',()=>{
   const missing=GATEWAYS.filter(g=>!blocksInternal(read(g)));

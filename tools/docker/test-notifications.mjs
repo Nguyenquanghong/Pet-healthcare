@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { createServer } from 'node:net';
 import { prepareNotifications } from './prepare-notifications.mjs';
 import { preparePhase2 } from './prepare-phase2.mjs';
+import { freeNetworkPrefix } from './network-prefix.mjs';
 
 const strict = process.argv.includes('--phase2');
 if(process.argv.slice(2).some(arg=>arg!=='--phase2'))throw new Error('Unknown argument');
@@ -21,7 +22,7 @@ const socket = createServer();
 await new Promise((ok,fail)=>{socket.once('error',fail);socket.listen(0,'127.0.0.1',ok);});
 const port = socket.address().port;
 await new Promise(ok=>socket.close(ok));
-writeFileSync(envFile, `POSTGRES_PASSWORD=${password}\nDATABASE_URL=postgresql://nipopeto:${password}@postgres:5432/nipopeto?schema=public\nPORT=${port}\n`,{flag:'wx',mode:0o600});
+writeFileSync(envFile, `POSTGRES_PASSWORD=${password}\nDATABASE_URL=postgresql://nipopeto:${password}@postgres:5432/nipopeto?schema=public\nPORT=${port}\nPET_NET_PREFIX=${freeNetworkPrefix()}\n`,{flag:'wx',mode:0o600});
 prepareNotifications(envFile);
 if(strict)preparePhase2(envFile);
 // JSON is YAML-compatible. !reset is needed to remove root's published PG port;
@@ -30,7 +31,7 @@ writeFileSync(override, `services:\n  postgres:\n    ports: !reset []\n`, {flag:
 const composeArgs = ['compose','--project-name',project,'--env-file',envFile,'-f',resolve('docker-compose.yml'),...(strict?['-f',resolve('docker-compose.phase2.yml')]:[]),'-f',override];
 const baseEnv = {...process.env,COMPOSE_PARALLEL_LIMIT:'1'};
 // Shell values override --env-file; isolate all interpolation inputs from host.
-for (const key of Object.keys(baseEnv)) if (/^(JWT_|DATABASE_URL$|POSTGRES_PASSWORD$|NOTIFICATION_|CORE_|CLINIC_|RATE_LIMIT_|OBSERVABILITY_|PHASE2_|REDIS_|BROKER_|PORT$|FRONTEND_PORT$|CORS_ORIGIN$|VNPAY_|BANK_TRANSFER_|COMPOSE_)/.test(key)) delete baseEnv[key];
+for (const key of Object.keys(baseEnv)) if (/^(JWT_|DATABASE_URL$|POSTGRES_PASSWORD$|NOTIFICATION_|CORE_|CLINIC_|RATE_LIMIT_|OBSERVABILITY_|PHASE2_|REDIS_|BROKER_|PORT$|FRONTEND_PORT$|CORS_ORIGIN$|VNPAY_|BANK_TRANSFER_|COMPOSE_|PET_)/.test(key)) delete baseEnv[key];
 baseEnv.COMPOSE_PARALLEL_LIMIT = '1';
 async function docker(args, input) {
   return new Promise((ok,fail)=>{
