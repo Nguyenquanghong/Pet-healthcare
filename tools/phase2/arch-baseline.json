@@ -45,9 +45,10 @@
       }
     },
     "S7": {
-      "kind": "manual",
-      "declared": {
-        "omissionStillRuns": true
+      "kind": "derived",
+      "better": "lower",
+      "values": {
+        "undeclared": 0
       }
     },
     "S8": {
