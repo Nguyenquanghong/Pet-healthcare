@@ -1,4 +1,4 @@
-import type { Server } from "node:http";
+import type { Server } from 'node:http';
 
 export async function drainServer(server: Server, timeoutMs = 10_000): Promise<void> {
   await new Promise<void>((resolve, reject) => {
@@ -6,7 +6,8 @@ export async function drainServer(server: Server, timeoutMs = 10_000): Promise<v
     timer.unref();
     server.close(error => {
       clearTimeout(timer);
-      if (error) reject(error); else resolve();
+      if (error) reject(error);
+      else resolve();
     });
   });
 }

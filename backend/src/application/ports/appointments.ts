@@ -1,7 +1,26 @@
-import type { Actor } from "../../domain/auth.js";
+import type { Actor } from '../../domain/auth.js';
 
-export const appointmentTypes = ["general_checkup", "vaccination", "dental", "dermatology", "surgery", "hotel_consultation", "spa_bath", "spa_grooming", "spa_combo", "other"] as const;
-export const appointmentStatuses = ["pending", "confirmed", "checked_in", "in_progress", "completed", "cancelled", "no_show"] as const;
+export const appointmentTypes = [
+  'general_checkup',
+  'vaccination',
+  'dental',
+  'dermatology',
+  'surgery',
+  'hotel_consultation',
+  'spa_bath',
+  'spa_grooming',
+  'spa_combo',
+  'other',
+] as const;
+export const appointmentStatuses = [
+  'pending',
+  'confirmed',
+  'checked_in',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'no_show',
+] as const;
 export type AppointmentType = (typeof appointmentTypes)[number];
 export type AppointmentStatus = (typeof appointmentStatuses)[number];
 
@@ -43,9 +62,16 @@ export interface AppointmentRepository {
   findWithPet(id: string): Promise<{ appointment: AppointmentRecord; pet: PetForAppointment } | null>;
   hasSlot(petId: string, date: Date, time: string, exceptId?: string): Promise<boolean>;
   create(data: {
-    petId: string; ownerId: string; doctorId: string | null; type: AppointmentType;
-    serviceName: string; clinicName: string; appointmentDate: Date; appointmentTime: string;
-    ownerNote: string | null; createdBy: string;
+    petId: string;
+    ownerId: string;
+    doctorId: string | null;
+    type: AppointmentType;
+    serviceName: string;
+    clinicName: string;
+    appointmentDate: Date;
+    appointmentTime: string;
+    ownerNote: string | null;
+    createdBy: string;
   }): Promise<AppointmentRecord>;
 }
 

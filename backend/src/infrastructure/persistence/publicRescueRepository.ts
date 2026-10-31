@@ -1,13 +1,20 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from '@prisma/client';
 import { writeNotification } from './notificationOutbox.js';
-import type { PublicRescueDependencies, PublicRescueRepository, PublicRescueUnitOfWork } from "../../application/ports/publicRescue.js";
+import type {
+  PublicRescueDependencies,
+  PublicRescueRepository,
+  PublicRescueUnitOfWork,
+} from '../../application/ports/publicRescue.js';
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
 class PrismaPublicRescueRepository implements PublicRescueRepository {
   constructor(private readonly client: Client) {}
   async findEnabledPetWithOwner(token: string) {
-    const row = await this.client.pet.findFirst({ where: { qrToken: token, qrEnabled: true }, include: { owner: true } });
+    const row = await this.client.pet.findFirst({
+      where: { qrToken: token, qrEnabled: true },
+      include: { owner: true },
+    });
     return row ? { pet: row, owner: row.owner } : null;
   }
   findEnabledPetForReport(token: string) {
@@ -17,12 +24,17 @@ class PrismaPublicRescueRepository implements PublicRescueRepository {
     await this.client.$queryRaw`SELECT id FROM "pets" WHERE id = ${petId} FOR UPDATE`;
   }
   async hasRecentReport(petId: string, finderPhone: string, since: Date) {
-    return (await this.client.rescueReport.findFirst({ where: { petId, finderPhone, createdAt: { gte: since } }, select: { id: true } })) !== null;
+    return (
+      (await this.client.rescueReport.findFirst({
+        where: { petId, finderPhone, createdAt: { gte: since } },
+        select: { id: true },
+      })) !== null
+    );
   }
-  async createReport(data: Parameters<PublicRescueRepository["createReport"]>[0]) {
+  async createReport(data: Parameters<PublicRescueRepository['createReport']>[0]) {
     await this.client.rescueReport.create({ data });
   }
-  async notifyOwner(data: Parameters<PublicRescueRepository["notifyOwner"]>[0]) {
+  async notifyOwner(data: Parameters<PublicRescueRepository['notifyOwner']>[0]) {
     await writeNotification(this.client, data);
   }
 }
@@ -30,7 +42,7 @@ class PrismaPublicRescueRepository implements PublicRescueRepository {
 class PrismaPublicRescueUnitOfWork implements PublicRescueUnitOfWork {
   constructor(private readonly client: PrismaClient) {}
   run<T>(work: (repo: PublicRescueRepository) => Promise<T>): Promise<T> {
-    return this.client.$transaction(async (tx) => work(new PrismaPublicRescueRepository(tx)));
+    return this.client.$transaction(async tx => work(new PrismaPublicRescueRepository(tx)));
   }
 }
 

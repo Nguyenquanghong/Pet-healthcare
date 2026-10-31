@@ -1,25 +1,54 @@
 export type HotelBookingValue = {
-  id: string; petId: string; ownerId: string; checkIn: Date; checkOut: Date;
-  nights: number; roomType: "standard" | "deluxe" | "vip"; serviceKeys: string[];
-  totalAmount: number | { toString(): string }; status: "pending" | "confirmed" | "in_stay" | "checked_out" | "cancelled" | "rejected";
-  ownerNote: string | null; internalNote: string | null; createdAt: Date; updatedAt: Date;
+  id: string;
+  petId: string;
+  ownerId: string;
+  checkIn: Date;
+  checkOut: Date;
+  nights: number;
+  roomType: 'standard' | 'deluxe' | 'vip';
+  serviceKeys: string[];
+  totalAmount: number | { toString(): string };
+  status: 'pending' | 'confirmed' | 'in_stay' | 'checked_out' | 'cancelled' | 'rejected';
+  ownerNote: string | null;
+  internalNote: string | null;
+  createdAt: Date;
+  updatedAt: Date;
   dailyCareNotes?: Array<{ id: string }>;
   statusRevision: number;
 };
 
 export type CareNoteValue = {
-  id: string; bookingId: string; noteDate: Date; eatingStatus: string; mood: string;
-  note: string; visibleToOwner: boolean; createdByStaffId: string | null; createdAt: Date;
+  id: string;
+  bookingId: string;
+  noteDate: Date;
+  eatingStatus: string;
+  mood: string;
+  note: string;
+  visibleToOwner: boolean;
+  createdByStaffId: string | null;
+  createdAt: Date;
 };
 
 export type HotelBookingWrite = {
-  petId: string; ownerId: string; checkIn: Date; checkOut: Date; nights: number;
-  roomType: string; serviceKeys: string[]; totalAmount: number; ownerNote: string | null;
+  petId: string;
+  ownerId: string;
+  checkIn: Date;
+  checkOut: Date;
+  nights: number;
+  roomType: string;
+  serviceKeys: string[];
+  totalAmount: number;
+  ownerNote: string | null;
 };
 
 export type CareNoteWrite = {
-  bookingId: string; noteDate: Date; eatingStatus: string; mood: string; note: string;
-  visibleToOwner: boolean; createdByStaffId: string;
+  bookingId: string;
+  noteDate: Date;
+  eatingStatus: string;
+  mood: string;
+  note: string;
+  visibleToOwner: boolean;
+  createdByStaffId: string;
 };
 
 export interface HotelBookingRepository {
@@ -38,8 +67,14 @@ export interface HotelBookingRepository {
 
 export interface HotelNotificationWriter {
   create(draft: {
-    recipientOwnerId?: string; recipientRole: string; type: string; title: string; message: string;
-    actionUrl: string; relatedPetId: string; relatedBookingId: string;
+    recipientOwnerId?: string;
+    recipientRole: string;
+    type: string;
+    title: string;
+    message: string;
+    actionUrl: string;
+    relatedPetId: string;
+    relatedBookingId: string;
   }): Promise<void>;
 }
 

@@ -6,10 +6,15 @@ export const PENDING_HOLD_MS = 48 * 3_600_000;
 const CHECK_IN_CUTOFF_AFTER_MIDNIGHT_UTC_MS = (12 - 7) * 3_600_000;
 
 export function pendingExpiresAt(createdAt: Date, checkIn: Date): Date {
-  return new Date(Math.min(createdAt.getTime() + PENDING_HOLD_MS, checkIn.getTime() + CHECK_IN_CUTOFF_AFTER_MIDNIGHT_UTC_MS));
+  return new Date(
+    Math.min(createdAt.getTime() + PENDING_HOLD_MS, checkIn.getTime() + CHECK_IN_CUTOFF_AFTER_MIDNIGHT_UTC_MS),
+  );
 }
 // The same rule as two bounds a database query can use: expired when requested on or
 // before `createdBefore`, or when checking in on or before `checkInOnOrBefore`.
 export function expiryBounds(now: Date) {
-  return { createdBefore: new Date(now.getTime() - PENDING_HOLD_MS), checkInOnOrBefore: new Date(now.getTime() - CHECK_IN_CUTOFF_AFTER_MIDNIGHT_UTC_MS) };
+  return {
+    createdBefore: new Date(now.getTime() - PENDING_HOLD_MS),
+    checkInOnOrBefore: new Date(now.getTime() - CHECK_IN_CUTOFF_AFTER_MIDNIGHT_UTC_MS),
+  };
 }

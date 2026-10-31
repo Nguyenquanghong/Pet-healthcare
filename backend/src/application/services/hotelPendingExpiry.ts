@@ -1,5 +1,5 @@
-import { expiryBounds } from "../../domain/hotelPendingExpiry.js";
-import type { HotelPendingExpiryStore } from "../ports/hotelPendingExpiry.js";
+import { expiryBounds } from '../../domain/hotelPendingExpiry.js';
+import type { HotelPendingExpiryStore } from '../ports/hotelPendingExpiry.js';
 
 // AQ-10: frees the rooms of pending stays nobody confirmed in time (run by the Core worker).
 export class HotelPendingExpiryService {

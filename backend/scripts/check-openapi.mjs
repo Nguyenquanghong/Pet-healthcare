@@ -22,7 +22,7 @@ const dashboardSource=readFileSync(resolve(backend,'src/routes/dashboard.ts'),'u
 for(const match of dashboardSource.matchAll(/app\.get\(\s*'([^']+)'/g))runtime.add('GET '+match[1]);
 for (const [file, mount] of Object.entries(mounts)) {
   const source = readFileSync(resolve(backend, "src/routes", `${file}.ts`), "utf8");
-  for (const match of source.matchAll(/\brouter\.(get|post|patch|put|delete)\(\s*"([^"]+)"/g)) {
+  for (const match of source.matchAll(/\brouter\.(get|post|patch|put|delete)\(\s*["']([^"']+)["']/g)) {
     const path = (mount + (match[2] === "/" ? "" : match[2])).replace(/:([A-Za-z][\w]*)/g, "{$1}");
     runtime.add(`${match[1].toUpperCase()} ${path}`);
   }

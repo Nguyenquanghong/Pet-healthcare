@@ -1,3 +1,19 @@
 **/generated/**
 **/dist/**
 **/node_modules/**
+
+# Core's Phase 1 stack stays as it was written (K3 decision D3): the 11 files that never run in split mode (S11 without the proof billing.ts).
+backend/src/app.ts
+backend/src/application/services/appointments.ts
+backend/src/application/services/medicalRecords.ts
+backend/src/application/services/notifications.ts
+backend/src/infrastructure/persistence/appointmentRepository.ts
+backend/src/infrastructure/persistence/medicalRepository.ts
+backend/src/infrastructure/persistence/notificationRepository.ts
+backend/src/routes/appointments.ts
+backend/src/routes/bootstrap.ts
+backend/src/routes/medicalRecords.ts
+backend/src/routes/notifications.ts
+# K3 decision Q1: formatting these two would push PrismaListsRepository.page and PrismaBootstrapRepository.load over 100 lines; K4 rewrites them.
+backend/src/infrastructure/persistence/listsRepository.ts
+backend/src/infrastructure/persistence/bootstrapRepository.ts

@@ -494,7 +494,7 @@ class HarnessSource(unittest.TestCase):
         core = HERE.parents[2] / 'backend/src/index.ts'
         if not core.is_file():
             self.skipTest('product source not in this tree')
-        idle = int(re.search(r'keepAliveTimeout=(\d+)', core.read_text(encoding='utf-8')).group(1))
+        idle = int(re.search(r'keepAliveTimeout\s*=\s*(\d+)', core.read_text(encoding='utf-8')).group(1))
         configured = int(re.search(r'keepalive_timeout (\d+)s;', self.text).group(1))
         self.assertLess(configured * 1000, idle)
 
