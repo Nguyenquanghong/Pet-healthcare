@@ -438,7 +438,7 @@ rule('clinic-core-calls-confined', () => {
 // ---- 12. Structure ratchet ---------------------------------------------------------------
 // Each non-manual metric has a direction ("lower" or "higher" is better). Worse than the baseline fails; better passes
 // and reminds to lower the baseline so the gain cannot be lost later. Manual metrics are declared, never compared.
-const {measure}=await import(pathToFileURL(resolve(root,'tools/phase2/arch-metrics.mjs')).href);
+const {measure,ciJobsRunning,LEGACY_APP,PRODUCTION_APP}=await import(pathToFileURL(resolve(root,'tools/phase2/arch-metrics.mjs')).href);
 const RATCHET_FIX='node tools/phase2/arch-metrics.mjs --write-baseline';
 export function ratchetFindings(current,baseline){
   const worse=[],better=[],stale=[];
@@ -476,6 +476,16 @@ rule('structure-ratchet',()=>{
   assert.equal(ratchetFindings(fx('lower',{n:4}),{metrics:{}}).stale.length,1,'a new metric needs a baseline');
   assert.equal(ratchetFindings(fx('lower',{n:4}),fx('higher',{n:4})).stale.length,1,'the direction cannot be flipped in the baseline alone');
   assert.deepEqual(ratchetFindings({metrics:{S:{kind:'manual',declared:{x:2}}}},{metrics:{S:{kind:'manual',declared:{x:1}}}}),{worse:[],better:[],stale:[]});
+  // S17 reads the workflow: only an uncommented run step in a job counts, and only that exact command
+  const workflow=(...steps)=>'name: x\non: push\njobs:\n  proof:\n    steps:\n      - run: npm test\n  compose:\n    steps:\n'+steps.map(s=>'      '+s).join('\n')+'\n';
+  assert.deepEqual(ciJobsRunning(workflow('- run: npm ci','- run: npm run test:docker:ingress'),'npm run test:docker:ingress'),['compose']);
+  assert.deepEqual(ciJobsRunning(workflow('# - run: npm run test:docker:ingress'),'npm run test:docker:ingress'),[],'a commented step is not a run');
+  assert.deepEqual(ciJobsRunning(workflow('- run: npm run test:docker:ingress-other'),'npm run test:docker:ingress'),[],'another script is not this one');
+  assert.deepEqual(ciJobsRunning(workflow('- run: npm run test:docker:ingress').replace(/\n/g,'\r\n'),'npm run test:docker:ingress'),['compose'],'CRLF checkouts are read the same');
+  // S5 sees a dynamic import of the monolith's app and of the production composition as well as a static one
+  assert.ok(LEGACY_APP.test("const {createApp}=await import('../../backend/dist/src/app.js');")&&LEGACY_APP.test("import { createApp } from '../src/app.js';"));
+  assert.ok(!LEGACY_APP.test("const {createApp}=await import('../../services/clinic/dist/app.js');"),'a service app is not the monolith');
+  assert.ok(PRODUCTION_APP.test("const {createCoreApp}=await import('../../backend/dist/src/phase2/coreApp.js');")&&!PRODUCTION_APP.test("import('../../backend/dist/src/app.js')"));
   // the real measurement against a baseline made stricter by one
   const strict=structuredClone(baseline),first=Object.values(strict.metrics).find(m=>m.kind!=='manual'&&m.better==='lower'&&Object.values(m.values).some(v=>v>0));
   const key=Object.keys(first.values).find(k=>first.values[k]>0);first.values[key]-=1;

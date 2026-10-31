@@ -104,6 +104,23 @@ export function importEdges(file,src,known){
   return edges;
 }
 
+// A static `from '...'` and a dynamic `import('...')` (permission-matrix.test.mjs uses `await import`) both count.
+export const IMPORT_OF=/(?:\bfrom\s*|\bimport\s*\(\s*)/.source;
+export const LEGACY_APP=new RegExp(IMPORT_OF+/['"][^'"]*(?:backend\/dist\/src|\.\.\/dist\/src|backend\/src|\.\.\/src)\/app\.(?:js|ts)['"]/.source),PRODUCTION_APP=new RegExp(IMPORT_OF+/['"][^'"]*phase2\/core(?:App|Domains)\.(?:js|ts)['"]/.source);
+
+// Names of the jobs in a GitHub workflow file with an uncommented `run:` step that is exactly `command` (no YAML parser:
+// jobs are the keys at two-space indent under `jobs:`).
+export function ciJobsRunning(workflow,command){
+  const jobs=[];let inJobs=false,current;
+  for(const line of workflow.split(/\r?\n/)){
+    if(/^\S/.test(line)){inJobs=/^jobs:\s*$/.test(line);current=undefined;continue;}
+    const key=inJobs&&/^  ([A-Za-z0-9_-]+):\s*$/.exec(line);
+    if(key){current={name:key[1],runs:false};jobs.push(current);continue;}
+    if(current&&new RegExp('^\\s*-?\\s*run:\\s*'+command.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*$').test(line))current.runs=true;
+  }
+  return jobs.filter(j=>j.runs).map(j=>j.name);
+}
+
 // ---- layout configuration (a move of files means updating these) ----------------------
 // Layer rank: an import from a lower rank to a higher one points against the dependency direction.
 const LAYERS={
@@ -157,7 +174,6 @@ export function measure(root=defaultRoot){
 
   // S5: test files that run on the monolith's createApp rather than the production composition.
   const testFiles=[...walk(abs('backend/tests'),['.mjs']),...walk(abs('tools/phase2'),['.mjs'])].filter(f=>/\.(test|integration)\.mjs$|p7-legacy-server\.mjs$/.test(f));
-  const LEGACY_APP=/from\s*['"][^'"]*(?:backend\/dist\/src|\.\.\/dist\/src|backend\/src|\.\.\/src)\/app\.(?:js|ts)['"]/,PRODUCTION_APP=/from\s*['"][^'"]*phase2\/core(?:App|Domains)\.(?:js|ts)['"]/;
   const legacyTests=testFiles.filter(f=>LEGACY_APP.test(text(f))),productionTests=testFiles.filter(f=>PRODUCTION_APP.test(text(f)));
   put('S5','Test files on the monolith createApp, not the production composition','derived','lower',{legacyAppTests:legacyTests.length},{onProductionComposition:productionTests.map(rel),legacyAppTests:legacyTests.map(rel)},{note:'counts files importing backend app.js; the plan asks for a list chosen in K3'});
 
@@ -226,7 +242,12 @@ export function measure(root=defaultRoot){
   const frontend=walk(abs('frontend/src')).map(f=>({file:rel(f),lines:wcl(text(f))})).filter(f=>f.lines>500).sort((a,b)=>b.lines-a.lines);
   put('S16','Frontend files over 500 lines','measured','lower',{files:frontend.length,largest:frontend[0]?.lines??0},frontend.map(f=>f.lines+' '+f.file));
 
-  put('S17','Test runs through the compose nginx','manual',null,undefined,'no CI job drives the compose overlay through the frontend port (K0 step 5)',{declared:{runs:0}});
+  // S17: CI jobs that run the ingress test, which drives the compose overlay through the frontend port. A job counts only
+  // while package.json still maps the script to a test file that exists and sends its traffic to FRONTEND_PORT.
+  const INGRESS_SCRIPT='test:docker:ingress',ingressFile=/^node\s+(\S+\.mjs)$/.exec(JSON.parse(text(abs('package.json'))).scripts?.[INGRESS_SCRIPT]??'')?.[1];
+  const ingressWired=Boolean(ingressFile&&existsSync(abs(ingressFile))&&/FRONTEND_PORT/.test(text(abs(ingressFile)))&&/frontendPort/.test(text(abs(ingressFile))));
+  const workflowDir=abs('.github/workflows'),ingressJobs=ingressWired&&existsSync(workflowDir)?readdirSync(workflowDir).filter(f=>/\.ya?ml$/.test(f)).flatMap(f=>ciJobsRunning(text(join(workflowDir,f)),'npm run '+INGRESS_SCRIPT).map(job=>f+':'+job)):[];
+  put('S17','CI jobs that run the compose nginx ingress test','measured','higher',{runs:ingressJobs.length},ingressJobs.length?ingressJobs:'no CI job runs '+INGRESS_SCRIPT+(ingressWired?'':' (the script or its test file is missing or does not use the frontend port)'));
   return {schema:1,metrics};
 }
 
