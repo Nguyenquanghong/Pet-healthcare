@@ -11,12 +11,9 @@ import { AppointmentService } from './application/services/appointments.js';
 import { MedicalRecordsService, medicalFields } from './application/services/medicalRecords.js';
 import { appointmentTypes } from './application/ports/appointments.js';
 import { BookingLifecycleService } from './application/services/bookingLifecycle.js';
-import {
-  appointmentDependencies,
-  medicalDependencies,
-  Lifecycle,
-  medicalMutation,
-} from './infrastructure/persistence/repositories.js';
+import { appointmentDependencies } from './infrastructure/persistence/appointmentRepository.js';
+import { medicalDependencies, medicalMutation } from './infrastructure/persistence/medicalRepository.js';
+import { Lifecycle } from './infrastructure/persistence/bookingLifecycleRepository.js';
 import { appointmentDto, medicalRecordDto } from './application/serialize.js';
 import { deduplicated } from './infrastructure/persistence/dedup.js';
 import { list } from './infrastructure/queries/authoritativeLists.js';

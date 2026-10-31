@@ -1,29 +1,18 @@
-import { Prisma, type PrismaClient } from '../../generated/client/index.js';
+import type { Prisma, PrismaClient } from '../../generated/client/index.js';
 import { bookingLifecycles } from '@nipopeto/contracts';
 import type { Actor } from '../../domain/auth.js';
 import { BusinessError, StaleRevision } from '../../domain/error.js';
-import type {
-  AppointmentRepository,
-  AppointmentDependencies,
-  AppointmentType,
-} from '../../application/ports/appointments.js';
 import type {
   MedicalRecordRepository,
   MedicalDependencies,
   MedicalRevisionValue,
 } from '../../application/ports/medicalRecords.js';
-import type {
-  BookingLifecycleStore,
-  LifecycleTransaction,
-  BookingKind,
-} from '../../application/ports/bookingLifecycle.js';
 import { appointmentSlotWrite } from './appointmentSlotConflict.js';
-import { writeNotification } from '../messaging/notificationOutbox.js';
 import type { RequestDirectory } from '../core/directory.js';
 import type { BlobStore } from '../blob/blobStore.js';
 import { imageRetentionMs } from '../blob/blobCleanup.js';
+import { appendStatusEvent, transaction, unlocked, writer, type Client } from './shared.js';
 
-type Client = PrismaClient | Prisma.TransactionClient;
 type ImageRow = {
   id: string;
   petId: string;
@@ -50,134 +39,6 @@ const imageLog = (image: ImageRow, action: 'delete' | 'restore', actor: Actor) =
   actorId: actor.sub,
   actorRole: actor.role,
 });
-const transaction = <T>(
-  db: PrismaClient,
-  bound: Prisma.TransactionClient | undefined,
-  work: (tx: Prisma.TransactionClient) => Promise<T>,
-) => (bound ? work(bound) : db.$transaction(work));
-async function unlocked(tx: Client, id: string) {
-  if (await tx.appointmentReservation.count({ where: { appointmentId: id, state: { in: ['HELD', 'INVOICED'] } } }))
-    throw new BusinessError(409, 'Appointment is reserved or already invoiced.');
-}
-export async function appendStatusEvent(
-  tx: Client,
-  directory: RequestDirectory,
-  id: string,
-  actor: Actor,
-  action: string,
-  fromStatus: string,
-  toStatus: string,
-  revision: number,
-  reason?: string,
-  reversesId?: string,
-) {
-  await tx.bookingStatusEvent.create({
-    data: {
-      kind: 'appointment',
-      bookingId: id,
-      actorId: actor.sub,
-      actorName: directory.snapshot.actor.fullName,
-      actorRole: actor.role,
-      action,
-      fromStatus,
-      toStatus,
-      revision,
-      reason,
-      reversesId,
-    },
-  });
-}
-class Appointments implements AppointmentRepository {
-  constructor(
-    private readonly db: Client,
-    private readonly directory: RequestDirectory,
-  ) {}
-  list(ownerId?: string) {
-    return this.db.appointment.findMany({
-      where: { ownerId },
-      orderBy: [{ appointmentDate: 'desc' }, { appointmentTime: 'desc' }],
-    });
-  }
-  findPet(id: string) {
-    return this.directory.pet(id);
-  }
-  find(id: string) {
-    return this.db.appointment.findUnique({ where: { id } });
-  }
-  async findWithPet(id: string) {
-    const appointment = await this.find(id);
-    return appointment ? { appointment, pet: await this.directory.pet(appointment.petId) } : null;
-  }
-  async slotPolicy(type: AppointmentType) {
-    const policy = await this.db.appointmentTypePolicy.findUniqueOrThrow({ where: { type } }),
-      group = await this.db.appointmentResourceGroup.findUniqueOrThrow({
-        where: { resourceGroup: policy.resourceGroup },
-      });
-    return {
-      type,
-      resourceGroup: group.resourceGroup,
-      durationMinutes: policy.durationMinutes,
-      capacity: group.capacity,
-      openTime: group.openTime,
-      closeTime: group.closeTime,
-      stepMinutes: group.stepMinutes,
-      fixedSlots: group.fixedSlots,
-    };
-  }
-  slotUsage(resourceGroup: string, from: Date, to: Date) {
-    return this.db.appointmentSlotUsage.findMany({
-      where: { resourceGroup, slotStart: { gte: from, lt: to } },
-      select: { slotStart: true, booked: true, capacity: true },
-    });
-  }
-  async doctorSlots(doctorId: string, from: Date, to: Date) {
-    return (
-      await this.db.appointmentDoctorSlot.findMany({
-        where: { doctorId, slotStart: { gte: from, lt: to } },
-        select: { slotStart: true },
-      })
-    ).map(s => s.slotStart);
-  }
-  async create(data: Parameters<AppointmentRepository['create']>[0]) {
-    const row = await appointmentSlotWrite(this.db.appointment.create({ data }));
-    return row;
-  }
-}
-const writer = (db: Client) => ({
-  create: async (draft: {
-    recipientOwnerId?: string;
-    recipientRole: string;
-    title: string;
-    message: string;
-    type: string;
-    actionUrl: string;
-    relatedPetId: string;
-    relatedAppointmentId: string | null;
-  }) => {
-    await writeNotification(db, {
-      ...draft,
-      recipientOwnerId: draft.recipientOwnerId ?? null,
-      recipientRole: draft.recipientRole as 'owner' | 'admin',
-    });
-  },
-});
-export function appointmentDependencies(
-  db: PrismaClient,
-  directory: RequestDirectory,
-  bound?: Prisma.TransactionClient,
-): AppointmentDependencies {
-  const c = bound ?? db;
-  return {
-    appointments: new Appointments(c, directory),
-    notifications: writer(c),
-    unitOfWork: {
-      run: work =>
-        transaction(db, bound, tx =>
-          work({ appointments: new Appointments(tx, directory), notifications: writer(tx) }),
-        ),
-    },
-  };
-}
 class Records implements MedicalRecordRepository {
   constructor(
     private readonly db: Client,
@@ -350,77 +211,6 @@ export function medicalDependencies(
         transaction(db, bound, tx => work({ records: new Records(tx, directory), notifications: writer(tx) })),
     },
   };
-}
-export class Lifecycle implements BookingLifecycleStore {
-  constructor(
-    private readonly db: PrismaClient,
-    private readonly directory: RequestDirectory,
-    private readonly bound?: Prisma.TransactionClient,
-  ) {}
-  async history(_kind: BookingKind, id: string) {
-    if (!(await this.db.appointment.findUnique({ where: { id } })))
-      throw new BusinessError(404, 'Appointment not found.');
-    return this.db.bookingStatusEvent.findMany({
-      where: { kind: 'appointment', bookingId: id },
-      orderBy: { revision: 'desc' },
-    });
-  }
-  run<T>(kind: BookingKind, id: string, work: (tx: LifecycleTransaction) => Promise<T>) {
-    if (kind !== 'appointment') throw new BusinessError(422, 'Clinic only owns appointments.');
-    return transaction(this.db, this.bound, async tx => {
-      await tx.$queryRaw`SELECT id FROM appointments WHERE id=${id} FOR UPDATE`;
-      const booking = await tx.appointment.findUnique({ where: { id } });
-      if (!booking) throw new BusinessError(404, 'Appointment not found.');
-      // Same lock as prepare: never mutate a HELD/INVOICED source, including notes.
-      await unlocked(tx, id);
-      return work({
-        booking,
-        dependencies: async () => ({
-          medical: await tx.medicalRecord.count({ where: { appointmentId: id } }),
-          invoices: await tx.appointmentReservation.count({
-            where: { appointmentId: id, state: { in: ['HELD', 'INVOICED'] } },
-          }),
-        }),
-        latestTransition: () =>
-          tx.bookingStatusEvent.findFirst({
-            where: { bookingId: id, action: { not: 'note_updated' } },
-            orderBy: { revision: 'desc' },
-          }),
-        save: async (status, patch = {}) => {
-          const saved = await appointmentSlotWrite(
-            tx.appointment.update({
-              where: { id },
-              data: {
-                ...patch,
-                status: status as Prisma.AppointmentUpdateInput['status'],
-                statusRevision: { increment: 1 },
-              },
-            }),
-          );
-          return saved;
-        },
-        event: (actor, action, from, to, rev, reason, original) =>
-          appendStatusEvent(tx, this.directory, id, actor, action, from, to, rev, reason, original),
-        notify: async (message, recipient = 'owner') => {
-          await writeNotification(tx, {
-            recipientOwnerId: recipient === 'owner' ? booking.ownerId : null,
-            recipientRole: recipient,
-            type: 'booking_status_updated',
-            title: 'Appointment updated',
-            message,
-            relatedPetId: booking.petId,
-            relatedAppointmentId: id,
-            actionUrl:
-              recipient === 'admin'
-                ? '/admin/appointments'
-                : booking.type.startsWith('spa_')
-                  ? '/owner/spa-booking'
-                  : '/owner/appointments',
-          });
-        },
-      });
-    });
-  }
 }
 // Medical edit/delete also serialize with reservation and lifecycle mutations.
 export async function medicalMutation<T>(
