@@ -5,7 +5,7 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "lines": 580
+        "lines": 577
       }
     },
     "S2": {
@@ -100,7 +100,7 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "files": 2
+        "files": 1
       }
     },
     "S15": {
