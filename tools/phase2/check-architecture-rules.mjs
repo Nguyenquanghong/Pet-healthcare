@@ -74,7 +74,7 @@ export function emittedTypes(source,families){return [...source.matchAll(/['"`](
 const contractsSource=read('packages/contracts/src/index.ts'),types=declaredTypes(contractsSource),families=new Set(types.map(t=>t.split('.')[0]));
 rule('event-types-declared-and-bound',()=>{
   assert.ok(types.length>0,'no eventTypes found');
-  const bound=bindings(read('packages/messaging/src/index.ts'));
+  const bound=bindings(read('packages/messaging/src/topology.ts'));
   for(const t of types){
     assert.match(t,/^[a-z]+\.[a-z]+(?:-[a-z]+)*\.v\d+$/,'bad event type name '+t);
     assert.ok(bound.some(b=>topicMatches(b.key,t)),'no queue binding for '+t);
@@ -214,7 +214,7 @@ export function consumerGaps({eventTypes,consumedEvents,drainingEvents={}},bound
 }
 const consumerCheck=(existsSync(built)&&existsSync(clinicBilling)?Promise.all([import(pathToFileURL(built).href),import(pathToFileURL(clinicBilling).href)]):Promise.reject(new Error('build packages/contracts and services/clinic first (npm run phase2:build)')))
   .then(([contracts,{billingOutcomes}])=>rule('event-consumers-explicit',()=>{
-    const bound=bindings(read('packages/messaging/src/index.ts'));
+    const bound=bindings(read('packages/messaging/src/topology.ts'));
     assert.deepEqual(consumerGaps(contracts,bound,billingOutcomes),[]);
     // negative fixtures
     const voided={eventTypes:[...contracts.eventTypes,'billing.invoice-voided.v1'],consumedEvents:{...contracts.consumedEvents,clinic:[...contracts.consumedEvents.clinic,'billing.invoice-voided.v1']}};
