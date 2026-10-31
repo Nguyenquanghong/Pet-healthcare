@@ -10,7 +10,7 @@ import { request as httpRequest } from 'node:http';
 import { PrismaClient as CoreClient } from '@prisma/client';
 import { PrismaClient as NotificationClient } from '../../services/notification/src/generated/client/index.js';
 import { PrismaClient as ClinicClient } from '../../services/clinic/src/generated/client/index.js';
-import { createCoreApp } from '../../backend/dist/src/phase2/coreApp.js';
+import { createCoreApp } from '../../backend/dist/src/composition/coreApp.js';
 import { signToken } from '../../backend/dist/src/lib/token.js';
 import { hashPasswordAsync } from '../../backend/dist/src/lib/password.js';
 import { createApp } from '../../services/notification/dist/app.js';
@@ -460,7 +460,7 @@ test('broker/consumer outage cannot roll back committed Core HTTP write; manual 
   connection = await brokerConnection(); channel = await connection.createConfirmChannel(); channel.on('error', () => {});
   await declareTopology(broker, routes);
   const env = { BROKER_URL: broker, BROKER_PREFIX: `p2.runtime.${run}` };
-  const runtime = await startWorker('backend/dist/src/phase2/notificationWorker.js', { ...env, DATABASE_URL: urls.core, OUTBOX_CREATED_AFTER: runStartedAt });
+  const runtime = await startWorker('backend/dist/src/workers/notification.js', { ...env, DATABASE_URL: urls.core, OUTBOX_CREATED_AFTER: runStartedAt });
   // Consumer starts later: broker accepts a durable backlog without rolling back Core.
   await until(async () => (await core.outboxEvent.findUnique({ where: { id: pending.id } })).publishedAt, 'Core outbox confirm');
   assert.ok((await channel.checkQueue(routes.notification)).messageCount > 0);
@@ -488,7 +488,7 @@ test('broker/consumer outage cannot roll back committed Core HTTP write; manual 
 test('Core worker refuses the created-after test scope outside the guarded project or with a malformed instant', async () => {
   for (const env of [{ OUTBOX_CREATED_AFTER: new Date().toISOString(), PHASE2_TEST_CONFIRM: '' }, { OUTBOX_CREATED_AFTER: 'yesterday' }]) {
     const baseEnv = { ...process.env, BROKER_URL: broker, BROKER_PREFIX: `p2.runtime.${run}`, DATABASE_URL: urls.core, ...env }; delete baseEnv.JWT_PRIVATE_KEY; delete baseEnv.JWT_SECRET;
-    const child = spawn(process.execPath, ['backend/dist/src/phase2/notificationWorker.js'], { env: baseEnv, stdio: 'pipe' });
+    const child = spawn(process.execPath, ['backend/dist/src/workers/notification.js'], { env: baseEnv, stdio: 'pipe' });
     let output = ''; child.stdout.on('data', b => { output += b; }); child.stderr.on('data', b => { output += b; });
     const timer = setTimeout(() => child.kill(), 10000);
     const [code] = await once(child, 'exit'); clearTimeout(timer);

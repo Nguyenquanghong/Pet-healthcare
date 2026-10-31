@@ -4,7 +4,7 @@ import {once} from 'node:events';
 import {generateKeyPairSync} from 'node:crypto';
 import {createApp} from '../../../../services/clinic/dist/app.js';
 import {CoreDirectory} from '../../../../services/clinic/dist/infrastructure/core/directory.js';
-import {createCoreApp} from '../../../../backend/dist/src/phase2/coreApp.js';
+import {createCoreApp} from '../../../../backend/dist/src/composition/coreApp.js';
 import {signToken,verifyToken} from '../../../../backend/dist/src/lib/token.js';
 
 test('activity contract/current-admin authorization and cache hits work directly and through real Core proxy',{timeout:30000},async(t)=>{

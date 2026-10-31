@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import amqp from 'amqplib';
 import { PrismaClient } from '@prisma/client';
-import { OutboxRelay } from '../../backend/dist/src/phase2/relay.js';
+import { OutboxRelay } from '../../backend/dist/src/workers/relay.js';
 import { RuntimeOutboxStore } from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';
 import { topology, declareTopology } from '@nipopeto/messaging';
 import { topologyQueues } from './test-project.mjs';

@@ -2,7 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createRuntime, integer } from '@nipopeto/runtime';
 import { verifyToken } from '../lib/token.js';
 import { hashAdmission } from '../lib/password.js';
-import { coreBodyLimits, coreLimitRules, coreRouteLabel } from '../middleware/runtimeHttp.js';
+import { coreBodyLimits, coreLimitRules, coreRouteLabel } from './limitRules.js';
 export const coreRuntime = (db: PrismaClient) =>
   createRuntime({
     service: 'core',

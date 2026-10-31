@@ -4,8 +4,8 @@ import express from 'express';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { ServiceRuntime } from '@nipopeto/runtime';
-import { coreRuntime } from '../dist/src/phase2/runtime.js';
-import { coreBodyLimits, coreLimitRules, coreRouteLabel } from '../dist/src/middleware/runtimeHttp.js';
+import { coreRuntime } from '../dist/src/composition/runtime.js';
+import { coreBodyLimits, coreLimitRules, coreRouteLabel } from '../dist/src/composition/limitRules.js';
 import { signToken } from '../dist/src/lib/token.js';
 
 // The shared runtime knows no Core route. Core hands it the sign-in and rescue limits, the 16kb sign-in body limit and the

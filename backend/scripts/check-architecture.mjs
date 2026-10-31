@@ -36,14 +36,25 @@ for (const file of files.filter((path) => protectedRoots.some((directory) => pat
   }
 }
 
+// K3 C2 moved these three files into routes/ unchanged. Each still reaches Prisma or infrastructure until it is split
+// (billing C4b, directory C5, dashboard C7). A file that no longer violates must leave this list, and a name that no
+// longer exists is stale; the list is gone when C10 replaces this script by the tier table.
+const PENDING_SPLIT = new Set(["routes/internal/directory.ts", "routes/internal/billing.ts", "routes/dashboard.ts"]);
+const seenPending = new Set();
 for (const file of files.filter((path) => path.startsWith(routesRoot + "\\") || path.startsWith(routesRoot + "/"))) {
   const source = readFileSync(file, "utf8");
+  const name = relative(root, file).replaceAll("\\", "/");
+  const violations = [];
   for (const specifier of imports(source, file)) {
-    if (persistenceForbidden.test(specifier) || /(?:^|\/)lib\/prisma(?:\.js)?$|(?:^|\/)infrastructure\//.test(specifier)) errors.push(`${relative(root, file)} accesses persistence through ${specifier}`);
+    if (persistenceForbidden.test(specifier) || /(?:^|\/)lib\/prisma(?:\.js)?$|(?:^|\/)infrastructure\//.test(specifier)) violations.push(`${name} accesses persistence through ${specifier}`);
   }
-  if (/\bprisma\s*\./.test(source)) errors.push(`${relative(root, file)} calls Prisma directly`);
+  if (/\bprisma\s*\./.test(source)) violations.push(`${name} calls Prisma directly`);
+  if (PENDING_SPLIT.has(name)) {
+    seenPending.add(name);
+    if (!violations.length) errors.push(`${name} no longer violates the route rule; remove it from PENDING_SPLIT`);
+  } else errors.push(...violations);
 }
-
+for (const name of PENDING_SPLIT) if (!seenPending.has(name)) errors.push(`${name} in PENDING_SPLIT does not exist`);
 const negativeFixture = imports('export type { Role } from "@prisma/client"; import("express");', "negative.ts");
 if (negativeFixture.filter((item) => forbidden.test(item)).length !== 2) errors.push("Negative fixture did not detect forbidden type re-export and dynamic import.");
 

@@ -1,9 +1,9 @@
 import type { Express, Request, Response } from 'express';
 import express from 'express';
 import type { Pet, Prisma, PrismaClient } from '@prisma/client';
-import type { Role } from '../domain/auth.js';
-import { issuedBeforePasswordChange, verifyToken } from '../lib/token.js';
-import { ownerDto, petDto } from '../lib/serialize.js';
+import type { Role } from '../../domain/auth.js';
+import { issuedBeforePasswordChange, verifyToken } from '../../lib/token.js';
+import { ownerDto, petDto } from '../../lib/serialize.js';
 import { acceptsCredential } from '@nipopeto/runtime';
 
 export function mountDirectory(app: Express, db: PrismaClient, credential?: string) {

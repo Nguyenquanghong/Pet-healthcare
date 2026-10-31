@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { createCoreApp } from "./phase2/coreApp.js";
+import { createCoreApp } from "./composition/coreApp.js";
 import { prisma } from "./lib/prisma.js";
 import { drainServer } from "./lib/shutdown.js";
 import type { ServiceRuntime } from '@nipopeto/runtime';

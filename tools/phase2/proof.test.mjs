@@ -5,8 +5,8 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient as CoreClient } from '../../backend/src/generated/phase2-core/index.js';
 import { PrismaClient as ClinicClient } from '../../services/clinic/src/generated/client/index.js';
 import { PrismaClient as NotificationClient } from '../../services/notification/src/generated/client/index.js';
-import { CoreBilling } from '../../backend/src/phase2/billing.ts';
-import { OutboxRelay } from '../../backend/src/phase2/relay.ts';
+import { CoreBilling } from '../../backend/src/infrastructure/persistence/billing.ts';
+import { OutboxRelay } from '../../backend/src/workers/relay.ts';
 import { ClinicBilling } from '../../services/clinic/src/infrastructure/persistence/billing.ts';
 import { NotificationInbox } from '../../services/notification/src/inbox.ts';
 import amqp from 'amqplib';
@@ -375,7 +375,7 @@ test('P03: replay --all moves the DLQ back in order and stops at a repeated or i
 });
 
 async function spawnWorker(service, env) {
-  const path = service === 'core' ? 'backend/dist/src/phase2/worker.js' : `services/${service}/dist/worker.js`;
+  const path = service === 'core' ? 'backend/dist/src/workers/outbox.js' : `services/${service}/dist/worker.js`;
   if(service==='clinic')env={...env,CORE_SERVICE_URL:'',CLINIC_PROOF_ONLY:'1'};
   const child = spawn(process.execPath, [path], { env: { ...process.env, ...env }, stdio: 'pipe' });
   let output = '', exited = false; child.stdout.on('data', bytes => { output += bytes; }); child.stderr.on('data', bytes => { output += bytes; }); child.once('exit', () => { exited = true; });

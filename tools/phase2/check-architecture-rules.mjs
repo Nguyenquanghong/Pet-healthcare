@@ -23,7 +23,7 @@
 //     are GET handlers that answer through authorizedRead, they are exactly the three of ADR-P12, and the
 //     gate (one && condition, read without comments) only opens for GET on the exact path with a closed breaker
 //     and fails closed; mountRoutes puts the PEP of each route before its handler.
-// 10. No two .ts files in services/*/src or backend/src/phase2 are identical: a copy
+// 10. No two .ts files in services/*/src or backend/src/{composition,gateway,workers,routes/internal} are identical: a copy
 //     belongs in packages/runtime or packages/messaging.
 // 11. Clinic reaches other systems over HTTP only from infrastructure/core/directory.ts and
 //     infrastructure/core/directorySync.ts (the Core calls, ADR-P13) and infrastructure/blob/blobStore.ts
@@ -164,7 +164,7 @@ rule('gateway-hides-internal-routes',()=>{
 // per downstream), never a hand-written fetch in the composition root.
 export const directFetches=source=>source.split(/\r?\n/).flatMap((line,index)=>/(^|[^\w.])fetch\s*\(/.test(line)?['line '+(index+1)]:[]);
 rule('gateway-uses-service-proxy',()=>{
-  const source=read('backend/src/phase2/coreApp.ts');
+  const source=read('backend/src/composition/coreApp.ts');
   assert.deepEqual(directFetches(source),[],'coreApp.ts calls fetch directly; route it through serviceProxy');
   assert.ok(/serviceProxy\(\{\s*name:\s*'clinic'/.test(source)&&/serviceProxy\(\{\s*name:\s*'notification'/.test(source),'both downstreams use serviceProxy');
   // negative fixtures
@@ -490,7 +490,7 @@ export function duplicateModules(modules){
   return [...groups.values()].filter(group=>group.length>1).map(group=>group.join(' = '));
 }
 rule('no-duplicated-service-modules',()=>{
-  const dirs=[...readdirSync(resolve(root,'services'),{withFileTypes:true}).filter(e=>e.isDirectory()).map(e=>'services/'+e.name+'/src'),'backend/src/phase2'];
+  const dirs=[...readdirSync(resolve(root,'services'),{withFileTypes:true}).filter(e=>e.isDirectory()).map(e=>'services/'+e.name+'/src'),...['composition','gateway','workers','routes/internal'].map(d=>'backend/src/'+d)];
   const modules=dirs.flatMap(d=>files(resolve(root,d))).filter(f=>f.endsWith('.ts')&&!f.split(sep).includes('dist')).map(f=>({file:relative(root,f).split(sep).join('/'),source:readFileSync(f,'utf8')}));
   assert.ok(modules.length>=40,'found the service modules ('+modules.length+')');
   const copies=duplicateModules(modules);
@@ -716,7 +716,7 @@ rule('structure-ratchet',()=>{
   // S5 sees a dynamic import of the monolith's app and of the production composition as well as a static one
   assert.ok(LEGACY_APP.test("const {createApp}=await import('../../backend/dist/src/app.js');")&&LEGACY_APP.test("import { createApp } from '../src/app.js';"));
   assert.ok(!LEGACY_APP.test("const {createApp}=await import('../../services/clinic/dist/app.js');"),'a service app is not the monolith');
-  assert.ok(PRODUCTION_APP.test("const {createCoreApp}=await import('../../backend/dist/src/phase2/coreApp.js');")&&!PRODUCTION_APP.test("import('../../backend/dist/src/app.js')"));
+  assert.ok(PRODUCTION_APP.test("const {createCoreApp}=await import('../../backend/dist/src/composition/coreApp.js');")&&!PRODUCTION_APP.test("import('../../backend/dist/src/app.js')"));
   // the real measurement against a baseline made stricter by one: the baseline of the measurement itself with one value one lower,
   // so the result does not depend on how far the committed baseline lags behind the code (an improvement passes)
   assert.deepEqual(ratchetFindings(current,baselineOf(current)),{worse:[],better:[],stale:[]},'a baseline written from the measurement holds');

@@ -106,7 +106,7 @@ export function importEdges(file,src,known){
 
 // A static `from '...'` and a dynamic `import('...')` (permission-matrix.test.mjs uses `await import`) both count.
 export const IMPORT_OF=/(?:\bfrom\s*|\bimport\s*\(\s*)/.source;
-export const LEGACY_APP=new RegExp(IMPORT_OF+/['"][^'"]*(?:backend\/dist\/src|\.\.\/dist\/src|backend\/src|\.\.\/src)\/app\.(?:js|ts)['"]/.source),PRODUCTION_APP=new RegExp(IMPORT_OF+/['"][^'"]*phase2\/core(?:App|Domains)\.(?:js|ts)['"]/.source);
+export const LEGACY_APP=new RegExp(IMPORT_OF+/['"][^'"]*(?:backend\/dist\/src|\.\.\/dist\/src|backend\/src|\.\.\/src)\/app\.(?:js|ts)['"]/.source),PRODUCTION_APP=new RegExp(IMPORT_OF+/['"][^'"]*composition\/core(?:App|Domains)\.(?:js|ts)['"]/.source);
 
 // Names of the jobs in a GitHub workflow file with an uncommented `run:` step that is exactly `command` (no YAML parser:
 // jobs are the keys at two-space indent under `jobs:`).
@@ -124,14 +124,14 @@ export function ciJobsRunning(workflow,command){
 // ---- layout configuration (a move of files means updating these) ----------------------
 // Layer rank: an import from a lower rank to a higher one points against the dependency direction.
 const LAYERS={
-  core:{dir:'backend/src',rank:{domain:0,lib:0,application:1,infrastructure:2,middleware:2,routes:3,phase2:4,'app.ts':4,'index.ts':5}},
+  core:{dir:'backend/src',rank:{domain:0,lib:0,application:1,infrastructure:2,middleware:2,gateway:3,routes:3,workers:4,composition:4,'app.ts':4,'index.ts':5}},
   clinic:{dir:'services/clinic/src',rank:{domain:0,application:1,infrastructure:2,http:3,'(root)':4}},
 };
-const CORE_SPLIT_ENTRIES=/^(index\.ts|phase2\/(worker|billingWorker|notificationWorker)\.ts)$/;
+const CORE_SPLIT_ENTRIES=/^(index\.ts|workers\/(outbox|billing|notification)\.ts)$/;
 // Split mode never reaches the monolith: coreApp only calls createApp without the runtime, and the clinical routers that
 // coreDomains still mounts are shadowed by the proxy (ADR rule 2.4), so those edges are cut.
 const CORE_CLINICAL=/(routes\/(appointments|medicalRecords)|application\/services\/(appointments|medicalRecords)|persistence\/(appointmentRepository|medicalRepository))\.ts$/;
-const CORE_CUT=(from,to)=>from==='phase2/coreApp.ts'&&to==='app.ts'||from==='phase2/coreDomains.ts'&&CORE_CLINICAL.test(to);
+const CORE_CUT=(from,to)=>from==='composition/coreApp.ts'&&to==='app.ts'||from==='composition/coreDomains.ts'&&CORE_CLINICAL.test(to);
 const PROOF_CLASSES=/\bclass (ClinicBilling|CoreBilling)\b/;
 const SYNC_CALL_RULES=/calls-(confined|declared)/;
 const LEGACY_DIR='/legacy/';

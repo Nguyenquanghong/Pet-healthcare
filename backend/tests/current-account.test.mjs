@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { currentAccount } from '../dist/src/phase2/currentAccount.js';
+import { currentAccount } from '../dist/src/middleware/currentAccount.js';
 import { signToken, verifyToken } from '../dist/src/lib/token.js';
 import { requireAuth } from '../dist/src/middleware/auth.js';
 import { requestActor } from '@nipopeto/runtime';

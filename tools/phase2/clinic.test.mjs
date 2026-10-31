@@ -9,12 +9,12 @@ import {request as httpRequest,createServer as createHttpServer} from 'node:http
 import {PrismaClient as CoreClient} from '@prisma/client';
 import {PrismaClient as ClinicClient} from '../../services/clinic/src/generated/client/index.js';
 import {PrismaClient as NotificationClient} from '../../services/notification/src/generated/client/index.js';
-import {createCoreApp} from '../../backend/dist/src/phase2/coreApp.js';
+import {createCoreApp} from '../../backend/dist/src/composition/coreApp.js';
 import {signToken} from '../../backend/dist/src/lib/token.js';
 import {ClinicInbox} from '../../services/clinic/dist/infrastructure/messaging/inbox.js';
 import {DirectorySync} from '../../services/clinic/dist/infrastructure/core/directorySync.js';
 import {backfill} from '../../services/clinic/dist/infrastructure/messaging/backfill.js';
-import {OutboxRelay as CoreRelay} from '../../backend/dist/src/phase2/relay.js';
+import {OutboxRelay as CoreRelay} from '../../backend/dist/src/workers/relay.js';
 import {RuntimeOutboxStore} from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';
 import {OutboxRelay as ClinicRelay} from '../../services/clinic/dist/infrastructure/messaging/relay.js';
 import {topology,declareTopology,publishConfirmed} from '@nipopeto/messaging';

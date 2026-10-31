@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import {once} from 'node:events';
 import {ServiceRuntime} from '../dist/index.js';
-import {coreLimitRules} from '../../../backend/dist/src/middleware/runtimeHttp.js';
+import {coreLimitRules} from '../../../backend/dist/src/composition/limitRules.js';
 
 // AQ-01 / E-b: public rescue reports get their own IP and per-token buckets. The rule is Core's, passed in like the service does.
 const snapshot={pending:0,outboxAgeSeconds:0,outboxRetries:0,billingPending:0,billingAgeSeconds:0,dbLockWaits:0};
