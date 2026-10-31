@@ -18,7 +18,7 @@ import {declareTopology,topology} from '@nipopeto/messaging';
 import amqp from 'amqplib';
 import {OutboxRelay as CoreRelay} from '../../backend/dist/src/phase2/relay.js';
 import {RuntimeOutboxStore} from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';
-import {OutboxRelay as ClinicRelay} from '../../services/clinic/dist/relay.js';
+import {OutboxRelay as ClinicRelay} from '../../services/clinic/dist/infrastructure/messaging/relay.js';
 import {blobTestEnv} from './blob-test.mjs';
 import {liftAppointmentCapacity} from './appointment-capacity.mjs';
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test');assertTestProject();

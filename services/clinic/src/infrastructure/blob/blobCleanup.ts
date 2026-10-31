@@ -1,4 +1,4 @@
-import type { PrismaClient } from './generated/client/index.js';
+import type { PrismaClient } from '../../generated/client/index.js';
 import type { BlobStore } from './blobStore.js';
 import { integer } from '@nipopeto/runtime';
 

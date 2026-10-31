@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {S3BlobStore,UnconfiguredBlobStore,blobStoreFromEnv} from '../../../services/clinic/dist/blobStore.js';
+import {S3BlobStore,UnconfiguredBlobStore,blobStoreFromEnv} from '../../../services/clinic/dist/infrastructure/blob/blobStore.js';
 
 // AQ-09 valet key. The SigV4 signature itself is verified against a real S3-compatible
 // server in tools/phase2/clinic.test.mjs; here: shape, TTL, config validation, fail-closed.

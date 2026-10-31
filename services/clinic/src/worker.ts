@@ -8,13 +8,13 @@ import {
   startWorker,
 } from '@nipopeto/messaging';
 import { PrismaClient } from './generated/client/index.js';
-import { ClinicInbox } from './inbox.js';
-import { OutboxRelay } from './relay.js';
-import { DirectorySync } from './directorySync.js';
-import { classifyClinicFailure } from './messagingErrors.js';
+import { ClinicInbox } from './infrastructure/messaging/inbox.js';
+import { OutboxRelay } from './infrastructure/messaging/relay.js';
+import { DirectorySync } from './infrastructure/core/directorySync.js';
+import { classifyClinicFailure } from './infrastructure/messaging/messagingErrors.js';
 import { withRequestId, eventCorrelation, integer, prismaClient } from '@nipopeto/runtime';
-import { blobStoreConfigured, blobStoreFromEnv } from './blobStore.js';
-import { drainBlobCleanup } from './blobCleanup.js';
+import { blobStoreConfigured, blobStoreFromEnv } from './infrastructure/blob/blobStore.js';
+import { drainBlobCleanup } from './infrastructure/blob/blobCleanup.js';
 const db = prismaClient(PrismaClient);
 await startWorker('clinic', async signal => {
   try {

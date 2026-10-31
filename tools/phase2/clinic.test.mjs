@@ -11,19 +11,19 @@ import {PrismaClient as ClinicClient} from '../../services/clinic/src/generated/
 import {PrismaClient as NotificationClient} from '../../services/notification/src/generated/client/index.js';
 import {createCoreApp} from '../../backend/dist/src/phase2/coreApp.js';
 import {signToken} from '../../backend/dist/src/lib/token.js';
-import {ClinicInbox} from '../../services/clinic/dist/inbox.js';
-import {DirectorySync} from '../../services/clinic/dist/directorySync.js';
-import {backfill} from '../../services/clinic/dist/backfill.js';
+import {ClinicInbox} from '../../services/clinic/dist/infrastructure/messaging/inbox.js';
+import {DirectorySync} from '../../services/clinic/dist/infrastructure/core/directorySync.js';
+import {backfill} from '../../services/clinic/dist/infrastructure/messaging/backfill.js';
 import {OutboxRelay as CoreRelay} from '../../backend/dist/src/phase2/relay.js';
 import {RuntimeOutboxStore} from '../../backend/dist/src/infrastructure/persistence/runtimeOutboxStore.js';
-import {OutboxRelay as ClinicRelay} from '../../services/clinic/dist/relay.js';
+import {OutboxRelay as ClinicRelay} from '../../services/clinic/dist/infrastructure/messaging/relay.js';
 import {topology,declareTopology,publishConfirmed} from '@nipopeto/messaging';
 import {isTransientFailure} from '@nipopeto/runtime';
 import amqp from 'amqplib';
 import {readFileSync} from 'node:fs';
 import {blobTestEnv} from './blob-test.mjs';
-import {blobStoreFromEnv} from '../../services/clinic/dist/blobStore.js';
-import {drainBlobCleanup,imageRetentionMs} from '../../services/clinic/dist/blobCleanup.js';
+import {blobStoreFromEnv} from '../../services/clinic/dist/infrastructure/blob/blobStore.js';
+import {drainBlobCleanup,imageRetentionMs} from '../../services/clinic/dist/infrastructure/blob/blobCleanup.js';
 import {liftAppointmentCapacity} from './appointment-capacity.mjs';
 
 assert.equal(process.env.PHASE2_TEST_CONFIRM,'pet-phase2-p1-test','Use guarded phase2:test:clinic');

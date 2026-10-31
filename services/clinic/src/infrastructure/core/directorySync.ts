@@ -1,5 +1,5 @@
 import type { DirectoryEntry } from '@nipopeto/contracts';
-import type { ProjectionEntry } from './inbox.js';
+import type { ProjectionEntry } from '../messaging/inbox.js';
 import { serviceOrigin, traceHeaders } from '@nipopeto/runtime';
 import { TransientError } from '@nipopeto/messaging';
 // P03: Core not answering, or not yet at the event's version, heals with a retry.

@@ -1,6 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto';
-import type { Prisma, PrismaClient } from './generated/client/index.js';
-import { BusinessError } from './domain/error.js';
+import type { Prisma, PrismaClient } from '../../generated/client/index.js';
+import { BusinessError } from '../../domain/error.js';
 const canonical = (value: unknown): unknown =>
   value instanceof Date
     ? value.toISOString()

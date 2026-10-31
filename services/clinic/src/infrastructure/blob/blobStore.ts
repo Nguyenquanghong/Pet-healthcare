@@ -1,6 +1,6 @@
 import { createHash, createHmac } from 'node:crypto';
-import { BusinessError } from './domain/error.js';
-import type { BlobStore } from './application/ports/blobs.js';
+import { BusinessError } from '../../domain/error.js';
+import type { BlobStore } from '../../application/ports/blobs.js';
 import { serviceOrigin } from '@nipopeto/runtime';
 import { PermanentError, TransientError } from '@nipopeto/messaging';
 export type { BlobStore };

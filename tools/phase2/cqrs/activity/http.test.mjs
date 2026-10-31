@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {generateKeyPairSync} from 'node:crypto';
 import {createApp} from '../../../../services/clinic/dist/app.js';
-import {CoreDirectory} from '../../../../services/clinic/dist/directory.js';
+import {CoreDirectory} from '../../../../services/clinic/dist/infrastructure/core/directory.js';
 import {createCoreApp} from '../../../../backend/dist/src/phase2/coreApp.js';
 import {signToken,verifyToken} from '../../../../backend/dist/src/lib/token.js';
 

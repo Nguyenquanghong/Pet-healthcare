@@ -1,6 +1,6 @@
-import type { PrismaClient, Prisma } from './generated/client/index.js';
-import type { Actor } from './domain/auth.js';
-import { BusinessError } from './domain/error.js';
+import type { PrismaClient, Prisma } from '../../generated/client/index.js';
+import type { Actor } from '../../domain/auth.js';
+import { BusinessError } from '../../domain/error.js';
 import type { BillingSourceSnapshot, CoreState } from '@nipopeto/contracts';
 
 function permitted(actor: Actor, ownerId: string) {

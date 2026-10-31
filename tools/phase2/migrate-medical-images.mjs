@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {PrismaClient} from '../../services/clinic/src/generated/client/index.js';
-import {S3BlobStore,blobStoreFromEnv} from '../../services/clinic/dist/blobStore.js';
+import {S3BlobStore,blobStoreFromEnv} from '../../services/clinic/dist/infrastructure/blob/blobStore.js';
 import {imageContent} from '../../services/clinic/dist/domain/validation.js';
 
 const args=process.argv.slice(2),mode=args[0],deleteOrphans=args.includes('--delete-orphans');

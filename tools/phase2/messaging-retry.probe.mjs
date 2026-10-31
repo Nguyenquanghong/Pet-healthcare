@@ -15,8 +15,8 @@ import amqp from 'amqplib';
 import { declareTopology, topology, publishConfirmed, consumeEvents } from '@nipopeto/messaging';
 import { PrismaClient as ClinicClient } from '../../services/clinic/src/generated/client/index.js';
 import { PrismaClient as NotificationClient } from '../../services/notification/src/generated/client/index.js';
-import { ClinicInbox } from '../../services/clinic/dist/inbox.js';
-import { DirectorySync } from '../../services/clinic/dist/directorySync.js';
+import { ClinicInbox } from '../../services/clinic/dist/infrastructure/messaging/inbox.js';
+import { DirectorySync } from '../../services/clinic/dist/infrastructure/core/directorySync.js';
 import { NotificationInbox } from '../../services/notification/dist/inbox.js';
 import { assertTestProject } from './test-project.mjs';
 

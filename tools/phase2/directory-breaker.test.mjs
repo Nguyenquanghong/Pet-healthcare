@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {once} from 'node:events';
-import {CoreDirectory} from '../../services/clinic/dist/directory.js';
+import {CoreDirectory} from '../../services/clinic/dist/infrastructure/core/directory.js';
 
 // Clinic -> Core directory Circuit Breaker against real HTTP servers (no database).
 const actor={sub:'owner-1',role:'owner'},credential='directory-breaker-fixture-'.padEnd(40,'x');

@@ -77,13 +77,15 @@ try {
   const original = execFileSync('git', ['show', baselineSha + ':services/clinic/src/lists.ts'], {encoding: 'utf8'});
   assert.equal(hash(original), fixture.hashes.baselineReader);
   report.hashes.baselineReader = hash(original);
-  for (const file of ['domain/error.ts', 'domain/validation.ts', 'lib/serialize.ts']) {
-    const path = 'services/clinic/src/' + file;
+  // serialize moved from lib/ to application/ after the baseline: read the current file at its new path, the baseline at the old one.
+  for (const [file, baselineFile] of [['domain/error.ts', 'domain/error.ts'], ['domain/validation.ts', 'domain/validation.ts'], ['application/serialize.ts', 'lib/serialize.ts']]) {
+    const sourcePath = 'services/clinic/src/' + file, baselinePath = 'services/clinic/src/' + baselineFile;
     const normalized = value => value.toString().replaceAll('\r\n', '\n');
-    assert.equal(hash(normalized(readFileSync(path))), hash(normalized(execFileSync('git', ['show', baselineSha + ':' + path]))), 'Baseline dependency drift');
+    assert.equal(hash(normalized(readFileSync(sourcePath))), hash(normalized(execFileSync('git', ['show', baselineSha + ':' + baselinePath]))), 'Baseline dependency drift');
   }
+  const currentPath = path => path === 'lib/serialize.js' ? 'application/serialize.js' : path;
   writeFileSync(resolve(output, 'baseline-reader.mjs'), stripTypeScriptTypes(original)
-    .replace(/from ['"]\.\/([^'"]+)['"]/g, (_, path) => 'from ' + JSON.stringify(pathToFileURL(resolve('services/clinic/dist', path)).href)));
+    .replace(/from ['"]\.\/([^'"]+)['"]/g, (_, path) => 'from ' + JSON.stringify(pathToFileURL(resolve('services/clinic/dist', currentPath(path))).href)));
   const old = await import(pathToFileURL(resolve(output, 'baseline-reader.mjs')).href);
   const projected = await db.directoryProjection.findMany({orderBy: [{kind: 'asc'}, {id: 'asc'}]});
   const owners = projected.filter(p => p.kind === 'owner').map(p => ({id: p.id, fullName: p.displayName, directoryVersion: p.sourceVersion}));

@@ -4,9 +4,9 @@ import type { Actor } from './domain/auth.js';
 import { BusinessError, StaleRevision } from './domain/error.js';
 import type { MedicalRecordValue } from './application/ports/medicalRecords.js';
 import { authorize } from './domain/authorization.js';
-import { imageRetentionMs } from './blobCleanup.js';
+import { imageRetentionMs } from './infrastructure/blob/blobCleanup.js';
 import { objectInput, calendarDate, requiredText } from './domain/validation.js';
-import { CoreDirectory, RequestDirectory, DeferredDirectory, failClosed } from './directory.js';
+import { CoreDirectory, RequestDirectory, DeferredDirectory, failClosed } from './infrastructure/core/directory.js';
 import { AppointmentService } from './application/services/appointments.js';
 import { MedicalRecordsService, medicalFields } from './application/services/medicalRecords.js';
 import { appointmentTypes } from './application/ports/appointments.js';
@@ -17,15 +17,15 @@ import {
   Lifecycle,
   medicalMutation,
 } from './infrastructure/persistence/repositories.js';
-import { appointmentDto, medicalRecordDto } from './lib/serialize.js';
-import { deduplicated } from './dedup.js';
+import { appointmentDto, medicalRecordDto } from './application/serialize.js';
+import { deduplicated } from './infrastructure/persistence/dedup.js';
 import { list } from './infrastructure/queries/authoritativeLists.js';
 import { AuthoritativeAppointmentQueries } from './infrastructure/queries/authoritativeAppointments.js';
-import { bootstrap } from './bootstrap.js';
+import { bootstrap } from './infrastructure/persistence/bootstrap.js';
 import { parseActivityFilter } from './application/queries/clinicActivity.js';
 import { ClinicActivityQueries } from './infrastructure/queries/clinicActivity.js';
-import { mountBilling } from './billingApi.js';
-import { blobStoreFromEnv, type BlobStore } from './blobStore.js';
+import { mountBilling } from './http/billingApi.js';
+import { blobStoreFromEnv, type BlobStore } from './infrastructure/blob/blobStore.js';
 import type { ServiceRuntime } from '@nipopeto/runtime';
 import { currentRequestId, isTransientFailure, reportUnexpected, requestActor, requestFault } from '@nipopeto/runtime';
 

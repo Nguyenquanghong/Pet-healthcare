@@ -1,9 +1,9 @@
 import { createApp } from './app.js';
 import { PrismaClient } from './generated/client/index.js';
 import { actorVerifier, credential, installShutdown, prismaClient } from '@nipopeto/runtime';
-import { CoreDirectory } from './directory.js';
+import { CoreDirectory } from './infrastructure/core/directory.js';
 import { clinicRuntime } from './runtime.js';
-import { S3BlobStore, blobStoreFromEnv } from './blobStore.js';
+import { S3BlobStore, blobStoreFromEnv } from './infrastructure/blob/blobStore.js';
 const db = prismaClient(PrismaClient);
 try {
   await db.$connect();

@@ -1,8 +1,8 @@
-import type { PrismaClient } from './generated/client/index.js';
-import type { Actor } from './domain/auth.js';
-import { todayInVietnam } from './domain/validation.js';
-import { appointmentDto, medicalRecordDto } from './lib/serialize.js';
-import type { RequestDirectory } from './directory.js';
+import type { PrismaClient } from '../../generated/client/index.js';
+import type { Actor } from '../../domain/auth.js';
+import { todayInVietnam } from '../../domain/validation.js';
+import { appointmentDto, medicalRecordDto } from '../../application/serialize.js';
+import type { RequestDirectory } from '../core/directory.js';
 // The bounded Clinic dashboard view served at GET /api/dashboard/clinic.
 export async function bootstrap(db: PrismaClient, actor: Actor, directory: RequestDirectory) {
   const own = actor.role === 'owner' ? { ownerId: actor.sub } : {},
