@@ -37,9 +37,9 @@ for (const file of files.filter((path) => protectedRoots.some((directory) => pat
 }
 
 // K3 C2 moved these files into routes/ unchanged. Each still reaches Prisma or infrastructure until it is split
-// (directory C5, dashboard C7; billing left in C4b). A file that no longer violates must leave this list, and a name that no
+// (dashboard C7; billing left in C4b, directory in C5). A file that no longer violates must leave this list, and a name that no
 // longer exists is stale; the list is gone when C10 replaces this script by the tier table.
-const PENDING_SPLIT = new Set(["routes/internal/directory.ts", "routes/dashboard.ts"]);
+const PENDING_SPLIT = new Set(["routes/dashboard.ts"]);
 const seenPending = new Set();
 for (const file of files.filter((path) => path.startsWith(routesRoot + "\\") || path.startsWith(routesRoot + "/"))) {
   const source = readFileSync(file, "utf8");
