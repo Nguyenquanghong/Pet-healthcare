@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { HotelBookingsService } from '../application/services/hotelBookings.js';
-import { careNoteDto, hotelBookingDto } from '../lib/serialize.js';
+import { careNoteDto, hotelBookingDto } from './dto/serialize.js';
 import { failure } from './failure.js';
 
 export function createHotelBookingsRouter(service: HotelBookingsService) {

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { OwnersService } from '../application/services/owners.js';
 import { BusinessError } from '../domain/error.js';
-import { ownerDto } from '../lib/serialize.js';
+import { ownerDto } from './dto/serialize.js';
 import { OwnerActivationService } from '../application/services/ownerActivation.js';
 
 export function createOwnersRouter(service: OwnersService, activation: OwnerActivationService) {

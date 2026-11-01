@@ -98,7 +98,7 @@ test('every permission in the matrix has probes, and the session contract lists 
   const {readFile}=await import('node:fs/promises');
   const spec=JSON.parse(await readFile(new URL('../../backend/openapi.json',import.meta.url),'utf8'));
   assert.deepEqual(spec.components.schemas.User.properties.permissions.items.enum,permissions);
-  const {sessionUser}=await import('../../backend/dist/src/lib/serialize.js');
+  const {sessionUser}=await import('../../backend/dist/src/routes/dto/serialize.js');
   for(const role of roles)assert.deepEqual(sessionUser({id:'u',fullName:'U',role}).permissions,permissions.filter(p=>allows(role,p)));
 });
 

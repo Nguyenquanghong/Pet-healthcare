@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { ListsService } from '../application/services/lists.js';
-import { listResultDto } from '../lib/listSerialize.js';
+import { listResultDto } from './dto/listSerialize.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 
 // Mounted before the write routers; only these GET handlers run authentication here.

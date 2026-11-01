@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import type { OutboxStore } from '../../workers/relay.js';
+import type { OutboxStore } from '../../application/ports/outbox.js';
 
 // Core runtime adapter uses Core's own full schema/client. Generated Prisma
 // delegates are not cast or passed between independent schemas/services.

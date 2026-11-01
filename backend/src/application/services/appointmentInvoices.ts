@@ -5,19 +5,12 @@ import { BusinessError } from '../../domain/error.js';
 import { authorize } from '../../domain/authorization.js';
 import { charges, fees, type Fees } from '../../domain/billing/charges.js';
 import { isPending, terminalState } from '../../domain/billing/operation.js';
-import type {
-  BillingInvoice,
-  BillingOperationRecord,
-  BillingOperationStore,
-  BillingRemote,
-} from '../ports/appointmentBilling.js';
+import type { BillingOperationRecord, BillingOperationStore, BillingRemote } from '../ports/appointmentBilling.js';
 
 export class AppointmentInvoices {
-  // `present` shapes the invoice of a finished operation for the wire. It goes away once the routes map the invoice themselves.
   constructor(
     private readonly store: BillingOperationStore,
     private readonly remote: BillingRemote,
-    private readonly present: (invoice: BillingInvoice) => unknown,
   ) {}
   async actor(actor: Actor) {
     const role = await this.store.actorRole(actor.sub);
@@ -177,7 +170,7 @@ export class AppointmentInvoices {
         operationId: op.id,
         status: 'succeeded' as const,
         invoiceId: invoice.id,
-        invoice: this.present(invoice),
+        invoice,
       };
     }
     if (op.state === 'ABORTED')

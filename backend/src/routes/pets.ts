@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PetsService } from '../application/services/pets.js';
-import { petDto } from '../lib/serialize.js';
+import { petDto } from './dto/serialize.js';
 import { failure } from './failure.js';
 
 export function createPetsRouter(service: PetsService) {

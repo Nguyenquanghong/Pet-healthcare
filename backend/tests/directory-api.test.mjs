@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { mountDirectory } from '../dist/src/composition/internalRoutes.js';
 import { signToken, verifyToken, issuedBeforePasswordChange } from '../dist/src/lib/token.js';
-import { ownerDto, petDto } from '../dist/src/lib/serialize.js';
+import { ownerDto, petDto } from '../dist/src/routes/dto/serialize.js';
 
 // Core's directory handler: the check order, the response bodies and the query plan (D).
 const credential = 'directory-api-fixture-'.padEnd(40, 'x');

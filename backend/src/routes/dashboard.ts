@@ -3,7 +3,7 @@ import type { Actor } from '../domain/auth.js';
 import { BusinessError } from '../domain/error.js';
 import { requireAuth } from '../middleware/auth.js';
 import type { BootstrapService } from '../application/services/bootstrap.js';
-import { ownerDto, petDto, hotelBookingDto, appointmentDto, medicalRecordDto } from '../lib/serialize.js';
+import { ownerDto, petDto, hotelBookingDto, appointmentDto, medicalRecordDto } from './dto/serialize.js';
 
 // `core` reads no clinical or notification table; `clinic` reads the clinical ones (legacy mode only); `account` is the stored
 // role of an account, or null when it is gone.
