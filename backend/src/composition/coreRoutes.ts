@@ -68,7 +68,7 @@ import { mountDirectory, mountNotificationAuthorization } from './internalRoutes
 const clinicPrefixes = ['/api/appointments', '/api/medical-records', '/api/dashboard/clinic'] as const;
 
 export type CoreRouteOptions = {
-  // The appointment and medical-record routers; a composition that sends them to Clinic leaves them out.
+  // The appointment and medical-record routers. Every composition still mounts them; the split one puts the Clinic proxy in front.
   clinical: boolean;
   // Only the legacy entrypoint: /api/auth with its limiter, /api/bootstrap and the in-process /api/notifications.
   monolith?: { authLimiter: RequestHandler };

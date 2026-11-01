@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createApp } from "../dist/src/app.js";
+import { createCoreApp } from "../dist/src/composition/coreApp.js";
+import { coreTestEnv, probeAware } from "./core-composition-helper.mjs";
 
 test("OpenAPI JSON and Swagger UI are served without a database", async () => {
-  const server = createApp({}).listen(0, "127.0.0.1");
+  coreTestEnv();
+  const app = createCoreApp(probeAware({}), {});
+  const server = app.listen(0, "127.0.0.1");
   try {
     await new Promise((resolve) => server.once("listening", resolve));
     const address = server.address();
@@ -19,6 +22,7 @@ test("OpenAPI JSON and Swagger UI are served without a database", async () => {
     assert.equal(uiResponse.status, 200);
     assert.match(await uiResponse.text(), /swagger-ui/);
   } finally {
+    app.locals.runtime.close();
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
