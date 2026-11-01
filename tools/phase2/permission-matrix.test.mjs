@@ -5,13 +5,16 @@ import {once} from 'node:events';
 // AQ-05: generated from the permission matrix. Every permission has probes; every
 // probe runs for all four roles. A role the matrix denies gets 403 with the
 // matrix message before any data access; a role it allows passes the guard and
-// reaches the (unavailable) data layer. HTTP probes run the real Core (Phase 1
-// app, the same services and middleware Core mounts in Phase 2) and the real
-// Clinic app; operations that load data before the role check run at service level.
+// reaches the (unavailable) data layer. HTTP probes run the production Core
+// composition (createCoreApp: the real runtime, middleware and routes on a fake
+// database that fails any data access) and the real Clinic app; operations that
+// load data before the role check run at service level. The probes that reach
+// Clinic or Notification in a deployment (appointments, medical records,
+// /notifications/send) stay on the Phase 1 app in permission-matrix-legacy.test.mjs.
 process.env.JWT_SECRET ??= 'permission-matrix-fixture-secret-0123456789abcdef';
 const {allows,deniedMessage,permissions,roles}=await import('../../packages/contracts/dist/index.js');
-const {PrismaClient}=await import('@prisma/client');
-const {createApp:createCore}=await import('../../backend/dist/src/app.js');
+const {createCoreApp}=await import('../../backend/dist/src/composition/coreApp.js');
+const {coreTestEnv,localLimiter,probeAware}=await import('../../backend/tests/core-composition-helper.mjs');
 const {signToken,verifyToken}=await import('../../backend/dist/src/lib/token.js');
 const {createApp:createClinic}=await import('../../services/clinic/dist/app.js');
 const {BookingLifecycleService:CoreLifecycle}=await import('../../backend/dist/src/application/services/bookingLifecycle.js');
@@ -27,20 +30,11 @@ const withFakes=fakes=>new Proxy(fakes,{get:(target,key)=>key in target?target[k
 
 const id='00000000-0000-4000-8000-000000000001';
 const core=[ // [permission, method, path, body?]
-  ['booking.manage','PATCH',`/api/appointments/${id}/status`,{status:'confirmed',expectedRevision:0}],
-  ['booking.manage','POST',`/api/appointments/${id}/undo-status`,{reason:'fixture',expectedRevision:0}],
-  ['booking.manage','POST',`/api/appointments/${id}/reminder`],
-  ['booking.manage','GET',`/api/appointments/${id}/status-history`],
   ['booking.manage','PATCH',`/api/hotel-bookings/${id}/status`,{status:'confirmed',expectedRevision:0}],
   ['booking.manage','GET',`/api/hotel-bookings/${id}/status-history`],
   ['hotel.care-note.write','POST',`/api/hotel-bookings/${id}/care-notes`,{note:'fixture'}],
   ['booking.manage','GET','/api/hotel-capacity'],
   ['hotel.capacity.manage','PUT','/api/hotel-capacity/standard',{capacity:10}],
-  ['medical-record.write','POST','/api/medical-records',{petId:id}],
-  ['medical-record.write','PATCH',`/api/medical-records/${id}`,{title:'fixture'}],
-  ['medical-record.write','DELETE',`/api/medical-records/${id}`],
-  ['medical-record.write','POST','/api/medical-records/images',{petId:id}],
-  ['medical-record.write','DELETE',`/api/medical-records/images/${id}`],
   ['billing.manage','POST','/api/invoices',{type:'appointment',relatedId:id}],
   ['billing.manage','PATCH',`/api/invoices/${id}/pay`,{paymentMethod:'cash'}],
   ['billing.manage','POST',`/api/invoices/${id}/transfer-reject`,{reason:'fixture'}],
@@ -55,7 +49,6 @@ const core=[ // [permission, method, path, body?]
   ['owner.manage','POST',`/api/owners/${id}/activation`,{email:'fixture@example.com',customerVerified:true}],
   ['directory.read','GET','/api/owners'],
   ['directory.read','GET','/api/doctors'],
-  ['notification.send','POST','/api/notifications/send',{recipientOwnerId:id,title:'t',message:'m'}],
 ];
 const clinic=[
   ['booking.manage','PATCH',`/api/appointments/${id}/status`,{status:'confirmed',expectedRevision:0}],
@@ -109,12 +102,22 @@ async function call(base,role,[,method,path,body]){
   return {status:res.status,message:error};
 }
 
+// The account lookup of createCoreApp answers from the id (`owner-1` is an owner); any other data access, a read of the
+// same table included, is a tripwire.
+const accountLookup=select=>select?.id===true&&select.role===true&&select.passwordChangedAt===true&&Object.keys(select).length===3;
+const coreDb=()=>probeAware(withFakes({user:{findUnique:async({where,select})=>{
+  if(!accountLookup(select))throw new Error('permission-matrix tripwire: user.findUnique');
+  return {id:where.id,role:where.id.split('-')[0],passwordChangedAt:null};
+}}}));
+
 test('Core HTTP: every role-restricted route answers by the matrix',{timeout:120000},async()=>{
-  const client=new PrismaClient({datasources:{db:{url:'postgresql://test:test@127.0.0.1:0/permission_matrix'}}});
-  const {server,base}=await serve(createCore(client));
+  coreTestEnv();
+  const app=createCoreApp(coreDb(),{});
+  const rt=await localLimiter(app);
+  const {server,base}=await serve(app);
   try{
     for(const probe of core)for(const role of roles){const {status,message}=await call(base,role,probe);verdict(probe[0],role,status,message);}
-  }finally{server.closeAllConnections();await new Promise(r=>server.close(r));await client.$disconnect();}
+  }finally{rt.close();server.closeAllConnections();await new Promise(r=>server.close(r));}
 });
 
 test('Clinic HTTP: every role-restricted route answers by the matrix',{timeout:60000},async()=>{

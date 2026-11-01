@@ -78,3 +78,27 @@ test("auth rate limit remains 50 per 15 minutes and returns JSON with retry head
     await client.$disconnect();
   }
 });
+
+test("every createApp builds its own auth limiter: a second app in the same process still allows 50 requests", async () => {
+  const servers = [];
+  const start = async () => {
+    const server = createApp({}).listen(0, "127.0.0.1");
+    servers.push(server);
+    await new Promise(resolve => server.once("listening", resolve));
+    return `http://127.0.0.1:${server.address().port}/api/auth/me`;
+  };
+  const status = async url => {
+    const response = await fetch(url);
+    await response.arrayBuffer();
+    return response.status;
+  };
+  try {
+    const first = await start();
+    for (let index = 0; index < 5; index++) assert.equal(await status(first), 401, `first app, request ${index + 1}`);
+    const second = await start();
+    for (let index = 0; index < 50; index++) assert.equal(await status(second), 401, `second app, request ${index + 1}`);
+    assert.equal(await status(second), 429);
+  } finally {
+    await Promise.all(servers.map(server => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))));
+  }
+});

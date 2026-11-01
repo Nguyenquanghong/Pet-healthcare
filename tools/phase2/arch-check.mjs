@@ -17,6 +17,7 @@ const checks=[
   {name:'document links',protects:'NFR12 (reproducible handoff)',command:[process.execPath,'tools/phase2/check-document-links.mjs']},
   {name:'alert rules reference real metrics',protects:'NFR12, ops',command:[process.execPath,'tools/phase2/check-alert-metrics.mjs']},
   {name:'permission matrix over HTTP (4 roles x every guard)',protects:'AQ-05, NFR04',command:[process.execPath,'--test','tools/phase2/permission-matrix.test.mjs']},
+  {name:'permission matrix, Phase 1 routes (appointments, medical records, manual send)',protects:'AQ-05, NFR04',command:[process.execPath,'--test','tools/phase2/permission-matrix-legacy.test.mjs']},
   {name:'Clinic request scope (what the HTTP layer decides before a handler)',protects:'AQ-05, ADR-P12, K2',command:[process.execPath,'--test','tools/phase2/clinic-scope.test.mjs']},
   {name:'Clinic route registry (declared scope, assertRoutes, metric labels)',protects:'AQ-05, K2',command:[process.execPath,'--test','tools/phase2/clinic-routes.test.mjs']},
   {name:'Core HTTP surface (production composition in 3 configurations, saga on a double)',protects:'AQ-05, K3',command:[process.execPath,'--test','tools/phase2/core-surface.test.mjs']},

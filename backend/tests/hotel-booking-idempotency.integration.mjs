@@ -1,8 +1,9 @@
 import { notificationOutbox } from "./notification-outbox-helper.mjs";
+import { coreTestEnv, localLimiter, probeAware } from "./core-composition-helper.mjs";
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
-import { createApp } from "../dist/src/app.js";
+import { createCoreApp } from "../dist/src/composition/coreApp.js";
 import { signToken } from "../dist/src/lib/token.js";
 
 const rawUrl = process.env.PG_TEST_DATABASE_URL;
@@ -10,16 +11,22 @@ assert.ok(rawUrl, "Use a disposable local PostgreSQL database named *_test.");
 const url = new URL(rawUrl);
 assert.ok(["postgres:", "postgresql:"].includes(url.protocol));
 assert.ok(["localhost", "127.0.0.1"].includes(url.hostname) && decodeURIComponent(url.pathname).endsWith("_test"));
-process.env.JWT_SECRET = randomBytes(32).toString("hex");
+coreTestEnv();
 const db = new PrismaClient({ datasources: { db: { url: rawUrl } } });
-let server, base;
+let server, base, runtime;
 const users = [];
 async function start() {
-  server = createApp(db).listen(0, "127.0.0.1");
+  const app = createCoreApp(probeAware(db), {});
+  runtime = await localLimiter(app);
+  server = app.listen(0, "127.0.0.1");
   await new Promise(resolve => server.once("listening", resolve));
   base = `http://127.0.0.1:${server.address().port}/api/hotel-bookings`;
 }
-async function stop() { if (server) await new Promise(resolve => server.close(resolve)); server = null; }
+async function stop() {
+  runtime?.close();
+  if (server) await new Promise(resolve => server.close(resolve));
+  server = null;
+}
 async function request(token, method = "GET", body, path = "", key) {
   const response = await fetch(base + path, { method, headers: {
     Authorization: `Bearer ${token}`,
