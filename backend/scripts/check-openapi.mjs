@@ -16,7 +16,7 @@ const mounts = {
   payments: "/api/payments", lists: "/api",
 };
 const runtime = new Set(["GET /api/health"]);
-assert.match(readFileSync(resolve(backend,'src/routes/internal/billing.ts'),'utf8'),/app\.get\(\s*'\/api\/operations\/:id'/);
+assert.match(readFileSync(resolve(backend,'src/routes/appointmentBilling.ts'),'utf8'),/app\.get\(\s*'\/api\/operations\/:id'/);
 runtime.add('GET /api/operations/{id}');
 const dashboardSource=readFileSync(resolve(backend,'src/routes/dashboard.ts'),'utf8');
 for(const match of dashboardSource.matchAll(/app\.get\(\s*'([^']+)'/g))runtime.add('GET '+match[1]);

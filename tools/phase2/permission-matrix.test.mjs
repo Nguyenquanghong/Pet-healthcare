@@ -16,7 +16,7 @@ const {signToken,verifyToken}=await import('../../backend/dist/src/lib/token.js'
 const {createApp:createClinic}=await import('../../services/clinic/dist/app.js');
 const {BookingLifecycleService:CoreLifecycle}=await import('../../backend/dist/src/application/services/bookingLifecycle.js');
 const {BookingLifecycleService:ClinicLifecycle}=await import('../../services/clinic/dist/application/services/bookingLifecycle.js');
-const {AppointmentInvoiceBilling}=await import('../../backend/dist/src/infrastructure/persistence/appointmentBilling.js');
+const {AppointmentInvoiceBilling}=await import('../../backend/dist/src/composition/appointmentBilling.js');
 const {ManualSend}=await import('../../services/notification/dist/manualSend.js');
 const {MedicalRecordsService}=await import('../../services/clinic/dist/application/services/medicalRecords.js');
 

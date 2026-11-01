@@ -5,7 +5,7 @@ import {createServer, request as httpRequest} from 'node:http';
 import {generateKeyPairSync} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {createCoreApp} from '../../backend/dist/src/composition/coreApp.js';
-import {AppointmentInvoiceBilling} from '../../backend/dist/src/infrastructure/persistence/appointmentBilling.js';
+import {AppointmentInvoiceBilling} from '../../backend/dist/src/composition/appointmentBilling.js';
 import {signToken} from '../../backend/dist/src/lib/token.js';
 import {BusinessError} from '../../backend/dist/src/domain/error.js';
 
