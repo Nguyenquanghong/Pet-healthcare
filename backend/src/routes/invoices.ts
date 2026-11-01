@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { InvoicesService } from '../application/services/invoices.js';
-import { invoiceDto } from '../lib/serialize.js';
+import { invoiceDto } from './dto/serialize.js';
 import { failure } from './failure.js';
 
 export function createInvoicesRouter(service: InvoicesService) {

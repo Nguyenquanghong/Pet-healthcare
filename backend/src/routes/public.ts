@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PublicRescueService } from '../application/services/publicRescue.js';
-import { publicPetDto } from '../lib/serialize.js';
+import { publicPetDto } from './dto/serialize.js';
 import { failure } from './failure.js';
 
 export function createPublicRouter(service: PublicRescueService) {

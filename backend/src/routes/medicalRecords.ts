@@ -1,7 +1,7 @@
 /** @deprecated Legacy monolith route (createApp only); split mode proxies this prefix to Clinic. */
 import { Router } from "express";
 import { MedicalRecordsService } from "../application/services/medicalRecords.js";
-import { medicalRecordDto } from "../lib/serialize.js";
+import { medicalRecordDto } from "./dto/serialize.js";
 import { failure } from "./failure.js";
 
 export function createMedicalRecordsRouter(service: MedicalRecordsService) {

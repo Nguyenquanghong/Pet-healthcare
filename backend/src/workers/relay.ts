@@ -1,5 +1,6 @@
 import type { PrismaClient } from '../generated/phase2-core/index.js';
 import { BaseOutboxRelay, type ClaimedOutbox, type OutboxRelayStore, type RelayOptions } from '@nipopeto/messaging';
+import type { OutboxStore } from '../application/ports/outbox.js';
 export type { RelayOptions };
 // Batches need a store with claimBatch. The loop is shared with Clinic in @nipopeto/messaging.
 class CoreRelayStore implements OutboxRelayStore {
@@ -34,17 +35,6 @@ export class OutboxRelay extends BaseOutboxRelay {
     if ((options.batchSize ?? 1) > 1 && !store.claimBatch) throw new Error('INVALID_RELAY_BATCH');
     super(new CoreRelayStore(store, scopeAggregateId ?? null, createdAfter ?? null), brokerUrl, 'core-relay', options);
   }
-}
-export interface OutboxStore {
-  claim(leaseOwner: string, scope: string | null, createdAfter?: string | null): Promise<ClaimedOutbox | null>;
-  claimBatch?(
-    leaseOwner: string,
-    scope: string | null,
-    createdAfter: string | null,
-    limit: number,
-  ): Promise<ClaimedOutbox[]>;
-  markPublished(id: string, leaseOwner: string): Promise<void>;
-  retry(id: string, leaseOwner: string, nextAttemptAt: Date): Promise<void>;
 }
 class ProofOutboxStore implements OutboxStore {
   constructor(private readonly db: PrismaClient) {}

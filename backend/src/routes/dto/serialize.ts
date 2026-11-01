@@ -1,11 +1,11 @@
-import type { UserAccount } from '../application/ports/auth.js';
-import type { AppointmentRecord } from '../application/ports/appointments.js';
-import type { MedicalRecordValue } from '../application/ports/medicalRecords.js';
-import type { CareNoteValue, HotelBookingValue } from '../application/ports/hotelBookings.js';
-import type { PetValue } from '../application/ports/pets.js';
-import type { InvoiceValue } from '../application/ports/invoices.js';
+import type { UserAccount } from '../../application/ports/auth.js';
+import type { AppointmentRecord } from '../../application/ports/appointments.js';
+import type { MedicalRecordValue } from '../../application/ports/medicalRecords.js';
+import type { CareNoteValue, HotelBookingValue } from '../../application/ports/hotelBookings.js';
+import type { PetValue } from '../../application/ports/pets.js';
+import type { InvoiceValue } from '../../application/ports/invoices.js';
 import { allowedActions, permissionsFor } from '@nipopeto/contracts';
-import type { Actor } from '../domain/auth.js';
+import type { Actor } from '../../domain/auth.js';
 
 // Who reads a booking: owners get the owner view; everyone gets the actions their
 // permissions allow (P01 allowedActions; the server still checks each one).

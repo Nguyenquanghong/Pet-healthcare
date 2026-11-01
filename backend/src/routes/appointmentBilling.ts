@@ -3,6 +3,12 @@ import { requireAuth } from '../middleware/auth.js';
 import { BusinessError } from '../domain/error.js';
 import type { AppointmentInvoices } from '../application/services/appointmentInvoices.js';
 import { currentRequestId, isTransientFailure, reportUnexpected } from '@nipopeto/runtime';
+import { invoiceDto } from './dto/serialize.js';
+
+type BillingResult = Awaited<ReturnType<AppointmentInvoices['result']>>;
+
+const wireResult = (result: BillingResult) =>
+  result.status === 'succeeded' ? { ...result, invoice: invoiceDto(result.invoice) } : result;
 
 export const billingSafe =
   (work: (req: express.Request, res: express.Response) => Promise<void>) =>
@@ -29,7 +35,7 @@ export function mountAppointmentBilling(app: express.Express, billing: Appointme
       if (op.actorId !== req.auth!.sub || op.actorRole !== req.auth!.role)
         throw new BusinessError(404, 'Operation not found.');
       res.setHeader('Cache-Control', 'no-store');
-      res.json(await billing.result(op));
+      res.json(wireResult(await billing.result(op)));
     }),
   );
   for (const [path, self] of [
@@ -62,7 +68,7 @@ export function mountAppointmentBilling(app: express.Express, billing: Appointme
             } finally {
               if (timer) clearTimeout(timer);
             }
-            const result = await billing.result(outcome);
+            const result = wireResult(await billing.result(outcome));
             if (process.env.PHASE2_RUNTIME_REQUIRED === '1')
               process.stdout.write(
                 JSON.stringify({

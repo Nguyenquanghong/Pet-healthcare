@@ -1,6 +1,6 @@
 import { Router, type Response } from 'express';
 import { AuthService } from '../application/services/auth.js';
-import { sessionUser } from '../lib/serialize.js';
+import { sessionUser } from './dto/serialize.js';
 import { requireAuth } from '../middleware/auth.js';
 import { OwnerActivationService } from '../application/services/ownerActivation.js';
 import { failure as respond } from './failure.js';

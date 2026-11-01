@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MedicalRecordsService } from "../dist/src/application/services/medicalRecords.js";
-import * as serializers from "../dist/src/lib/serialize.js";
+import * as serializers from "../dist/src/routes/dto/serialize.js";
 import { appointmentSlotWrite } from "../dist/src/infrastructure/persistence/appointmentSlotConflict.js";
 
 const staff = { sub: "staff-1", role: "staff" };

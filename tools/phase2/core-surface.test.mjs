@@ -6,6 +6,7 @@ import {generateKeyPairSync} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {createCoreApp} from '../../backend/dist/src/composition/coreApp.js';
 import {AppointmentInvoiceBilling} from '../../backend/dist/src/composition/appointmentBilling.js';
+import {invoiceDto} from '../../backend/dist/src/routes/dto/serialize.js';
 import {signToken} from '../../backend/dist/src/lib/token.js';
 import {BusinessError} from '../../backend/dist/src/domain/error.js';
 
@@ -677,7 +678,7 @@ async function saga() {
     await resume('checkout over an existing invoice with another revision: the error leaves resume', {ops: [rop({operationType: 'invoice.checkout', actorId: 'owner-1', actorRole: 'owner', appointmentId: 'appt-co', expectedRevision: 3})], invoices: [sagaInvoice({sourceSnapshot: snapshotOf('appt-co', {revision: 9})})]});
     await resume('the abort itself fails: the error leaves resume', {ops: [rop()], remote: {prepare: async () => { throw new BusinessError(404, 'Clinic rejected the billing source.'); }}, world: Object.assign(makeWorld({verbose: true}), {failOn: name => name === 'appointmentBillingOperation.update' ? new Error('update failed') : undefined})});
     await check('result', sagaRig({ops: [rop({state: 'COMMITTED', invoiceId: 'inv-1'}), rop({state: 'ABORTED', errorStatus: 404, errorCode: 'Gone', id: 'a'}), rop({state: 'ABORTED', id: 'b'}), rop({id: 'c'})], invoices: [sagaInvoice({id: 'inv-1', items: [{id: 'l1', description: 'X', quantity: 1, unitPrice: '1000', amount: '1000'}], subtotal: '1000', totalAmount: '1000'})]}),
-      async r => { const out = []; for (const id of ['r', 'a', 'b', 'c']) out.push(await r.billing.result(await r.billing.read(id))); return out; });
+      async r => { const out = []; for (const id of ['r', 'a', 'b', 'c']) { const res = await r.billing.result(await r.billing.read(id)); out.push(res.status === 'succeeded' ? {...res, invoice: invoiceDto(res.invoice)} : res); } return out; });
 
     // reconcileOnce
     for (const limit of [0, 33, 1.5, 'x']) await check('reconcile limit ' + limit, sagaRig(), r => r.billing.reconcileOnce('worker-1', limit));

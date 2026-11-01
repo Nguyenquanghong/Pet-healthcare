@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appointmentDto, hotelBookingDto, medicalRecordDto } from "../dist/src/lib/serialize.js";
+import { appointmentDto, hotelBookingDto, medicalRecordDto } from "../dist/src/routes/dto/serialize.js";
 
 test("owner projections exclude staff notes while staff projections retain them", () => {
   const date = new Date("2038-01-01T00:00:00.000Z");

@@ -3,7 +3,7 @@ import express from 'express';
 import type { DirectoryKind, DirectoryReader, DirectoryRow } from '../../application/ports/directory.js';
 import type { DirectoryAuthorization, DirectoryDecision } from '../../application/services/directoryAuthorization.js';
 import { verifyToken } from '../../lib/token.js';
-import { ownerDto, petDto } from '../../lib/serialize.js';
+import { ownerDto, petDto } from '../dto/serialize.js';
 import { acceptsCredential } from '@nipopeto/runtime';
 
 function decisionBody(decision: DirectoryDecision) {
