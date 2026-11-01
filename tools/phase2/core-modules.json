@@ -1,0 +1,311 @@
+{
+  "groups": {
+    "identity": {
+      "kind": "context",
+      "files": [
+        "lib/password",
+        "lib/token",
+        "application/ports/auth",
+        "application/ports/ownerActivation",
+        "application/services/auth",
+        "application/services/ownerActivation",
+        "application/services/notificationAuthorization",
+        "application/ports/notificationAuthorization",
+        "infrastructure/persistence/userRepository",
+        "infrastructure/persistence/ownerActivationRepository",
+        "infrastructure/persistence/notificationAuthorizationRepository",
+        "infrastructure/security/authAdapters",
+        "infrastructure/security/activationToken",
+        "middleware/*",
+        "routes/auth",
+        "routes/internal/notificationAuthorization"
+      ]
+    },
+    "directory": {
+      "kind": "context",
+      "files": [
+        "application/ports/owners",
+        "application/ports/pets",
+        "application/ports/directory",
+        "application/services/owners",
+        "application/services/pets",
+        "application/services/directoryAuthorization",
+        "infrastructure/persistence/ownerRepository",
+        "infrastructure/persistence/petRepository",
+        "infrastructure/persistence/directoryRepository",
+        "infrastructure/security/qrToken",
+        "routes/owners",
+        "routes/pets",
+        "routes/internal/directory"
+      ]
+    },
+    "hotel": {
+      "kind": "context",
+      "files": [
+        "domain/hotelPendingExpiry",
+        "application/ports/hotelBookings",
+        "application/ports/hotelCapacity",
+        "application/ports/hotelPendingExpiry",
+        "application/ports/bookingLifecycle",
+        "application/services/hotelBookings",
+        "application/services/hotelCapacity",
+        "application/services/hotelPendingExpiry",
+        "application/services/bookingLifecycle",
+        "infrastructure/persistence/hotelRepository",
+        "infrastructure/persistence/hotelCapacityRepository",
+        "infrastructure/persistence/hotelPendingExpiryStore",
+        "infrastructure/persistence/bookingLifecycleRepository",
+        "infrastructure/persistence/hotelStayConflict",
+        "routes/hotelBookings",
+        "routes/hotelCapacity"
+      ]
+    },
+    "billing": {
+      "kind": "context",
+      "files": [
+        "domain/billing/*",
+        "application/ports/invoices",
+        "application/ports/payments",
+        "application/ports/appointmentBilling",
+        "application/services/invoices",
+        "application/services/payments",
+        "application/services/appointmentInvoices",
+        "infrastructure/persistence/invoiceRepository",
+        "infrastructure/persistence/paymentRepository",
+        "infrastructure/persistence/appointmentBillingRepository",
+        "infrastructure/config/bankTransfer",
+        "infrastructure/payments/vietqr",
+        "infrastructure/security/vnpay",
+        "infrastructure/http/clinicBillingRemote",
+        "routes/invoices",
+        "routes/payments",
+        "routes/appointmentBilling",
+        "routes/internal/billing"
+      ]
+    },
+    "rescue": {
+      "kind": "context",
+      "files": [
+        "application/ports/publicRescue",
+        "application/services/publicRescue",
+        "infrastructure/persistence/publicRescueRepository",
+        "routes/public"
+      ]
+    },
+    "kernel": {
+      "kind": "kernel",
+      "files": [
+        "domain/auth",
+        "domain/error",
+        "domain/validation",
+        "domain/authorization",
+        "lib/prisma",
+        "lib/version",
+        "lib/shutdown",
+        "routes/failure",
+        "infrastructure/persistence/notificationOutbox",
+        "infrastructure/persistence/runtimeOutboxStore",
+        "infrastructure/persistence/healthRepository",
+        "application/ports/outbox"
+      ]
+    },
+    "dto": {
+      "kind": "dto",
+      "files": [
+        "routes/dto/*"
+      ]
+    },
+    "read": {
+      "kind": "read",
+      "files": [
+        "application/ports/lists",
+        "application/ports/bootstrap",
+        "application/services/lists",
+        "application/services/bootstrap",
+        "infrastructure/persistence/listsRepository",
+        "infrastructure/persistence/bootstrapRepository",
+        "routes/lists",
+        "routes/bootstrap",
+        "routes/dashboard"
+      ]
+    },
+    "clinical": {
+      "kind": "context",
+      "files": [
+        "application/ports/appointments",
+        "application/ports/medicalRecords",
+        "application/ports/notifications",
+        "application/services/appointments",
+        "application/services/medicalRecords",
+        "application/services/notifications",
+        "infrastructure/persistence/appointmentRepository",
+        "infrastructure/persistence/appointmentSlotConflict",
+        "infrastructure/persistence/medicalRepository",
+        "infrastructure/persistence/notificationRepository",
+        "infrastructure/persistence/billing",
+        "routes/appointments",
+        "routes/medicalRecords",
+        "routes/notifications"
+      ]
+    },
+    "platform": {
+      "kind": "platform",
+      "files": [
+        "index",
+        "app",
+        "composition/*",
+        "gateway/*",
+        "workers/*"
+      ]
+    }
+  },
+  "edges": [
+    {
+      "from": "directory",
+      "to": "identity",
+      "note": "owner and pet ports reuse UserAccount; owners route calls ownerActivation; directory export verifies the staff token (lib/token)"
+    },
+    {
+      "from": "rescue",
+      "to": "directory",
+      "note": "ports/publicRescue uses PetValue"
+    },
+    {
+      "from": "rescue",
+      "to": "identity",
+      "note": "ports/publicRescue uses UserAccount"
+    },
+    {
+      "from": "billing",
+      "to": "identity",
+      "note": "payments and appointmentBilling routes use middleware/auth; clinicBillingRemote signs with lib/token"
+    },
+    {
+      "from": "hotel",
+      "to": "clinical",
+      "note": "bookingLifecycle serves appointments too (ports/bookingLifecycle, appointmentSlotConflict); K4 removes"
+    },
+    {
+      "from": "clinical",
+      "to": "hotel",
+      "note": "appointments service and medicalRepository call the booking lifecycle; K4 removes"
+    }
+  ],
+  "tables": {
+    "identity": [
+      "user",
+      "users",
+      "ownerActivation",
+      "owner_activations"
+    ],
+    "directory": [
+      "pet",
+      "pets"
+    ],
+    "hotel": [
+      "hotelBooking",
+      "hotel_bookings",
+      "hotelRoomNight",
+      "hotel_room_nights",
+      "hotelRoomCapacity",
+      "hotel_room_capacity",
+      "hotelBookingRequest",
+      "hotel_booking_requests",
+      "bookingStatusEvent",
+      "booking_status_events",
+      "dailyCareNote",
+      "daily_care_notes"
+    ],
+    "billing": [
+      "invoice",
+      "invoices",
+      "invoiceItem",
+      "invoice_items",
+      "paymentEvent",
+      "payment_events",
+      "paymentAttempt",
+      "payment_attempts",
+      "appointmentBillingOperation",
+      "AppointmentBillingOperation"
+    ],
+    "rescue": [
+      "rescueReport",
+      "rescue_reports"
+    ],
+    "kernel": [
+      "outboxEvent",
+      "OutboxEvent"
+    ],
+    "clinical": [
+      "appointment",
+      "appointments",
+      "medicalRecord",
+      "medical_records",
+      "medicalImage",
+      "medical_images",
+      "notification",
+      "notifications",
+      "billingOperation",
+      "BillingOperation",
+      "proofInvoice",
+      "ProofInvoice"
+    ]
+  },
+  "dataEdges": [
+    {
+      "from": "hotel",
+      "to": "billing",
+      "note": "bookingLifecycleRepository reads invoice (count, findUnique) and locks invoices"
+    },
+    {
+      "from": "hotel",
+      "to": "clinical",
+      "note": "bookingLifecycleRepository reads and updates appointment and counts medicalRecord; K4 removes"
+    },
+    {
+      "from": "hotel",
+      "to": "identity",
+      "note": "bookingLifecycleRepository reads user; hotelRepository locks users"
+    },
+    {
+      "from": "hotel",
+      "to": "directory",
+      "note": "hotelRepository reads pet and locks pets"
+    },
+    {
+      "from": "billing",
+      "to": "hotel",
+      "note": "invoiceRepository reads hotelBooking and locks hotel_bookings"
+    },
+    {
+      "from": "billing",
+      "to": "clinical",
+      "note": "invoiceRepository reads appointment and locks appointments"
+    },
+    {
+      "from": "billing",
+      "to": "identity",
+      "note": "invoiceRepository and appointmentBillingRepository read user"
+    },
+    {
+      "from": "billing",
+      "to": "directory",
+      "note": "appointmentBillingRepository reads pet"
+    },
+    {
+      "from": "directory",
+      "to": "identity",
+      "note": "petRepository.ownerExists and directoryRepository read user; ownerRepository creates and matches users"
+    },
+    {
+      "from": "rescue",
+      "to": "directory",
+      "note": "publicRescueRepository reads pet and locks pets"
+    },
+    {
+      "from": "clinical",
+      "to": "directory",
+      "note": "appointmentRepository and medicalRepository read pet"
+    }
+  ]
+}

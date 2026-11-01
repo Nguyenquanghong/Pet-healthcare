@@ -34,6 +34,8 @@
 // 14. Every createRuntime call site in the services names limitRules (an empty list is an explicit choice).
 // 15. Clinic's routes are declared only as elements of the registry (http/routes), each naming its resource: no
 //     router.get/post/patch/put/delete/all in http/routes, http/scope.ts or app.ts.
+// 16. Core module map (K3): every backend/src file belongs to one group of tools/phase2/core-modules.json; an import between
+//     two groups, and a table one group reads that another owns, must be declared there (and a declaration nothing uses fails).
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -670,7 +672,7 @@ rule('clinic-routes-declare-scope',()=>{
 // ---- 12. Structure ratchet ---------------------------------------------------------------
 // Each non-manual metric has a direction ("lower" or "higher" is better). Worse than the baseline fails; better passes
 // and reminds to lower the baseline so the gain cannot be lost later. Manual metrics are declared, never compared.
-const {measure,baselineOf,ciJobsRunning,LEGACY_APP,PRODUCTION_APP}=await import(pathToFileURL(resolve(root,'tools/phase2/arch-metrics.mjs')).href);
+const {measure,baselineOf,ciJobsRunning,LEGACY_APP,PRODUCTION_APP,walk,importEdges}=await import(pathToFileURL(resolve(root,'tools/phase2/arch-metrics.mjs')).href);
 const RATCHET_FIX='node tools/phase2/arch-metrics.mjs --write-baseline';
 export function ratchetFindings(current,baseline){
   const worse=[],better=[],stale=[];
@@ -725,6 +727,112 @@ rule('structure-ratchet',()=>{
   const key=Object.keys(first.values).find(k=>first.values[k]>0);first.values[key]-=1;
   assert.equal(ratchetFindings(current,strict).worse.length,1,'a stricter baseline must fail');
   return Object.values(current.metrics).filter(m=>m.kind!=='manual').length+' metrics held'+(better.length?'; improved, lower the baseline ('+RATCHET_FIX+'): '+better.join(', '):'');
+});
+
+// ---- 16. Core module map (K3) -----------------------------------------------------------------
+// tools/phase2/core-modules.json: the groups of backend/src (contexts, and the kernel, dto, read, clinical and platform groups
+// that are not contexts). An import that crosses two groups is declared in `edges`, a table one group reads that another owns in
+// `dataEdges` (K4 removes them); a declaration nothing uses any more fails. Free by kind: anything may import the kernel,
+// platform (composition, workers, entries) imports every group and no other group imports it, read imports every group, routes
+// import dto and dto imports the ports it maps.
+const GROUP_KINDS = ['context', 'kernel', 'dto', 'read', 'platform'];
+const inPattern = (path, pattern) => (pattern.endsWith('*') ? path.startsWith(pattern.slice(0, -1)) : path === pattern);
+// A Prisma delegate (tx|client|db.<delegate>.<call>) and the table a raw SQL template names after FROM, JOIN, INTO or UPDATE.
+const DATA_DELEGATE = /\b(?:tx|client|db)\.([A-Za-z_$][\w$]*)\.(?:find\w*|create\w*|update\w*|upsert|delete\w*|count|aggregate|groupBy)\s*[(<]/g;
+const RAW_SQL = /\$(?:queryRaw|executeRaw)\s*(?:<[^`]*?>)?\s*`([^`]*)`/g;
+const SQL_TABLE = /(?:\bFROM|\bJOIN|\bINTO|(?<!\bFOR\s+|\bDO\s+)\bUPDATE)\s+"?([A-Za-z_]\w*)"?/gi;
+export function tablesRead(source) {
+  const code = withoutComments(source), names = new Set();
+  for (const m of code.matchAll(DATA_DELEGATE)) names.add(m[1]);
+  for (const sql of code.matchAll(RAW_SQL)) for (const m of sql[1].matchAll(SQL_TABLE)) names.add(m[1]);
+  return names;
+}
+export function coreModuleFindings(config, modules, base = resolve(root, 'backend/src')) {
+  const found = [], { groups, edges = [], tables = {}, dataEdges = [] } = config, kind = name => groups[name].kind;
+  for (const [name, group] of Object.entries(groups)) if (!GROUP_KINDS.includes(group.kind)) found.push('group ' + name + ' has the unknown kind ' + group.kind);
+  const groupOf = new Map();
+  for (const { file } of modules) {
+    const hit = Object.entries(groups).filter(([, g]) => g.files.some(p => inPattern(file.replace(/\.ts$/, ''), p))).map(([name]) => name);
+    if (!hit.length) found.push(file + ' belongs to no group');
+    else if (hit.length > 1) found.push(file + ' belongs to ' + hit.length + ' groups: ' + hit.join(', '));
+    else groupOf.set(file, hit[0]);
+  }
+  const abs = f => resolve(base, f), known = new Set(modules.map(m => abs(m.file))), relOf = new Map(modules.map(m => [abs(m.file), m.file]));
+  const free = (from, to, a, b) => kind(from) === 'platform' || kind(to) === 'kernel' || kind(from) === 'read' || (kind(from) === 'dto' && b.startsWith('application/ports/')) || (kind(to) === 'dto' && a.startsWith('routes/'));
+  const real = new Map();
+  for (const { file, source } of modules) {
+    const from = groupOf.get(file);
+    if (!from) continue;
+    for (const target of importEdges(abs(file), source, known)) {
+      const to = groupOf.get(relOf.get(target)), b = relOf.get(target);
+      if (!to || to === from) continue;
+      if (kind(to) === 'platform' && kind(from) !== 'platform') found.push(file + ' imports ' + b + ': only platform may import platform');
+      else if (!free(from, to, file, b) && !real.has(from + ' -> ' + to)) real.set(from + ' -> ' + to, file + ' -> ' + b);
+    }
+  }
+  const declared = new Map(edges.map(e => [e.from + ' -> ' + e.to, e]));
+  for (const [key, e] of declared) if (!groups[e.from] || !groups[e.to]) found.push('edge ' + key + ' names a group that does not exist');
+  for (const [key, example] of real) if (!declared.has(key)) found.push(key + ' is not in edges (first import: ' + example + ')');
+  for (const key of declared.keys()) if (!real.has(key)) found.push('edge ' + key + ' is declared but no file imports it any more');
+  const owner = new Map(Object.entries(tables).flatMap(([group, names]) => names.map(name => [name, group])));
+  const realData = new Map();
+  for (const { file, source } of modules) {
+    const from = groupOf.get(file);
+    if (!from || kind(from) === 'platform') continue;
+    for (const name of tablesRead(source)) {
+      const to = owner.get(name);
+      if (!to) found.push(file + ' reads ' + name + ', which no group owns in tables');
+      else if (to !== from && kind(to) !== 'kernel' && kind(from) !== 'read' && kind(from) !== 'dto' && !realData.has(from + ' -> ' + to)) realData.set(from + ' -> ' + to, file + ' reads ' + name);
+    }
+  }
+  const declaredData = new Set(dataEdges.map(e => e.from + ' -> ' + e.to));
+  for (const [key, example] of realData) if (!declaredData.has(key)) found.push('data edge ' + key + ' is not in dataEdges (first: ' + example + ')');
+  for (const key of declaredData) if (!realData.has(key)) found.push('data edge ' + key + ' is declared but no file reads it any more');
+  return found;
+}
+rule('core-module-map', () => {
+  const base = resolve(root, 'backend/src'), config = JSON.parse(read('tools/phase2/core-modules.json'));
+  const modules = walk(base).map(f => ({ file: relative(base, f).split(sep).join('/'), source: readFileSync(f, 'utf8') }));
+  assert.ok(modules.length >= 100, 'found the Core modules (' + modules.length + ')');
+  const bad = coreModuleFindings(config, modules);
+  assert.deepEqual(bad, [], 'Core module map (tools/phase2/core-modules.json): ' + bad.join('; '));
+  // negative fixtures, one reason each (virtual files with the real group names; edges and dataEdges start empty)
+  const edge = (from, to) => ({ from, to }), at = (sources, extra = {}) => coreModuleFindings({ ...config, edges: [], dataEdges: [], ...extra }, sources.map(([file, source]) => ({ file, source })));
+  const hotel = 'application/services/hotelBookings.ts', billing = 'application/services/invoices.ts', hotelToBilling = ['hotel -> billing is not in edges (first import: ' + hotel + ' -> ' + billing + ')'];
+  const target = [billing, 'export const a = 1;'], hotelRepo = 'infrastructure/persistence/hotelRepository.ts';
+  assert.deepEqual(at([['application/services/stray.ts', '']]), ['application/services/stray.ts belongs to no group'], 'a file in no group');
+  assert.deepEqual(at([['lib/token.ts', '']], { groups: { ...config.groups, extra: { kind: 'context', files: ['lib/token'] } } }), ['lib/token.ts belongs to 2 groups: identity, extra'], 'a file in two groups');
+  assert.deepEqual(at([[hotel, "import { a } from './invoices.js';"], target]), hotelToBilling, 'a new edge hotel -> billing');
+  assert.deepEqual(at([[hotel, "import { a } from './invoices.js';"], target], { edges: [edge('hotel', 'billing')] }), [], 'the same edge once declared');
+  assert.deepEqual(at([], { edges: [edge('rescue', 'billing')] }), ['edge rescue -> billing is declared but no file imports it any more'], 'a declared edge that is gone');
+  assert.deepEqual(at([], { edges: [edge('rescue', 'nowhere')] }).slice(0, 1), ['edge rescue -> nowhere names a group that does not exist'], 'a declared edge to a group that is not there');
+  const toPlatform = [['application/services/pets.ts', "import { a } from '../../composition/http.js';"], ['composition/http.ts', '']];
+  assert.deepEqual(at(toPlatform), ['application/services/pets.ts imports composition/http.ts: only platform may import platform'], 'a context imports platform');
+  assert.ok(at(toPlatform, { edges: [edge('directory', 'platform')] }).includes('application/services/pets.ts imports composition/http.ts: only platform may import platform'), 'declaring the edge does not allow it');
+  for (const statement of ["const a = await import('./invoices.js');", "export * from './invoices.js';", "export { a } from './invoices.js';", "export type { A } from './invoices.js';", "import type { A } from './invoices.js';", "import './invoices.js';"])
+    assert.deepEqual(at([[hotel, statement], target]), hotelToBilling, statement);
+  assert.deepEqual(at([[hotel, "// import { a } from './invoices.js';\n/* export * from './invoices.js'; */\nconst text = \"import('./invoices.js')\";"], target]), [], 'a comment or a string is not an import');
+  assert.deepEqual(at([['application/services/pets.ts', "import { a } from './lists.js';"], ['application/services/lists.ts', '']]), ['directory -> read is not in edges (first import: application/services/pets.ts -> application/services/lists.ts)'], 'a context imports read');
+  assert.deepEqual(at([['application/services/pets.ts', "import { a } from '../../domain/error.js';"], ['domain/error.ts', '']]), [], 'every group imports the kernel');
+  assert.deepEqual(at([['composition/x.ts', "import { a } from '../application/services/invoices.js'; import { b } from '../routes/lists.js';"], target, ['routes/lists.ts', '']]), [], 'platform imports every group');
+  assert.deepEqual(at([['application/services/lists.ts', "import { a } from './invoices.js';"], target]), [], 'read imports every group');
+  assert.deepEqual(at([['routes/pets.ts', "import { a } from './dto/serialize.js';"], ['routes/dto/serialize.ts', "import type { A } from '../../application/ports/invoices.js';"], ['application/ports/invoices.ts', '']]), [], 'routes import dto and dto imports the ports it maps');
+  assert.deepEqual(at([['application/services/pets.ts', "import { a } from '../../routes/dto/serialize.js';"], ['routes/dto/serialize.ts', '']]), ['directory -> dto is not in edges (first import: application/services/pets.ts -> routes/dto/serialize.ts)'], 'only routes import dto');
+  assert.deepEqual(at([['routes/dto/serialize.ts', "import { a } from '../../application/services/invoices.js';"], target]), ['dto -> billing is not in edges (first import: routes/dto/serialize.ts -> application/services/invoices.ts)'], 'dto imports ports, not services');
+  const dataEdge = (statement, extra) => at([[hotelRepo, statement]], extra), hotelData = ['data edge hotel -> billing is not in dataEdges (first: ' + hotelRepo + ' reads invoice)'];
+  assert.deepEqual(dataEdge('await tx.invoice.findUnique({ where: { id } });'), hotelData, 'a delegate of another context');
+  assert.deepEqual(dataEdge('await this.client.invoice.count();'), hotelData, 'this.client.<delegate>');
+  assert.deepEqual(dataEdge('await db.invoice.update({});'), hotelData, 'db.<delegate>');
+  assert.deepEqual(dataEdge('await tx.invoice.findUnique({});', { dataEdges: [edge('hotel', 'billing')] }), [], 'the same data edge once declared');
+  assert.deepEqual(dataEdge('await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${id} FOR UPDATE`;'), [hotelData[0].replace('reads invoice', 'reads invoices')], 'a raw SQL table of another context');
+  assert.deepEqual(dataEdge('await tx.$queryRaw`SELECT id FROM hotel_bookings WHERE id = ${id} FOR UPDATE`;'), [], 'a raw SQL table of its own, FOR UPDATE is not a table');
+  assert.deepEqual(dataEdge('await tx.hotelBooking.update({}); await tx.outboxEvent.create({});'), [], 'its own table and a kernel table');
+  assert.deepEqual(dataEdge('// await tx.invoice.findUnique({});'), [], 'a comment reads nothing');
+  assert.deepEqual(dataEdge('await tx.mystery.findMany({});'), [hotelRepo + ' reads mystery, which no group owns in tables'], 'a delegate no group owns');
+  assert.deepEqual(dataEdge('await tx.$queryRaw`SELECT id FROM mystery_table`;'), [hotelRepo + ' reads mystery_table, which no group owns in tables'], 'a raw SQL table no group owns');
+  assert.deepEqual(dataEdge('', { dataEdges: [edge('hotel', 'billing')] }), ['data edge hotel -> billing is declared but no file reads it any more'], 'a declared data edge that is gone');
+  assert.deepEqual(at([['infrastructure/persistence/listsRepository.ts', 'await tx.invoice.findMany({});'], ['composition/coreRoutes.ts', 'await db.user.findUnique({});']]), [], 'read and platform read any table');
+  return Object.keys(config.groups).length + ' groups, ' + config.edges.length + ' edges, ' + config.dataEdges.length + ' data edges, ' + modules.length + ' modules';
 });
 
 await envelopeCheck;
