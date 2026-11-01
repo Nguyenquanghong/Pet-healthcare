@@ -5,8 +5,11 @@ import type { PrismaClient } from '@prisma/client';
 import { createApp } from '../app.js';
 import { asymmetricConfig, verifyToken } from '../lib/token.js';
 import { mountDirectory } from '../routes/internal/directory.js';
-import { mountAppointmentBilling } from '../routes/internal/billing.js';
+import { mountBillingEvidence } from '../routes/internal/billing.js';
+import { mountAppointmentBilling } from '../routes/appointmentBilling.js';
 import { mountDashboards } from '../routes/dashboard.js';
+import { AppointmentInvoiceBilling } from './appointmentBilling.js';
+import { ClinicBillingRemote } from '../infrastructure/http/clinicBillingRemote.js';
 import { coreRuntime } from './runtime.js';
 import { createCoreDomains } from './coreDomains.js';
 import { acceptsCredential, credential, requestFault, serviceOrigin } from '@nipopeto/runtime';
@@ -103,7 +106,9 @@ export function createCoreApp(
         notFoundMessage: 'Clinic route not found.',
       }),
     );
-    mountAppointmentBilling(app, db, clinic, config.clinicToken!, config.evidenceToken);
+    const billing = new AppointmentInvoiceBilling(db, new ClinicBillingRemote(clinic, config.clinicToken!));
+    mountBillingEvidence(app, billing, config.evidenceToken ?? config.clinicToken!);
+    mountAppointmentBilling(app, billing);
   }
   if (
     config.notificationUrl &&

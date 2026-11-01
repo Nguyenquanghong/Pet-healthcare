@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { delay, reconnect, startWorker } from '@nipopeto/messaging';
 import { asymmetricConfig } from '../lib/token.js';
-import { AppointmentInvoiceBilling, ClinicBillingRemote } from '../infrastructure/persistence/appointmentBilling.js';
+import { AppointmentInvoiceBilling } from '../composition/appointmentBilling.js';
+import { ClinicBillingRemote } from '../infrastructure/http/clinicBillingRemote.js';
 import { prismaClient, serviceOrigin } from '@nipopeto/runtime';
 const db = prismaClient(PrismaClient);
 await startWorker('core-billing', async signal => {
