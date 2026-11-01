@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { mountDirectory } from '../dist/src/routes/internal/directory.js';
+import { mountDirectory } from '../dist/src/composition/internalRoutes.js';
 import { signToken, verifyToken, issuedBeforePasswordChange } from '../dist/src/lib/token.js';
 import { ownerDto, petDto } from '../dist/src/lib/serialize.js';
 
@@ -19,7 +19,7 @@ const pets = [pet('p1', 'o1'), pet('p2', 'o2'), pet('p3', 'x1')]; // p3's owner 
 const personSelect = { id: true, username: true, phone: true, email: true, fullName: true, role: true, address: true, avatarUrl: true, createdAt: true, updatedAt: true, passwordHash: true, passwordSalt: true, directoryRevision: true };
 
 // A database double that logs every query. It answers the legacy `id in (...)` owner filter and the batch one.
-function store({ rows = users, fail = false } = {}) {
+function store({ rows = users, fail = false, petRows = pets } = {}) {
   const log = [];
   const record = (name, args) => { log.push({ name, args }); if (fail) throw new Error('database down'); };
   const owned = (u, clause) => clause.id ? clause.id.in.includes(u.id) : pets.some(p => p.ownerId === u.id && clause.pets.some.id.in.includes(p.id));
@@ -30,7 +30,7 @@ function store({ rows = users, fail = false } = {}) {
       findFirst: async args => { record('user.findFirst', args); const u = rows.find(r => r.id === args.where.id && r.role === args.where.role); return u ? { id: u.id, fullName: u.fullName } : null; },
       findMany: async args => { record('user.findMany', args); const w = args.where; return rows.filter(u => u.role === w.role && (!w.id || w.id.in.includes(u.id)) && (!w.OR || w.OR.some(c => owned(u, c)))); },
     },
-    pet: { findMany: async args => { record('pet.findMany', args); return pets.filter(p => args.where.id.in.includes(p.id)); } },
+    pet: { findMany: async args => { record('pet.findMany', args); return petRows.filter(p => args.where.id.in.includes(p.id)); } },
     $transaction: async (work, options) => { log.push({ name: '$transaction', form: Array.isArray(work) ? 'batch' : 'callback', options }); return Array.isArray(work) ? Promise.all(work) : work(db); },
   };
   return db;
@@ -63,8 +63,8 @@ const server = app.listen(0, '127.0.0.1');
 await once(server, 'listening');
 test.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
 
-async function ask(body, { as = 's1', role, rows, fail, token, service = credential, path = 'authorize' } = {}) {
-  const db = store({ rows, fail }); holder.db = db;
+async function ask(body, { as = 's1', role, rows, fail, petRows, token, service = credential, path = 'authorize' } = {}) {
+  const db = store({ rows, fail, petRows }); holder.db = db;
   const bearer = token ?? signToken(as, role ?? users.find(u => u.id === as)?.role ?? 'staff');
   const res = await fetch(`http://127.0.0.1:${server.address().port}/internal/directory/${path}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-service-token': service, authorization: 'Bearer ' + bearer }, body: JSON.stringify(body) });
   return { status: res.status, body: await res.json(), db, bearer };
@@ -152,4 +152,10 @@ test('input and credential checks stay before the database; a database failure i
     const failed = await ask(body, { as: 's1', fail: true });
     assert.equal(failed.status, 503);assert.deepEqual(failed.body, { error: 'Core directory unavailable.' });
   }
+});
+
+test('a row that cannot be mapped to its DTO is the same 503 as a database failure', async () => {
+  const unmappable = [{ ...pet('p1', 'o1'), get allergies() { throw new Error('unmappable row'); } }];
+  const failed = await ask({ petIds: ['p1'] }, { as: 's1', petRows: unmappable });
+  assert.equal(failed.status, 503);assert.deepEqual(failed.body, { error: 'Core directory unavailable.' });
 });

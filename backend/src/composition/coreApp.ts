@@ -4,7 +4,7 @@ import cors from 'cors';
 import type { PrismaClient } from '@prisma/client';
 import { createApp } from '../app.js';
 import { asymmetricConfig, verifyToken } from '../lib/token.js';
-import { mountDirectory } from '../routes/internal/directory.js';
+import { mountDirectory } from './internalRoutes.js';
 import { mountBillingEvidence } from '../routes/internal/billing.js';
 import { mountAppointmentBilling } from '../routes/appointmentBilling.js';
 import { mountDashboards } from '../routes/dashboard.js';
