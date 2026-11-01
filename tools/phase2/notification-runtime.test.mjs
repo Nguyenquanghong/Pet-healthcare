@@ -79,7 +79,7 @@ async function startWorker(file, env) {
   child.stdout.on('data', b => { output += b; }); child.stderr.on('data', b => { output += b; }); child.once('exit', () => { exited = true; });
   const handle = { stop: async () => { if (!exited) { child.kill(); await once(child, 'exit'); } }, logs: () => output };
   workers.push(handle);
-  await until(() => { if (exited) throw new Error('Built worker exited before ready'); return output.includes('worker-ready'); }, 'built worker ready');
+  await until(() => { if (exited) throw new Error(`Built worker exited before ready: ${file}\n${output}`); return output.includes('worker-ready'); }, 'built worker ready');
   return handle;
 }
 test.before(async () => {
