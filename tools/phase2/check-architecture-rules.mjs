@@ -164,8 +164,9 @@ rule('gateway-hides-internal-routes',()=>{
 // per downstream), never a hand-written fetch in the composition root.
 export const directFetches=source=>source.split(/\r?\n/).flatMap((line,index)=>/(^|[^\w.])fetch\s*\(/.test(line)?['line '+(index+1)]:[]);
 rule('gateway-uses-service-proxy',()=>{
-  const source=read('backend/src/composition/coreApp.ts');
-  assert.deepEqual(directFetches(source),[],'coreApp.ts calls fetch directly; route it through serviceProxy');
+  const files=['backend/src/composition/coreApp.ts','backend/src/composition/coreRoutes.ts'],sources=files.map(read);
+  for(const [index,file] of files.entries())assert.deepEqual(directFetches(sources[index]),[],file+' calls fetch directly; route it through serviceProxy');
+  const source=sources.join('\n');
   assert.ok(/serviceProxy\(\{\s*name:\s*'clinic'/.test(source)&&/serviceProxy\(\{\s*name:\s*'notification'/.test(source),'both downstreams use serviceProxy');
   // negative fixtures
   assert.deepEqual(directFetches("app.use(x,async(req,res)=>{const r=await fetch(url,{method:req.method});})"),['line 1']);

@@ -37,7 +37,7 @@ for(const file of clinicRouteFiles)for(const match of readFileSync(resolve(clini
 }
 // Core entrypoint composes the independently owned Notification public router.
 // Include routes from its source, not just its spec, in the public inventory.
-assert.match(readFileSync(resolve(backend, 'src/composition/coreApp.ts'), 'utf8'), /app\.use\(\s*'\/api\/notifications'/);
+assert.match(readFileSync(resolve(backend, 'src/composition/coreRoutes.ts'), 'utf8'), /app\.use\(\s*'\/api\/notifications',\s*express\.json\(/);
 assert.match(readFileSync(resolve(backend, 'src/index.ts'), 'utf8'), /createCoreApp/);
 const notificationSource = readFileSync(resolve(backend, '../services/notification/src/app.ts'), 'utf8');
 for (const match of notificationSource.matchAll(/\brouter\.(get|post|patch|put|delete)\(\s*['"]([^'"]+)['"]/g)) {

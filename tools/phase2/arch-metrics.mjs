@@ -128,10 +128,12 @@ const LAYERS={
   clinic:{dir:'services/clinic/src',rank:{domain:0,application:1,infrastructure:2,http:3,'(root)':4}},
 };
 const CORE_SPLIT_ENTRIES=/^(index\.ts|workers\/(outbox|billing|notification)\.ts)$/;
-// Split mode never reaches the monolith: coreApp only calls createApp without the runtime, and the clinical routers that
-// coreDomains still mounts are shadowed by the proxy (ADR rule 2.4), so those edges are cut.
+// Split mode never reaches the monolith: coreApp only calls createApp without the runtime, and coreRoutes mounts the clinical
+// routers that the proxy shadows (ADR rule 2.4) and the routers only createApp passes `monolith` for (/api/bootstrap, the
+// in-process /api/notifications), so those edges are cut.
 const CORE_CLINICAL=/(routes\/(appointments|medicalRecords)|application\/services\/(appointments|medicalRecords)|persistence\/(appointmentRepository|medicalRepository))\.ts$/;
-const CORE_CUT=(from,to)=>from==='composition/coreApp.ts'&&to==='app.ts'||from==='composition/coreDomains.ts'&&CORE_CLINICAL.test(to);
+const CORE_MONOLITH=/(routes\/(notifications|bootstrap)|application\/services\/notifications|persistence\/notificationRepository)\.ts$/;
+const CORE_CUT=(from,to)=>from==='composition/coreApp.ts'&&to==='app.ts'||from==='composition/coreRoutes.ts'&&(CORE_CLINICAL.test(to)||CORE_MONOLITH.test(to));
 const PROOF_CLASSES=/\bclass (ClinicBilling|CoreBilling)\b/;
 const SYNC_CALL_RULES=/calls-(confined|declared)/;
 const LEGACY_DIR='/legacy/';

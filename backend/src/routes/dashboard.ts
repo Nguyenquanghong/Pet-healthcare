@@ -1,22 +1,27 @@
 import type { Express } from 'express';
-import type { PrismaClient } from '@prisma/client';
 import type { Actor } from '../domain/auth.js';
 import { BusinessError } from '../domain/error.js';
 import { requireAuth } from '../middleware/auth.js';
-import { BootstrapService } from '../application/services/bootstrap.js';
-import { PrismaBootstrapRepository } from '../infrastructure/persistence/bootstrapRepository.js';
+import type { BootstrapService } from '../application/services/bootstrap.js';
 import { ownerDto, petDto, hotelBookingDto, appointmentDto, medicalRecordDto } from '../lib/serialize.js';
 
-async function currentActor(db: PrismaClient, actor: Actor) {
-  const user = await db.user.findUnique({ where: { id: actor.sub }, select: { role: true } });
+// `core` reads no clinical or notification table; `clinic` reads the clinical ones (legacy mode only); `account` is the stored
+// role of an account, or null when it is gone.
+export type DashboardSources = {
+  core: BootstrapService;
+  clinic: BootstrapService;
+  account: (id: string) => Promise<{ role: string } | null>;
+};
+
+async function currentActor(sources: DashboardSources, actor: Actor) {
+  const user = await sources.account(actor.sub);
   if (!user || user.role !== actor.role) throw new BusinessError(403, 'Current account permission is required.');
 }
-export function mountDashboards(app: Express, db: PrismaClient, splitClinic: boolean) {
-  const local = new BootstrapService(new PrismaBootstrapRepository(db, true, true));
+export function mountDashboards(app: Express, sources: DashboardSources, splitClinic: boolean) {
   app.get('/api/dashboard/core', requireAuth, async (req, res) => {
     try {
-      await currentActor(db, req.auth!);
-      const d = await local.load(req.auth!, 'dashboard');
+      await currentActor(sources, req.auth!);
+      const d = await sources.core.load(req.auth!, 'dashboard');
       res.setHeader('Cache-Control', 'no-store');
       res.json({
         asOf: new Date().toISOString(),
@@ -45,11 +50,8 @@ export function mountDashboards(app: Express, db: PrismaClient, splitClinic: boo
   if (!splitClinic)
     app.get('/api/dashboard/clinic', requireAuth, async (req, res) => {
       try {
-        await currentActor(db, req.auth!);
-        const d = await new BootstrapService(new PrismaBootstrapRepository(db, false, true)).load(
-          req.auth!,
-          'dashboard',
-        );
+        await currentActor(sources, req.auth!);
+        const d = await sources.clinic.load(req.auth!, 'dashboard');
         res.setHeader('Cache-Control', 'no-store');
         res.json({
           asOf: new Date().toISOString(),
