@@ -1,9 +1,7 @@
 // Core domain composition ported from the preserved local app.ts for sanitized
 // runtime errors. Keep the user's legacy entrypoint intact; route regression
 // tests exercise this owned composition through createCoreApp.
-import cors from 'cors';
 import express from 'express';
-import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import type { PrismaClient } from '@prisma/client';
 import openapi from '../../openapi.json' with { type: 'json' };
@@ -44,6 +42,7 @@ import { BusinessError } from '../domain/error.js';
 import { serviceVersion } from '../lib/version.js';
 import { currentRequestId, isTransientFailure, reportUnexpected, requestFault } from '@nipopeto/runtime';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
+import { applyJsonBody } from './http.js';
 import { createAppointmentsRouter } from '../routes/appointments.js';
 import { createAuthRouter } from '../routes/auth.js';
 import { createHotelBookingsRouter } from '../routes/hotelBookings.js';
@@ -65,24 +64,10 @@ export function createCoreDomains(client: PrismaClient) {
     activationTokenAdapter,
     passwordAdapter,
   );
-  const origins = process.env.CORS_ORIGIN?.split(',')
-    .map(value => value.trim())
-    .filter(Boolean);
 
+  // createCoreApp's outer app sets the security headers and CORS; Express adds x-powered-by in every app it runs.
   app.disable('x-powered-by');
-  app.use(helmet());
-  app.use(cors({ origin: origins?.length ? origins : false, credentials: true }));
-  app.use(express.json({ limit: '10mb' }));
-  app.use((req, res, next) => {
-    if (req.method === 'POST' || req.method === 'PATCH' || req.method === 'PUT') {
-      req.body ??= {};
-      if (typeof req.body !== 'object' || Array.isArray(req.body)) {
-        res.status(422).json({ error: 'Request body must be a JSON object.' });
-        return;
-      }
-    }
-    next();
-  });
+  applyJsonBody(app);
 
   app.get('/api/openapi.json', (_req, res) => res.json(openapi));
   app.use(

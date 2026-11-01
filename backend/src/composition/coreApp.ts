@@ -1,10 +1,9 @@
 import express from 'express';
-import helmet from 'helmet';
-import cors from 'cors';
 import type { PrismaClient } from '@prisma/client';
 import { createApp } from '../app.js';
-import { asymmetricConfig, verifyToken } from '../lib/token.js';
-import { mountDirectory } from './internalRoutes.js';
+import { coreConfigFromEnv, coreSettings, type CoreConfig } from './config.js';
+import { applySecurity } from './http.js';
+import { mountDirectory, mountNotificationAuthorization } from './internalRoutes.js';
 import { mountBillingEvidence } from '../routes/internal/billing.js';
 import { mountAppointmentBilling } from '../routes/appointmentBilling.js';
 import { mountDashboards } from '../routes/dashboard.js';
@@ -12,9 +11,8 @@ import { AppointmentInvoiceBilling } from './appointmentBilling.js';
 import { ClinicBillingRemote } from '../infrastructure/http/clinicBillingRemote.js';
 import { coreRuntime } from './runtime.js';
 import { createCoreDomains } from './coreDomains.js';
-import { acceptsCredential, credential, requestFault, serviceOrigin } from '@nipopeto/runtime';
+import { requestFault } from '@nipopeto/runtime';
 import { serviceProxy } from '../gateway/serviceProxy.js';
-import { allows, deniedMessage } from '@nipopeto/contracts';
 import { createAuthRouter } from '../routes/auth.js';
 import { AuthService } from '../application/services/auth.js';
 import { OwnerActivationService } from '../application/services/ownerActivation.js';
@@ -29,49 +27,10 @@ const clinicPrefixes = ['/api/appointments', '/api/medical-records', '/api/dashb
 
 // Keep the user's app.ts intact. This composition owns the split service route
 // and the private Core authorization endpoint before mounting existing domains.
-export function createCoreApp(
-  db: PrismaClient,
-  config: {
-    notificationUrl?: string;
-    notificationToken?: string;
-    clinicUrl?: string;
-    clinicToken?: string;
-    directoryToken?: string;
-    evidenceToken?: string;
-  } = {
-    notificationUrl: process.env.NOTIFICATION_SERVICE_URL,
-    notificationToken: process.env.CORE_NOTIFICATION_SEND_TOKEN ?? process.env.NOTIFICATION_SERVICE_TOKEN,
-    clinicUrl: process.env.CLINIC_SERVICE_URL,
-    clinicToken: process.env.CLINIC_BILLING_TOKEN ?? process.env.CLINIC_SERVICE_TOKEN,
-    directoryToken: process.env.CORE_DIRECTORY_TOKEN,
-    evidenceToken: process.env.CORE_BILLING_EVIDENCE_TOKEN,
-  },
-) {
+export function createCoreApp(db: PrismaClient, config: CoreConfig = coreConfigFromEnv()) {
+  const { clinic, notification } = coreSettings(config);
   const app = express();
-  app.disable('x-powered-by');
-  const origins = process.env.CORS_ORIGIN?.split(',')
-    .map(value => value.trim())
-    .filter(Boolean);
-  app.use(helmet());
-  app.use(
-    cors({
-      origin: origins?.length ? origins : false,
-      credentials: true,
-      exposedHeaders: ['X-Service-Degraded', 'Retry-After'],
-    }),
-  );
-  const jwt = asymmetricConfig();
-  if (process.env.PHASE2_RUNTIME_REQUIRED === '1') {
-    if (!jwt?.privateKey || !jwt.keyId) throw new Error('CORE_RSA_SIGNING_CONFIGURATION_REQUIRED');
-    const scoped = [
-      'CORE_DIRECTORY_TOKEN',
-      'CORE_BILLING_EVIDENCE_TOKEN',
-      'CLINIC_BILLING_TOKEN',
-      'CORE_NOTIFICATION_SEND_TOKEN',
-    ].map(credential);
-    if (new Set(scoped).size !== scoped.length) throw new Error('DISTINCT_SERVICE_CREDENTIALS_REQUIRED');
-    if (!config.clinicUrl || !config.notificationUrl) throw new Error('SPLIT_SERVICE_URLS_REQUIRED');
-  }
+  applySecurity(app, { exposedHeaders: ['X-Service-Degraded', 'Retry-After'] });
   const runtime = coreRuntime(db);
   runtime?.install(app);
   app.use('/api', currentAccount(db));
@@ -84,12 +43,6 @@ export function createCoreApp(
       ),
     );
   mountDirectory(app, db, config.directoryToken ?? config.clinicToken);
-  if (
-    config.clinicUrl &&
-    (!jwt?.privateKey || !config.clinicToken || config.clinicToken.length < 32 || config.clinicToken.length > 512)
-  )
-    throw new Error('SPLIT_CLINIC_CONFIGURATION_REQUIRED');
-  const clinic = config.clinicUrl ? serviceOrigin(config.clinicUrl, 'INVALID_CLINIC_SERVICE_URL') : null;
   mountDashboards(app, db, Boolean(clinic));
   if (clinic) {
     app.use(
@@ -110,76 +63,12 @@ export function createCoreApp(
     mountBillingEvidence(app, billing, config.evidenceToken ?? config.clinicToken!);
     mountAppointmentBilling(app, billing);
   }
-  if (
-    config.notificationUrl &&
-    (!jwt?.privateKey ||
-      !config.notificationToken ||
-      config.notificationToken.length < 32 ||
-      config.notificationToken.length > 512)
-  )
-    throw new Error('SPLIT_NOTIFICATION_CONFIGURATION_REQUIRED');
-  const target = config.notificationUrl
-    ? serviceOrigin(config.notificationUrl, 'INVALID_NOTIFICATION_SERVICE_URL')
-    : null;
+  mountNotificationAuthorization(app, db, config.notificationToken);
 
-  app.post('/internal/notifications/authorize-send', express.json({ limit: '8kb' }), async (req, res) => {
-    if (!config.notificationToken || config.notificationToken.length < 32) {
-      res.status(503).json({ error: 'Internal authorization unavailable.' });
-      return;
-    }
-    if (!acceptsCredential(req.headers['x-service-token'], config.notificationToken)) {
-      res.status(401).json({ error: 'Service authentication required.' });
-      return;
-    }
-    let actor;
-    try {
-      const token = req.headers.authorization;
-      if (!token?.startsWith('Bearer ') || token.length > 8192) throw new Error('INVALID_TOKEN');
-      actor = verifyToken(token.slice(7));
-    } catch {
-      res.status(401).json({ error: 'Invalid actor context.' });
-      return;
-    }
-    if (!allows(actor.role, 'notification.send')) {
-      res.status(403).json({ error: deniedMessage('notification.send') });
-      return;
-    }
-    if (
-      !req.body ||
-      typeof req.body !== 'object' ||
-      Array.isArray(req.body) ||
-      typeof req.body.recipientOwnerId !== 'string' ||
-      !req.body.recipientOwnerId ||
-      req.body.recipientOwnerId.length > 200 ||
-      Object.keys(req.body).some(k => k !== 'recipientOwnerId')
-    ) {
-      res.status(422).json({ error: 'Invalid recipient request.' });
-      return;
-    }
-    try {
-      const sender = await db.user.findUnique({ where: { id: actor.sub }, select: { id: true, role: true } });
-      if (!sender || sender.role !== actor.role) {
-        res.status(403).json({ error: 'Staff access is required.' });
-        return;
-      }
-      const recipient = await db.user.findUnique({
-        where: { id: req.body.recipientOwnerId },
-        select: { id: true, role: true },
-      });
-      if (!recipient || recipient.role !== 'owner') {
-        res.status(404).json({ error: 'Recipient not found.' });
-        return;
-      }
-      res.json({ actorId: sender.id, actorRole: sender.role, recipientOwnerId: recipient.id, authorized: true });
-    } catch {
-      res.status(503).json({ error: 'Core authorization unavailable.' });
-    }
-  });
-
-  const notificationProxy = target
+  const notificationProxy = notification
     ? serviceProxy({
         name: 'notification',
-        origin: target,
+        origin: notification,
         prefixes: ['/api/notifications'],
         forwardRequestHeaders: ['authorization', 'idempotency-key'],
         forwardResponseHeaders: ['retry-after', 'x-service-degraded', 'x-service-instance'],
