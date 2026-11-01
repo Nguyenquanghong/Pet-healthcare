@@ -1,6 +1,4 @@
-import cors from "cors";
 import express from "express";
-import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
 import { rateLimit } from "express-rate-limit";
 import type { PrismaClient } from "@prisma/client";
@@ -45,6 +43,7 @@ import { qrTokenAdapter } from "./infrastructure/security/qrToken.js";
 import { BusinessError } from "./domain/error.js";
 import { serviceVersion } from "./lib/version.js";
 import { requireAuth, requirePermission } from "./middleware/auth.js";
+import { applyJsonBody, applySecurity } from "./composition/http.js";
 import { createAppointmentsRouter } from "./routes/appointments.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createBootstrapRouter } from "./routes/bootstrap.js";
@@ -64,23 +63,10 @@ export function createApp(client: PrismaClient) {
   const bankTransfer = bankTransferConfig(process.env);
   const checkDatabase = databaseHealthCheck(client);
   const activation = new OwnerActivationService(new PrismaOwnerActivationRepository(client), activationTokenAdapter, passwordAdapter);
-  const origins = process.env.CORS_ORIGIN?.split(",").map((value) => value.trim()).filter(Boolean);
 
   if (process.env.TRUST_PROXY_HOPS === "1") app.set("trust proxy", 1);
-  app.disable("x-powered-by");
-  app.use(helmet());
-  app.use(cors({ origin: origins?.length ? origins : false, credentials: true }));
-  app.use(express.json({ limit: "10mb" }));
-  app.use((req, res, next) => {
-    if (req.method === "POST" || req.method === "PATCH" || req.method === "PUT") {
-      req.body ??= {};
-      if (typeof req.body !== "object" || Array.isArray(req.body)) {
-        res.status(422).json({ error: "Request body must be a JSON object." });
-        return;
-      }
-    }
-    next();
-  });
+  applySecurity(app);
+  applyJsonBody(app);
 
   app.get("/api/openapi.json", (_req, res) => res.json(openapi));
   app.use("/api/docs", (_req: express.Request, res: express.Response, next: express.NextFunction) => {
