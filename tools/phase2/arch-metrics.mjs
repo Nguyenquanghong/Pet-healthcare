@@ -91,11 +91,20 @@ export function functions(src){
   }
   return [...found.values()].sort((a,b)=>a.start-b.start);
 }
+// Every module specifier of one file: a static import, a dynamic `import(...)`, a re-export and a side-effect import. The strings are
+// blanked in the sanitized copy, so the specifier is read from the source at the same offset.
+export function importSpecifiers(src){
+  const code=sanitize(src),found=[];
+  for(const m of code.matchAll(/\b(?:from|import)\s*\(?\s*(['"])( *)\1/g)){
+    const at=m.index+m[0].indexOf(m[1])+1;
+    found.push(src.slice(at,at+m[2].length));
+  }
+  return found;
+}
 // Relative imports (static, dynamic, re-export) of one file, resolved to files in `known`; package imports are not edges.
 export function importEdges(file,src,known){
-  const code=sanitize(src),edges=[];
-  for(const m of code.matchAll(/\b(?:from|import)\s*\(?\s*(['"])( *)\1/g)){
-    const at=m.index+m[0].indexOf(m[1])+1,spec=src.slice(at,at+m[2].length);
+  const edges=[];
+  for(const spec of importSpecifiers(src)){
     if(!spec.startsWith('.'))continue;
     const base=resolve(dirname(file),spec).replace(/\.js$/,'');
     const target=[base+'.ts',base+'.tsx',join(base,'index.ts'),join(base,'index.tsx')].find(c=>known.has(c));
@@ -103,6 +112,116 @@ export function importEdges(file,src,known){
   }
   return edges;
 }
+
+// ---- clinical reads (K4) ---------------------------------------------------------------------
+// The one reading of "this code touches a clinical table", used by the rule legacy-isolated (check-architecture-rules.mjs, 17) and by S11
+// (clinicalReadsOutsideLegacy), so the two cannot disagree. The four clinical models are a decision made here; everything else is
+// generated from backend/prisma/schema.prisma: the delegates (lowerFirst of the model), the tables (@@map) and the relation keys (every
+// field of any model whose type is a clinical model: User.appointments, User.doctorAppts, Pet.medicalImages, MedicalRecord.appointment, ...).
+export const CLINICAL_MODELS=['Appointment','MedicalRecord','MedicalImage','Notification'];
+const lowerFirst=s=>s[0].toLowerCase()+s.slice(1);
+export function clinicalSchema(schemaText){
+  const models=new Map(),enums=new Set();
+  let current;
+  for(const line of schemaText.split(/\r?\n/)){
+    const open=/^(model|enum)\s+(\w+)\s*\{/.exec(line);
+    if(open){if(open[1]==='enum'){enums.add(open[2]);current=undefined;}else{current={name:open[2],fields:[],table:undefined};models.set(open[2],current);}continue;}
+    if(/^\}/.test(line)){current=undefined;continue;}
+    if(!current)continue;
+    const map=/^\s*@@map\("([^"]+)"\)/.exec(line);
+    if(map){current.table=map[1];continue;}
+    const field=/^\s+(\w+)\s+([A-Za-z]\w*)(?:\[\])?\??(?:\s|$)/.exec(line);
+    if(field&&!line.trim().startsWith('@@')&&!line.trim().startsWith('//'))current.fields.push({name:field[1],type:field[2]});
+  }
+  const missing=CLINICAL_MODELS.filter(m=>!models.has(m));
+  if(missing.length)throw new Error('the schema has no model '+missing.join(', ')+'; update CLINICAL_MODELS in tools/phase2/arch-metrics.mjs');
+  const keys=new Set();
+  for(const {fields} of models.values())for(const f of fields)if(CLINICAL_MODELS.includes(f.type))keys.add(f.name);
+  return {
+    models:[...models.keys()],
+    enums:[...enums],
+    delegates:new Set(CLINICAL_MODELS.map(lowerFirst)),
+    modelDelegates:new Set([...models.keys()].map(lowerFirst)),
+    tables:new Set(CLINICAL_MODELS.map(m=>(models.get(m).table??m).toLowerCase())),
+    keys,
+  };
+}
+// The model a Prisma type name belongs to: the longest model name it starts with (AppointmentBillingOperationWhereInput is billing's, AppointmentStatus is the clinical enum).
+const typeIsClinical=(name,schema)=>{
+  const owner=[...schema.models,...CLINICAL_MODELS].filter(m=>name.startsWith(m)).sort((a,b)=>b.length-a.length)[0];
+  return owner!==undefined&&CLINICAL_MODELS.includes(owner);
+};
+// A Prisma delegate call (<receiver>.<delegate>.<call>) and the table a raw SQL template names after FROM, JOIN, INTO, TRUNCATE or UPDATE (a
+// schema prefix, runtime.appointments or "public"."appointments", is skipped). DATA_DELEGATE is the narrow reading the module map uses (tx,
+// client or db as the receiver); DELEGATE_ANY accepts every receiver (prisma, this.db, ...). A dot is `.` or `?.`, with white space (a line
+// break: Prettier wraps a long chain as "tx.appointment\n  .findMany(") on either side, and the call may be optional (`findMany?.(`).
+const DOT=String.raw`\s*(?:\?\.|\.)\s*`;
+const DELEGATE_CALL=String.raw`([A-Za-z_$][\w$]*)${DOT}(?:find\w*|create\w*|update\w*|upsert|delete\w*|count|aggregate|groupBy)\s*(?:\?\.)?\s*[(<]`;
+export const DATA_DELEGATE=new RegExp(String.raw`\b(?:tx|client|db)${DOT}`+DELEGATE_CALL,'g');
+export const DELEGATE_ANY=new RegExp(DOT+DELEGATE_CALL,'g');
+export const RAW_SQL=/\$(?:queryRaw|executeRaw)\s*(?:<[^`]*?>)?\s*`([^`]*)`/g;
+export const SQL_TABLE=/(?:\bFROM|\bJOIN|\bINTO|\bTRUNCATE(?:\s+TABLE)?|(?<!\bFOR\s+|\bDO\s+)\bUPDATE)\s+(?:"?[A-Za-z_]\w*"?\s*\.\s*)?"?([A-Za-z_]\w*)"?/gi;
+// A raw SQL text is a template that follows $queryRaw/$executeRaw/Prisma.sql, or the first argument of $queryRawUnsafe/$executeRawUnsafe.
+const RAW_SQL_START=/(?:\$(?:queryRaw|executeRaw)\s*(?:<[^`]*?>)?|\bPrisma\.sql)\s*`|\$(?:queryRaw|executeRaw)Unsafe\s*\(\s*(['"`])/g;
+const TYPED_OBJECT=/\bPrisma\.\w*(?:WhereInput|Include|Select|OrderBy\w*)\b(?:\[\])?/g;
+const lineOf=(text,index)=>text.slice(0,index).split('\n').length;
+const matchOpenBack=(code,close)=>{let depth=0;for(let i=close;i>=0;i--){if(code[i]==='}')depth++;else if(code[i]==='{'&&--depth===0)return i;}return -1;};
+// Every place a file touches a clinical table: {kind, text, line}. Comments, strings and regex literals read nothing (the code is sanitized).
+// Known limits (the code is read as text, not as a program). Not seen, a miss:
+//  - an object of relation keys put in a variable with no Prisma type and passed to a call later;
+//  - a delegate reached by an alias (`const { appointment } = tx`) or by `tx['appointment']`;
+//  - `import { Prisma as P }` and then `P.AppointmentWhereInput`; the enums `$Enums.AppointmentStatus` and `Prisma.$Enums.AppointmentStatus`;
+//  - `Prisma.validator<...>()({ appointments: true })` and `Prisma.PetGetPayload<{ include: { appointments: true } }>` (no declared object);
+//  - raw SQL with a comment inside the name (`FROM /*x*/ appointments`), `Prisma.raw('appointments')`, SQL built by concatenation.
+// Seen by mistake, noise (a FAIL, never a silent pass): the delegate check takes any `.appointment.<find|create|update|...>(` for a Prisma call,
+// so `this.cache.appointment.find(...)` outside legacy/ fails; rename the variable. The relation keys are read only in the arguments of a
+// call on a name that is a model of the schema (`.pet.`, `.user.`, ...), so `this.rows.find(({ appointment }) => ...)` and
+// `this.factory.create({ appointment })` read nothing; `unitOfWork.run(async ({ bookings, notifications }) => ...)` (hotelBookings.ts) and
+// `lifecycleByKind({ hotel, ...(clinical ? { appointment: ... } : {}) })` (coreRoutes.ts) are not delegate calls and read nothing either.
+export function clinicalReads(source,schema){
+  const code=sanitize(source),found=[],add=(kind,text,index)=>found.push({kind,text,line:lineOf(code,index)});
+  const keyPattern=new RegExp(String.raw`(?<=[{,]\s*)(${[...schema.keys].join('|')})\b\s*(?::|(?=\s*[,}]))`,'g');
+  const keysIn=(from,to)=>{for(const m of code.slice(from,to).matchAll(keyPattern))add('relation key',m[1],from+m.index);};
+  // 2. a delegate of a clinical model; 4a. a relation key in the arguments of any delegate call
+  for(const m of code.matchAll(DELEGATE_ANY)){
+    if(schema.delegates.has(m[1]))add('delegate',m[1]+' (delegate call)',m.index);
+    let open=m.index+m[0].length-1;
+    if(code[open]==='<'){const end=matchClose(code,open,'<','>');open=end<0?-1:skipWs(code,end+1);}
+    if(open>=0&&code[open]==='('&&schema.modelDelegates.has(m[1])){
+      const end=matchClose(code,open,'(',')');
+      if(end>0){
+        keysIn(open,end);
+        // the fluent API: tx.pet.findUnique({ ... }).appointments()
+        const fluent=new RegExp(String.raw`^${DOT}(${[...schema.keys].join('|')})\s*\(`).exec(code.slice(end+1));
+        if(fluent)add('relation key',fluent[1]+' (fluent call)',end);
+      }
+    }
+  }
+  // 3. raw SQL that names a clinical table
+  for(const m of code.matchAll(RAW_SQL_START)){
+    const start=m.index+m[0].length,end=code.indexOf(m[1]??'`',start);
+    if(end<0)continue;
+    for(const t of source.slice(start,end).matchAll(SQL_TABLE))if(schema.tables.has(t[1].toLowerCase()))add('sql',t[1]+' (raw SQL)',m.index);
+  }
+  // 4b. a relation key in an object declared with a Prisma where/include/select/orderBy type
+  for(const m of code.matchAll(TYPED_OBJECT)){
+    // `= {`, `=> ({`, and an array of objects: `: Prisma.PetOrderByWithRelationInput[] = [{ ... }, { ... }]`
+    const after=/^\s*=>?\s*\(?\s*[[{]/.exec(code.slice(m.index+m[0].length));
+    if(after){const open=m.index+m[0].length+after[0].length-1,end=code[open]==='['?matchClose(code,open,'[',']'):matchClose(code,open,'{','}');if(end>0)keysIn(open,end);}
+    const before=/\}\s*(?:satisfies|as)\s+$/.exec(code.slice(0,m.index));
+    if(before){const close=m.index-before[0].length+before[0].indexOf('}'),open=matchOpenBack(code,close);if(open>=0)keysIn(open,close);}
+  }
+  // 5. a Prisma type of a clinical model, and a name of one imported from @prisma/client
+  for(const m of code.matchAll(/\bPrisma\.([A-Za-z_]\w*)/g))if(typeIsClinical(m[1],schema))add('type',m[0],m.index);
+  for(const m of code.matchAll(/\b(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s*from\s*(['"])( *)\2/g)){
+    const at=m.index+m[0].length-1-m[3].length;
+    if(source.slice(at,at+m[3].length)!=='@prisma/client')continue;
+    for(const part of m[1].split(','))for(const name of [part.trim().replace(/^type\s+/,'').split(/\s+as\s+/)[0]])if(name&&typeIsClinical(name,schema))add('import',name+' (from @prisma/client)',m.index);
+  }
+  return found;
+}
+// Where the Core's schema is, relative to the repository root.
+export const SCHEMA_PATH='backend/prisma/schema.prisma';
 
 // A static `from '...'` and a dynamic `import('...')` (permission-matrix.test.mjs uses `await import`) both count.
 export const IMPORT_OF=/(?:\bfrom\s*|\bimport\s*\(\s*)/.source;
@@ -220,7 +339,11 @@ export function measure(root=defaultRoot){
   const reached=new Set(),stack=[...entries];
   while(stack.length){const f=stack.pop();if(reached.has(f))continue;reached.add(f);for(const t of coreGraph.get(f))if(!CORE_CUT(coreRel(f),coreRel(t)))stack.push(t);}
   const unreachable=coreFiles.filter(f=>!reached.has(f)&&!coreRel(f).startsWith('legacy/'));
-  put('S11','Core code that never runs in split mode, outside legacy/','measured','lower',{files:unreachable.length,lines:sumLines(unreachable)},unreachable.map(f=>wcl(text(f))+' '+coreRel(f)),{note:'plus clinical branches inside 4 shared repositories, not measured'});
+  // The clinical branches inside shared repositories are counted as reads of a clinical table outside legacy/ (the reading of the rule
+  // legacy-isolated): split mode runs none of them, so they must be zero as well.
+  const schema=clinicalSchema(readFileSync(abs(SCHEMA_PATH),'utf8')),outside=coreFiles.filter(f=>!coreRel(f).startsWith('legacy/'));
+  const clinicalOutside=outside.flatMap(f=>clinicalReads(text(f),schema).map(r=>coreRel(f)+':'+r.line+' '+r.kind+' '+r.text));
+  put('S11','Core code that never runs in split mode, outside legacy/','measured','lower',{files:unreachable.length,lines:sumLines(unreachable),clinicalReadsOutsideLegacy:clinicalOutside.length},{files:unreachable.map(f=>wcl(text(f))+' '+coreRel(f)),clinicalReadsOutsideLegacy:clinicalOutside},{note:'files not reached from the split entries once every import into backend/src/legacy is cut, plus reads of a clinical table in a file outside legacy/ (rule legacy-isolated)'});
 
   // S12: proof code in src.
   const proofClassFiles=[...coreFiles,...clinicFiles].filter(f=>PROOF_CLASSES.test(text(f))),proofBranches=[...coreFiles,...clinicFiles].filter(f=>!proofClassFiles.includes(f)&&/\bProofAppointment\b/.test(text(f)));
