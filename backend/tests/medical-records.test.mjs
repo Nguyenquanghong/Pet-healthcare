@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MedicalRecordsService } from "../dist/src/application/services/medicalRecords.js";
+import { MedicalRecordsService } from "../dist/src/legacy/application/services/medicalRecords.js";
 
 const doctor = { sub: "doctor-1", role: "doctor" };
 const staff = { sub: "staff-1", role: "staff" };

@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { BootstrapService } from "../application/services/bootstrap.js";
-import { appointmentDto, careNoteDto, hotelBookingDto, medicalRecordDto, ownerDto, petDto } from "./dto/serialize.js";
+import { BootstrapService } from "../../application/services/bootstrap.js";
+import { appointmentDto, careNoteDto, hotelBookingDto, medicalRecordDto, ownerDto, petDto } from "../../routes/dto/serialize.js";
 
 export function createBootstrapRouter(service: BootstrapService) {
   const router = Router();

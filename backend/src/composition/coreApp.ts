@@ -1,6 +1,6 @@
 import express from 'express';
 import type { PrismaClient } from '@prisma/client';
-import { createApp } from '../app.js';
+import { createApp } from '../legacy/app.js';
 import { coreConfigFromEnv, coreSettings, type CoreConfig } from './config.js';
 import { applySecurity } from './http.js';
 import { mountSplitRoutes } from './coreRoutes.js';

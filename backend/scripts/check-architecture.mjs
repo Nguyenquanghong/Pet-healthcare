@@ -5,8 +5,9 @@ const root = resolve(import.meta.dirname, "../src");
 
 // Tiers of backend/src and the tiers each may import (its own tier always). A directory the table does not name and a root
 // file that is not an entry fail, so a new place for code is a decision made here. generated/ is the Prisma client: only
-// infrastructure and workers reach it. The root files are entries: index.ts starts the composition, app.ts is the monolith
-// that composition/coreApp.ts wraps, so composition may import app.ts and app.ts imports composition/http and coreRoutes.
+// infrastructure and workers reach it. The one root file is the entry: index.ts starts the composition. legacy/ is the
+// Phase 1 monolith (app.ts and the appointment, medical record and notification stack) that composition wraps: it may import
+// every tier except workers, and only composition imports it.
 const ALLOWED = {
   domain: ["domain"],
   application: ["domain", "application"],
@@ -16,8 +17,8 @@ const ALLOWED = {
   gateway: ["gateway"],
   routes: ["domain", "application", "lib", "middleware", "routes"],
   workers: ["domain", "application", "infrastructure", "lib", "workers", "composition", "generated"],
-  composition: ["domain", "application", "lib", "infrastructure", "middleware", "gateway", "routes", "composition", "app.ts", "(outside src)"],
-  "app.ts": ["domain", "composition"],
+  composition: ["domain", "application", "lib", "infrastructure", "middleware", "gateway", "routes", "composition", "legacy", "(outside src)"],
+  legacy: ["domain", "application", "lib", "infrastructure", "middleware", "routes", "composition", "generated"],
   "index.ts": ["composition", "lib"],
 };
 const STORAGE = /^(@prisma\/client|prisma|pg)(\/|$)/;
@@ -120,6 +121,10 @@ rejects("workers import express", "workers/x.ts", 'import express from "express"
 rejects("composition imports workers", "composition/x.ts", 'import { a } from "../workers/a.js";');
 rejects("composition imports the entry", "composition/x.ts", 'import { a } from "../index.js";');
 rejects("middleware imports a route", "middleware/x.ts", 'import { a } from "../routes/a.js";');
+rejects("routes import legacy", "routes/x.ts", 'import { a } from "../legacy/routes/a.js";');
+rejects("infrastructure imports legacy", "infrastructure/x.ts", 'import { a } from "../legacy/a.js";');
+rejects("legacy imports workers", "legacy/x.ts", 'import { a } from "../workers/a.js";');
+rejects("legacy imports the entry", "legacy/x.ts", 'import { a } from "../index.js";');
 rejects("middleware imports the storage client", "middleware/x.ts", 'import type { PrismaClient } from "@prisma/client";');
 rejects("only the named file may import the client type", "middleware/currentAccount.ts", 'import { PrismaClient } from "@prisma/client";');
 rejects("the entry reaches past composition", "index.ts", 'import { a } from "./infrastructure/a.js";');
@@ -137,8 +142,9 @@ accepts("routes", "routes/x.ts", 'import express from "express"; import { a } fr
 accepts("routes/internal", "routes/internal/x.ts", 'import { a } from "../../application/services/a.js"; import { b } from "../../lib/token.js"; import { c } from "../appointmentBilling.js";');
 accepts("routes/dto", "routes/dto/x.ts", 'import type { A } from "../../application/ports/a.js"; import { b } from "./b.js"; import type { Actor } from "../../domain/auth.js";');
 accepts("workers", "workers/x.ts", 'import { PrismaClient } from "@prisma/client"; import { P } from "../generated/phase2-core/index.js"; import { a } from "../composition/a.js"; import { b } from "../infrastructure/b.js"; import { c } from "./c.js";');
-accepts("composition", "composition/x.ts", 'import express from "express"; import { a } from "../app.js"; import { b } from "../routes/b.js"; import { c } from "../infrastructure/c.js"; import { d } from "../gateway/d.js"; import { e } from "../middleware/e.js"; import openapi from "../../openapi.json";');
-accepts("app.ts", "app.ts", 'import { a } from "./domain/a.js"; import { b } from "./composition/b.js"; import express from "express";');
+accepts("composition", "composition/x.ts", 'import express from "express"; import { a } from "../legacy/app.js"; import { b } from "../routes/b.js"; import { c } from "../infrastructure/c.js"; import { d } from "../gateway/d.js"; import { e } from "../middleware/e.js"; import openapi from "../../openapi.json";');
+accepts("legacy", "legacy/routes/x.ts", 'import express from "express"; import { a } from "../../domain/a.js"; import { b } from "../../application/ports/b.js"; import { c } from "../../routes/dto/c.js"; import { d } from "../../composition/d.js"; import { e } from "../../infrastructure/persistence/e.js"; import { f } from "./f.js";');
+accepts("legacy, the Prisma client", "legacy/infrastructure/persistence/x.ts", 'import type { Prisma } from "@prisma/client"; import { a } from "../../../lib/token.js"; import { b } from "../../../infrastructure/persistence/b.js";');
 accepts("index.ts", "index.ts", 'import { a } from "./composition/a.js"; import { b } from "./lib/b.js";');
 accepts("a comment is not an import", "domain/x.ts", '// import { a } from "../application/a.js";\n/* import express from "express"; */');
 for (const { reason, path, source, count } of fixtures) {

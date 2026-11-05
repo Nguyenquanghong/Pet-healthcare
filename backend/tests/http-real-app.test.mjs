@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { PrismaClient } from "@prisma/client";
-import { createApp } from "../dist/src/app.js";
+import { createApp } from "../dist/src/legacy/app.js";
 
 test("app factory serves OpenAPI/Swagger and protects GET/POST before DB access", async () => {
   const client = new PrismaClient({ datasources: { db: {

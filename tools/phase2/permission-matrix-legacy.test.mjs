@@ -10,7 +10,7 @@ import {once} from 'node:events';
 process.env.JWT_SECRET ??= 'permission-matrix-fixture-secret-0123456789abcdef';
 const {allows,deniedMessage,permissions,roles}=await import('../../packages/contracts/dist/index.js');
 const {PrismaClient}=await import('@prisma/client');
-const {createApp:createCore}=await import('../../backend/dist/src/app.js');
+const {createApp:createCore}=await import('../../backend/dist/src/legacy/app.js');
 const {signToken}=await import('../../backend/dist/src/lib/token.js');
 
 const id='00000000-0000-4000-8000-000000000001';

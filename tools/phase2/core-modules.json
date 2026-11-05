@@ -125,8 +125,8 @@
         "infrastructure/persistence/listsRepository",
         "infrastructure/persistence/bootstrapRepository",
         "routes/lists",
-        "routes/bootstrap",
-        "routes/dashboard"
+        "routes/dashboard",
+        "legacy/routes/bootstrap"
       ]
     },
     "clinical": {
@@ -135,24 +135,20 @@
         "application/ports/appointments",
         "application/ports/medicalRecords",
         "application/ports/notifications",
-        "application/services/appointments",
-        "application/services/medicalRecords",
-        "application/services/notifications",
-        "infrastructure/persistence/appointmentRepository",
         "infrastructure/persistence/appointmentSlotConflict",
-        "infrastructure/persistence/medicalRepository",
-        "infrastructure/persistence/notificationRepository",
         "infrastructure/persistence/billing",
-        "routes/appointments",
-        "routes/medicalRecords",
-        "routes/notifications"
+        "legacy/application/*",
+        "legacy/infrastructure/*",
+        "legacy/routes/appointments",
+        "legacy/routes/medicalRecords",
+        "legacy/routes/notifications"
       ]
     },
     "platform": {
       "kind": "platform",
       "files": [
         "index",
-        "app",
+        "legacy/app",
         "composition/*",
         "gateway/*",
         "workers/*"

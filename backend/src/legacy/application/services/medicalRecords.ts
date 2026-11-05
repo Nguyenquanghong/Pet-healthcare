@@ -1,8 +1,8 @@
-import type { Actor } from "../../domain/auth.js";
-import { BusinessError } from "../../domain/error.js";
-import { authorize } from "../../domain/authorization.js";
-import { calendarDate, objectInput, optionalText, positiveNumber, requiredText } from "../../domain/validation.js";
-import type { MedicalDependencies, MedicalRecordValue, MedicalUpdate, MedicalWrite } from "../ports/medicalRecords.js";
+import type { Actor } from "../../../domain/auth.js";
+import { BusinessError } from "../../../domain/error.js";
+import { authorize } from "../../../domain/authorization.js";
+import { calendarDate, objectInput, optionalText, positiveNumber, requiredText } from "../../../domain/validation.js";
+import type { MedicalDependencies, MedicalRecordValue, MedicalUpdate, MedicalWrite } from "../../../application/ports/medicalRecords.js";
 
 export type MedicalInput = {
   petId?: string | null; ownerId?: string | null; appointmentId?: string | null; doctorName?: string; visitDate?: string;

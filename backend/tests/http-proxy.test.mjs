@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PrismaClient } from "@prisma/client";
-import { createApp } from "../dist/src/app.js";
+import { createApp } from "../dist/src/legacy/app.js";
 
 async function withApp(proxyHops, run) {
   const client = new PrismaClient({ datasources: { db: {

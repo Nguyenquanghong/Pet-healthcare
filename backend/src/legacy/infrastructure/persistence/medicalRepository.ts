@@ -1,10 +1,10 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import type { MedicalDependencies, MedicalNotificationWriter, MedicalRecordRepository, MedicalTransaction, MedicalUnitOfWork } from "../../application/ports/medicalRecords.js";
-import { appointmentSlotWrite } from "./appointmentSlotConflict.js";
-import { writeNotification } from './notificationOutbox.js';
-import { appendStatusEvent } from "./bookingLifecycleRepository.js";
-import { BusinessError } from "../../domain/error.js";
-import type { Actor } from "../../domain/auth.js";
+import type { MedicalDependencies, MedicalNotificationWriter, MedicalRecordRepository, MedicalTransaction, MedicalUnitOfWork } from "../../../application/ports/medicalRecords.js";
+import { appointmentSlotWrite } from "../../../infrastructure/persistence/appointmentSlotConflict.js";
+import { writeNotification } from '../../../infrastructure/persistence/notificationOutbox.js';
+import { appendStatusEvent } from "../../../infrastructure/persistence/bookingLifecycleRepository.js";
+import { BusinessError } from "../../../domain/error.js";
+import type { Actor } from "../../../domain/auth.js";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 

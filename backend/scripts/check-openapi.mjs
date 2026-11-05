@@ -15,13 +15,16 @@ const mounts = {
   hotelBookings: "/api/hotel-bookings", hotelCapacity: "/api/hotel-capacity", notifications: "/api/notifications", invoices: "/api/invoices",
   payments: "/api/payments", lists: "/api",
 };
+const legacyRouters = new Set(["appointments", "medicalRecords", "notifications"]);
 const runtime = new Set(["GET /api/health"]);
 assert.match(readFileSync(resolve(backend,'src/routes/appointmentBilling.ts'),'utf8'),/app\.get\(\s*'\/api\/operations\/:id'/);
 runtime.add('GET /api/operations/{id}');
 const dashboardSource=readFileSync(resolve(backend,'src/routes/dashboard.ts'),'utf8');
 for(const match of dashboardSource.matchAll(/app\.get\(\s*'([^']+)'/g))runtime.add('GET '+match[1]);
 for (const [file, mount] of Object.entries(mounts)) {
-  const source = readFileSync(resolve(backend, "src/routes", `${file}.ts`), "utf8");
+  // The Phase 1 routers live in src/legacy/routes; the rest are Core's own.
+  const dir = legacyRouters.has(file) ? "src/legacy/routes" : "src/routes";
+  const source = readFileSync(resolve(backend, dir, `${file}.ts`), "utf8");
   for (const match of source.matchAll(/\brouter\.(get|post|patch|put|delete)\(\s*["']([^"']+)["']/g)) {
     const path = (mount + (match[2] === "/" ? "" : match[2])).replace(/:([A-Za-z][\w]*)/g, "{$1}");
     runtime.add(`${match[1].toUpperCase()} ${path}`);

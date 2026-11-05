@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import SwaggerParser from "@apidevtools/swagger-parser";
-import { createApp } from "../dist/src/app.js";
+import { createApp } from "../dist/src/legacy/app.js";
 import { hashPassword } from "../dist/src/lib/password.js";
 import { signToken } from "../dist/src/lib/token.js";
 

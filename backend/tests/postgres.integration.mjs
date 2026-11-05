@@ -2,10 +2,10 @@ import { notificationOutbox } from "./notification-outbox-helper.mjs";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
-import { createApp } from "../dist/src/app.js";
+import { createApp } from "../dist/src/legacy/app.js";
 import { hashPassword } from "../dist/src/lib/password.js";
-import { createAppointmentDependencies } from "../dist/src/infrastructure/persistence/appointmentRepository.js";
-import { createMedicalDependencies } from "../dist/src/infrastructure/persistence/medicalRepository.js";
+import { createAppointmentDependencies } from "../dist/src/legacy/infrastructure/persistence/appointmentRepository.js";
+import { createMedicalDependencies } from "../dist/src/legacy/infrastructure/persistence/medicalRepository.js";
 import { createHotelDependencies } from "../dist/src/infrastructure/persistence/hotelRepository.js";
 import { createPublicRescueDependencies } from "../dist/src/infrastructure/persistence/publicRescueRepository.js";
 

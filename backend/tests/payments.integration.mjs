@@ -2,7 +2,7 @@ import { notificationOutbox } from "./notification-outbox-helper.mjs";
 import assert from "node:assert/strict";
 import { randomUUID, randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
-import { createApp } from "../dist/src/app.js";
+import { createApp } from "../dist/src/legacy/app.js";
 import { signToken } from "../dist/src/lib/token.js";
 import { signVnpay } from "../dist/src/infrastructure/security/vnpay.js";
 
