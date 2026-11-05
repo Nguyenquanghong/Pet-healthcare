@@ -19,7 +19,8 @@ const legacyRouters = new Set(["appointments", "medicalRecords", "notifications"
 const runtime = new Set(["GET /api/health"]);
 assert.match(readFileSync(resolve(backend,'src/routes/appointmentBilling.ts'),'utf8'),/app\.get\(\s*'\/api\/operations\/:id'/);
 runtime.add('GET /api/operations/{id}');
-const dashboardSource=readFileSync(resolve(backend,'src/routes/dashboard.ts'),'utf8');
+// The Core dashboard is in routes/dashboard.ts; the clinic dashboard is legacy's, in legacy/routes/clinicDashboard.ts.
+const dashboardSource=['src/routes/dashboard.ts','src/legacy/routes/clinicDashboard.ts'].map(file=>readFileSync(resolve(backend,file),'utf8')).join('\n');
 for(const match of dashboardSource.matchAll(/app\.get\(\s*'([^']+)'/g))runtime.add('GET '+match[1]);
 for (const [file, mount] of Object.entries(mounts)) {
   // The Phase 1 routers live in src/legacy/routes; the rest are Core's own. The list router's clinical GETs are in

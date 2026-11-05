@@ -123,3 +123,42 @@ test("representative routes keep JSON, auth and method contracts", async () => {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
+
+// /api/bootstrap exists only in the legacy entrypoint, which always serves the clinical routes, so there is no clinical: false
+// path to it. What the entrypoint must do is hand the repository both legacy sources: a summary without them reads no
+// appointment, medical record, image or notification table and shows zeros.
+test("the legacy /api/bootstrap reads the clinical and the notification tables its summary counts", async () => {
+  process.env.JWT_SECRET = randomBytes(32).toString("hex");
+  const calls = [];
+  const db = new Proxy({}, {
+    get: (_target, model) => {
+      if (model === "then" || typeof model === "symbol") return undefined;
+      if (model === "$transaction") return async work => work(db);
+      return new Proxy({}, {
+        get: (_models, method) => method === "then" ? undefined : async () => {
+          calls.push(`${model}.${method}`);
+          return method === "count" ? 0 : method === "findMany" || method === "groupBy" ? [] : null;
+        },
+      });
+    },
+  });
+  const server = createApp(db).listen(0, "127.0.0.1");
+  await new Promise(resolve => server.once("listening", resolve));
+  const base = `http://127.0.0.1:${server.address().port}/api/bootstrap`;
+  const read = async (view, role) => {
+    calls.length = 0;
+    const response = await fetch(`${base}?view=${view}`, { headers: { authorization: `Bearer ${signToken(`${role}-1`, role)}` } });
+    assert.equal(response.status, 200, `${role} ${view}`);
+    return new Set(calls);
+  };
+  try {
+    for (const role of ["admin", "owner"]) {
+      const dashboard = await read("dashboard", role);
+      for (const call of ["appointment.count", "appointment.groupBy", "appointment.findMany", "medicalRecord.count", "medicalRecord.findMany", "medicalImage.count", "notification.count", "notification.groupBy", "notification.findMany"])
+        assert.ok(dashboard.has(call), `${role} dashboard: ${call}`);
+      assert.ok((await read("session", role)).has("notification.count"), `${role} session: the unread count reads notifications`);
+    }
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});

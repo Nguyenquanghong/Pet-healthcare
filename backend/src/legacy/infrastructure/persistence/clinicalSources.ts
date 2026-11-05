@@ -5,6 +5,10 @@ import {
   notificationCategoryWhere,
   type NotificationCategory,
 } from '@nipopeto/contracts';
+import type {
+  ClinicalBootstrapSource,
+  NotificationBootstrapSource,
+} from '../../../infrastructure/persistence/bootstrapRepository.js';
 import type { AppointmentInvoiceSource } from '../../../infrastructure/persistence/invoiceRepository.js';
 import type { ClinicalListSource } from '../../../infrastructure/persistence/listsRepository.js';
 
@@ -148,4 +152,61 @@ export const clinicalListSource: ClinicalListSource = {
     });
     return Object.fromEntries(rows.map(row => [row.appointmentDate.toISOString().slice(0, 10), row._count]));
   },
+};
+
+// The clinical queries of PrismaBootstrapRepository's dashboard summary, moved out unchanged. Each returns the Prisma
+// call without awaiting it (and none is `async`): the repository's Promise.all starts them in its own order, on its
+// transaction (`tx`).
+export const clinicalBootstrap: ClinicalBootstrapSource = {
+  appointmentCount: (tx, own) => tx.appointment.count({ where: own }),
+  medicalCount: (tx, own) => tx.medicalRecord.count({ where: own }),
+  imageCount: (tx, ownerId, own) => tx.medicalImage.count({ where: ownerId ? { pet: own } : {} }),
+  appointmentStatus: (tx, own) => {
+    // A local, so groupBy infers its row type from the arguments and not from the declared return type.
+    const rows = tx.appointment.groupBy({ by: ['status'], where: own, _count: true });
+    return rows;
+  },
+  todayCount: (tx, own, today) => tx.appointment.count({ where: { ...own, appointmentDate: today } }),
+  adminAppointments: (tx, today) =>
+    Promise.all([
+      tx.appointment.findMany({
+        where: { appointmentDate: today },
+        take: 5,
+        orderBy: [{ appointmentTime: 'asc' }, { id: 'asc' }],
+      }),
+      tx.appointment.findMany({
+        where: { status: 'pending' },
+        take: 3,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]),
+  ownerAppointments: (tx, own, today) =>
+    tx.appointment.findMany({
+      where: { ...own, status: { in: ['pending', 'confirmed'] }, appointmentDate: { gte: today } },
+      take: 5,
+      orderBy: [{ appointmentDate: 'asc' }, { appointmentTime: 'asc' }, { id: 'asc' }],
+    }),
+  medicalRecords: (tx, own, isAdmin) =>
+    tx.medicalRecord.findMany({
+      where: own,
+      take: isAdmin ? 4 : 1,
+      orderBy: [{ visitDate: 'desc' }, { id: 'desc' }],
+    }),
+};
+
+// The notification queries of the same summary; `where` is the recipient filter the repository built.
+export const notificationBootstrap: NotificationBootstrapSource = {
+  unread: (tx, where) => tx.notification.count({ where: { ...where, status: 'sent' } }),
+  count: (tx, where) => tx.notification.count({ where }),
+  types: (tx, where) => {
+    const rows = tx.notification.groupBy({ by: ['type'], where, _count: true });
+    return rows;
+  },
+  hotelUpdates: (tx, where) => tx.notification.count({ where: { AND: [where, hotelStatusUpdates] } }),
+  latest: (tx, where) =>
+    tx.notification.findMany({
+      where,
+      take: 5,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    }),
 };
