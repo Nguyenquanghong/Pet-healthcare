@@ -22,13 +22,13 @@ let server;
 const users = [];
 const notificationIds = [];
 try {
-  for (const role of ["owner", "owner", "staff"]) {
+  for (const role of ["owner", "owner", "staff", "doctor"]) {
     const account = await prisma.user.create({ data: { role, fullName: marker,
       email: `${randomUUID()}@example.test`, ...hashPassword("valid-password") } });
     users.push(account);
   }
-  const [owner, other, staff] = users;
-  const ownerToken = signToken(owner.id, "owner"), otherToken = signToken(other.id, "owner"), staffToken = signToken(staff.id, "staff");
+  const [owner, other, staff, doctor] = users;
+  const ownerToken = signToken(owner.id, "owner"), otherToken = signToken(other.id, "owner"), staffToken = signToken(staff.id, "staff"), doctorToken = signToken(doctor.id, "doctor");
   if (!externalApi) {
     server = createApp(prisma).listen(0, "127.0.0.1");
     await new Promise(resolve => server.once("listening", resolve));
@@ -71,11 +71,11 @@ try {
 
   const medical = { petId: pet.id, title: "Visit", doctorName: "Doctor", diagnosis: "Healthy", treatment: "Observe", visitDate: "2028-02-29" };
   for (const change of [{ visitDate: "2026-02-30" }, { followUpDate: "2026-02-29" }, { weightKg: -1 }, { heartRateBpm: 1.5 }])
-    await request(staffToken, "POST", "/medical-records", { ...medical, ...change }, 422);
-  const { record } = await request(staffToken, "POST", "/medical-records", { ...medical, weightKg: 4.2, temperatureC: 38.5, heartRateBpm: 80 }, 201);
+    await request(doctorToken, "POST", "/medical-records", { ...medical, ...change }, 422);
+  const { record } = await request(doctorToken, "POST", "/medical-records", { ...medical, weightKg: 4.2, temperatureC: 38.5, heartRateBpm: 80 }, 201);
   for (const change of [{ title: " " }, { treatment: "" }, { diagnosis: null }, { visitDate: "2026-02-30" }, { weightKg: -1 }])
-    await request(staffToken, "PATCH", `/medical-records/${record.id}`, change, 422);
-  await request(staffToken, "PATCH", `/medical-records/${record.id}`, { weightKg: null, temperatureC: null, heartRateBpm: null }, 200);
+    await request(doctorToken, "PATCH", `/medical-records/${record.id}`, change, 422);
+  await request(doctorToken, "PATCH", `/medical-records/${record.id}`, { weightKg: null, temperatureC: null, heartRateBpm: null }, 200);
   const stored = await prisma.medicalRecord.findUniqueOrThrow({ where: { id: record.id } });
   assert.equal(stored.title, "Visit"); assert.equal(stored.weightKg, null); assert.equal(stored.heartRateBpm, null);
 

@@ -22,6 +22,7 @@ const marker = `phase1-${randomBytes(8).toString("hex")}`;
 const password = hashPassword("test-password-123");
 let owner;
 let staff;
+let doctor;
 let server;
 
 async function expectRollback(name, work, count) {
@@ -39,6 +40,10 @@ try {
   } });
   staff = await prisma.user.create({ data: {
     username: marker, fullName: "Phase 1 test staff", role: "staff",
+    passwordHash: password.passwordHash, passwordSalt: password.passwordSalt,
+  } });
+  doctor = await prisma.user.create({ data: {
+    username: `${marker}-doctor`, fullName: "Phase 1 test doctor", role: "doctor",
     passwordHash: password.passwordHash, passwordSalt: password.passwordSalt,
   } });
   const pet = await prisma.pet.create({ data: {
@@ -111,6 +116,9 @@ try {
   assert.equal(staffLogin.status, 200);
   const token = login.body.token;
   const staffToken = staffLogin.body.token;
+  const doctorLogin = await request("/api/auth/admin/login", "POST", undefined, { username: `${marker}-doctor`, password: "test-password-123" });
+  assert.equal(doctorLogin.status, 200);
+  const doctorToken = doctorLogin.body.token;
   const booked = await request("/api/appointments", "POST", token, {
     petId: pet.id, type: "general_checkup", serviceName: "Integration checkup", date: "2099-01-01", time: "11:00",
   });
@@ -123,7 +131,7 @@ try {
   assert.equal((await request("/api/appointments", "GET", token)).body.items.find(item => item.id === appointmentId).internalNote, undefined);
   assert.equal((await request("/api/appointments", "GET", staffToken)).body.items.find(item => item.id === appointmentId).internalNote, "Staff appointment note");
   assert.equal((await request(`/api/appointments/${appointmentId}/status`, "PATCH", staffToken, { status: "checked_in" })).status, 200);
-  const record = await request("/api/medical-records", "POST", staffToken, {
+  const record = await request("/api/medical-records", "POST", doctorToken, {
     petId: pet.id, appointmentId, doctorName: "Integration doctor", visitDate: "2099-01-02",
     title: "Checkup", diagnosis: "Healthy", treatment: "Observation", internalNote: "Doctor confidential",
   });
@@ -132,7 +140,7 @@ try {
   assert.ok((await request("/api/medical-records", "GET", token)).body.items.some(item => item.id === record.body.record.id));
   assert.equal((await request("/api/medical-records", "GET", token)).body.items.find(item => item.id === record.body.record.id).internalNote, undefined);
   assert.equal((await request(`/api/medical-records/${record.body.record.id}`, "DELETE", token)).status, 403);
-  assert.equal((await request(`/api/medical-records/${record.body.record.id}`, "DELETE", staffToken)).status, 204);
+  assert.equal((await request(`/api/medical-records/${record.body.record.id}`, "DELETE", doctorToken)).status, 204);
   const stay = await request("/api/hotel-bookings", "POST", token, {
     petId: pet.id, checkIn: "2099-01-01", checkOut: "2099-01-03", roomType: "standard", serviceKeys: ["daily_walk"],
   });
@@ -176,5 +184,6 @@ try {
     await prisma.user.delete({ where: { id: owner.id } });
   }
   if (staff) await prisma.user.delete({ where: { id: staff.id } });
+  if (doctor) await prisma.user.delete({ where: { id: doctor.id } });
   await prisma.$disconnect();
 }

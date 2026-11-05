@@ -23,12 +23,14 @@ let server;
 let owner;
 let otherOwner;
 let staff;
+let doctor;
 
 try {
   await prisma.$connect();
   owner = await prisma.user.create({ data: { email: `${marker}@example.test`, fullName: "Fix owner", role: "owner", ...password, phone: "000111", address: "Private address" } });
   otherOwner = await prisma.user.create({ data: { email: `${marker}-other@example.test`, fullName: "Other owner", role: "owner", ...password } });
   staff = await prisma.user.create({ data: { username: marker, fullName: "Fix staff", role: "staff", ...password } });
+  doctor = await prisma.user.create({ data: { username: `${marker}-doctor`, fullName: "Fix doctor", role: "doctor", ...password } });
   const pet = await prisma.pet.create({ data: {
     ownerId: owner.id, name: "Fix pet", species: "dog", allergies: ["SECRET_ALLERGY"],
     healthStatus: "critical", notes: "SECRET_NOTE", qrToken: marker, rescueNote: "Public rescue note",
@@ -59,6 +61,9 @@ try {
   assert.equal(staffLogin.status, 200);
   const token = login.body.token;
   const staffToken = staffLogin.body.token;
+  const doctorLogin = await request("/api/auth/admin/login", "POST", undefined, { username: `${marker}-doctor`, password: "synthetic-password-123" });
+  assert.equal(doctorLogin.status, 200);
+  const doctorToken = doctorLogin.body.token;
   const book = (petId, date, time = "10:00") => ({ petId, type: "general_checkup", serviceName: "Fix checkup", date, time });
   async function create(petId, date, time) {
     const response = await request("/api/appointments", "POST", token, book(petId, date, time));
@@ -123,23 +128,23 @@ try {
   const foreignAppointment = await prisma.appointment.create({ data: { petId: foreign.id, ownerId: otherOwner.id, type: "general_checkup", serviceName: "Foreign", clinicName: "Test", appointmentDate: new Date("2099-01-20T00:00:00.000Z"), appointmentTime: "10:00", createdBy: "owner" } });
   for (const [name, id, expected] of [["missing", "nonexistent-id", 404], ["same owner other pet", siblingAppointment.id, 422], ["other owner", foreignAppointment.id, 422]]) {
     const before = await baseline();
-    const response = await request("/api/medical-records", "POST", staffToken, medicalInput(pet.id, id));
+    const response = await request("/api/medical-records", "POST", doctorToken, medicalInput(pet.id, id));
     assert.equal(response.status, expected, `${name}: ${JSON.stringify(response.body)}`);
     assert.deepEqual(await baseline(), before, `${name} must have no record/notification side effect`);
     assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id } }).catch(() => null))?.status ?? null, id === "nonexistent-id" ? null : "pending");
     summary.scenarios.push(`medical ${name} ${expected} no side effects`);
   }
-  const standalone = await request("/api/medical-records", "POST", staffToken, medicalInput(pet.id, undefined));
+  const standalone = await request("/api/medical-records", "POST", doctorToken, medicalInput(pet.id, undefined));
   assert.equal(standalone.status, 201);
   for (const status of ["confirmed", "checked_in"]) assert.equal((await request(`/api/appointments/${first.id}/status`, "PATCH", staffToken, { status })).status, 200);
-  const valid = await request("/api/medical-records", "POST", staffToken, medicalInput(pet.id, first.id));
+  const valid = await request("/api/medical-records", "POST", doctorToken, medicalInput(pet.id, first.id));
   assert.equal(valid.status, 201, JSON.stringify(valid.body));
   assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: first.id } })).status, "completed");
   summary.scenarios.push("medical standalone and matching link 201");
 
   // A no-show appointment would become active on completion; its write must fail atomically.
   const beforeConflict = await baseline();
-  const completion = await request("/api/medical-records", "POST", staffToken, medicalInput(pet.id, replacement.id));
+  const completion = await request("/api/medical-records", "POST", doctorToken, medicalInput(pet.id, replacement.id));
   assert.equal(completion.status, 409, JSON.stringify(completion.body));
   assert.deepEqual(await baseline(), beforeConflict);
   assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: replacement.id } })).status, "no_show");
@@ -194,5 +199,6 @@ try {
     await prisma.user.delete({ where: { id: user.id } });
   }
   if (staff) await prisma.user.delete({ where: { id: staff.id } });
+  if (doctor) await prisma.user.delete({ where: { id: doctor.id } });
   await prisma.$disconnect();
 }
