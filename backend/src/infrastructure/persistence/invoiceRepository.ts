@@ -1,7 +1,12 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { writeNotification } from './notificationOutbox.js';
-import type { InvoiceRepository, InvoiceIssuance, BankTransferDetails } from '../../application/ports/invoices.js';
+import type {
+  InvoiceRepository,
+  InvoiceIssuance,
+  InvoiceSource,
+  BankTransferDetails,
+} from '../../application/ports/invoices.js';
 import { BusinessError } from '../../domain/error.js';
 import type { Actor } from '../../domain/auth.js';
 
@@ -31,8 +36,15 @@ async function recordPaymentEvent(
   });
 }
 
+// Reads (and locks) the appointment an invoice is issued for. Core does not know the appointment table:
+// the Phase 1 clinical stack supplies this, and without it an appointment is simply not found.
+export type AppointmentInvoiceSource = (tx: Prisma.TransactionClient, id: string) => Promise<InvoiceSource | null>;
+
 export class PrismaInvoiceRepository implements InvoiceRepository {
-  constructor(private readonly client: PrismaClient) {}
+  constructor(
+    private readonly client: PrismaClient,
+    private readonly appointmentSource?: AppointmentInvoiceSource,
+  ) {}
   list(ownerId?: string) {
     return this.client.invoice.findMany({
       where: ownerId ? { ownerId } : undefined,
@@ -99,19 +111,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       return await this.client.$transaction(async tx =>
         work({
           source: async (type, id) => {
-            if (type === 'appointment') {
-              await tx.$queryRaw`SELECT id FROM appointments WHERE id = ${id} FOR UPDATE`;
-              const item = await tx.appointment.findUnique({ where: { id } });
-              return item
-                ? {
-                    ownerId: item.ownerId,
-                    petId: item.petId,
-                    status: item.status,
-                    description: item.serviceName,
-                    serviceType: item.type,
-                  }
-                : null;
-            }
+            if (type === 'appointment') return (await this.appointmentSource?.(tx, id)) ?? null;
             await tx.$queryRaw`SELECT id FROM hotel_bookings WHERE id = ${id} FOR UPDATE`;
             const item = await tx.hotelBooking.findUnique({ where: { id } });
             return item
