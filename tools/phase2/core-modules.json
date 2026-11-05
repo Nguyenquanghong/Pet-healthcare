@@ -136,7 +136,6 @@
         "application/ports/medicalRecords",
         "application/ports/notifications",
         "infrastructure/persistence/appointmentSlotConflict",
-        "infrastructure/persistence/billing",
         "legacy/application/*",
         "legacy/infrastructure/*",
         "legacy/routes/appointments",
