@@ -1,8 +1,8 @@
-import type { Actor } from "../../domain/auth.js";
-import { BusinessError } from "../../domain/error.js";
-import { authorize } from "../../domain/authorization.js";
-import { objectInput, requiredText } from "../../domain/validation.js";
-import type { NotificationRepository } from "../ports/notifications.js";
+import type { Actor } from "../../../domain/auth.js";
+import { BusinessError } from "../../../domain/error.js";
+import { authorize } from "../../../domain/authorization.js";
+import { objectInput, requiredText } from "../../../domain/validation.js";
+import type { NotificationRepository } from "../../../application/ports/notifications.js";
 
 export type SendNotificationInput = { recipientOwnerId?: string; title?: string; message?: string };
 

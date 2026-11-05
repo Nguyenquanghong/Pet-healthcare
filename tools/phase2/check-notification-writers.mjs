@@ -8,5 +8,5 @@ const core = files(resolve('backend/src')); const violations = core.filter(f => 
 assert.deepEqual(violations, [], 'Core runtime must publish transactional outbox, never create notification rows');
 const sites = files(resolve('services/notification/src')).filter(f => forbidden(readFileSync(f,'utf8'))).map(f => f.replaceAll('\\','/').split('/').at(-1)).sort();
 assert.deepEqual(sites, ['inbox.ts','manualSend.ts'], 'Only inbox/manual send own Notification creation');
-assert.ok(readFileSync('backend/src/infrastructure/persistence/notificationRepository.ts','utf8').includes('Manual notifications require the Notification service.'));
+assert.ok(readFileSync('backend/src/legacy/infrastructure/persistence/notificationRepository.ts','utf8').includes('Manual notifications require the Notification service.'));
 console.log('Notification writers PASS: no Core inserts; Notification inbox/manual-send are sole runtime creators. Legacy fixture/export reads retained.');

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID, randomInt, createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
-import { createApp } from "../dist/src/app.js";
+import { createApp } from "../dist/src/legacy/app.js";
 import { signToken, verifyToken } from "../dist/src/lib/token.js";
 import { verifyPassword } from "../dist/src/lib/password.js";
 

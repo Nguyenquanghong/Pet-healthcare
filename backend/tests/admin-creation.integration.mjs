@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID, randomInt } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
-import { createApp } from "../dist/src/app.js";
+import { createApp } from "../dist/src/legacy/app.js";
 import { signToken } from "../dist/src/lib/token.js";
 
 const rawUrl = process.env.PG_TEST_DATABASE_URL;

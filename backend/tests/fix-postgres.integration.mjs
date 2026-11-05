@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { PrismaClient } from "@prisma/client";
-import { createApp } from "../dist/src/app.js";
+import { createApp } from "../dist/src/legacy/app.js";
 import { hashPassword } from "../dist/src/lib/password.js";
-import { createMedicalDependencies } from "../dist/src/infrastructure/persistence/medicalRepository.js";
+import { createMedicalDependencies } from "../dist/src/legacy/infrastructure/persistence/medicalRepository.js";
 
 const rawUrl = process.env.PG_TEST_DATABASE_URL;
 assert.ok(rawUrl, "Set PG_TEST_DATABASE_URL to a migrated, disposable local *_test database.");

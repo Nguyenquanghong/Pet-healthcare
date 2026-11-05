@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AppointmentService } from "../dist/src/application/services/appointments.js";
+import { AppointmentService } from "../dist/src/legacy/application/services/appointments.js";
 
 const owner = { sub: "owner-1", role: "owner" };
 const staff = { sub: "staff-1", role: "staff" };

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import test from "node:test";
-import { createApp } from "../dist/src/app.js";
+import { createApp } from "../dist/src/legacy/app.js";
 import { signToken } from "../dist/src/lib/token.js";
 
 test("auth middleware protects appointment GET and POST, while valid owner reaches service", async () => {

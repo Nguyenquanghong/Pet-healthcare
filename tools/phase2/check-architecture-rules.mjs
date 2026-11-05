@@ -717,7 +717,8 @@ rule('structure-ratchet',()=>{
   assert.deepEqual(ciJobsRunning(workflow('- run: npm run test:docker:ingress-other'),'npm run test:docker:ingress'),[],'another script is not this one');
   assert.deepEqual(ciJobsRunning(workflow('- run: npm run test:docker:ingress').replace(/\n/g,'\r\n'),'npm run test:docker:ingress'),['compose'],'CRLF checkouts are read the same');
   // S5 sees a dynamic import of the monolith's app and of the production composition as well as a static one
-  assert.ok(LEGACY_APP.test("const {createApp}=await import('../../backend/dist/src/app.js');")&&LEGACY_APP.test("import { createApp } from '../src/app.js';"));
+  assert.ok(LEGACY_APP.test("const {createApp}=await import('../../backend/dist/src/legacy/app.js');")&&LEGACY_APP.test("import { createApp } from '../src/legacy/app.js';"));
+  assert.ok(LEGACY_APP.test("const {createApp}=await import('../../backend/dist/src/app.js');"),'the pre-K4 path still counts');
   assert.ok(!LEGACY_APP.test("const {createApp}=await import('../../services/clinic/dist/app.js');"),'a service app is not the monolith');
   assert.ok(PRODUCTION_APP.test("const {createCoreApp}=await import('../../backend/dist/src/composition/coreApp.js');")&&!PRODUCTION_APP.test("import('../../backend/dist/src/app.js')"));
   // the real measurement against a baseline made stricter by one: the baseline of the measurement itself with one value one lower,
@@ -758,7 +759,7 @@ export function coreModuleFindings(config, modules, base = resolve(root, 'backen
     else groupOf.set(file, hit[0]);
   }
   const abs = f => resolve(base, f), known = new Set(modules.map(m => abs(m.file))), relOf = new Map(modules.map(m => [abs(m.file), m.file]));
-  const free = (from, to, a, b) => kind(from) === 'platform' || kind(to) === 'kernel' || kind(from) === 'read' || (kind(from) === 'dto' && b.startsWith('application/ports/')) || (kind(to) === 'dto' && a.startsWith('routes/'));
+  const free = (from, to, a, b) => kind(from) === 'platform' || kind(to) === 'kernel' || kind(from) === 'read' || (kind(from) === 'dto' && b.startsWith('application/ports/')) || (kind(to) === 'dto' && /^(?:legacy\/)?routes\//.test(a));
   const real = new Map();
   for (const { file, source } of modules) {
     const from = groupOf.get(file);

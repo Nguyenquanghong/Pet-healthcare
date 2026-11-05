@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { NotificationsService } from "../application/services/notifications.js";
-import { failure } from "./failure.js";
+import { failure } from "../../routes/failure.js";
 
 export function createNotificationsRouter(service: NotificationsService) {
   const router = Router();

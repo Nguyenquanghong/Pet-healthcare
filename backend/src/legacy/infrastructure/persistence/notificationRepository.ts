@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
-import type { NotificationRepository, NotificationScope } from "../../application/ports/notifications.js";
-import { BusinessError } from '../../domain/error.js';
+import type { NotificationRepository, NotificationScope } from "../../../application/ports/notifications.js";
+import { BusinessError } from '../../../domain/error.js';
 
 export class PrismaNotificationRepository implements NotificationRepository {
   constructor(private readonly client: PrismaClient) {}

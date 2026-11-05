@@ -1,12 +1,12 @@
-import { BookingLifecycleService, type LifecycleInput, type UndoInput } from "./bookingLifecycle.js";
-import { BusinessError } from "../../domain/error.js";
-import { authorize } from "../../domain/authorization.js";
-import { todayInVietnam } from "../../domain/validation.js";
-import type { Actor } from "../../domain/auth.js";
+import { BookingLifecycleService, type LifecycleInput, type UndoInput } from "../../../application/services/bookingLifecycle.js";
+import { BusinessError } from "../../../domain/error.js";
+import { authorize } from "../../../domain/authorization.js";
+import { todayInVietnam } from "../../../domain/validation.js";
+import type { Actor } from "../../../domain/auth.js";
 import {
   appointmentStatuses, appointmentTypes,
   type AppointmentDependencies, type AppointmentRecord, type AppointmentStatus, type AppointmentType,
-} from "../ports/appointments.js";
+} from "../../../application/ports/appointments.js";
 
 export type CreateAppointmentInput = {
   petId?: string; type?: string; date?: string; time?: string; serviceName?: string;

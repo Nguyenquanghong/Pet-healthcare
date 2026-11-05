@@ -4,7 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import jsQR from "jsqr";
 import { PNG } from "pngjs";
 import { QRPay } from "vietnam-qr-pay";
-import { createApp } from "../dist/src/app.js";
+import { createApp } from "../dist/src/legacy/app.js";
 import { signToken } from "../dist/src/lib/token.js";
 
 const url = new URL(process.env.PG_TEST_DATABASE_URL || "http://invalid");

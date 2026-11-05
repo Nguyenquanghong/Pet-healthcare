@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NotificationsService } from "../dist/src/application/services/notifications.js";
+import { NotificationsService } from "../dist/src/legacy/application/services/notifications.js";
 
 const owner = { sub: "owner-1", role: "owner" };
 const staff = { sub: "staff-1", role: "staff" };

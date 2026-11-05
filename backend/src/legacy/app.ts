@@ -1,9 +1,9 @@
 import express from "express";
 import { rateLimit } from "express-rate-limit";
 import type { PrismaClient } from "@prisma/client";
-import { BusinessError } from "./domain/error.js";
-import { applyJsonBody, applySecurity } from "./composition/http.js";
-import { mountCoreRoutes } from "./composition/coreRoutes.js";
+import { BusinessError } from "../domain/error.js";
+import { applyJsonBody, applySecurity } from "../composition/http.js";
+import { mountCoreRoutes } from "../composition/coreRoutes.js";
 
 export function createApp(client: PrismaClient) {
   const app = express();
