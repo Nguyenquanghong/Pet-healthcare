@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import { generateKeyPairSync } from 'node:crypto';
 import { once } from 'node:events';
+import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { createCoreApp } from '../dist/src/composition/coreApp.js';
+import { servesClinical } from '../dist/src/composition/config.js';
 import { createCoreDomains } from '../dist/src/composition/coreDomains.js';
 import { hashPassword } from '../dist/src/lib/password.js';
 import { signToken } from '../dist/src/lib/token.js';
@@ -362,5 +365,259 @@ test('the Core dashboard queries no clinical or notification table', async () =>
     );
   } finally {
     await core.close();
+  }
+});
+
+// ---- servesClinical: one setting decides what Core mounts -------------------------------------------------------------
+
+test('servesClinical: a process with a Clinic URL does not serve clinical routes, one without does', () => {
+  assert.equal(servesClinical({ clinic: null }), true, 'no Clinic URL: Core serves them');
+  assert.equal(servesClinical({ clinic: new URL('http://127.0.0.1:1') }), false, 'a Clinic URL: the Clinic service does');
+});
+
+const splitEnv = ({ runtime }) => {
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  coreTestEnv();
+  if (!runtime) delete process.env.REDIS_URL;
+  Object.assign(process.env, {
+    JWT_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    JWT_PUBLIC_KEY: publicKey.export({ type: 'spki', format: 'pem' }),
+    JWT_ISSUER: 'composition-fixture',
+    JWT_AUDIENCE: 'composition-fixture',
+    JWT_KEY_ID: 'fixture',
+  });
+};
+const serviceToken = 'composition-service-credential-'.repeat(2);
+// Stands in for the Clinic and Notification services: every request is answered and counted.
+async function stubService() {
+  const calls = [];
+  const server = createServer((req, res) => {
+    calls.push(`${req.method} ${req.url}`);
+    req.resume();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end('{"marker":"stub"}');
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  return { calls, url: `http://127.0.0.1:${server.address().port}`, close: () => stop(server) };
+}
+// What a database sees in a Core that must not read Clinic's tables: any access to a clinical delegate, any clinical relation
+// named anywhere in a query's arguments (an include or a select reads the table too), or raw SQL naming a clinical table, is
+// recorded and then throws, so a swallowed error still leaves a trace. Relation names are those of backend/prisma/schema.prisma.
+function clinicFreeDb() {
+  const touched = [];
+  const clinicalDelegates = new Set(['appointment', 'medicalRecord', 'medicalImage', 'notification']);
+  const clinicalRelations = new Set([
+    ...clinicalDelegates,
+    'appointments',
+    'doctorAppts',
+    'medicalRecords',
+    'medicalImages',
+    'notifications',
+  ]);
+  const clinicalTable = /\b(appointments|medical_records|medical_images|notifications)\b/i;
+  const forbid = what => {
+    touched.push(what);
+    throw new Error(`clinical table touched: ${what}`);
+  };
+  const scan = (where, value) => {
+    if (Array.isArray(value)) value.forEach(item => scan(where, item));
+    else if (value && typeof value === 'object' && !(value instanceof Date))
+      for (const [key, child] of Object.entries(value)) {
+        if (clinicalRelations.has(key)) forbid(`${where} names ${key}`);
+        scan(where, child);
+      }
+  };
+  const delegate = model =>
+    new Proxy(
+      {},
+      {
+        get: (_target, method) =>
+          method === 'then' || typeof method === 'symbol'
+            ? undefined
+            : async (args = {}) => {
+                scan(`${model}.${String(method)}`, args);
+                if (model === 'user' && method === 'findUnique')
+                  return { id: args.where.id, role: args.where.id.split('-')[0], passwordChangedAt: null };
+                return method === 'count' ? 0 : method === 'findMany' || method === 'groupBy' ? [] : null;
+              },
+      },
+    );
+  const db = new Proxy(
+    {},
+    {
+      get: (_target, key) => {
+        if (key === 'then' || typeof key === 'symbol') return undefined;
+        if (clinicalDelegates.has(key)) return forbid(key);
+        if (key === '$transaction') return async work => work(db);
+        if (/^\$(query|execute)Raw/.test(key))
+          return async (query = '') => {
+            const text = Array.isArray(query) ? query.join(' ') : String(query.sql ?? query.strings?.join(' ') ?? query);
+            if (clinicalTable.test(text)) forbid(`${key} ${text}`);
+            return [];
+          };
+        return delegate(key);
+      },
+    },
+  );
+  return { db, touched };
+}
+const restoreEnv = saved => {
+  for (const name of Object.keys(process.env)) if (!(name in saved)) delete process.env[name];
+  Object.assign(process.env, saved);
+};
+
+// Every operation of backend/openapi.json as admin: [method, concrete path with the base URL].
+function operationRequests() {
+  const operations = Object.entries(openapi.paths).flatMap(([path, methods]) =>
+    Object.keys(methods)
+      .filter(method => ['get', 'post', 'put', 'patch', 'delete'].includes(method))
+      .map(method => [method.toUpperCase(), path]),
+  );
+  assert.equal(operations.length, 75, 'backend/openapi.json declares 75 operations');
+  return operations.map(([method, path]) => [
+    method,
+    `${openapi.servers[0].url}${path}`
+      .replace('{roomType}', 'standard')
+      .replace('{token}', 'tok-1')
+      .replace(/\{[^}]+\}/g, 'x-1'),
+  ]);
+}
+async function sweepAsAdmin(base, extra = []) {
+  const token = signToken('admin-1', 'admin');
+  const statuses = new Map();
+  for (const [method, path] of [...operationRequests(), ...extra]) {
+    const response = await fetch(base + path, {
+      method,
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'idempotency-key': 'sweep-1' },
+      ...(['POST', 'PATCH', 'PUT'].includes(method) ? { body: '{}' } : {}),
+    });
+    await response.arrayBuffer();
+    statuses.set(`${method} ${path}`, response.status);
+  }
+  return statuses;
+}
+const clinicalPaths = [
+  ['GET', '/api/appointments'],
+  ['GET', '/api/appointments/calendar'],
+  ['POST', '/api/appointments'],
+  ['GET', '/api/medical-records'],
+  ['GET', '/api/medical-records/images'],
+  ['POST', '/api/medical-records'],
+  ['GET', '/api/notifications'],
+];
+
+// A Core with a Clinic URL (and a Notification URL), over a database that refuses clinical tables. `runtime` is the
+// production shape (REDIS_URL set, createCoreDomains behind the split routes); without it the tail is createApp.
+async function splitCore({ runtime }) {
+  const saved = { ...process.env };
+  const clinic = await stubService();
+  const notification = await stubService();
+  const { db, touched } = clinicFreeDb();
+  splitEnv({ runtime });
+  const servers = [];
+  let rt;
+  const close = async () => {
+    rt?.close();
+    for (const server of servers) await stop(server);
+    await clinic.close();
+    await notification.close();
+    restoreEnv(saved);
+  };
+  try {
+    const app = createCoreApp(probeAware(db), {
+      clinicUrl: clinic.url,
+      clinicToken: serviceToken,
+      notificationUrl: notification.url,
+      notificationToken: serviceToken,
+    });
+    if (runtime) rt = await localLimiter(app);
+    assert.equal(typeof app.locals.domains, 'function', 'createCoreApp keeps the app behind the split routes');
+    const listen = async handler => {
+      const server = handler.listen(0, '127.0.0.1');
+      servers.push(server);
+      await once(server, 'listening');
+      return `http://127.0.0.1:${server.address().port}`;
+    };
+    return { app, clinic, notification, touched, close, through: () => listen(app), direct: () => listen(app.locals.domains) };
+  } catch (error) {
+    await close();
+    throw error;
+  }
+}
+
+// Limits of these sweeps: the fake database answers null, [] or 0 and every body is {}, so many deep branches stop at a 400 or
+// 404 before they reach a data source. "No clinical table touched" holds for the paths that really ran, not for every branch.
+//
+// With a Clinic URL the Clinic proxy answers every clinical path before the shared routes, so the flag cannot show in a
+// request through createCoreApp. It shows in the shared routes themselves, which the second pass reaches by sending the same
+// requests to the app behind the split routes (app.locals.domains) straight: there the clinical paths must be plain 404s and
+// no request may read a clinical table.
+test('split Core (Clinic URL, runtime, RSA) answers all 75 operations as admin without touching a clinical table', async () => {
+  const core = await splitCore({ runtime: true });
+  try {
+    const through = await sweepAsAdmin(await core.through());
+    assert.deepEqual(core.touched, [], 'through the gateway: no request reached a clinical table');
+    assert.equal(through.get('GET /api/pets'), 200, 'a Core list is read through the database that refuses clinical tables');
+    assert.ok(core.clinic.calls.includes('GET /api/appointments'), 'the Clinic prefixes went to the Clinic service');
+    assert.ok(core.notification.calls.includes('GET /api/notifications'), 'the notification routes went to Notification');
+
+    const direct = await sweepAsAdmin(await core.direct());
+    assert.deepEqual(core.touched, [], 'on the domains app: no request reached a clinical table');
+    assert.equal(direct.get('GET /api/pets'), 200);
+    for (const [method, path] of clinicalPaths)
+      assert.equal(direct.get(`${method} ${path}`), 404, `${method} ${path} is not a Core route`);
+  } finally {
+    await core.close();
+  }
+});
+
+// The same without REDIS_URL: createCoreApp then mounts createApp(db, { clinical }), the monolith's entrypoint, behind the split
+// routes. It also serves /api/bootstrap, whose repository must not read the clinical or notification tables either.
+test('split Core without a runtime (createApp behind a Clinic URL) serves no clinical route and reads no clinical table', async () => {
+  const core = await splitCore({ runtime: false });
+  try {
+    await sweepAsAdmin(await core.through());
+    assert.deepEqual(core.touched, [], 'through the gateway: no request reached a clinical table');
+    assert.ok(core.clinic.calls.includes('GET /api/appointments'), 'the Clinic prefixes went to the Clinic service');
+
+    const direct = await sweepAsAdmin(await core.direct(), [['GET', '/api/bootstrap']]);
+    assert.deepEqual(core.touched, [], 'on createApp: no request reached a clinical table');
+    assert.equal(direct.get('GET /api/pets'), 200);
+    assert.equal(direct.get('GET /api/bootstrap'), 200, 'the monolith dashboard is served, from Core tables only');
+    for (const [method, path] of clinicalPaths)
+      assert.equal(direct.get(`${method} ${path}`), 404, `${method} ${path} is not a Core route`);
+  } finally {
+    await core.close();
+  }
+});
+
+// Appointment billing is mounted by mountSplitRoutes for a Clinic URL, and only there. A request of type 'appointment' is
+// refused by that route alone, so a configuration that stops serving clinical routes without it would answer 404.
+test('servesClinical is false exactly where appointment billing is mounted', async () => {
+  const saved = { ...process.env };
+  const clinic = await stubService();
+  try {
+    for (const clinicUrl of [undefined, clinic.url]) {
+      splitEnv({ runtime: true });
+      const config = clinicUrl ? { clinicUrl, clinicToken: serviceToken } : {};
+      const { db } = clinicFreeDb();
+      const app = createCoreApp(probeAware(db), config);
+      const rt = await localLimiter(app);
+      const server = app.listen(0, '127.0.0.1');
+      await once(server, 'listening');
+      try {
+        const response = await fetch(`http://127.0.0.1:${server.address().port}/api/operations/op-1`);
+        const mounted = response.status === 401;
+        assert.ok(mounted || response.status === 404, `GET /api/operations/op-1 answered ${response.status}`);
+        assert.equal(mounted, !servesClinical({ clinic: clinicUrl ? new URL(clinicUrl) : null }), String(clinicUrl));
+      } finally {
+        rt.close();
+        await stop(server);
+      }
+    }
+  } finally {
+    await clinic.close();
+    restoreEnv(saved);
   }
 });
