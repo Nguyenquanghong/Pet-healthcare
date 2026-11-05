@@ -4,7 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { createApp } from "../dist/src/legacy/app.js";
 import { signToken } from "../dist/src/lib/token.js";
 import { BookingLifecycleService } from "../dist/src/application/services/bookingLifecycle.js";
-import { PrismaBookingLifecycleStore } from "../dist/src/infrastructure/persistence/bookingLifecycleRepository.js";
+import { PrismaBookingLifecycleStore } from "../dist/src/legacy/infrastructure/persistence/appointmentLifecycleStore.js";
 const url = new URL(process.env.PG_TEST_DATABASE_URL || "http://invalid");
 assert.ok(["postgres:", "postgresql:"].includes(url.protocol));
 assert.ok(["localhost", "127.0.0.1"].includes(url.hostname) && url.pathname.endsWith("_test"));

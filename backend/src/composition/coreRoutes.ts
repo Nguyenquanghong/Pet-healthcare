@@ -3,10 +3,7 @@ import type { Express, RequestHandler } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import type { PrismaClient } from '@prisma/client';
 import openapi from '../../openapi.json' with { type: 'json' };
-import { AppointmentService } from '../legacy/application/services/appointments.js';
-import { MedicalRecordsService } from '../legacy/application/services/medicalRecords.js';
 import { HotelBookingsService } from '../application/services/hotelBookings.js';
-import { NotificationsService } from '../legacy/application/services/notifications.js';
 import { AuthService } from '../application/services/auth.js';
 import { PetsService } from '../application/services/pets.js';
 import { ListsService } from '../application/services/lists.js';
@@ -18,8 +15,21 @@ import { PrismaOwnerActivationRepository } from '../infrastructure/persistence/o
 import { activationTokenAdapter } from '../infrastructure/security/activationToken.js';
 import { PublicRescueService } from '../application/services/publicRescue.js';
 import { InvoicesService } from '../application/services/invoices.js';
-import { BookingLifecycleService } from '../application/services/bookingLifecycle.js';
-import { PrismaBookingLifecycleStore } from '../infrastructure/persistence/bookingLifecycleRepository.js';
+import { BookingLifecycleService, lifecycleByKind } from '../application/services/bookingLifecycle.js';
+import { PrismaHotelLifecycleStore } from '../infrastructure/persistence/bookingLifecycleRepository.js';
+import {
+  AppointmentService,
+  MedicalRecordsService,
+  NotificationsService,
+  PrismaAppointmentLifecycleStore,
+  PrismaNotificationRepository,
+  createAppointmentDependencies,
+  createAppointmentsRouter,
+  createBootstrapRouter,
+  createMedicalDependencies,
+  createMedicalRecordsRouter,
+  createNotificationsRouter,
+} from '../legacy/index.js';
 import { VietQrGenerator } from '../infrastructure/payments/vietqr.js';
 import { PaymentsService } from '../application/services/payments.js';
 import { PrismaPaymentRepository } from '../infrastructure/persistence/paymentRepository.js';
@@ -27,10 +37,7 @@ import { VnpaySandboxGateway } from '../infrastructure/security/vnpay.js';
 import { bankTransferConfig } from '../infrastructure/config/bankTransfer.js';
 import { createPaymentsRouter } from '../routes/payments.js';
 import { BootstrapService } from '../application/services/bootstrap.js';
-import { createAppointmentDependencies } from '../legacy/infrastructure/persistence/appointmentRepository.js';
-import { createMedicalDependencies } from '../legacy/infrastructure/persistence/medicalRepository.js';
 import { createHotelDependencies } from '../infrastructure/persistence/hotelRepository.js';
-import { PrismaNotificationRepository } from '../legacy/infrastructure/persistence/notificationRepository.js';
 import { PrismaUserRepository } from '../infrastructure/persistence/userRepository.js';
 import { PrismaPetRepository } from '../infrastructure/persistence/petRepository.js';
 import { PrismaOwnerRepository } from '../infrastructure/persistence/ownerRepository.js';
@@ -44,16 +51,12 @@ import { ClinicBillingRemote } from '../infrastructure/http/clinicBillingRemote.
 import { serviceVersion } from '../lib/version.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { serviceProxy } from '../gateway/serviceProxy.js';
-import { createAppointmentsRouter } from '../legacy/routes/appointments.js';
 import { createAuthRouter } from '../routes/auth.js';
-import { createBootstrapRouter } from '../legacy/routes/bootstrap.js';
 import { createHotelBookingsRouter } from '../routes/hotelBookings.js';
 import { createHotelCapacityRouter } from '../routes/hotelCapacity.js';
 import { HotelCapacityService } from '../application/services/hotelCapacity.js';
 import { PrismaHotelCapacityRepository } from '../infrastructure/persistence/hotelCapacityRepository.js';
 import { createInvoicesRouter } from '../routes/invoices.js';
-import { createMedicalRecordsRouter } from '../legacy/routes/medicalRecords.js';
-import { createNotificationsRouter } from '../legacy/routes/notifications.js';
 import { createPetsRouter } from '../routes/pets.js';
 import { createOwnersRouter } from '../routes/owners.js';
 import { createPublicRouter } from '../routes/public.js';
@@ -112,7 +115,12 @@ export function mountCoreRoutes(app: Express, client: PrismaClient, { clinical, 
     activationTokenAdapter,
     passwordAdapter,
   );
-  const lifecycle = new BookingLifecycleService(new PrismaBookingLifecycleStore(client));
+  const lifecycle = new BookingLifecycleService(
+    lifecycleByKind({
+      hotel: new PrismaHotelLifecycleStore(client),
+      ...(clinical ? { appointment: new PrismaAppointmentLifecycleStore(client) } : {}),
+    }),
+  );
 
   mountServiceInfo(app, client);
   if (monolith)

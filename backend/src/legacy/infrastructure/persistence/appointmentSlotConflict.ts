@@ -1,4 +1,4 @@
-import { BusinessError } from '../../domain/error.js';
+import { BusinessError } from '../../../domain/error.js';
 
 const slotIndex = 'appointments_active_pet_slot_key';
 const slotColumns = ['pet_id', 'appointment_date', 'appointment_time'];

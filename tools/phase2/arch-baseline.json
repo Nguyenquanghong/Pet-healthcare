@@ -64,7 +64,7 @@
       "values": {
         "longest": 135,
         "over100": 2,
-        "over80": 10
+        "over80": 9
       }
     },
     "S10": {
@@ -108,7 +108,7 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "windowsOutsideLegacy": 292,
+        "windowsOutsideLegacy": 283,
         "windowsAll": 305
       }
     },
