@@ -23,6 +23,7 @@ import {
   NotificationsService,
   PrismaAppointmentLifecycleStore,
   PrismaNotificationRepository,
+  appointmentInvoiceSource,
   createAppointmentDependencies,
   createAppointmentsRouter,
   createBootstrapRouter,
@@ -178,7 +179,13 @@ export function mountCoreRoutes(app: Express, client: PrismaClient, { clinical, 
   app.use(
     '/api/invoices',
     requireAuth,
-    createInvoicesRouter(new InvoicesService(new PrismaInvoiceRepository(client), bankTransfer, new VietQrGenerator())),
+    createInvoicesRouter(
+      new InvoicesService(
+        new PrismaInvoiceRepository(client, clinical ? appointmentInvoiceSource : undefined),
+        bankTransfer,
+        new VietQrGenerator(),
+      ),
+    ),
   );
   app.use(
     '/api/payments',

@@ -179,6 +179,11 @@
       "from": "clinical",
       "to": "hotel",
       "note": "appointments service and medicalRepository call the booking lifecycle; appointmentLifecycleStore implements its port and appends the status event; K4 removes"
+    },
+    {
+      "from": "clinical",
+      "to": "billing",
+      "note": "clinicalSources types the appointment source of invoice issuing (AppointmentInvoiceSource); type-only, K4 removes"
     }
   ],
   "tables": {
@@ -261,11 +266,6 @@
       "from": "billing",
       "to": "hotel",
       "note": "invoiceRepository reads hotelBooking and locks hotel_bookings"
-    },
-    {
-      "from": "billing",
-      "to": "clinical",
-      "note": "invoiceRepository reads appointment and locks appointments"
     },
     {
       "from": "billing",
