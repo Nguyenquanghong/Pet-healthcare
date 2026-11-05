@@ -10,7 +10,7 @@ assert.ok(["postgres:", "postgresql:"].includes(url.protocol));
 assert.ok(["localhost", "127.0.0.1"].includes(url.hostname) && url.pathname.endsWith("_test"));
 process.env.JWT_SECRET = randomBytes(32).toString("hex");
 const db = new PrismaClient({ datasources: { db: { url: url.href } } });
-let server, base, pet, owner, staff, admin, count = 0;
+let server, base, pet, owner, staff, admin, doctor, count = 0;
 const users = [], ids = [];
 async function start() { server = createApp(db).listen(0,"127.0.0.1"); await new Promise(r=>server.once("listening",r)); base=`http://127.0.0.1:${server.address().port}/api`; }
 async function stop() { if(server) await new Promise(r=>server.close(r)); }
@@ -22,7 +22,7 @@ const route = b => `/${"appointmentDate" in b || "serviceName" in b ? "appointme
 async function fixture(kind="appointment", status="pending") {
   count++;
   const b=kind==="appointment"? await db.appointment.create({data:{ownerId:owner.id,petId:pet.id,type:"spa_bath",serviceName:"Lifecycle test",clinicName:"Test",appointmentDate:new Date(`2038-01-${String(count).padStart(2,"0")}`),appointmentTime:"10:00",status}})
-    :await db.hotelBooking.create({data:{ownerId:owner.id,petId:pet.id,checkIn:new Date("2038-02-01"),checkOut:new Date("2038-02-02"),nights:1,roomType:"standard",serviceKeys:[],totalAmount:350000,status}});
+    :await db.hotelBooking.create({data:{ownerId:owner.id,petId:pet.id,checkIn:new Date(Date.UTC(2038,1,count)),checkOut:new Date(Date.UTC(2038,1,count+1)),nights:1,roomType:"standard",serviceKeys:[],totalAmount:350000,status}});
   ids.push(b.id); return b;
 }
 async function change(b,status) { const res=await req(route(b)+"/status",staff,"PATCH",{status,expectedRevision:b.statusRevision}); assert.equal(res.status,200,JSON.stringify(res.body));return res.body.appointment||res.body.booking; }
@@ -39,8 +39,8 @@ async function settleHotel(b) {
   return invoice.id;
 }
 try {
-  for(const role of ["owner","staff","admin"])users.push(await db.user.create({data:{role,fullName:`Lifecycle ${role}`,email:`${randomUUID()}@example.test`,passwordHash:"unused",passwordSalt:"unused"}}));
-  [owner,staff,admin]=users;pet=await db.pet.create({data:{ownerId:owner.id,name:"Lifecycle pet",species:"dog",allergies:[]}});
+  for(const role of ["owner","staff","admin","doctor"])users.push(await db.user.create({data:{role,fullName:`Lifecycle ${role}`,email:`${randomUUID()}@example.test`,passwordHash:"unused",passwordSalt:"unused"}}));
+  [owner,staff,admin,doctor]=users;pet=await db.pet.create({data:{ownerId:owner.id,name:"Lifecycle pet",species:"dog",allergies:[]}});
   await start();
   for(const kind of ["appointment","hotel"]) {
     let b=await fixture(kind);const checkin=kind==="appointment"?"checked_in":"in_stay";
@@ -84,7 +84,7 @@ try {
   assert.deepEqual((await history(rollback)).body,before);
   // Medical record vs undo: a shared booking lock prevents an inconsistent history.
   const medical=await advance(await fixture(),["confirmed","checked_in"]);
-  const medicalRace=await Promise.all([req("/medical-records",staff,"POST",{petId:pet.id,appointmentId:medical.id,doctorName:"Test",visitDate:"2038-01-01",title:"Test",diagnosis:"Test",treatment:"Test"}),undo(medical)]);
+  const medicalRace=await Promise.all([req("/medical-records",doctor,"POST",{petId:pet.id,appointmentId:medical.id,doctorName:"Test",visitDate:"2038-01-01",title:"Test",diagnosis:"Test",treatment:"Test"}),undo(medical)]);
   assert.ok((medicalRace[0].status===201&&medicalRace[1].status===409)||(medicalRace[0].status===409&&medicalRace[1].status===200));
   const medicalState=await db.appointment.findUniqueOrThrow({where:{id:medical.id}});
   assert.equal(await db.medicalRecord.count({where:{appointmentId:medical.id}}),medicalState.status==="completed"?1:0);
