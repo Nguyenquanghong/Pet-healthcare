@@ -14,3 +14,5 @@ cb26f3ed9a5ad331c0cf16df6b669ff5ad1a9678
 3fd1757b0f18bd46052c7003039b9753e41447bb
 # Prettier on listsRepository.ts, with three branches of page moved verbatim into functions of their own (no query change)
 7ccb9c81a3ab96d37116c342c8323a0d6ac6c1a8
+# Prettier on bootstrapRepository.ts, with the dashboard totals and rows of load moved verbatim into functions of their own (no query change)
+b8bdc24c73c7b3e5f72193b8949cc1e4a603f504
