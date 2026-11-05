@@ -5,14 +5,14 @@ import { BusinessError } from "../domain/error.js";
 import { applyJsonBody, applySecurity } from "../composition/http.js";
 import { mountCoreRoutes } from "../composition/coreRoutes.js";
 
-export function createApp(client: PrismaClient) {
+export function createApp(client: PrismaClient, { clinical = true }: { clinical?: boolean } = {}) {
   const app = express();
 
   if (process.env.TRUST_PROXY_HOPS === "1") app.set("trust proxy", 1);
   applySecurity(app);
   applyJsonBody(app);
 
-  mountCoreRoutes(app, client, { clinical: true, monolith: { authLimiter: rateLimit({ windowMs: 15 * 60 * 1000, limit: 50, standardHeaders: "draft-8", legacyHeaders: false, message: { error: "Too many requests, please try again later." } }) } });
+  mountCoreRoutes(app, client, { clinical, monolith: { authLimiter: rateLimit({ windowMs: 15 * 60 * 1000, limit: 50, standardHeaders: "draft-8", legacyHeaders: false, message: { error: "Too many requests, please try again later." } }) } });
 
   app.use((req, res) => res.status(404).json({ error: `Route ${req.originalUrl} was not found.` }));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

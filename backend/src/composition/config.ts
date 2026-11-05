@@ -60,3 +60,8 @@ export function coreSettings(config: CoreConfig): CoreSettings {
     : null;
   return { config, clinic, notification };
 }
+
+// Whether this process serves the clinical routes itself. With a Clinic URL the Clinic service owns the appointment, medical
+// record and notification-list routes and Core never mounts them, nor the repository sources that read their tables. The same
+// setting decides the Clinic proxy and appointment billing in mountSplitRoutes, so the two cannot disagree.
+export const servesClinical = (settings: Pick<CoreSettings, 'clinic'>): boolean => !settings.clinic;

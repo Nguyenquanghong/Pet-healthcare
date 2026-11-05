@@ -151,9 +151,10 @@ test('a downstream body that is not JSON is a 502 with a code, not an outage', a
   });
 });
 
-// The legacy appointment and medical-record routers are still mounted behind the proxy for the
-// monolith (createApp). In split mode nothing may reach them: the fake database has no clinical
-// tables, so a legacy handler could not produce the stub's marker.
+// With a Clinic URL, createApp gets clinical: false (servesClinical), so the legacy appointment and
+// medical-record routers are not mounted behind the proxy at all; only the monolith (no Clinic URL)
+// mounts them. Nothing may reach a legacy handler either way: the fake database has no clinical
+// tables, so such a handler could not produce the stub's marker.
 test('split mode: every Clinic prefix reaches the Clinic proxy and never a legacy Core handler', async () => {
   const requests = [
     ['GET', '/api/appointments'], ['GET', '/api/appointments/'], ['GET', '/api/appointments?status=pending&page=2'],

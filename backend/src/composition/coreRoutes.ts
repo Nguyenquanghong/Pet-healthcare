@@ -70,16 +70,17 @@ import { mountAppointmentBilling } from '../routes/appointmentBilling.js';
 import { mountBillingEvidence } from '../routes/internal/billing.js';
 import { mountDashboards } from '../routes/dashboard.js';
 import { AppointmentInvoiceBilling } from './appointmentBilling.js';
-import type { CoreSettings } from './config.js';
+import { servesClinical, type CoreSettings } from './config.js';
 import { mountDirectory, mountNotificationAuthorization } from './internalRoutes.js';
 
 // Paths the gateway forwards to Clinic; the proxy checks them again after resolving the URL.
 const clinicPrefixes = ['/api/appointments', '/api/medical-records', '/api/dashboard/clinic'] as const;
 
 export type CoreRouteOptions = {
-  // The appointment and medical-record routers. Every composition still mounts them; the split one puts the Clinic proxy in front.
+  // The appointment and medical-record routers, the clinical list routes and the repository sources behind them. Off when a
+  // Clinic service is split off (servesClinical), where the proxy answers those paths.
   clinical: boolean;
-  // Only the legacy entrypoint: /api/auth with its limiter, /api/bootstrap and the in-process /api/notifications.
+  // Only the legacy entrypoint: /api/auth with its limiter, /api/bootstrap and the in-process /api/notifications (which also needs `clinical`).
   monolith?: { authLimiter: RequestHandler };
 };
 
@@ -111,6 +112,13 @@ function mountServiceInfo(app: Express, client: PrismaClient) {
     }
   });
 }
+
+// The dashboard repository of the monolith's /api/bootstrap: it reads the clinical and notification tables only where this
+// process serves clinical routes (servesClinical), as the repository of every other route does.
+const bootstrapRepository = (client: PrismaClient, clinical: boolean) =>
+  clinical
+    ? new PrismaBootstrapRepository(client, clinicalBootstrap, notificationBootstrap)
+    : new PrismaBootstrapRepository(client);
 
 // The routes every Core composition shares. The order is part of the contract: the first matching mount answers.
 export function mountCoreRoutes(app: Express, client: PrismaClient, { clinical, monolith }: CoreRouteOptions) {
@@ -146,9 +154,7 @@ export function mountCoreRoutes(app: Express, client: PrismaClient, { clinical, 
     app.use(
       '/api/bootstrap',
       requireAuth,
-      createBootstrapRouter(
-        new BootstrapService(new PrismaBootstrapRepository(client, clinicalBootstrap, notificationBootstrap)),
-      ),
+      createBootstrapRouter(new BootstrapService(bootstrapRepository(client, clinical))),
     );
   app.use('/api/pets', requireAuth, createPetsRouter(new PetsService(new PrismaPetRepository(client), qrTokenAdapter)));
   app.use(
@@ -179,7 +185,7 @@ export function mountCoreRoutes(app: Express, client: PrismaClient, { clinical, 
     requireAuth,
     createHotelCapacityRouter(new HotelCapacityService(new PrismaHotelCapacityRepository(client))),
   );
-  if (monolith)
+  if (monolith && clinical)
     app.use(
       '/api/notifications',
       requireAuth,
@@ -228,7 +234,7 @@ export function mountSplitRoutes(app: Express, db: PrismaClient, settings: CoreS
   mountDirectory(app, db, config.directoryToken ?? config.clinicToken);
   const account = (id: string) => db.user.findUnique({ where: { id }, select: { role: true } });
   mountDashboards(app, { core: new BootstrapService(new PrismaBootstrapRepository(db)), account });
-  if (!clinic)
+  if (servesClinical(settings))
     mountClinicDashboard(app, {
       clinic: new BootstrapService(new PrismaBootstrapRepository(db, clinicalBootstrap)),
       account,
