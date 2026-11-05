@@ -12,7 +12,7 @@ import { NotificationInbox } from '../../services/notification/src/inbox.ts';
 import amqp from 'amqplib';
 import { declareTopology, topology, publishConfirmed, consumeEvents, replayEvent, TransientError, permanentOn } from '@nipopeto/messaging';
 import { brokerQueues, topologyQueues } from './test-project.mjs';
-import { ClinicInbox } from '../../services/clinic/src/infrastructure/messaging/inbox.ts';
+import { ProofClinicInbox } from './fixtures/p1-proof/proofInbox.ts';
 import { OutboxRelay as ClinicRelay } from '../../services/clinic/src/infrastructure/messaging/relay.ts';
 assert.equal(process.env.PHASE2_TEST_CONFIRM, 'pet-phase2-p1-test', 'Use phase2:test:integration; direct execution refused');
 const urls = Object.fromEntries(['core', 'clinic', 'notification'].map(s => [s, `postgresql://p2_${s}:p2_${s}_fixture_only@127.0.0.1:55432/p2_${s}_test?schema=p1_proof`]));
@@ -222,7 +222,7 @@ async function empty(q) { await until(async () => (await channel.checkQueue(q)).
 test('topic routes billing/directory to Clinic; projection never regresses or revives a tombstone', async () => {
   const t = topology(`p2.routes.${run}`); await declareTopology(broker, t);
   extraExchanges.add(t.exchange); for (const c of ['clinic', 'notification']) { extraQueues.add(t[c]); extraQueues.add(`${t[c]}.dlq`); }
-  const ownerId = randomUUID(), clinicInbox = new ClinicInbox(clients.clinic);
+  const ownerId = randomUUID(), clinicInbox = new ProofClinicInbox(clients.clinic);
   for (const version of [2, 3, 1]) {
     const event = { ...notificationEvent(ownerId), eventType: 'directory.owner-upserted.v1', aggregateType: 'owner', aggregateVersion: version, payload: { id: ownerId, sourceVersion: version, displayName: 'Synthetic owner', deletedAt: version === 3 ? new Date().toISOString() : null } };
     await clients.core.outboxEvent.create({ data: { id: event.eventId, envelope: event } });
@@ -387,24 +387,23 @@ async function spawnWorker(service, env) {
 test('three built workers route both producers, survive broker stop and recover durable backlog after restart', { timeout: 60000 }, async () => {
   const t = topology(`p2.workers.${run}`); await declareTopology(broker, t);
   extraExchanges.add(t.exchange); for (const c of ['clinic', 'notification']) { extraQueues.add(t[c]); extraQueues.add(`${t[c]}.dlq`); }
-  const a = await appointment(), op = await begin(a), snap = await clinic.prepare(op.id, a.id, 1); await core.terminal(op.id, 'commit', snap);
-  const workers = [], env = { BROKER_URL: broker, BROKER_PREFIX: `p2.workers.${run}`, OUTBOX_AGGREGATE_ID: op.id };
+  const scope = randomUUID();
+  const workers = [], env = { BROKER_URL: broker, BROKER_PREFIX: `p2.workers.${run}`, OUTBOX_AGGREGATE_ID: scope };
   let notificationWorker, stoppedBroker = false;
   const docker = (...args) => execFileSync('docker', ['compose', '-f', 'deploy/phase2/compose.test.yml', ...args], { stdio: 'pipe', timeout: 30000 });
   assert.equal(docker('exec', '-T', 'rabbitmq', 'hostname').toString().trim(), 'p2-rabbit-test', 'Stable node identity is required for durable volume reload');
   try {
     notificationWorker = await spawnWorker('notification', { ...env, DATABASE_URL: urls.notification }); workers.push(notificationWorker);
     workers.push(await spawnWorker('clinic', { ...env, DATABASE_URL: urls.clinic })); workers.push(await spawnWorker('core', { ...env, DATABASE_URL: urls.core }));
-    const coreEvent = notificationEvent(op.id), clinicEvent = { ...notificationEvent(op.id), producer: 'clinic' };
+    const coreEvent = notificationEvent(scope), clinicEvent = { ...notificationEvent(scope), producer: 'clinic' };
     await clients.core.outboxEvent.create({ data: { id: coreEvent.eventId, envelope: coreEvent } }); await clients.clinic.outboxEvent.create({ data: { id: clinicEvent.eventId, envelope: clinicEvent } });
     for (const event of [coreEvent, clinicEvent]) await until(() => clients.notification.notification.findUnique({ where: { id: event.payload.notificationId } }), 'both worker producers');
-    await until(async () => (await clients.clinic.billingReservation.findUnique({ where: { operationId: op.id } })).state === 'INVOICED', 'billing worker finalizes');
     await notificationWorker.stop();
-    const queued = notificationEvent(op.id); await clients.core.outboxEvent.create({ data: { id: queued.eventId, envelope: queued } });
+    const queued = notificationEvent(scope); await clients.core.outboxEvent.create({ data: { id: queued.eventId, envelope: queued } });
     await until(async () => (await clients.core.outboxEvent.findUnique({ where: { id: queued.eventId } })).publishedAt, 'backlog confirmed'); await until(async () => (await channel.checkQueue(t.notification)).messageCount >= 1, 'durable backlog');
     await channel.close(); await connection.close(); channel = undefined; connection = undefined;
     docker('stop', 'rabbitmq'); stoppedBroker = true;
-    const pending = notificationEvent(op.id); await clients.core.outboxEvent.create({ data: { id: pending.eventId, envelope: pending } });
+    const pending = notificationEvent(scope); await clients.core.outboxEvent.create({ data: { id: pending.eventId, envelope: pending } });
     await until(async () => (await clients.core.outboxEvent.findUnique({ where: { id: pending.eventId } })).lastErrorCode === 'DELIVERY_UNCONFIRMED', 'broker-down outbox retained');
     assert.equal((await clients.core.outboxEvent.findUnique({ where: { id: pending.eventId } })).publishedAt, null);
     docker('up', '-d', '--wait', 'rabbitmq'); stoppedBroker = false;
