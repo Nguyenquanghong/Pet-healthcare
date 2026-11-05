@@ -138,6 +138,7 @@
         "legacy/application/*",
         "legacy/infrastructure/*",
         "legacy/routes/appointments",
+        "legacy/routes/clinicDashboard",
         "legacy/routes/clinicalLists",
         "legacy/routes/medicalRecords",
         "legacy/routes/notifications"

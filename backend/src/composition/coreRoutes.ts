@@ -24,6 +24,7 @@ import {
   PrismaAppointmentLifecycleStore,
   PrismaNotificationRepository,
   appointmentInvoiceSource,
+  clinicalBootstrap,
   clinicalListSource,
   createAppointmentDependencies,
   createAppointmentsRouter,
@@ -32,6 +33,8 @@ import {
   createMedicalDependencies,
   createMedicalRecordsRouter,
   createNotificationsRouter,
+  mountClinicDashboard,
+  notificationBootstrap,
 } from '../legacy/index.js';
 import { VietQrGenerator } from '../infrastructure/payments/vietqr.js';
 import { PaymentsService } from '../application/services/payments.js';
@@ -143,7 +146,9 @@ export function mountCoreRoutes(app: Express, client: PrismaClient, { clinical, 
     app.use(
       '/api/bootstrap',
       requireAuth,
-      createBootstrapRouter(new BootstrapService(new PrismaBootstrapRepository(client))),
+      createBootstrapRouter(
+        new BootstrapService(new PrismaBootstrapRepository(client, clinicalBootstrap, notificationBootstrap)),
+      ),
     );
   app.use('/api/pets', requireAuth, createPetsRouter(new PetsService(new PrismaPetRepository(client), qrTokenAdapter)));
   app.use(
@@ -221,15 +226,13 @@ export function mountSplitRoutes(app: Express, db: PrismaClient, settings: CoreS
       ),
     );
   mountDirectory(app, db, config.directoryToken ?? config.clinicToken);
-  mountDashboards(
-    app,
-    {
-      core: new BootstrapService(new PrismaBootstrapRepository(db, true, true)),
-      clinic: new BootstrapService(new PrismaBootstrapRepository(db, false, true)),
-      account: id => db.user.findUnique({ where: { id }, select: { role: true } }),
-    },
-    Boolean(clinic),
-  );
+  const account = (id: string) => db.user.findUnique({ where: { id }, select: { role: true } });
+  mountDashboards(app, { core: new BootstrapService(new PrismaBootstrapRepository(db)), account });
+  if (!clinic)
+    mountClinicDashboard(app, {
+      clinic: new BootstrapService(new PrismaBootstrapRepository(db, clinicalBootstrap)),
+      account,
+    });
   if (clinic) {
     app.use(
       [...clinicPrefixes],
