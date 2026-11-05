@@ -21,6 +21,9 @@ export class ClinicInbox {
       })
     )
       return false;
+    // Billing terminal events name the appointment they close. Without it no retry
+    // can help, so reject before any transaction opens and let the broker dead-letter it.
+    if (billing && !(event.payload as Record<string, string>).appointmentId) throw new Error('UNSUPPORTED_EVENT');
     const kind = event.eventType.split('.')[1]!.replace('-upserted', '');
     const original = event.payload as unknown as DirectoryEntry;
     // Full search fields are fetched outside the SQL transaction. Wire events
@@ -40,28 +43,11 @@ export class ClinicInbox {
           ON CONFLICT (kind,id) DO UPDATE SET "sourceVersion" = EXCLUDED."sourceVersion", "displayName" = EXCLUDED."displayName", "ownerId" = EXCLUDED."ownerId", species = EXCLUDED.species, phone=EXCLUDED.phone,breed=EXCLUDED.breed,email=EXCLUDED.email,"microchipId"=EXCLUDED."microchipId","updatedAt"=now(), "deletedAt" = EXCLUDED."deletedAt" WHERE "DirectoryProjection"."sourceVersion" < EXCLUDED."sourceVersion"`;
       } else {
         const p = event.payload as Record<string, string>;
-        if (p.appointmentId) {
-          await applyBillingTerminal(tx, p.operationId!, {
-            state: billing!.terminal,
-            appointmentId: p.appointmentId,
-            invoiceId: p.invoiceId,
-          });
-          return true;
-        }
-        const r = await tx.billingReservation.findUniqueOrThrow({ where: { operationId: p.operationId } });
-        await tx.$queryRaw`SELECT id FROM "ProofAppointment" WHERE id = ${r.appointmentId} FOR UPDATE`;
-        const current = await tx.billingReservation.findUniqueOrThrow({ where: { operationId: p.operationId } });
-        const state = billing!.reservation;
-        if (
-          current.state !== 'HELD' &&
-          (current.state !== state || (state === 'INVOICED' && current.invoiceId !== p.invoiceId))
-        )
-          throw new Error('TERMINAL_CONFLICT');
-        if (current.state === 'HELD')
-          await tx.billingReservation.update({
-            where: { operationId: p.operationId },
-            data: { state, invoiceId: p.invoiceId },
-          });
+        await applyBillingTerminal(tx, p.operationId!, {
+          state: billing!.terminal,
+          appointmentId: p.appointmentId!,
+          invoiceId: p.invoiceId,
+        });
       }
       return true;
     });
