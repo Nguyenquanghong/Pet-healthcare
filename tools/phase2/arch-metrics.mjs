@@ -135,13 +135,21 @@ export function clinicalSchema(schemaText){
   }
   const missing=CLINICAL_MODELS.filter(m=>!models.has(m));
   if(missing.length)throw new Error('the schema has no model '+missing.join(', ')+'; update CLINICAL_MODELS in tools/phase2/arch-metrics.mjs');
-  const keys=new Set();
-  for(const {fields} of models.values())for(const f of fields)if(CLINICAL_MODELS.includes(f.type))keys.add(f.name);
+  const keys=new Set(),relations=new Map(),scalars=new Map();
+  for(const {name,fields} of models.values()){
+    relations.set(name,new Map(fields.filter(f=>models.has(f.type)).map(f=>[f.name,f.type])));
+    scalars.set(name,new Set(fields.filter(f=>!models.has(f.type)).map(f=>f.name)));
+    for(const f of fields)if(CLINICAL_MODELS.includes(f.type))keys.add(f.name);
+  }
   return {
     models:[...models.keys()],
     enums:[...enums],
     delegates:new Set(CLINICAL_MODELS.map(lowerFirst)),
-    modelDelegates:new Set([...models.keys()].map(lowerFirst)),
+    // delegate name -> model (pet -> Pet), and per model its relation fields: field -> the model it points at (Pet.owner -> User)
+    delegateModel:new Map([...models.keys()].map(m=>[lowerFirst(m),m])),
+    relations,
+    // per model its scalar fields (enums and Json included): a value under one of them is data, not a query
+    scalars,
     tables:new Set(CLINICAL_MODELS.map(m=>(models.get(m).table??m).toLowerCase())),
     keys,
   };
@@ -166,6 +174,32 @@ const RAW_SQL_START=/(?:\$(?:queryRaw|executeRaw)\s*(?:<[^`]*?>)?|\bPrisma\.sql)
 const TYPED_OBJECT=/\bPrisma\.\w*(?:WhereInput|Include|Select|OrderBy\w*)\b(?:\[\])?/g;
 const lineOf=(text,index)=>text.slice(0,index).split('\n').length;
 const matchOpenBack=(code,close)=>{let depth=0;for(let i=close;i>=0;i--){if(code[i]==='}')depth++;else if(code[i]==='{'&&--depth===0)return i;}return -1;};
+// The two places a Prisma query object lives, found once for every reader: the arguments of a delegate call on a model of the schema, and an
+// object declared with a Prisma where/include/select/orderBy type. `model` is the model the object is about (pet for tx.pet.findMany, Pet for
+// Prisma.PetWhereInput), the `from..to` range holds the object (or the parentheses of the call, or the array of objects).
+export function delegateCalls(code,schema,pattern=DELEGATE_ANY){
+  const calls=[];
+  for(const m of code.matchAll(pattern)){
+    let open=m.index+m[0].length-1;
+    if(code[open]==='<'){const end=matchClose(code,open,'<','>');open=end<0?-1:skipWs(code,end+1);}
+    const call={name:m[1],model:schema.delegateModel.get(m[1]),index:m.index,from:-1,to:-1};
+    if(open>=0&&code[open]==='('){const end=matchClose(code,open,'(',')');if(end>0){call.from=open;call.to=end;}}
+    calls.push(call);
+  }
+  return calls;
+}
+export function typedObjects(code,schema){
+  const found=[];
+  for(const m of code.matchAll(TYPED_OBJECT)){
+    const type=m[0].replace(/^Prisma\./,'').replace(/\[\]$/,''),model=[...schema.models].filter(x=>type.startsWith(x)).sort((a,b)=>b.length-a.length)[0];
+    // `= {`, `=> ({`, and an array of objects: `: Prisma.PetOrderByWithRelationInput[] = [{ ... }, { ... }]`
+    const after=/^\s*=>?\s*\(?\s*[[{]/.exec(code.slice(m.index+m[0].length));
+    if(after){const open=m.index+m[0].length+after[0].length-1,end=code[open]==='['?matchClose(code,open,'[',']'):matchClose(code,open,'{','}');if(end>0)found.push({model,from:open,to:end,index:m.index});}
+    const before=/\}\s*(?:satisfies|as)\s+$/.exec(code.slice(0,m.index));
+    if(before){const close=m.index-before[0].length+before[0].indexOf('}'),open=matchOpenBack(code,close);if(open>=0)found.push({model,from:open,to:close,index:m.index});}
+  }
+  return found;
+}
 // Every place a file touches a clinical table: {kind, text, line}. Comments, strings and regex literals read nothing (the code is sanitized).
 // Known limits (the code is read as text, not as a program). Not seen, a miss:
 //  - an object of relation keys put in a variable with no Prisma type and passed to a call later;
@@ -183,18 +217,13 @@ export function clinicalReads(source,schema){
   const keyPattern=new RegExp(String.raw`(?<=[{,]\s*)(${[...schema.keys].join('|')})\b\s*(?::|(?=\s*[,}]))`,'g');
   const keysIn=(from,to)=>{for(const m of code.slice(from,to).matchAll(keyPattern))add('relation key',m[1],from+m.index);};
   // 2. a delegate of a clinical model; 4a. a relation key in the arguments of any delegate call
-  for(const m of code.matchAll(DELEGATE_ANY)){
-    if(schema.delegates.has(m[1]))add('delegate',m[1]+' (delegate call)',m.index);
-    let open=m.index+m[0].length-1;
-    if(code[open]==='<'){const end=matchClose(code,open,'<','>');open=end<0?-1:skipWs(code,end+1);}
-    if(open>=0&&code[open]==='('&&schema.modelDelegates.has(m[1])){
-      const end=matchClose(code,open,'(',')');
-      if(end>0){
-        keysIn(open,end);
-        // the fluent API: tx.pet.findUnique({ ... }).appointments()
-        const fluent=new RegExp(String.raw`^${DOT}(${[...schema.keys].join('|')})\s*\(`).exec(code.slice(end+1));
-        if(fluent)add('relation key',fluent[1]+' (fluent call)',end);
-      }
+  for(const call of delegateCalls(code,schema)){
+    if(schema.delegates.has(call.name))add('delegate',call.name+' (delegate call)',call.index);
+    if(call.model&&call.to>0){
+      keysIn(call.from,call.to);
+      // the fluent API: tx.pet.findUnique({ ... }).appointments()
+      const fluent=new RegExp(String.raw`^${DOT}(${[...schema.keys].join('|')})\s*\(`).exec(code.slice(call.to+1));
+      if(fluent)add('relation key',fluent[1]+' (fluent call)',call.to);
     }
   }
   // 3. raw SQL that names a clinical table
@@ -204,13 +233,7 @@ export function clinicalReads(source,schema){
     for(const t of source.slice(start,end).matchAll(SQL_TABLE))if(schema.tables.has(t[1].toLowerCase()))add('sql',t[1]+' (raw SQL)',m.index);
   }
   // 4b. a relation key in an object declared with a Prisma where/include/select/orderBy type
-  for(const m of code.matchAll(TYPED_OBJECT)){
-    // `= {`, `=> ({`, and an array of objects: `: Prisma.PetOrderByWithRelationInput[] = [{ ... }, { ... }]`
-    const after=/^\s*=>?\s*\(?\s*[[{]/.exec(code.slice(m.index+m[0].length));
-    if(after){const open=m.index+m[0].length+after[0].length-1,end=code[open]==='['?matchClose(code,open,'[',']'):matchClose(code,open,'{','}');if(end>0)keysIn(open,end);}
-    const before=/\}\s*(?:satisfies|as)\s+$/.exec(code.slice(0,m.index));
-    if(before){const close=m.index-before[0].length+before[0].indexOf('}'),open=matchOpenBack(code,close);if(open>=0)keysIn(open,close);}
-  }
+  for(const t of typedObjects(code,schema))keysIn(t.from,t.to);
   // 5. a Prisma type of a clinical model, and a name of one imported from @prisma/client
   for(const m of code.matchAll(/\bPrisma\.([A-Za-z_]\w*)/g))if(typeIsClinical(m[1],schema))add('type',m[0],m.index);
   for(const m of code.matchAll(/\b(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s*from\s*(['"])( *)\2/g)){
@@ -219,6 +242,56 @@ export function clinicalReads(source,schema){
     for(const part of m[1].split(','))for(const name of [part.trim().replace(/^type\s+/,'').split(/\s+as\s+/)[0]])if(name&&typeIsClinical(name,schema))add('import',name+' (from @prisma/client)',m.index);
   }
   return found;
+}
+// The tables a file reads through relations nested in a query (Q6): `tx.hotelBooking.findMany({ include: { pet: true } })` reads pet, and
+// `where: { booking: { owner: {...} } }` on dailyCareNote reads hotelBooking and then user. The walk follows the model: a key that is a relation
+// of the current model names the model it points at (generated from the schema: Pet.owner -> User), and its object is read as that model;
+// any other key (include, select, where, _count, some, OR, a scalar) keeps the model. The names returned are delegate names (pet, user,
+// hotelBooking), which the module map's `tables` own. The queries are the ones clinicalReads reads (delegateCalls, typedObjects); the
+// delegate itself is not in the result (tablesRead has it). A value under a scalar field of the model (a Json column, an `in: [...]` list)
+// is data and is not walked. The fluent API is followed: `tx.pet.findUnique({...}).owner()` reads user, and the chain goes on while each
+// name is a relation of the model before it. `pattern` says which receivers count (DELEGATE_ANY by default; tablesRead passes DATA_DELEGATE,
+// the receivers its own delegate reading takes, so a query is never counted by half). Known limits: an object kept in a variable with no
+// Prisma type and passed later is not followed (hotelRepository.ts: `const noteIds = { dailyCareNotes: ... } as const`, then
+// `include: noteIds`; directoryRepository.ts: the `owned` array), and a relation named by a computed or quoted key is not seen.
+export function nestedTables(source,schema,pattern=DELEGATE_ANY){
+  const code=sanitize(source),names=new Set(),lower=m=>m[0].toLowerCase()+m.slice(1);
+  const objectsIn=(from,to)=>{const found=[];for(let j=from;j<to;){if(code[j]==='{'){found.push(j);const end=matchClose(code,j,'{','}');j=end<0?to:end+1;}else j++;}return found;};
+  const entryEnd=(from,to)=>{let depth=0;for(let j=from;j<to;j++){const c=code[j];if(c==='('||c==='['||c==='{')depth++;else if(c===')'||c===']'||c==='}')depth--;else if(c===','&&depth===0)return j;}return to;};
+  const walkObject=(open,model)=>{
+    const end=matchClose(code,open,'{','}');
+    if(end<0)return;
+    for(let i=open+1;i<end;){
+      const stop=entryEnd(i,end),entry=/^\s*([A-Za-z_$][\w$]*)\s*(?::|$)/.exec(code.slice(i,stop));
+      let next=model,start=i;
+      if(entry){
+        if(schema.scalars.get(model)?.has(entry[1])){i=stop+1;continue;}
+        const target=schema.relations.get(model)?.get(entry[1]);
+        if(target){names.add(lower(target));next=target;}
+        start=i+entry[0].length;
+      }
+      for(const o of objectsIn(start,stop))walkObject(o,next);
+      i=stop+1;
+    }
+  };
+  const fluent=new RegExp(String.raw`^${DOT}([A-Za-z_$][\w$]*)\s*\(`);
+  for(const call of delegateCalls(code,schema,pattern)){
+    if(!call.model||call.to<=0)continue;
+    for(const o of objectsIn(call.from,call.to))walkObject(o,call.model);
+    // the fluent API: tx.pet.findUnique({...}).owner({ ... }).hotelBookings()
+    let model=call.model,at=call.to+1;
+    for(;;){
+      const m=fluent.exec(code.slice(at)),target=m&&schema.relations.get(model)?.get(m[1]);
+      if(!target)break;
+      names.add(lower(target));
+      const open=at+m[0].length-1,end=matchClose(code,open,'(',')');
+      if(end<0)break;
+      for(const o of objectsIn(open,end))walkObject(o,target);
+      model=target;at=end+1;
+    }
+  }
+  for(const t of typedObjects(code,schema))if(t.model)for(const o of objectsIn(t.from,t.to+1))walkObject(o,t.model);
+  return names;
 }
 // Where the Core's schema is, relative to the repository root.
 export const SCHEMA_PATH='backend/prisma/schema.prisma';

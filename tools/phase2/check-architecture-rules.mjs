@@ -37,6 +37,7 @@
 // 16. Core module map (K3, K4): every backend/src file belongs to one group of tools/phase2/core-modules.json; an import between
 //     two groups, and a table one group reads that another owns, must be declared there (and a declaration nothing uses fails);
 //     the group `legacy` (backend/src/legacy) is imported by platform alone and reads the clinical tables alone, declared or not.
+//     A table counts as read when a query reaches it through a relation nested in include, select, where, orderBy or _count (K4 Q6).
 // 17. Legacy isolation (K4): outside backend/src/legacy, nothing imports legacy/ (composition/ excepted) and nothing reads a clinical
 //     table: no delegate, raw SQL table, relation key (generated from the Prisma schema) or Prisma type of Appointment, MedicalRecord,
 //     MedicalImage or Notification. A self-check fails the rule if its reader stops seeing the reads inside legacy/.
@@ -676,7 +677,7 @@ rule('clinic-routes-declare-scope',()=>{
 // ---- 12. Structure ratchet ---------------------------------------------------------------
 // Each non-manual metric has a direction ("lower" or "higher" is better). Worse than the baseline fails; better passes
 // and reminds to lower the baseline so the gain cannot be lost later. Manual metrics are declared, never compared.
-const {measure,baselineOf,ciJobsRunning,LEGACY_APP,PRODUCTION_APP,walk,importEdges,importSpecifiers,clinicalSchema,clinicalReads,CLINICAL_MODELS,SCHEMA_PATH,DATA_DELEGATE,RAW_SQL,SQL_TABLE}=await import(pathToFileURL(resolve(root,'tools/phase2/arch-metrics.mjs')).href);
+const {measure,baselineOf,ciJobsRunning,LEGACY_APP,PRODUCTION_APP,walk,importEdges,importSpecifiers,clinicalSchema,clinicalReads,nestedTables,CLINICAL_MODELS,SCHEMA_PATH,DATA_DELEGATE,RAW_SQL,SQL_TABLE}=await import(pathToFileURL(resolve(root,'tools/phase2/arch-metrics.mjs')).href);
 const RATCHET_FIX='node tools/phase2/arch-metrics.mjs --write-baseline';
 export function ratchetFindings(current,baseline){
   const worse=[],better=[],stale=[];
@@ -749,11 +750,16 @@ const GROUP_KINDS = ['context', 'kernel', 'dto', 'read', 'legacy', 'platform'];
 const LEGACY_COMPOSITION = 'legacy/app.ts';
 const inPattern = (path, pattern) => (pattern.endsWith('*') ? path.startsWith(pattern.slice(0, -1)) : path === pattern);
 // A Prisma delegate (tx|client|db.<delegate>.<call>) and the table a raw SQL template names after FROM, JOIN, INTO, TRUNCATE or UPDATE
-// (DATA_DELEGATE, RAW_SQL and SQL_TABLE are in arch-metrics.mjs, shared with the rule legacy-isolated).
-export function tablesRead(source) {
+// (DATA_DELEGATE, RAW_SQL and SQL_TABLE are in arch-metrics.mjs, shared with the rule legacy-isolated), and, since K4 Q6, the tables a query
+// reaches through relations nested in include, select, where, orderBy or _count (nestedTables in arch-metrics.mjs follows each relation
+// field to the model it points at, from the Prisma schema, over the same queries the rule legacy-isolated reads). A table read that way is
+// attributed like a delegate: `include: { pet: true }` in a hotel file is a read of pet.
+const SCHEMA = clinicalSchema(read(SCHEMA_PATH));
+export function tablesRead(source, schema = SCHEMA) {
   const code = withoutComments(source), names = new Set();
   for (const m of code.matchAll(DATA_DELEGATE)) names.add(m[1]);
   for (const sql of code.matchAll(RAW_SQL)) for (const m of sql[1].matchAll(SQL_TABLE)) names.add(m[1]);
+  for (const name of nestedTables(source, schema, DATA_DELEGATE)) names.add(name);
   return names;
 }
 export function coreModuleFindings(config, modules, base = resolve(root, 'backend/src')) {
@@ -848,6 +854,44 @@ rule('core-module-map', () => {
   assert.deepEqual(dataEdge('await tx.$queryRaw`SELECT id FROM mystery_table`;'), [hotelRepo + ' reads mystery_table, which no group owns in tables'], 'a raw SQL table no group owns');
   assert.deepEqual(dataEdge('', { dataEdges: [edge('hotel', 'billing')] }), ['data edge hotel -> billing is declared but no file reads it any more'], 'a declared data edge that is gone');
   assert.deepEqual(at([['infrastructure/persistence/listsRepository.ts', 'await tx.invoice.findMany({});'], ['composition/coreRoutes.ts', 'await db.user.findUnique({});']]), [], 'read and platform read any table');
+  // relations nested in a query (K4 Q6): the table a relation points at is read, found by following each relation field to its model
+  const nested = (statement, extra) => dataEdge(statement, extra), hotelReads = table => 'data edge hotel -> ' + { invoice: 'billing', user: 'identity', pet: 'directory' }[table] + ' is not in dataEdges (first: ' + hotelRepo + ' reads ' + table + ')';
+  const asTable = statement => [...nestedTables(statement, SCHEMA)].sort();
+  assert.deepEqual(asTable('await tx.hotelBooking.findMany({ include: { pet: true } });'), ['pet'], 'include one relation: the table it points at (the delegate itself is not in the result)');
+  assert.deepEqual(asTable('await tx.dailyCareNote.findMany({ where: { booking: { owner: { id } } } });'), ['hotelBooking', 'user'], 'a where over two relations reads both tables, the second one by the model of the first');
+  assert.deepEqual(asTable('await tx.user.findMany({ include: { _count: { select: { pets: true } } } });'), ['pet'], '_count: { select: { pets } } reads pet');
+  assert.deepEqual(asTable('await tx.hotelBooking.findMany({ where: { items: {} }, select: { id: true } });'), [], 'items is a relation of Invoice, not of HotelBooking');
+  assert.deepEqual(asTable('const w = { pet: { name } }; res.json({ owner: 1 });'), [], 'an object that is no query reads nothing');
+  assert.deepEqual(nested('await tx.hotelBooking.findMany({ include: { invoices: true } });'), [hotelReads('invoice')], 'include a relation of another context that is not declared');
+  assert.deepEqual(nested('await tx.hotelBooking.findMany({ include: { invoices: true } });', { dataEdges: [edge('hotel', 'billing')] }), [], 'the same relation once declared');
+  assert.deepEqual(nested('await tx.hotelBooking.findMany({ include: { dailyCareNotes: { select: { id: true } } } });'), [], 'include a relation inside the same context');
+  assert.deepEqual(nested('await tx.dailyCareNote.findMany({ where: { booking: { owner: { id } } } });'), [hotelReads('user')], 'a where over two relations: the table of the second level');
+  assert.deepEqual(nested('await tx.dailyCareNote.findMany({ where: { booking: { invoices: { some: {} } } } });'), [hotelReads('invoice')], 'a where over two relations, the second one in another context');
+  assert.deepEqual(nested('await tx.hotelBooking.findMany({ where: { items: {} } });'), [], 'a key that is a relation of another model is not a relation here');
+  assert.deepEqual(dataEdge('await tx.user.findMany({ include: { _count: { select: { pets: true } } } });'), [hotelReads('user'), hotelReads('pet')], 'hotel reads user, and pet through _count');
+  assert.deepEqual(asTable('await tx.hotelBooking.findMany({ include: { pet } });'), ['pet'], 'a relation as a shorthand property');
+  assert.deepEqual(asTable('await tx.hotelBooking.findMany({ where: { id: { in: [a, pet, b] } } });'), [], 'commas inside a scalar value split no entry: `pet` there is a variable');
+  assert.deepEqual(asTable('await tx.dailyCareNote.findMany({ where: { id: { in: [a, b] }, owner: { id } } });'), [], 'owner is no relation of dailyCareNote, whatever precedes it');
+  assert.deepEqual(asTable('await tx.hotelBooking.findMany({ where: { id: { in: [a, b] }, owner: { id } } });'), ['user'], 'a relation key that follows a scalar value with commas and depth');
+  assert.deepEqual(asTable('await tx.appointmentBillingOperation.create({ data: { payload: { invoice: "x" } } });'), [], 'a Json column holds data: a key named like a relation under it is not a read');
+  assert.deepEqual(asTable('await tx.invoice.findMany({ where: { id: { in: rows.map(({ owner }) => owner) } } });'), [], 'a list of values under a scalar field is not walked');
+  assert.deepEqual(asTable('await this.client.pet.findUnique({ where: { id } }).owner();'), ['user'], 'the fluent API: .owner() reads user');
+  assert.deepEqual(asTable('await tx.pet.findUnique({ where: { id } })\n  .owner()\n  .invoices({ include: { items: true } });'), ['invoice', 'invoiceItem', 'user'], 'a fluent chain follows each relation to its model, and the arguments of each step');
+  assert.deepEqual(asTable('await tx.pet.findUnique({ where: { id } }).name();'), [], 'a call after the query that is no relation reads nothing');
+  assert.deepEqual(at([['infrastructure/persistence/publicRescueRepository.ts', 'await this.client.pet.findFirst({ where: { id } }).owner();']]), ['data edge rescue -> directory is not in dataEdges (first: infrastructure/persistence/publicRescueRepository.ts reads pet)', 'data edge rescue -> identity is not in dataEdges (first: infrastructure/persistence/publicRescueRepository.ts reads user)'], 'a rescue file reads user through .owner(), and pet through the delegate');
+  assert.deepEqual(nested('await prisma.hotelBooking.findMany({ include: { pet: true } });'), [], 'the receivers are the ones the delegate reading takes (tx, client, db): prisma is read by neither, so the query is not counted by half');
+  assert.deepEqual(asTable('await prisma.hotelBooking.findMany({ include: { pet: true } });'), ['pet'], 'nestedTables alone reads every receiver when it is not told otherwise');
+  assert.deepEqual(nested('await this.db.hotelBooking.findMany({ include: { pet: true } });'), [hotelReads('pet')], 'db is a receiver of both readings');
+  assert.deepEqual(at([['infrastructure/persistence/userRepository.ts', 'await tx.user.findMany({ include: { _count: { select: { pets: true } } } });']]), ['data edge identity -> directory is not in dataEdges (first: infrastructure/persistence/userRepository.ts reads pet)'], 'select _count: { select: { pets } } is a read of pet');
+  assert.deepEqual(nested("const where: Prisma.HotelBookingWhereInput = { pet: { ownerId } };"), [hotelReads('pet')], 'a relation in an object declared with a Prisma type');
+  assert.deepEqual(nested('await tx.hotelBooking.findMany({ where: { OR: [{ pet: { name } }, { id }] } });'), [hotelReads('pet')], 'a relation in an array');
+  assert.deepEqual(nested('await tx.hotelBooking.findMany({ where: { ...(x ? { owner: { id } } : {}) } });'), [hotelReads('user')], 'a relation in a spread conditional');
+  assert.deepEqual(nested('await tx.hotelBooking\n  .findMany({\n    include: { pet: true },\n  });'), [hotelReads('pet')], 'a call broken over lines');
+  assert.deepEqual(nested('const d = { invoices: [] }; res.json({ pet: 1, owner: 2 });'), [], 'relation names outside a query read nothing');
+  assert.ok(nested('await tx.pet.findMany({ include: { appointments: true } });').includes('infrastructure/persistence/hotelRepository.ts reads appointment, a table legacy owns: only legacy reads it'), 'a clinical table through a relation, outside legacy');
+  assert.deepEqual(at([['legacy/infrastructure/persistence/x.ts', 'await tx.pet.findMany({ include: { appointments: true, owner: true } });']]), [], 'legacy reads any table through a relation');
+  assert.deepEqual(at([['infrastructure/persistence/listsRepository.ts', 'await tx.user.findMany({ include: { invoices: true } });']]), [], 'read reads any table through a relation');
+  assert.deepEqual(at([['composition/coreRoutes.ts', 'await db.user.findMany({ include: { pets: true } });']]), [], 'platform reads any table through a relation');
   // legacy (K4): the clinical stack imports every group and reads every table; only platform and legacy import it; only legacy reads its tables
   const legacyFile = 'legacy/routes/a.ts', toLegacy = (from, extra) => at([[from, "import { a } from '../../legacy/routes/a.js';"], [legacyFile, '']], extra);
   const importsLegacy = from => from + ' imports ' + legacyFile + ': only platform and legacy may import legacy';

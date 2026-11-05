@@ -266,6 +266,11 @@
       "from": "rescue",
       "to": "directory",
       "note": "publicRescueRepository reads pet and locks pets"
+    },
+    {
+      "from": "rescue",
+      "to": "identity",
+      "note": "publicRescueRepository.findEnabledPetWithOwner reads user through the relation Pet.owner (include: { owner: true } on pet.findFirst), for the owner contact shown on the public rescue page (K4 Q6: found by the reader of nested relations)"
     }
   ]
 }
