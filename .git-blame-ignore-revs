@@ -10,3 +10,5 @@ bbcc5a77f842abf90a954b580723d0c3b3bbc926
 cb26f3ed9a5ad331c0cf16df6b669ff5ad1a9678
 # Pure move: the Phase 1 monolith (app.ts and the appointment, medical record, notification and bootstrap stack) goes to backend/src/legacy, imports follow (no logic change)
 78d3bd9d981425f7ba300a9647907f1139be8402
+# Pure move: the two proof billing classes go from backend/src and services/clinic/src to tools/phase2/fixtures/p1-proof (only their client imports change)
+3fd1757b0f18bd46052c7003039b9753e41447bb
