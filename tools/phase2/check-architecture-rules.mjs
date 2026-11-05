@@ -34,12 +34,16 @@
 // 14. Every createRuntime call site in the services names limitRules (an empty list is an explicit choice).
 // 15. Clinic's routes are declared only as elements of the registry (http/routes), each naming its resource: no
 //     router.get/post/patch/put/delete/all in http/routes, http/scope.ts or app.ts.
-// 16. Core module map (K3): every backend/src file belongs to one group of tools/phase2/core-modules.json; an import between
-//     two groups, and a table one group reads that another owns, must be declared there (and a declaration nothing uses fails).
+// 16. Core module map (K3, K4): every backend/src file belongs to one group of tools/phase2/core-modules.json; an import between
+//     two groups, and a table one group reads that another owns, must be declared there (and a declaration nothing uses fails);
+//     the group `legacy` (backend/src/legacy) is imported by platform alone and reads the clinical tables alone, declared or not.
+// 17. Legacy isolation (K4): outside backend/src/legacy, nothing imports legacy/ (composition/ excepted) and nothing reads a clinical
+//     table: no delegate, raw SQL table, relation key (generated from the Prisma schema) or Prisma type of Appointment, MedicalRecord,
+//     MedicalImage or Notification. A self-check fails the rule if its reader stops seeing the reads inside legacy/.
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
-import {resolve,dirname,relative,sep} from 'node:path';
+import {resolve,dirname,relative,sep,posix} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 const root=resolve(import.meta.dirname,'../..');
@@ -672,7 +676,7 @@ rule('clinic-routes-declare-scope',()=>{
 // ---- 12. Structure ratchet ---------------------------------------------------------------
 // Each non-manual metric has a direction ("lower" or "higher" is better). Worse than the baseline fails; better passes
 // and reminds to lower the baseline so the gain cannot be lost later. Manual metrics are declared, never compared.
-const {measure,baselineOf,ciJobsRunning,LEGACY_APP,PRODUCTION_APP,walk,importEdges}=await import(pathToFileURL(resolve(root,'tools/phase2/arch-metrics.mjs')).href);
+const {measure,baselineOf,ciJobsRunning,LEGACY_APP,PRODUCTION_APP,walk,importEdges,importSpecifiers,clinicalSchema,clinicalReads,CLINICAL_MODELS,SCHEMA_PATH,DATA_DELEGATE,RAW_SQL,SQL_TABLE}=await import(pathToFileURL(resolve(root,'tools/phase2/arch-metrics.mjs')).href);
 const RATCHET_FIX='node tools/phase2/arch-metrics.mjs --write-baseline';
 export function ratchetFindings(current,baseline){
   const worse=[],better=[],stale=[];
@@ -730,18 +734,22 @@ rule('structure-ratchet',()=>{
   return Object.values(current.metrics).filter(m=>m.kind!=='manual').length+' metrics held'+(better.length?'; improved, lower the baseline ('+RATCHET_FIX+'): '+better.join(', '):'');
 });
 
-// ---- 16. Core module map (K3) -----------------------------------------------------------------
-// tools/phase2/core-modules.json: the groups of backend/src (contexts, and the kernel, dto, read, clinical and platform groups
-// that are not contexts). An import that crosses two groups is declared in `edges`, a table one group reads that another owns in
-// `dataEdges` (K4 removes them); a declaration nothing uses any more fails. Free by kind: anything may import the kernel,
-// platform (composition, workers, entries) imports every group and no other group imports it, read imports every group, routes
-// import dto and dto imports the ports it maps.
-const GROUP_KINDS = ['context', 'kernel', 'dto', 'read', 'platform'];
+// ---- 16. Core module map (K3, K4) -------------------------------------------------------------
+// tools/phase2/core-modules.json: the groups of backend/src (contexts, and the kernel, dto, read, legacy and platform groups that are
+// not contexts). An import that crosses two groups is declared in `edges`, a table one group reads that another owns in `dataEdges`
+// (the remaining ones are joins inside the one Core database); a declaration nothing uses any more fails. Free by kind: anything may
+// import the kernel, platform (composition, workers, entries) imports every group and no other group imports it except legacy, read
+// imports every group, routes import dto and dto imports the ports it maps. legacy (backend/src/legacy, the Phase 1 clinical stack)
+// imports every context, dto, read and kernel without declaring it (its coupling to hotel, billing and identity is therefore not in
+// `edges`, nor its reads of pet, bookingStatusEvent and invoice in `dataEdges`: the count of declared edges fell by this exemption, not
+// by removing the coupling); it imports platform only in legacy/app.ts, which is a composition of the monolith. Only platform and legacy
+// import legacy (declaring the edge does not allow it), and a table legacy owns (the clinical tables) is read by legacy alone (declaring
+// a data edge does not allow it either). The rule legacy-isolated (17) reads the same facts from the code itself.
+const GROUP_KINDS = ['context', 'kernel', 'dto', 'read', 'legacy', 'platform'];
+const LEGACY_COMPOSITION = 'legacy/app.ts';
 const inPattern = (path, pattern) => (pattern.endsWith('*') ? path.startsWith(pattern.slice(0, -1)) : path === pattern);
-// A Prisma delegate (tx|client|db.<delegate>.<call>) and the table a raw SQL template names after FROM, JOIN, INTO or UPDATE.
-const DATA_DELEGATE = /\b(?:tx|client|db)\.([A-Za-z_$][\w$]*)\.(?:find\w*|create\w*|update\w*|upsert|delete\w*|count|aggregate|groupBy)\s*[(<]/g;
-const RAW_SQL = /\$(?:queryRaw|executeRaw)\s*(?:<[^`]*?>)?\s*`([^`]*)`/g;
-const SQL_TABLE = /(?:\bFROM|\bJOIN|\bINTO|(?<!\bFOR\s+|\bDO\s+)\bUPDATE)\s+"?([A-Za-z_]\w*)"?/gi;
+// A Prisma delegate (tx|client|db.<delegate>.<call>) and the table a raw SQL template names after FROM, JOIN, INTO, TRUNCATE or UPDATE
+// (DATA_DELEGATE, RAW_SQL and SQL_TABLE are in arch-metrics.mjs, shared with the rule legacy-isolated).
 export function tablesRead(source) {
   const code = withoutComments(source), names = new Set();
   for (const m of code.matchAll(DATA_DELEGATE)) names.add(m[1]);
@@ -759,7 +767,7 @@ export function coreModuleFindings(config, modules, base = resolve(root, 'backen
     else groupOf.set(file, hit[0]);
   }
   const abs = f => resolve(base, f), known = new Set(modules.map(m => abs(m.file))), relOf = new Map(modules.map(m => [abs(m.file), m.file]));
-  const free = (from, to, a, b) => kind(from) === 'platform' || kind(to) === 'kernel' || kind(from) === 'read' || (kind(from) === 'dto' && b.startsWith('application/ports/')) || (kind(to) === 'dto' && /^(?:legacy\/)?routes\//.test(a));
+  const free = (from, to, a, b) => kind(from) === 'platform' || kind(from) === 'legacy' || kind(to) === 'kernel' || kind(from) === 'read' || (kind(from) === 'dto' && b.startsWith('application/ports/')) || (kind(to) === 'dto' && /^routes\//.test(a));
   const real = new Map();
   for (const { file, source } of modules) {
     const from = groupOf.get(file);
@@ -767,26 +775,30 @@ export function coreModuleFindings(config, modules, base = resolve(root, 'backen
     for (const target of importEdges(abs(file), source, known)) {
       const to = groupOf.get(relOf.get(target)), b = relOf.get(target);
       if (!to || to === from) continue;
-      if (kind(to) === 'platform' && kind(from) !== 'platform') found.push(file + ' imports ' + b + ': only platform may import platform');
+      if (kind(to) === 'platform' && kind(from) !== 'platform' && file !== LEGACY_COMPOSITION) found.push(file + ' imports ' + b + ': only platform and ' + LEGACY_COMPOSITION + ' may import platform');
+      else if (kind(to) === 'legacy' && kind(from) !== 'platform') found.push(file + ' imports ' + b + ': only platform and legacy may import legacy');
       else if (!free(from, to, file, b) && !real.has(from + ' -> ' + to)) real.set(from + ' -> ' + to, file + ' -> ' + b);
     }
   }
   const declared = new Map(edges.map(e => [e.from + ' -> ' + e.to, e]));
   for (const [key, e] of declared) if (!groups[e.from] || !groups[e.to]) found.push('edge ' + key + ' names a group that does not exist');
+  for (const [key, e] of declared) if (groups[e.to]?.kind === 'legacy') found.push('edge ' + key + ' points into legacy: nothing declares an import of legacy');
   for (const [key, example] of real) if (!declared.has(key)) found.push(key + ' is not in edges (first import: ' + example + ')');
   for (const key of declared.keys()) if (!real.has(key)) found.push('edge ' + key + ' is declared but no file imports it any more');
   const owner = new Map(Object.entries(tables).flatMap(([group, names]) => names.map(name => [name, group])));
   const realData = new Map();
   for (const { file, source } of modules) {
     const from = groupOf.get(file);
-    if (!from || kind(from) === 'platform') continue;
+    if (!from) continue;
     for (const name of tablesRead(source)) {
       const to = owner.get(name);
-      if (!to) found.push(file + ' reads ' + name + ', which no group owns in tables');
-      else if (to !== from && kind(to) !== 'kernel' && kind(from) !== 'read' && kind(from) !== 'dto' && !realData.has(from + ' -> ' + to)) realData.set(from + ' -> ' + to, file + ' reads ' + name);
+      if (!to) { if (kind(from) !== 'platform') found.push(file + ' reads ' + name + ', which no group owns in tables'); }
+      else if (kind(to) === 'legacy' && kind(from) !== 'legacy') found.push(file + ' reads ' + name + ', a table legacy owns: only legacy reads it');
+      else if (kind(from) !== 'platform' && kind(from) !== 'legacy' && to !== from && kind(to) !== 'kernel' && kind(from) !== 'read' && kind(from) !== 'dto' && !realData.has(from + ' -> ' + to)) realData.set(from + ' -> ' + to, file + ' reads ' + name);
     }
   }
   const declaredData = new Set(dataEdges.map(e => e.from + ' -> ' + e.to));
+  for (const e of dataEdges) if (groups[e.to]?.kind === 'legacy') found.push('data edge ' + e.from + ' -> ' + e.to + ' points into legacy: nothing declares a read of a legacy table');
   for (const [key, example] of realData) if (!declaredData.has(key)) found.push('data edge ' + key + ' is not in dataEdges (first: ' + example + ')');
   for (const key of declaredData) if (!realData.has(key)) found.push('data edge ' + key + ' is declared but no file reads it any more');
   return found;
@@ -808,8 +820,8 @@ rule('core-module-map', () => {
   assert.deepEqual(at([], { edges: [edge('rescue', 'billing')] }), ['edge rescue -> billing is declared but no file imports it any more'], 'a declared edge that is gone');
   assert.deepEqual(at([], { edges: [edge('rescue', 'nowhere')] }).slice(0, 1), ['edge rescue -> nowhere names a group that does not exist'], 'a declared edge to a group that is not there');
   const toPlatform = [['application/services/pets.ts', "import { a } from '../../composition/http.js';"], ['composition/http.ts', '']];
-  assert.deepEqual(at(toPlatform), ['application/services/pets.ts imports composition/http.ts: only platform may import platform'], 'a context imports platform');
-  assert.ok(at(toPlatform, { edges: [edge('directory', 'platform')] }).includes('application/services/pets.ts imports composition/http.ts: only platform may import platform'), 'declaring the edge does not allow it');
+  assert.deepEqual(at(toPlatform), ['application/services/pets.ts imports composition/http.ts: only platform and legacy/app.ts may import platform'], 'a context imports platform');
+  assert.ok(at(toPlatform, { edges: [edge('directory', 'platform')] }).includes('application/services/pets.ts imports composition/http.ts: only platform and legacy/app.ts may import platform'), 'declaring the edge does not allow it');
   for (const statement of ["const a = await import('./invoices.js');", "export * from './invoices.js';", "export { a } from './invoices.js';", "export type { A } from './invoices.js';", "import type { A } from './invoices.js';", "import './invoices.js';"])
     assert.deepEqual(at([[hotel, statement], target]), hotelToBilling, statement);
   assert.deepEqual(at([[hotel, "// import { a } from './invoices.js';\n/* export * from './invoices.js'; */\nconst text = \"import('./invoices.js')\";"], target]), [], 'a comment or a string is not an import');
@@ -826,6 +838,9 @@ rule('core-module-map', () => {
   assert.deepEqual(dataEdge('await db.invoice.update({});'), hotelData, 'db.<delegate>');
   assert.deepEqual(dataEdge('await tx.invoice.findUnique({});', { dataEdges: [edge('hotel', 'billing')] }), [], 'the same data edge once declared');
   assert.deepEqual(dataEdge('await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${id} FOR UPDATE`;'), [hotelData[0].replace('reads invoice', 'reads invoices')], 'a raw SQL table of another context');
+  assert.deepEqual(dataEdge('await tx.$queryRaw`SELECT id FROM runtime.invoices WHERE id = ${id}`;'), [hotelData[0].replace('reads invoice', 'reads invoices')], 'a schema prefix is not the table');
+  assert.deepEqual(dataEdge('await tx.$queryRaw`SELECT id FROM "public"."hotel_bookings" WHERE id = ${id}`;'), [], 'a quoted schema prefix, a table of its own');
+  assert.deepEqual(dataEdge('await tx\n  .invoice.findUnique({});'), hotelData, 'a delegate call broken over lines');
   assert.deepEqual(dataEdge('await tx.$queryRaw`SELECT id FROM hotel_bookings WHERE id = ${id} FOR UPDATE`;'), [], 'a raw SQL table of its own, FOR UPDATE is not a table');
   assert.deepEqual(dataEdge('await tx.hotelBooking.update({}); await tx.outboxEvent.create({});'), [], 'its own table and a kernel table');
   assert.deepEqual(dataEdge('// await tx.invoice.findUnique({});'), [], 'a comment reads nothing');
@@ -833,7 +848,151 @@ rule('core-module-map', () => {
   assert.deepEqual(dataEdge('await tx.$queryRaw`SELECT id FROM mystery_table`;'), [hotelRepo + ' reads mystery_table, which no group owns in tables'], 'a raw SQL table no group owns');
   assert.deepEqual(dataEdge('', { dataEdges: [edge('hotel', 'billing')] }), ['data edge hotel -> billing is declared but no file reads it any more'], 'a declared data edge that is gone');
   assert.deepEqual(at([['infrastructure/persistence/listsRepository.ts', 'await tx.invoice.findMany({});'], ['composition/coreRoutes.ts', 'await db.user.findUnique({});']]), [], 'read and platform read any table');
+  // legacy (K4): the clinical stack imports every group and reads every table; only platform and legacy import it; only legacy reads its tables
+  const legacyFile = 'legacy/routes/a.ts', toLegacy = (from, extra) => at([[from, "import { a } from '../../legacy/routes/a.js';"], [legacyFile, '']], extra);
+  const importsLegacy = from => from + ' imports ' + legacyFile + ': only platform and legacy may import legacy';
+  assert.deepEqual(toLegacy('application/services/pets.ts'), [importsLegacy('application/services/pets.ts')], 'a context imports legacy');
+  assert.ok(toLegacy('application/services/pets.ts', { edges: [edge('directory', 'legacy')] }).includes(importsLegacy('application/services/pets.ts')), 'declaring the edge does not allow it');
+  assert.ok(toLegacy('application/services/pets.ts', { edges: [edge('directory', 'legacy')] }).includes('edge directory -> legacy points into legacy: nothing declares an import of legacy'), 'a declared edge into legacy fails by itself');
+  assert.deepEqual(toLegacy('application/services/lists.ts'), [importsLegacy('application/services/lists.ts')], 'read does not import legacy either');
+  assert.deepEqual(toLegacy('routes/dto/serialize.ts'), [importsLegacy('routes/dto/serialize.ts')], 'dto does not import legacy');
+  assert.deepEqual(toLegacy('composition/coreRoutes.ts'), [], 'platform imports legacy');
+  assert.deepEqual(at([['legacy/application/services/x.ts', "import { a } from '../../../application/services/hotelBookings.js';"], [hotel, '']]), [], 'legacy imports a context');
+  assert.deepEqual(at([['legacy/app.ts', "import { a } from '../composition/http.js';"], ['composition/http.ts', '']]), [], 'legacy/app.ts imports platform (it is a composition of the monolith)');
+  assert.deepEqual(at([['legacy/routes/x.ts', "import { a } from '../../composition/http.js';"], ['composition/http.ts', '']]), ['legacy/routes/x.ts imports composition/http.ts: only platform and legacy/app.ts may import platform'], 'another legacy file does not import platform');
+  assert.deepEqual(at([['legacy/index.ts', "import { a } from '../composition/http.js';"], ['composition/http.ts', '']]), ['legacy/index.ts imports composition/http.ts: only platform and legacy/app.ts may import platform'], 'not even legacy/index.ts');
+  assert.deepEqual(at([['legacy/infrastructure/persistence/x.ts', 'await tx.appointment.findMany({}); await tx.invoice.findMany({}); await tx.$queryRaw`SELECT id FROM medical_records`;']]), [], 'legacy reads its tables and any other');
+  const legacyData = (file, statement, extra) => at([[file, statement]], extra), legacyRead = (file, name) => file + ' reads ' + name + ', a table legacy owns: only legacy reads it';
+  assert.deepEqual(legacyData(hotelRepo, 'await tx.appointment.findMany({});'), [legacyRead(hotelRepo, 'appointment')], 'a context reads a clinical table');
+  assert.ok(legacyData(hotelRepo, 'await tx.appointment.findMany({});', { dataEdges: [edge('hotel', 'legacy')] }).includes(legacyRead(hotelRepo, 'appointment')), 'declaring the data edge does not allow it');
+  assert.ok(legacyData(hotelRepo, '', { dataEdges: [edge('hotel', 'legacy')] }).includes('data edge hotel -> legacy points into legacy: nothing declares a read of a legacy table'), 'a declared data edge into legacy fails by itself');
+  assert.deepEqual(legacyData(hotelRepo, 'await tx.$queryRaw`SELECT id FROM medical_records WHERE id = ${id} FOR UPDATE`;'), [legacyRead(hotelRepo, 'medical_records')], 'a raw SQL clinical table');
+  assert.deepEqual(legacyData('infrastructure/persistence/listsRepository.ts', 'await tx.notification.count({});'), [legacyRead('infrastructure/persistence/listsRepository.ts', 'notification')], 'read reads a clinical table');
+  assert.deepEqual(legacyData('composition/coreRoutes.ts', 'await db.medicalImage.findMany({});'), [legacyRead('composition/coreRoutes.ts', 'medicalImage')], 'platform reads a clinical table');
   return Object.keys(config.groups).length + ' groups, ' + config.edges.length + ' edges, ' + config.dataEdges.length + ' data edges, ' + modules.length + ' modules';
+});
+
+// ---- 17. Legacy isolation (K4) ----------------------------------------------------------------
+// backend/src/legacy is the Phase 1 clinical stack, which split mode never runs. Outside it, a file fails when it:
+//  1. imports, re-exports or `import()`s anything under legacy/ (composition/ is the one place that may);
+//  2. calls a Prisma delegate of a clinical model (<receiver>.appointment|medicalRecord|medicalImage|notification.<find|create|update|...>),
+//     with any receiver, not only tx, client and db;
+//  3. names a clinical table in raw SQL (FROM, JOIN, INTO or UPDATE, with or without quotes);
+//  4. holds a relation key to a clinical model (appointments, doctorAppts, medicalRecords, medicalImages, notifications, appointment: the
+//     list is generated from backend/prisma/schema.prisma) in the arguments of a delegate call, or in an object declared with a Prisma
+//     where/include/select/orderBy type (`: T = {`, `: T => ({`, `{ } satisfies T`, `{ } as T`);
+//  5. uses a Prisma type of a clinical model (Prisma.AppointmentWhereInput) or imports one from @prisma/client (AppointmentStatus).
+// The reader is clinicalReads in arch-metrics.mjs; S11 counts its findings as clinicalReadsOutsideLegacy, so the rule and the metric agree.
+// Self-check: the reader must find at least 20 clinical reads inside legacy/, and the generated keys must hold appointments and doctorAppts,
+// so a reader that went blind (a renamed delegate, a changed schema) fails here instead of passing everything.
+// Known limits (code is read as text, not as a program; the full list is on clinicalReads in arch-metrics.mjs). Misses: a relation object
+// put in a variable with no Prisma type and passed to a call later; a delegate reached through an alias (`const { appointment } = tx`) or
+// `tx['appointment']`; `import { Prisma as P }` then `P.AppointmentWhereInput`; `$Enums.AppointmentStatus`, `Prisma.$Enums...`;
+// `Prisma.validator<...>()({ appointments: true })`; `Prisma.PetGetPayload<{ include: { appointments: true } }>`; raw SQL built by
+// concatenation, `FROM /*x*/ appointments`, `Prisma.raw('appointments')`; a table named only in a Prisma type outside the forms above
+// (Prisma.UserFindManyArgs). Noise (a FAIL by mistake, fixed by renaming the variable): `this.cache.appointment.find(...)` is read as a
+// Prisma delegate call. `this.rows.find(({ appointment }) => ...)`, `this.factory.create({ appointment })`, `unitOfWork.run(async ({
+// bookings, notifications }) => ...)` and the `{ appointment: ... }` of coreRoutes are not read: relation keys count only in the arguments
+// of a call on a model of the schema.
+export function legacyViolations(file, source, schema) {
+  if (file.startsWith('legacy/')) return [];
+  const found = [];
+  if (!file.startsWith('composition/'))
+    for (const spec of importSpecifiers(source)) if (spec.startsWith('.') && posix.normalize(posix.join(posix.dirname(file), spec)).startsWith('legacy/')) found.push(file + ' imports ' + spec + ': only composition/ may import legacy/');
+  for (const r of clinicalReads(source, schema)) found.push(file + ':' + r.line + ' ' + r.kind + ' ' + r.text + ': a clinical table is read only inside legacy/');
+  return found;
+}
+rule('legacy-isolated', () => {
+  const base = resolve(root, 'backend/src'), schema = clinicalSchema(read(SCHEMA_PATH));
+  const modules = walk(base).map(f => ({ file: relative(base, f).split(sep).join('/'), source: readFileSync(f, 'utf8') }));
+  assert.ok(modules.length >= 100, 'found the Core modules (' + modules.length + ')');
+  const bad = modules.flatMap(({ file, source }) => legacyViolations(file, source, schema));
+  assert.deepEqual(bad, [], 'legacy is not isolated: ' + bad.join('; '));
+  // self-check: the reader sees what it should
+  const inLegacy = modules.filter(m => m.file.startsWith('legacy/')).reduce((n, m) => n + clinicalReads(m.source, schema).length, 0);
+  assert.ok(inLegacy >= 20, 'the reader finds only ' + inLegacy + ' clinical reads inside legacy/ (at least 20 expected): it went blind');
+  for (const key of ['appointments', 'doctorAppts']) assert.ok(schema.keys.has(key), 'the relation keys generated from the schema lack ' + key + ': ' + [...schema.keys].join(', '));
+  assert.deepEqual([...schema.delegates].sort(), ['appointment', 'medicalImage', 'medicalRecord', 'notification'], 'the clinical delegates');
+  assert.deepEqual([...schema.tables].sort(), ['appointments', 'medical_images', 'medical_records', 'notifications'], 'the clinical tables');
+  assert.ok(CLINICAL_MODELS.every(m => schema.models.includes(m)), 'the clinical models are in the schema');
+  // negative fixtures: each must fail (one reason each)
+  const outside = 'infrastructure/persistence/x.ts', inside = 'legacy/infrastructure/persistence/x.ts', at = (file, source) => legacyViolations(file, source, schema);
+  const fails = {
+    'a delegate of a clinical model': 'await tx.appointment.findMany({});',
+    'this.client.medicalRecord': 'await this.client.medicalRecord.count();',
+    'db.notification.groupBy': "await db.notification.groupBy({ by: ['type'] });",
+    'another receiver (prisma)': 'await prisma.medicalImage.create({ data });',
+    'a generic delegate call': 'await tx.appointment.findMany<X>({});',
+    'raw SQL, FROM': 'await tx.$queryRaw`SELECT id FROM appointments WHERE id = ${id} FOR UPDATE`;',
+    'raw SQL, quoted table': 'await tx.$queryRaw`SELECT * FROM "medical_images"`;',
+    'raw SQL, JOIN': 'await tx.$queryRaw`SELECT 1 FROM pets p JOIN notifications n ON n.related_pet_id = p.id`;',
+    'raw SQL, UPDATE': 'await tx.$executeRaw`UPDATE notifications SET status = ${s}`;',
+    'raw SQL, unsafe string': "await tx.$queryRawUnsafe('SELECT * FROM medical_records');",
+    'raw SQL, schema prefix': 'await tx.$queryRaw`SELECT * FROM runtime.appointments`;',
+    'raw SQL, quoted schema prefix': 'await tx.$queryRaw`SELECT * FROM "public"."appointments"`;',
+    'raw SQL, TRUNCATE': 'await tx.$executeRaw`TRUNCATE appointments`;',
+    'raw SQL, TRUNCATE TABLE with a schema': 'await tx.$executeRaw`TRUNCATE TABLE public.notifications`;',
+    'a chain Prettier broke over two lines': 'await tx.appointment\n  .findMany({});',
+    'a space before the dot': 'await tx.appointment .findMany({});',
+    'optional chaining': 'await tx?.appointment?.findMany({});',
+    'an optional call': 'await tx.appointment.findMany?.({});',
+    'a relation reached by the fluent API': 'await tx.pet.findUnique({ where: { id } }).appointments();',
+    'the fluent API over two lines': 'await tx.pet.findUnique({ where: { id } })\n  .medicalRecords();',
+    'a relation in an array of typed objects': "const o: Prisma.PetOrderByWithRelationInput[] = [{ id: 'asc' }, { appointments: { _count: 'asc' } }];",
+    'a relation in include': 'await tx.pet.findMany({ include: { appointments: true } });',
+    'a relation in a _count select': 'await tx.user.findMany({ include: { _count: { select: { notifications: true } } } });',
+    'a relation in where': 'await tx.user.findMany({ where: { medicalRecords: { some: {} } } });',
+    'the doctorAppts relation': 'await tx.user.count({ where: { doctorAppts: { none: {} } } });',
+    'the appointment relation (singular)': 'await tx.invoice.findMany({ include: { appointment: true } });',
+    'a relation as shorthand': 'await tx.pet.findMany({ select: { id: true, medicalImages } });',
+    'a relation in an object typed Prisma.*WhereInput': 'const where: Prisma.PetWhereInput = { appointments: { some: {} } };',
+    'a relation in an arrow returning Prisma.*WhereInput': 'const f = (): Prisma.UserWhereInput => ({ notifications: { some: {} } });',
+    'a relation in an object satisfies Prisma.*Include': 'const include = { medicalRecords: true } satisfies Prisma.PetInclude;',
+    'a relation in an object as Prisma.*Select': 'const select = { medicalImages: true } as Prisma.PetSelect;',
+    'a name imported from @prisma/client': "import { type AppointmentStatus } from '@prisma/client';",
+    'a model type imported from @prisma/client': "import { Prisma, MedicalRecord } from '@prisma/client';",
+    'a type re-exported from @prisma/client': "export type { Notification } from '@prisma/client';",
+    'a Prisma type of a clinical model': 'let w: Prisma.AppointmentWhereInput;',
+  };
+  for (const [reason, source] of Object.entries(fails)) assert.ok(at(outside, source).length > 0, 'must fail: ' + reason);
+  const imports = {
+    'a route imports a legacy route': ['routes/x.ts', "import { a } from '../legacy/routes/a.js';"],
+    'a dynamic import': ['routes/x.ts', "const { a } = await import('../legacy/a.js');"],
+    'a re-export of everything': ['routes/x.ts', "export * from '../legacy/a.js';"],
+    'a named re-export': ['infrastructure/x.ts', "export { a } from '../legacy/a.js';"],
+    'a type import': ['application/x.ts', "import type { A } from '../legacy/a.js';"],
+    'a side-effect import': ['routes/x.ts', "import '../legacy/a.js';"],
+    'a workers file': ['workers/x.ts', "import { a } from '../legacy/index.js';"],
+    'the entry': ['index.ts', "import { a } from './legacy/index.js';"],
+    'a file in composition/ is the only exception, one level down is not': ['routes/internal/x.ts', "import { a } from '../../legacy/a.js';"],
+  };
+  for (const [reason, [file, source]] of Object.entries(imports)) assert.equal(at(file, source).length, 1, 'must fail: ' + reason);
+  assert.match(at(outside, 'await tx.appointment.findMany({});')[0], /^infrastructure\/persistence\/x\.ts:1 delegate appointment/, 'the finding names the file, the line and the read');
+  // negative fixtures: each must pass
+  const passes = {
+    'a delegate of another model': 'await tx.invoice.findMany({ where: { appointmentId: id } });',
+    'a billing model whose name starts with Appointment': 'await tx.appointmentBillingOperation.findMany({}); const w: Prisma.AppointmentBillingOperationWhereInput = {};',
+    'raw SQL of the billing operation table': 'await tx.$queryRaw`SELECT id FROM "AppointmentBillingOperation" WHERE id = ${id} FOR UPDATE`;',
+    'raw SQL of another table, FOR UPDATE is not a table': 'await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${id} FOR UPDATE`;',
+    'raw SQL of another table with a schema prefix': 'await tx.$queryRaw`SELECT id FROM runtime.invoices`; await tx.$queryRaw`SELECT 1 FROM "public"."invoices"`;',
+    'a variable that is not a delegate, destructured in a callback': 'const a = this.rows.find(({ appointment }) => appointment.id === id);',
+    'a factory that is not a delegate': 'const b = this.factory.create({ appointment });',
+    'the unit of work callback': 'return this.deps.unitOfWork.run(async ({ bookings, notifications }) => { return bookings; });',
+    'a relation key outside a call and a typed object': 'const d = { appointments: [] };',
+    'a response body that is not a delegate call': 'res.json({ appointments: [], notifications: [] });',
+    'a clinical key in a typed object of another meaning': 'const e: Record<string, number> = { appointments: 1 };',
+    'a Prisma type that is not clinical': "import { Role } from '@prisma/client'; let w: Prisma.UserWhereInput = { role: 'owner' };",
+    'comments': '// await tx.appointment.findMany({});\n/* FROM appointments */\n/* include: { appointments: true } */',
+    'strings': "const a = 'tx.appointment.findMany(';\nconst b = \"include: { appointments: true } FROM medical_records\";\nconst c = '../legacy/a.js';",
+    'a template that is not raw SQL': 'const t = `SELECT * FROM appointments`;',
+  };
+  for (const [reason, source] of Object.entries(passes)) assert.deepEqual(at(outside, source), [], 'must pass: ' + reason);
+  assert.deepEqual(at('routes/x.ts', "import { a } from './dto/a.js'; import { b } from '../legacy-notes.js';"), [], 'a path that only starts with the word legacy');
+  assert.deepEqual(at('composition/coreRoutes.ts', "import { a } from '../legacy/index.js'; export * from '../legacy/a.js'; const { b } = await import('../legacy/b.js');"), [], 'composition imports legacy');
+  assert.deepEqual(at('composition/coreRoutes.ts', 'await tx.appointment.findMany({});').length, 1, 'composition may import legacy but not read the tables');
+  for (const source of [...Object.values(fails), 'await tx.medicalRecord.count({}); await tx.notification.groupBy({});']) assert.deepEqual(at(inside, source), [], 'inside legacy/ the same code passes');
+  assert.deepEqual(at(inside, "import { a } from '../../../composition/a.js'; import { b } from './x.js';"), [], 'legacy imports whatever it needs');
+  return modules.length + ' modules; ' + inLegacy + ' clinical reads inside legacy/, none outside; keys ' + [...schema.keys].sort().join(', ') + '; ' + (Object.keys(fails).length + Object.keys(imports).length + 1) + ' must-fail and ' + (Object.keys(passes).length + Object.keys(fails).length + 4) + ' must-pass fixtures';
 });
 
 await envelopeCheck;
@@ -845,4 +1004,4 @@ await categoryCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write(`Architecture rules PASS (${results.length} rules): service layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, Clinic routes declare their scope, no duplicated service modules, Clinic HTTP calls confined, shared packages without business routes, services declare limit rules, structure ratchet, negative fixtures.\n`);
+else process.stdout.write(`Architecture rules PASS (${results.length} rules): service layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, Clinic routes declare their scope, no duplicated service modules, Clinic HTTP calls confined, shared packages without business routes, services declare limit rules, structure ratchet, Core module map, legacy isolation, negative fixtures.\n`);

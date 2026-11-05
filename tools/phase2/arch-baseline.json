@@ -79,7 +79,8 @@
       "better": "lower",
       "values": {
         "files": 0,
-        "lines": 0
+        "lines": 0,
+        "clinicalReadsOutsideLegacy": 0
       }
     },
     "S12": {

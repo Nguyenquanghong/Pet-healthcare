@@ -126,30 +126,22 @@
         "infrastructure/persistence/bootstrapRepository",
         "routes/lists",
         "routes/dashboard",
-        "legacy/routes/bootstrap"
-      ]
-    },
-    "clinical": {
-      "kind": "context",
-      "files": [
         "application/ports/appointments",
         "application/ports/medicalRecords",
-        "application/ports/notifications",
-        "legacy/application/*",
-        "legacy/infrastructure/*",
-        "legacy/routes/appointments",
-        "legacy/routes/clinicDashboard",
-        "legacy/routes/clinicalLists",
-        "legacy/routes/medicalRecords",
-        "legacy/routes/notifications"
+        "application/ports/notifications"
+      ]
+    },
+    "legacy": {
+      "kind": "legacy",
+      "note": "K4: the Phase 1 clinical stack, which split mode never runs. legacy imports every context, dto, read and kernel module and reads every table, so its coupling to hotel (bookingLifecycle), billing (invoiceRepository) and identity (middleware/auth), and its reads of pet, bookingStatusEvent and invoice, are not listed in edges or dataEdges: the edge counts fell by this exemption, not by removing the coupling. It imports platform only in legacy/app.ts. Only platform and legacy import legacy, and only legacy reads the tables of this group, declared or not.",
+      "files": [
+        "legacy/*"
       ]
     },
     "platform": {
       "kind": "platform",
       "files": [
         "index",
-        "legacy/app",
-        "legacy/index",
         "composition/*",
         "gateway/*",
         "workers/*"
@@ -176,26 +168,6 @@
       "from": "billing",
       "to": "identity",
       "note": "payments and appointmentBilling routes use middleware/auth; clinicBillingRemote signs with lib/token"
-    },
-    {
-      "from": "clinical",
-      "to": "hotel",
-      "note": "appointments service and medicalRepository call the booking lifecycle; appointmentLifecycleStore implements its port and appends the status event; K4 removes"
-    },
-    {
-      "from": "clinical",
-      "to": "billing",
-      "note": "clinicalSources types the appointment source of invoice issuing (AppointmentInvoiceSource); type-only, K4 removes"
-    },
-    {
-      "from": "clinical",
-      "to": "read",
-      "note": "clinicalSources implements the clinical list source that listsRepository defines (ClinicalListSource, ListFilters; type-only); clinicalLists uses ListsService (read); listResultDto is in the dto group"
-    },
-    {
-      "from": "clinical",
-      "to": "identity",
-      "note": "clinicalLists authenticates its GET handlers with middleware/auth, as routes/lists does"
     }
   ],
   "tables": {
@@ -243,7 +215,7 @@
       "outboxEvent",
       "OutboxEvent"
     ],
-    "clinical": [
+    "legacy": [
       "appointment",
       "appointments",
       "medicalRecord",
@@ -251,11 +223,7 @@
       "medicalImage",
       "medical_images",
       "notification",
-      "notifications",
-      "billingOperation",
-      "BillingOperation",
-      "proofInvoice",
-      "ProofInvoice"
+      "notifications"
     ]
   },
   "dataEdges": [
@@ -298,21 +266,6 @@
       "from": "rescue",
       "to": "directory",
       "note": "publicRescueRepository reads pet and locks pets"
-    },
-    {
-      "from": "clinical",
-      "to": "directory",
-      "note": "appointmentRepository and medicalRepository read pet"
-    },
-    {
-      "from": "clinical",
-      "to": "hotel",
-      "note": "appointmentLifecycleStore reads bookingStatusEvent (writes go through appendStatusEvent, an import edge); K4 removes"
-    },
-    {
-      "from": "clinical",
-      "to": "billing",
-      "note": "appointmentLifecycleStore counts invoice; K4 removes"
     }
   ]
 }
