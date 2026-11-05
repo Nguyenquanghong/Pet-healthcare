@@ -8,3 +8,5 @@ ab8657bd3102d61f351a7e8fc93a271acb0e40d7
 bbcc5a77f842abf90a954b580723d0c3b3bbc926
 # Formatting only: Core backend/src through Prettier, except the Phase 1 stack and two repositories (no logic change)
 cb26f3ed9a5ad331c0cf16df6b669ff5ad1a9678
+# Pure move: the Phase 1 monolith (app.ts and the appointment, medical record, notification and bootstrap stack) goes to backend/src/legacy, imports follow (no logic change)
+78d3bd9d981425f7ba300a9647907f1139be8402
