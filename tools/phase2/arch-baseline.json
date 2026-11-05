@@ -12,7 +12,7 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "edges": 8
+        "edges": 0
       }
     },
     "S3": {
@@ -27,14 +27,14 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "sites": 3
+        "sites": 1
       }
     },
     "S5": {
       "kind": "derived",
       "better": "lower",
       "values": {
-        "legacyAppTests": 20
+        "legacyAppTests": 18
       }
     },
     "S6": {
@@ -62,9 +62,9 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "longest": 234,
-        "over100": 7,
-        "over80": 16
+        "longest": 135,
+        "over100": 2,
+        "over80": 10
       }
     },
     "S10": {
@@ -79,7 +79,7 @@
       "better": "lower",
       "values": {
         "files": 12,
-        "lines": 835
+        "lines": 733
       }
     },
     "S12": {
@@ -101,7 +101,7 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "files": 1
+        "files": 0
       }
     },
     "S15": {
