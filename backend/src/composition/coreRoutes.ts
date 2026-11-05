@@ -24,9 +24,11 @@ import {
   PrismaAppointmentLifecycleStore,
   PrismaNotificationRepository,
   appointmentInvoiceSource,
+  clinicalListSource,
   createAppointmentDependencies,
   createAppointmentsRouter,
   createBootstrapRouter,
+  createClinicalListsRouter,
   createMedicalDependencies,
   createMedicalRecordsRouter,
   createNotificationsRouter,
@@ -134,7 +136,9 @@ export function mountCoreRoutes(app: Express, client: PrismaClient, { clinical, 
       ),
     );
   app.use('/api/public', createPublicRouter(new PublicRescueService(createPublicRescueDependencies(client))));
-  app.use('/api', createListsRouter(new ListsService(new PrismaListsRepository(client))));
+  const lists = new ListsService(new PrismaListsRepository(client, clinical ? clinicalListSource : undefined));
+  app.use('/api', createListsRouter(lists));
+  if (clinical) app.use('/api', createClinicalListsRouter(lists));
   if (monolith)
     app.use(
       '/api/bootstrap',

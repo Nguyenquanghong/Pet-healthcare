@@ -242,23 +242,24 @@ test('a malformed JSON body at sign-in is a 400 with the one sentence the gatewa
   }
 });
 
+const outcome = async (domains, method, path, auth) => {
+  const server = domains.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}${path}`, {
+      method,
+      headers: { 'content-type': 'application/json', ...(auth ? { authorization: `Bearer ${auth}` } : {}) },
+      ...(method === 'GET' ? {} : { body: '{}' }),
+    });
+    return response.status;
+  } finally {
+    await stop(server);
+  }
+};
+
 test('createCoreDomains({ clinical: false }) mounts neither the appointment nor the medical-record router', async () => {
   coreTestEnv();
   const token = signToken('admin-1', 'admin');
-  const outcome = async (domains, method, path, auth) => {
-    const server = domains.listen(0, '127.0.0.1');
-    await once(server, 'listening');
-    try {
-      const response = await fetch(`http://127.0.0.1:${server.address().port}${path}`, {
-        method,
-        headers: { 'content-type': 'application/json', ...(auth ? { authorization: `Bearer ${auth}` } : {}) },
-        ...(method === 'GET' ? {} : { body: '{}' }),
-      });
-      return response.status;
-    } finally {
-      await stop(server);
-    }
-  };
   const clinicalOnly = [
     ['POST', '/api/appointments'],
     ['PATCH', '/api/appointments/a-1/status'],
@@ -276,6 +277,35 @@ test('createCoreDomains({ clinical: false }) mounts neither the appointment nor 
   }
   assert.equal(await outcome(split, 'POST', '/api/hotel-bookings'), 401, 'the hotel router stays mounted');
   assert.equal(await outcome(split, 'PATCH', '/api/hotel-bookings/h-1/status'), 401);
+});
+
+test('createCoreDomains({ clinical: false }) leaves the five clinical GETs out of the list routes and keeps the rest', async () => {
+  coreTestEnv();
+  const token = signToken('admin-1', 'admin');
+  const clinicalLists = [
+    '/api/appointments',
+    '/api/appointments/calendar?month=2026-11',
+    '/api/medical-records',
+    '/api/medical-records/images',
+    '/api/notifications',
+  ];
+  const split = createCoreDomains({}, { clinical: false });
+  const full = createCoreDomains({});
+  for (const path of clinicalLists) {
+    assert.equal(await outcome(split, 'GET', path), 404, `GET ${path} without a token`);
+    assert.equal(await outcome(split, 'GET', path, token), 404, `GET ${path} with a token`);
+    assert.equal(await outcome(full, 'GET', path), 401, `GET ${path} with the clinical list router mounted`);
+    // Without a token the prefix guards of /api/appointments and /api/medical-records answer 401 whether or not the list
+    // router is mounted. With one, only a mounted router gets past 404 (here it reaches the repository and fails on the empty db).
+    assert.notEqual(
+      await outcome(full, 'GET', path, token),
+      404,
+      `GET ${path} with a token reaches the clinical list router`,
+    );
+  }
+  // /api/doctors is served by the Core list router alone: 401 here means that router is mounted and guards it.
+  assert.equal(await outcome(split, 'GET', '/api/doctors'), 401, 'the Core list routes stay mounted');
+  assert.equal(await outcome(split, 'GET', '/api/hotel-bookings'), 401);
 });
 
 test('the Core dashboard queries no clinical or notification table', async () => {

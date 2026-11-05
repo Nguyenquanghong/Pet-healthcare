@@ -1,23 +1,38 @@
-import { Prisma, type PrismaClient, type AppointmentStatus, type PetSpecies, type PetHealthStatus, type HotelBookingStatus, type RoomType, type PaymentStatus } from "@prisma/client";
+import { Prisma, type PrismaClient, type PetSpecies, type PetHealthStatus, type HotelBookingStatus, type RoomType, type PaymentStatus } from "@prisma/client";
 import type { ListsRepository, ListData, ListQuery, ListResource, ListScope } from "../../application/ports/lists.js";
-import { hotelStatusUpdates, notificationCategoryCounts, notificationCategoryWhere, type NotificationCategory } from "@nipopeto/contracts";
 
 export const emptyListData = (): ListData => ({ owners: [], pets: [], appointments: [], hotelBookings: [], medicalRecords: [], medicalImages: [], dailyCareNotes: [], notifications: [], invoices: [] });
-const spaTypes = ["spa_bath", "spa_grooming", "spa_combo"] as const;
+
+// The filters every list shares. The clinical source builds its where-clauses from the same ones.
+export const listFilters = (scope: ListScope, query: ListQuery) => {
+  const bounds = { skip: (query.page - 1) * query.pageSize, take: query.pageSize };
+  const ownerId = scope.ownerId ?? query.ownerId;
+  const identity = { ...(query.id ? { id: query.id } : {}) };
+  const owner = { ...(ownerId ? { ownerId } : {}), ...(query.petId ? { petId: query.petId } : {}) };
+  const text = (field: string) => ({ [field]: { contains: query.q!, mode: "insensitive" as const } });
+  const contact = (): Prisma.UserWhereInput => ({ OR: [text("fullName"), text("phone"), text("email"), text("id")] });
+  const petSearch = (): Prisma.PetWhereInput => ({ OR: [text("name"), text("breed"), text("microchipId"), text("id"), { owner: contact() }] });
+  const joinedSearch = () => query.q ? [{ pet: petSearch() }, { owner: contact() }] : [];
+  return { bounds, ownerId, identity, owner, text, contact, petSearch, joinedSearch };
+};
+export type ListFilters = ReturnType<typeof listFilters>;
+
+// Appointment, medical record, medical image and notification lists. Legacy supplies it (see legacy/infrastructure/persistence/clinicalSources.ts).
+export interface ClinicalListSource {
+  // The resource's branch of `page`: fills `data` on the page's transaction and returns the total and status counts.
+  page(tx: Prisma.TransactionClient, resource: ListResource, scope: ListScope, query: ListQuery, data: ListData, filters: ListFilters): Promise<{ total: number; counts: Record<string, number> }>;
+  // The clinical rows a core list shows beside its own (medical records show their appointments).
+  related(tx: Prisma.TransactionClient, resource: ListResource, scope: ListScope, data: ListData): Promise<void>;
+  calendar(client: PrismaClient, scope: ListScope, month: string, category?: string): Promise<Record<string, number>>;
+}
 
 export class PrismaListsRepository implements ListsRepository {
-  constructor(private readonly client: PrismaClient) {}
+  constructor(private readonly client: PrismaClient, private readonly clinical?: ClinicalListSource) {}
   async page(resource: ListResource, scope: ListScope, query: ListQuery) {
     return this.client.$transaction(async tx => {
       const data = emptyListData();
-      const bounds = { skip: (query.page - 1) * query.pageSize, take: query.pageSize };
-      const ownerId = scope.ownerId ?? query.ownerId;
-      const identity = { ...(query.id ? { id: query.id } : {}) };
-      const owner = { ...(ownerId ? { ownerId } : {}), ...(query.petId ? { petId: query.petId } : {}) };
-      const text = (field: string) => ({ [field]: { contains: query.q!, mode: "insensitive" as const } });
-      const contact = (): Prisma.UserWhereInput => ({ OR: [text("fullName"), text("phone"), text("email"), text("id")] });
-      const petSearch = (): Prisma.PetWhereInput => ({ OR: [text("name"), text("breed"), text("microchipId"), text("id"), { owner: contact() }] });
-      const joinedSearch = () => query.q ? [{ pet: petSearch() }, { owner: contact() }] : [];
+      const filters = listFilters(scope, query);
+      const { bounds, ownerId, identity, owner, text, contact, petSearch, joinedSearch } = filters;
       let total = 0;
       let counts: Record<string, number> = {};
       if (resource === "owners") {
@@ -27,19 +42,6 @@ export class PrismaListsRepository implements ListsRepository {
         const where: Prisma.PetWhereInput = { ...(ownerId ? { ownerId } : {}), ...identity,
           ...(query.species ? { species: query.species as PetSpecies } : {}), ...(query.healthStatus ? { healthStatus: query.healthStatus as PetHealthStatus } : {}), ...(query.q ? petSearch() : {}) };
         [total, data.pets] = await Promise.all([tx.pet.count({ where }), tx.pet.findMany({ where, ...bounds, orderBy: [{ createdAt: "desc" }, { id: "desc" }] })]);
-      } else if (resource === "appointments") {
-        const billed = query.mode === "unbilled" ? (await tx.invoice.findMany({ where: { appointmentId: { not: null } }, select: { appointmentId: true } })).flatMap(row => row.appointmentId ? [row.appointmentId] : []) : [];
-        const base: Prisma.AppointmentWhereInput = { ...owner, ...identity,
-          ...(query.date ? { appointmentDate: new Date(`${query.date}T00:00:00Z`) } : {}),
-          ...(query.category ? { type: query.category === "spa" ? { in: [...spaTypes] } : { notIn: [...spaTypes] } } : {}),
-          ...(query.mode === "unbilled" ? { status: "completed", AND: [{ id: { notIn: billed } }] } : {}),
-          ...(query.q ? { OR: [...joinedSearch(), text("serviceName"), text("id")] } : {}) };
-        const groupStatuses: Record<string, AppointmentStatus[]> = { pending: ["pending", "confirmed", "checked_in", "in_progress"], completed: ["completed"], cancelled: ["cancelled", "no_show"] };
-        const where: Prisma.AppointmentWhereInput = { AND: [base, ...(query.statusGroup ? [{ status: { in: groupStatuses[query.statusGroup] } }] : []), ...(query.status ? [{ status: query.status as AppointmentStatus }] : [])] };
-        const groups = await tx.appointment.groupBy({ by: ["status"], where: base, _count: true });
-        counts = Object.fromEntries(groups.map(group => [group.status, group._count]));
-        [total, data.appointments] = await Promise.all([tx.appointment.count({ where }), tx.appointment.findMany({ where, ...bounds,
-          orderBy: scope.ownerId ? [{ status: "asc" }, { appointmentDate: "desc" }, { appointmentTime: "desc" }, { id: "desc" }] : [{ status: "asc" }, { createdAt: "desc" }, { id: "desc" }] })]);
       } else if (resource === "hotelBookings") {
         const base: Prisma.HotelBookingWhereInput = { ...owner, ...identity,
           ...(query.roomType ? { roomType: query.roomType as RoomType } : {}),
@@ -49,28 +51,12 @@ export class PrismaListsRepository implements ListsRepository {
         const groups = await tx.hotelBooking.groupBy({ by: ["status"], where: base, _count: true });
         counts = Object.fromEntries(groups.map(group => [group.status, group._count]));
         [total, data.hotelBookings] = await Promise.all([tx.hotelBooking.count({ where }), tx.hotelBooking.findMany({ where, ...bounds, include: { dailyCareNotes: { select: { id: true }, take: 0 } }, orderBy: [{ status: "asc" }, { createdAt: "desc" }, { id: "desc" }] })]);
-      } else if (resource === "medicalRecords") {
-        const where: Prisma.MedicalRecordWhereInput = { ...owner, ...identity, ...(query.q ? { OR: [...joinedSearch(), text("title"), text("doctorName"), text("diagnosis")] } : {}) };
-        [total, data.medicalRecords] = await Promise.all([tx.medicalRecord.count({ where }), tx.medicalRecord.findMany({ where, ...bounds, orderBy: [{ visitDate: "desc" }, { id: "desc" }] })]);
-      } else if (resource === "medicalImages") {
-        const where: Prisma.MedicalImageWhereInput = { ...identity, ...(scope.ownerId ? { pet: { ownerId: scope.ownerId } } : {}), ...(query.petId ? { petId: query.petId } : {}), ...(query.q ? { OR: [text("title"), { pet: petSearch() }] } : {}) };
-        [total, data.medicalImages] = await Promise.all([tx.medicalImage.count({ where }), tx.medicalImage.findMany({ where, ...bounds, orderBy: [{ createdAt: "desc" }, { id: "desc" }] })]);
       } else if (resource === "dailyCareNotes") {
         const where: Prisma.DailyCareNoteWhereInput = { ...identity, ...(scope.ownerId ? { booking: { ownerId: scope.ownerId }, visibleToOwner: true } : {}), ...(query.bookingId ? { bookingId: query.bookingId } : {}) };
         [total, data.dailyCareNotes] = await Promise.all([tx.dailyCareNote.count({ where }), tx.dailyCareNote.findMany({ where, ...bounds, orderBy: [{ noteDate: "desc" }, { id: "desc" }] })]);
-      } else if (resource === "notifications") {
-        // Tab counts ignore the selected tab; status counts and the page respect it.
-        const tabs: Prisma.NotificationWhereInput = { ...identity, ...(scope.ownerId ? { recipientOwnerId: scope.ownerId } : { recipientRole: scope.recipientRole ?? "admin" }),
-          ...(query.q ? { OR: [text("title"), text("message")] } : {}) };
-        const base: Prisma.NotificationWhereInput = query.category ? { AND: [tabs, notificationCategoryWhere(query.category as NotificationCategory)] } : tabs;
-        const where = { ...base, ...(query.status ? { status: query.status } : {}) };
-        const groups = await tx.notification.groupBy({ by: ["status"], where: base, _count: true });
-        counts = Object.fromEntries(groups.map(group => [group.status, group._count]));
-        const types = await tx.notification.groupBy({ by: ["type"], where: tabs, _count: true });
-        const hotelUpdates = await tx.notification.count({ where: { AND: [tabs, hotelStatusUpdates] } });
-        for (const [category, n] of Object.entries(notificationCategoryCounts(types.map(row => ({ type: row.type, count: row._count })), hotelUpdates))) counts[`category:${category}`] = n;
-        counts["category:all"] = types.reduce((sum, row) => sum + row._count, 0);
-        [total, data.notifications] = await Promise.all([tx.notification.count({ where }), tx.notification.findMany({ where, ...bounds, orderBy: [{ createdAt: "desc" }, { id: "desc" }] })]);
+      } else if (resource === "appointments" || resource === "medicalRecords" || resource === "medicalImages" || resource === "notifications") {
+        if (!this.clinical) throw new Error("LIST_RESOURCE_UNAVAILABLE");
+        ({ total, counts } = await this.clinical.page(tx, resource, scope, query, data, filters));
       } else if (resource === "invoices") {
         const base: Prisma.InvoiceWhereInput = { ...owner, ...identity, ...(query.bookingId ? { hotelBookingId: query.bookingId } : {}),
           ...(query.q ? { OR: [...joinedSearch(), text("invoiceCode"), text("transferCode"), text("id")] } : {}) };
@@ -81,7 +67,7 @@ export class PrismaListsRepository implements ListsRepository {
       }
       // Fetch only relations of rows on this page, instead of all owners/pets in the database.
       const rows = [...data.appointments, ...data.hotelBookings, ...data.medicalRecords, ...data.medicalImages, ...data.invoices];
-      if (resource === "medicalRecords") data.appointments = await tx.appointment.findMany({ where: { id: { in: data.medicalRecords.flatMap(row => row.appointmentId ? [row.appointmentId] : []) }, ...(scope.ownerId ? { ownerId: scope.ownerId } : {}) } });
+      if (this.clinical) await this.clinical.related(tx, resource, scope, data);
       if (resource === "hotelBookings" && data.hotelBookings.length) data.invoices = await tx.invoice.findMany({ where: { hotelBookingId: { in: data.hotelBookings.map(row => row.id) }, ...(scope.ownerId ? { ownerId: scope.ownerId } : {}) }, include: { items: true } });
       const petIds = [...new Set(rows.map(row => row.petId))];
       if (resource !== "pets" && petIds.length) data.pets = await tx.pet.findMany({ where: { id: { in: petIds }, ...(scope.ownerId ? { ownerId: scope.ownerId } : {}) } });
@@ -107,12 +93,7 @@ export class PrismaListsRepository implements ListsRepository {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
   async calendar(scope: ListScope, month: string, category?: string) {
-    const [year, number] = month.split("-").map(Number);
-    const rows = await this.client.appointment.groupBy({ by: ["appointmentDate"], where: {
-      ...(scope.ownerId ? { ownerId: scope.ownerId } : {}),
-      ...(category ? { type: category === "spa" ? { in: [...spaTypes] } : { notIn: [...spaTypes] } } : {}),
-      appointmentDate: { gte: new Date(Date.UTC(year!, number! - 1, 1)), lt: new Date(Date.UTC(year!, number!, 1)) },
-    }, _count: true });
-    return Object.fromEntries(rows.map(row => [row.appointmentDate.toISOString().slice(0, 10), row._count]));
+    if (!this.clinical) throw new Error("LIST_RESOURCE_UNAVAILABLE");
+    return this.clinical.calendar(this.client, scope, month, category);
   }
 }
