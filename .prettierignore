@@ -14,6 +14,5 @@ backend/src/legacy/routes/appointments.ts
 backend/src/legacy/routes/bootstrap.ts
 backend/src/legacy/routes/medicalRecords.ts
 backend/src/legacy/routes/notifications.ts
-# K3 decision Q1: formatting these two would push PrismaListsRepository.page and PrismaBootstrapRepository.load over 100 lines; K4 rewrites them.
-backend/src/infrastructure/persistence/listsRepository.ts
+# K3 decision Q1: formatting bootstrapRepository would push PrismaBootstrapRepository.load over 100 lines; K4 rewrites it (C8b).
 backend/src/infrastructure/persistence/bootstrapRepository.ts

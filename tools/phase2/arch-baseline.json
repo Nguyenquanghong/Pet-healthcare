@@ -108,8 +108,8 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "windowsOutsideLegacy": 283,
-        "windowsAll": 307
+        "windowsOutsideLegacy": 287,
+        "windowsAll": 311
       }
     },
     "S16": {
