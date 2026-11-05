@@ -138,6 +138,7 @@
         "legacy/application/*",
         "legacy/infrastructure/*",
         "legacy/routes/appointments",
+        "legacy/routes/clinicalLists",
         "legacy/routes/medicalRecords",
         "legacy/routes/notifications"
       ]
@@ -184,6 +185,16 @@
       "from": "clinical",
       "to": "billing",
       "note": "clinicalSources types the appointment source of invoice issuing (AppointmentInvoiceSource); type-only, K4 removes"
+    },
+    {
+      "from": "clinical",
+      "to": "read",
+      "note": "clinicalSources implements the clinical list source that listsRepository defines (ClinicalListSource, ListFilters; type-only); clinicalLists uses ListsService (read); listResultDto is in the dto group"
+    },
+    {
+      "from": "clinical",
+      "to": "identity",
+      "note": "clinicalLists authenticates its GET handlers with middleware/auth, as routes/lists does"
     }
   ],
   "tables": {

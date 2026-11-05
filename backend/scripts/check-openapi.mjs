@@ -22,9 +22,11 @@ runtime.add('GET /api/operations/{id}');
 const dashboardSource=readFileSync(resolve(backend,'src/routes/dashboard.ts'),'utf8');
 for(const match of dashboardSource.matchAll(/app\.get\(\s*'([^']+)'/g))runtime.add('GET '+match[1]);
 for (const [file, mount] of Object.entries(mounts)) {
-  // The Phase 1 routers live in src/legacy/routes; the rest are Core's own.
+  // The Phase 1 routers live in src/legacy/routes; the rest are Core's own. The list router's clinical GETs are in
+  // src/legacy/routes/clinicalLists.ts, mounted at the same /api.
   const dir = legacyRouters.has(file) ? "src/legacy/routes" : "src/routes";
-  const source = readFileSync(resolve(backend, dir, `${file}.ts`), "utf8");
+  const sources = [resolve(backend, dir, `${file}.ts`), ...(file === "lists" ? [resolve(backend, "src/legacy/routes/clinicalLists.ts")] : [])];
+  const source = sources.map(path => readFileSync(path, "utf8")).join("\n");
   for (const match of source.matchAll(/\brouter\.(get|post|patch|put|delete)\(\s*["']([^"']+)["']/g)) {
     const path = (mount + (match[2] === "/" ? "" : match[2])).replace(/:([A-Za-z][\w]*)/g, "{$1}");
     runtime.add(`${match[1].toUpperCase()} ${path}`);
