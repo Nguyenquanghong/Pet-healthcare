@@ -147,3 +147,15 @@ export class BookingLifecycleService {
     });
   }
 }
+// One store per booking kind. A kind without a store answers like a booking that does not exist.
+export function lifecycleByKind(stores: Partial<Record<BookingKind, BookingLifecycleStore>>): BookingLifecycleStore {
+  const of = (kind: BookingKind) => {
+    const store = stores[kind];
+    if (!store) throw new BusinessError(404, 'Không tìm thấy lịch đặt.');
+    return store;
+  };
+  return {
+    run: async (kind, id, work) => of(kind).run(kind, id, work),
+    history: async (kind, id) => of(kind).history(kind, id),
+  };
+}

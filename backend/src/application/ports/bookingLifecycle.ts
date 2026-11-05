@@ -1,9 +1,15 @@
 import type { Actor } from '../../domain/auth.js';
-import type { AppointmentRecord } from './appointments.js';
-import type { HotelBookingValue } from './hotelBookings.js';
 
 export type BookingKind = 'appointment' | 'hotel';
-export type LifecycleBooking = (AppointmentRecord | HotelBookingValue) & { statusRevision: number };
+export type LifecycleBooking = {
+  id: string;
+  ownerId: string;
+  petId: string;
+  status: string;
+  statusRevision: number;
+  internalNote?: string | null;
+  ownerNote?: string | null;
+};
 export type StatusEvent = {
   id: string;
   kind: string;

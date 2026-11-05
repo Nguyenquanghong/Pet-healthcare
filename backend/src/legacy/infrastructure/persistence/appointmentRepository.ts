@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { AppointmentDependencies, AppointmentRepository, AppointmentTransaction, AppointmentUnitOfWork, NotificationWriter } from "../../../application/ports/appointments.js";
-import { appointmentSlotWrite } from "../../../infrastructure/persistence/appointmentSlotConflict.js";
+import { appointmentSlotWrite } from "./appointmentSlotConflict.js";
 import { writeNotification } from '../../../infrastructure/persistence/notificationOutbox.js';
 
 type Client = PrismaClient | Prisma.TransactionClient;
