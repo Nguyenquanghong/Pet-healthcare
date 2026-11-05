@@ -78,15 +78,15 @@
       "kind": "measured",
       "better": "lower",
       "values": {
-        "files": 1,
-        "lines": 92
+        "files": 0,
+        "lines": 0
       }
     },
     "S12": {
       "kind": "derived",
       "better": "lower",
       "values": {
-        "files": 2,
+        "files": 0,
         "branches": 1
       }
     },

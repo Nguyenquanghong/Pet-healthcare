@@ -1,4 +1,4 @@
-import type { PrismaClient, Prisma } from '../../generated/client/index.js';
+import type { PrismaClient, Prisma } from '../../../../services/clinic/src/generated/client/index.js';
 import type { CoreState, ReservationSnapshot } from '@nipopeto/contracts';
 class ReservationConflict extends Error {}
 export class ClinicBilling {
