@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer';
 export * from './permissions.js';
 export * from './notificationCategories.js';
 export * from './bookingLifecycle.js';
+export * from './gatewayRoutes.js';
 export const eventTypes = [
   'notification.requested.v1',
   'billing.invoice-issued.v1',
