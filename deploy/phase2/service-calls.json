@@ -1,0 +1,181 @@
+{
+  "schema": 1,
+  "note": "Every synchronous HTTP call between Core, Clinic and Notification, and every outbound call to a system that is not one of them. The rule service-calls-declared (tools/phase2/check-architecture-rules.mjs, logic in tools/phase2/service-calls.mjs) reads the code against this file; ADR-P15 explains why the calls form cycles. Timeouts are milliseconds.",
+  "calls": [
+    {
+      "id": "core-clinic-proxy",
+      "kind": "proxy",
+      "caller": { "service": "core", "processes": ["api"] },
+      "callee": { "service": "clinic" },
+      "method": "*",
+      "paths": ["/api/appointments", "/api/medical-records", "/api/dashboard/clinic"],
+      "match": null,
+      "file": "backend/src/gateway/serviceProxy.ts",
+      "config": { "file": "backend/src/composition/coreRoutes.ts", "proxy": "clinic" },
+      "credential": null,
+      "forwards": ["authorization", "idempotency-key"],
+      "timeoutMs": 6000,
+      "nestedIn": null,
+      "receiver": null,
+      "reason": "A user's request for a Clinic prefix; Core is the ingress in compose and demo (ADR-P14 D4) and forwards the user's bearer token and idempotency key, with no service token."
+    },
+    {
+      "id": "core-notification-proxy",
+      "kind": "proxy",
+      "caller": { "service": "core", "processes": ["api"] },
+      "callee": { "service": "notification" },
+      "method": "*",
+      "paths": ["/api/notifications"],
+      "match": null,
+      "file": "backend/src/gateway/serviceProxy.ts",
+      "config": { "file": "backend/src/composition/coreRoutes.ts", "proxy": "notification" },
+      "credential": null,
+      "forwards": ["authorization", "idempotency-key"],
+      "timeoutMs": 4000,
+      "nestedIn": null,
+      "receiver": null,
+      "reason": "A user's request for the inbox; Core is the ingress, and going through Core keeps revocation of a deleted or demoted account immediate (ADR-P14 4.1)."
+    },
+    {
+      "id": "core-clinic-billing-source",
+      "kind": "http",
+      "caller": { "service": "core", "processes": ["api", "core-billing"] },
+      "callee": { "service": "clinic" },
+      "method": "GET",
+      "paths": ["/internal/billing-sources/:id"],
+      "match": "/internal/billing-sources/",
+      "file": "backend/src/infrastructure/http/clinicBillingRemote.ts",
+      "credential": { "header": "x-service-token", "token": "CLINIC_BILLING_TOKEN", "actor": "signed", "wiring": { "caller": ["backend/src/composition/config.ts", "backend/src/workers/billing.ts"], "callee": "services/clinic/src/index.ts" } },
+      "timeoutMs": 1800,
+      "nestedIn": null,
+      "receiver": { "file": "services/clinic/src/http/billingApi.ts", "gate": "acceptsService" },
+      "reason": "An invoice needs the snapshot of the appointment at the revision it is raised against; Core cannot read Clinic's table."
+    },
+    {
+      "id": "core-clinic-billing-prepare",
+      "kind": "http",
+      "caller": { "service": "core", "processes": ["api", "core-billing"] },
+      "callee": { "service": "clinic" },
+      "method": "PUT",
+      "paths": ["/internal/billing-reservations/:operationId"],
+      "match": "/internal/billing-reservations/",
+      "file": "backend/src/infrastructure/http/clinicBillingRemote.ts",
+      "credential": { "header": "x-service-token", "token": "CLINIC_BILLING_TOKEN", "actor": "signed", "wiring": { "caller": ["backend/src/composition/config.ts", "backend/src/workers/billing.ts"], "callee": "services/clinic/src/index.ts" } },
+      "timeoutMs": 1800,
+      "nestedIn": null,
+      "receiver": { "file": "services/clinic/src/http/billingApi.ts", "gate": "acceptsService" },
+      "reason": "The prepare phase holds the appointment in Clinic before Core writes the invoice."
+    },
+    {
+      "id": "core-clinic-billing-finalize",
+      "kind": "http",
+      "caller": { "service": "core", "processes": ["api", "core-billing"] },
+      "callee": { "service": "clinic" },
+      "method": "POST",
+      "paths": ["/internal/billing-reservations/:operationId/commit", "/internal/billing-reservations/:operationId/release"],
+      "match": "/internal/billing-reservations/",
+      "suffixes": ["/commit", "/release"],
+      "file": "backend/src/infrastructure/http/clinicBillingRemote.ts",
+      "credential": { "header": "x-service-token", "token": "CLINIC_BILLING_TOKEN", "actor": "none", "wiring": { "caller": ["backend/src/composition/config.ts", "backend/src/workers/billing.ts"], "callee": "services/clinic/src/index.ts" } },
+      "timeoutMs": 1800,
+      "nestedIn": null,
+      "receiver": { "file": "services/clinic/src/http/billingApi.ts", "gate": "acceptsService" },
+      "reason": "Ends a reservation quickly, with no actor; the billing event is the durable path if the call fails and the worker retries."
+    },
+    {
+      "id": "clinic-core-directory",
+      "kind": "http",
+      "caller": { "service": "clinic", "processes": ["api"] },
+      "callee": { "service": "core" },
+      "method": "POST",
+      "paths": ["/internal/directory/authorize", "/internal/directory/lookup"],
+      "match": "/internal/directory/",
+      "suffixes": ["authorize", "lookup"],
+      "file": "services/clinic/src/infrastructure/core/directory.ts",
+      "credential": { "header": "x-service-token", "token": "CORE_DIRECTORY_TOKEN", "actor": "bearer", "wiring": { "caller": "services/clinic/src/index.ts", "callee": "backend/src/composition/config.ts" } },
+      "timeoutMs": 2000,
+      "nestedIn": "core-clinic-proxy",
+      "receiver": { "file": "backend/src/routes/internal/directory.ts", "gate": "credentialGate" },
+      "reason": "Core is the source of identity, roles and revocation (ADR-05, ADR-P13); Clinic asks it for every request and keeps no copy of the answer."
+    },
+    {
+      "id": "clinic-core-billing-evidence",
+      "kind": "http",
+      "caller": { "service": "clinic", "processes": ["api"] },
+      "callee": { "service": "core" },
+      "method": "GET",
+      "paths": ["/internal/billing-operations/:operationId"],
+      "match": "/internal/billing-operations/",
+      "file": "services/clinic/src/infrastructure/core/directory.ts",
+      "credential": { "header": "x-service-token", "token": "CORE_BILLING_EVIDENCE_TOKEN", "actor": "none", "wiring": { "caller": "services/clinic/src/index.ts", "callee": "backend/src/composition/config.ts" } },
+      "timeoutMs": 2000,
+      "nestedIn": "core-clinic-billing-finalize",
+      "receiver": { "file": "backend/src/routes/internal/billing.ts", "gate": "acceptsCredential" },
+      "reason": "Clinic does not trust the caller of commit or release; it reads the terminal state of the operation from Core before it reconciles."
+    },
+    {
+      "id": "clinic-core-directory-export",
+      "kind": "http",
+      "caller": { "service": "clinic", "processes": ["worker"] },
+      "callee": { "service": "core" },
+      "method": "GET",
+      "paths": ["/internal/directory/export"],
+      "match": "/internal/directory/export",
+      "file": "services/clinic/src/infrastructure/core/directorySync.ts",
+      "credential": { "header": "x-service-token", "token": "CORE_DIRECTORY_TOKEN", "actor": "none", "wiring": { "caller": "services/clinic/src/worker.ts", "callee": "backend/src/composition/config.ts" } },
+      "timeoutMs": 2000,
+      "nestedIn": null,
+      "receiver": { "file": "backend/src/routes/internal/directory.ts", "gate": "credentialGate" },
+      "reason": "A directory event carries an id and a version only; the worker hydrates the current state from Core, and a transient failure is retried (P03)."
+    },
+    {
+      "id": "notification-core-authorize-send",
+      "kind": "http",
+      "caller": { "service": "notification", "processes": ["api"] },
+      "callee": { "service": "core" },
+      "method": "POST",
+      "paths": ["/internal/notifications/authorize-send"],
+      "match": "/internal/notifications/authorize-send",
+      "file": "services/notification/src/coreAuthorization.ts",
+      "credential": { "header": "x-service-token", "token": "CORE_NOTIFICATION_SEND_TOKEN", "actor": "bearer", "wiring": { "caller": "services/notification/src/index.ts", "callee": "backend/src/composition/config.ts" } },
+      "timeoutMs": 2000,
+      "nestedIn": "core-notification-proxy",
+      "receiver": { "file": "backend/src/routes/internal/notificationAuthorization.ts", "gate": "acceptsCredential" },
+      "reason": "The recipient and the sender's right to send are checked at the moment of sending, and only Core knows them."
+    }
+  ],
+  "external": [
+    {
+      "id": "clinic-blob-store-s3",
+      "service": "clinic",
+      "file": "services/clinic/src/infrastructure/blob/blobStore.ts",
+      "system": "S3-compatible object storage",
+      "reason": "Medical image bytes live in object storage, not in another service; this is a dependency on a system outside the three services, so it is not a direction between them."
+    },
+    {
+      "id": "core-vnpay-query",
+      "service": "core",
+      "file": "backend/src/infrastructure/security/vnpay.ts",
+      "system": "VNPay sandbox transaction query",
+      "reason": "Payment reconciliation asks the payment provider about a transaction; a third-party system, not a direction between the services."
+    }
+  ],
+  "uncalledRoutes": [
+    {
+      "callee": "clinic",
+      "method": "GET",
+      "path": "/internal/billing-reservations/:operationId",
+      "reason": "Diagnostic read of a reservation that no service calls; tools/phase2/clinic-scope.test.mjs uses it. It sits behind the same service-token gate as the other billing routes."
+    }
+  ],
+  "timeoutExceptions": [
+    {
+      "outer": "core-clinic-billing-finalize",
+      "inner": "clinic-core-billing-evidence",
+      "outerMs": 1800,
+      "innerMs": 2000,
+      "until": "2026-11-30",
+      "reason": "Core gives commit or release 1800 ms, and Clinic's handler then waits up to 2000 ms for the evidence call, so the outer call can stop first. Not changed in K5 (behaviour); the fix after K9 is an evidence timeout of 1500 ms, with reconcile checked to be idempotent under retry."
+    }
+  ]
+}
