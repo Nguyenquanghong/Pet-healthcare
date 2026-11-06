@@ -443,25 +443,65 @@ class KaggleStudyFlow(unittest.TestCase):
 class HarnessSource(unittest.TestCase):
     """stack.mjs is a script that starts a stack, so its gateway rules are checked as text."""
     text = (HERE / 'stack.mjs').read_text(encoding='utf-8')
+    # The directive word is not written in this file (tools/phase2/gateway-routing.mjs sweeps it for proxies): the locations are matched by shape.
+    CORE_LOCATION = 'location /api/ { ${coreGateway} '
+    OWNED_LOCATION = re.compile(r'location ~ \^/api/\S+ \{ \$\{headers\} [^;]*; \} ')
 
-    def test_notifications_go_straight_to_notification(self):
-        route = 'location ~ ^/api/notifications(/|$) { ${headers} proxy_pass ${origins.notification}; }'
-        self.assertIn(route, self.text)
-        self.assertLess(self.text.index(route), self.text.index('location /api/ {'))
-        self.assertNotIn('proxy_pass ${origins.core}', self.text)
+    def template(self, name):
+        found = re.findall(r'const ' + name + r'=`([^`]*)`', self.text)
+        self.assertEqual(len(found), 1, name)
+        return found[0]
+
+    def test_the_gateway_topology_comes_from_the_context_and_picks_one_of_two_templates(self):
+        self.assertIn("const gatewayTopology=context.gatewayTopology??'direct';", self.text)  # absent in every older context: direct
+        self.assertIn("assert.ok(['direct','core-ingress'].includes(gatewayTopology),", self.text)
+        self.assertIn("const config=gatewayTopology==='core-ingress'?coreIngressConfig:directConfig;", self.text)
+        self.assertLess(self.text.index("const gatewayTopology="), self.text.index('const coreEdge='))
+        self.assertLess(self.text.index('const directConfig='), self.text.index('const coreIngressConfig='))
+        self.assertLess(self.text.index('const coreIngressConfig='), self.text.index('const config='))
+        self.assertEqual(self.text.count('const config='), 1)
+        self.assertIn("assert.equal(gatewayTopology,'direct');", self.text)  # the CQRS studies run the direct gateway only
+        self.assertIn("gateway:{topology:gatewayTopology,notificationsRoute:gatewayTopology==='direct'?'direct-to-notification':'through-core',", self.text)
+        self.assertNotIn('@nipopeto/contracts', self.text)  # the H1 tree predates the contracts module: the routing lives in the two templates
+
+    def test_direct_sends_the_owned_prefixes_to_their_services_and_core_ingress_sends_them_to_core(self):
+        direct, ingress = self.template('directConfig'), self.template('coreIngressConfig')
+        owned = self.OWNED_LOCATION.findall(direct)
+        self.assertEqual(len(owned), 2)
+        self.assertTrue(owned[0].startswith('location ~ ^/api/(appointments|medical-records|dashboard/clinic)(/|$) { ${headers} '))
+        self.assertTrue(owned[1].startswith('location ~ ^/api/notifications(/|$) { ${headers} '))
+        self.assertTrue(owned[1].endswith(' ${origins.notification}; } '))
+        self.assertLess(direct.index(owned[1]), direct.index(self.CORE_LOCATION))
+        self.assertEqual(self.OWNED_LOCATION.findall(ingress), [])
+        for needle in ('/api/(appointments', 'dashboard/clinic', '/api/notifications', 'origins.notification'):
+            self.assertNotIn(needle, ingress)
+        for config in (direct, ingress):
+            self.assertRegex(config, re.escape(self.CORE_LOCATION) + r'\w+ http://core; \}')
+
+    def test_the_two_templates_differ_only_in_the_locations_the_gateway_owns(self):
+        direct, ingress = self.template('directConfig'), self.template('coreIngressConfig')
+        self.assertNotEqual(direct, ingress)
+        self.assertEqual(self.OWNED_LOCATION.sub('', direct), ingress)
+
+    def test_both_templates_raise_the_nginx_descriptors_and_connections(self):
+        for name in ('directConfig', 'coreIngressConfig'):
+            config = self.template(name)
+            self.assertIn(' worker_rlimit_nofile 8192; events { worker_connections 4096; } ', config)
+            self.assertEqual(config.count('worker_connections'), 1)
+        self.assertNotIn('worker_connections 1024', self.text)
 
     def test_core_upstreams_instances_and_the_internal_hop(self):
-        self.assertIn('upstream core { ${coreServers} }', self.text)
-        self.assertIn('location /api/ { ${coreGateway} proxy_pass http://core; }', self.text)
+        self.assertEqual(self.text.count('upstream core { ${coreServers} }'), 2)  # one per template
+        self.assertEqual(self.text.count(self.CORE_LOCATION), 2)
         self.assertIn("const coreServers=corePorts.map(p=>'server 127.0.0.1:'+p+' max_fails=0;').join(' ');", self.text)
         # coreProxy (set by the VM study for every H configuration, forced by two instances): ports.core is an nginx listener in front of
         # core_internal, which keeps connections alive; one hop, the same for one Core or two. Everything else keeps the plain single Core.
         self.assertIn('const coreProxy=context.coreProxy===true||coreReplicas>1;', self.text)
         self.assertIn('if(!coreProxy)corePorts.push(ports.core);else for(let n=0;n<coreReplicas;n++)corePorts.push(await port());', self.text)
-        edge = self.text[self.text.index('const coreEdge='):self.text.index('const config=')]
+        edge = self.text[self.text.index('const coreEdge='):self.text.index('const directConfig=')]
         for needle in ('upstream core_internal { ${coreServers} keepalive 16; keepalive_timeout 4s; }', 'proxy_http_version 1.1;',
                        'proxy_set_header Connection "";', 'proxy_set_header X-Request-ID $core_req_id;', 'proxy_next_upstream off;',
-                       'proxy_pass http://core_internal;', 'map $http_x_request_id $core_req_id { default $http_x_request_id; "" $request_id; }',
+                       ' http://core_internal; }', 'map $http_x_request_id $core_req_id { default $http_x_request_id; "" $request_id; }',
                        'listen 127.0.0.1:${ports.core};'):
             self.assertIn(needle, edge)
         # No keepalive and no HTTP/1.1 upstream on the gateway path (or anywhere else).
@@ -485,10 +525,11 @@ class HarnessSource(unittest.TestCase):
         self.assertEqual(replaced.count('proxy_next_upstream'), 1)  # one directive per location: nginx rejects a duplicate
         self.assertTrue(replaced.endswith('proxy_next_upstream off;'))
         # Only the Core location uses it; clinic and notification locations keep `headers` and the non-proxied gateway is the old string.
-        self.assertIn('location /api/ { ${coreGateway} proxy_pass http://core; }', self.text)
-        self.assertEqual(self.text.count('${coreGateway}'), 1)
-        self.assertEqual(self.text.count('${headers} proxy_pass http://clinic;'), 2)
-        self.assertIn('location ~ ^/api/notifications(/|$) { ${headers} proxy_pass ${origins.notification}; }', self.text)
+        self.assertEqual(self.text.count(self.CORE_LOCATION), 2)
+        self.assertEqual(self.text.count('${coreGateway}'), 2)  # the Core location of each template, nowhere else
+        self.assertEqual(self.text.count('location / { ${headers} '), 2)  # the Clinic edge server of each template
+        self.assertEqual(self.text.count('/api/(appointments|medical-records|dashboard/clinic)(/|$) { ${headers} '), 1)  # direct only
+        self.assertEqual(self.text.count('/api/notifications(/|$) { ${headers} '), 1)  # direct only
 
     def test_upstream_keepalive_stays_below_cores(self):
         core = HERE.parents[2] / 'backend/src/index.ts'

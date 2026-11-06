@@ -51,7 +51,8 @@
 // 18. Gateway routes from one source (K5): every place that routes /api traffic (tools/phase2/gateway-routing.mjs ROUTING_PLACES) sends
 //     the probe paths where packages/contracts/src/gatewayRoutes.ts says (core-ingress or direct), except listed exceptions (a prefix of
 //     gatewayRoutes, a reason, a day at most 60 ahead; checked on their last day UTC); the places are the nginx configs (read like nginx
-//     reads them, one server per port, only listed directives, anything it cannot follow fails), the E2E proxy, the frontend client and the Vite dev proxy;
+//     reads them, one server per port, only listed directives, anything it cannot follow fails; stack.mjs holds two templates, one per topology,
+//     so nine places in all), the E2E proxy, the frontend client and the Vite dev proxy;
 //     no proxy (proxy_pass, a Vite or Node proxy, a fetch of the request URL) in a file that is neither a place nor on the dated ignore
 //     list, phase2-plan/evidence excepted; the gateway and service OpenAPI files list the same paths and agree on the owner of each;
 //     Core's routes take their prefixes from the contracts, and only the three legacy mounts of mountCoreRoutes name one.
@@ -1261,8 +1262,9 @@ rule('legacy-isolated', () => {
 
 // ---- 18. Gateway routes from one source (K5) ---------------------------------------------------
 // Which service answers an /api path is declared once in packages/contracts/src/gatewayRoutes.ts. Every place that routes /api
-// traffic (tools/phase2/gateway-routing.mjs ROUTING_PLACES: the compose nginx, the split example, the measurement and resilience
-// gateways, the P7 rehearsal, the E2E proxy, the frontend client, the Vite dev proxy) must send a fixed set of probe paths where its topology says
+// traffic (tools/phase2/gateway-routing.mjs ROUTING_PLACES, nine: the compose nginx, the split example, the measurement gateway in its two
+// topologies (stack.mjs#direct and stack.mjs#core-ingress), the resilience gateway, the P7 rehearsal, the E2E proxy, the frontend client,
+// the Vite dev proxy) must send a fixed set of probe paths where its topology says
 // (core-ingress: all to Core; direct: each owned prefix to its owner), unless a listed exception with a reason and an end date says
 // otherwise. A proxy_pass in a file that is not a place fails, and so does a place that reads as empty. The gateway and service
 // OpenAPI files must agree on who owns each path, and Core's routes take the prefixes from the contracts.
@@ -1280,16 +1282,22 @@ const routingCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.
     const edits=(path,pairs)=>{let text=real.read(path);for(const [from,to] of pairs){assert.ok(text.includes(from),'fixture edit not found in '+path+': '+from);text=text.replace(from,()=>to);}return {[path]:text};};
     const append=(path,text)=>({[path]:real.read(path)+'\n'+text+'\n'});
     const json=(path,change)=>{const spec=JSON.parse(real.read(path));change(spec.paths);return {[path]:JSON.stringify(spec)};};
-    const run=(files,{routes,exceptions,ignore,at=FIXED}={})=>{
+    const run=(files,{routes,exceptions,ignore,places,at=FIXED}={})=>{
       const c=routes?{...contracts,gatewayRoutes:routes,routeOwner:p=>routes.find(r=>p===r.prefix||p.startsWith(r.prefix+'/'))?.service??'core'}:contracts;
-      return routingFindings(c,at,fixtureIo(real,files,{...(exceptions?{exceptions}:{}),...(ignore?{ignore}:{})}),{dist:!routes});
+      return routingFindings(c,at,fixtureIo(real,files,{...(exceptions?{exceptions}:{}),...(ignore?{ignore}:{}),...(places?{places}:{})}),{dist:!routes});
     };
     const VACC='location ~ ^/api/vaccinations(/|$) { proxy_pass http://clinic; }';
     const CORE='location /api/ { proxy_pass http://core; }',CLINIC_LOCATION='location ~ ^/api/(appointments|medical-records|dashboard/clinic)(/|$) { proxy_pass http://clinic; }';
     const e2eBranch="if(path.startsWith('/api/')){",e2eForward='fetch(origins.core+req.url';
     const e2eDetour=(call)=>edit(E2E,e2eBranch,"if(path.startsWith('/api/appointments')){"+call+"res.writeHead(200);res.end();return;}\n    "+e2eBranch);
     const ghost=[...contracts.gatewayRoutes,{prefix:'/api/ghost',service:'clinic'}],nested=[...contracts.gatewayRoutes,{prefix:'/api/appointments/archive',service:'clinic'}];
-    const stray=real.exceptions[0];
+    // The real lists hold no exception and no dated ignore (the K9 harness reads direct as the standard topology), so the checks on their dates, reasons and
+    // staleness run on synthetic entries: SYN waives /api/dashboard/clinic for stack.mjs#direct once NO_DASHBOARD takes it out of that template (else it is
+    // stale); SYN_IGNORE waives a file that only quotes a proxy, tools/stray-quote.py.
+    const SYN={place:STACK+'#direct',prefix:'/api/dashboard/clinic',routesTo:'core',until:'2026-11-20',reason:'a synthetic exception for the fixtures'};
+    const NO_DASHBOARD=edit(STACK,'(appointments|medical-records|dashboard/clinic)','(appointments|medical-records)');
+    const SYN_IGNORE={file:'tools/stray-quote.py',reason:'a synthetic ignore entry for the fixtures',until:'2026-11-20'},STRAY_QUOTE={'tools/stray-quote.py':'# a proxy_pass http://core; that is only quoted here\n'};
+    const DIRECT=STACK+'#direct';
     const fails=[
       ['direct config without dashboard/clinic',/^table deploy/,run(edit(SPLIT,'(appointments|medical-records|dashboard/clinic)','(appointments|medical-records)'))],
       ['direct config also sends vaccinations to Clinic',/^table deploy/,run(edit(SPLIT,'location /api/ { proxy_pass http://core; }','location ~ ^/api/vaccinations(/|$) { proxy_pass http://clinic; } location /api/ { proxy_pass http://core; }'))],
@@ -1319,11 +1327,12 @@ const routingCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.
       ['a literal prefix in coreApp',/^literal .*coreApp/,run(append(APP,"const p = '/api/medical-records';"))],
       ['coreRoutes no longer imports the contracts',/^literal .*does not take/,run(edit(ROUTES,"from '@nipopeto/contracts'","from './nope.js'"))],
       ['the built contracts are older than the source',/^dist/,run(edit(SOURCE,"'/api/medical-records'","'/api/medical-record'"))],
-      ['an exception past its date',/^exception .*expired/,run({},{at:'2026-11-21'})],
-      ['an exception that no longer differs',/^exception .*stale/,run({},{exceptions:[...real.exceptions,{place:SPLIT,prefix:'/api/dashboard/clinic',routesTo:'core',until:'2027-01-01',reason:'a reason of some length'}]})],
-      ['an exception with no reason',/^exception .*no reason/,run({},{exceptions:real.exceptions.map(e=>({...e,reason:''}))})],
-      ['an exception for a place that is not listed',/^exception .*place not found/,run({},{exceptions:[...real.exceptions,{...stray,place:'tools/phase2/nowhere.mjs'}]})],
-      ['an exception to a service the place does not use',/^table benchmarks/,run({},{exceptions:real.exceptions.map(e=>e.place===STACK?{...e,routesTo:'notification'}:e)})],
+      ['an exception past its date',/^exception .*expired/,run(NO_DASHBOARD,{exceptions:[SYN],at:'2026-11-21'})],
+      ['an exception that no longer differs',/^exception .*stale/,run(NO_DASHBOARD,{exceptions:[SYN,{place:SPLIT,prefix:'/api/dashboard/clinic',routesTo:'core',until:'2027-01-01',reason:'a reason of some length'}]})],
+      ['an exception that is still listed after the place was fixed',/^exception .*stale/,run({},{exceptions:[SYN]})],
+      ['an exception with no reason',/^exception .*no reason/,run(NO_DASHBOARD,{exceptions:[{...SYN,reason:''}]})],
+      ['an exception for a place that is not listed',/^exception .*place not found/,run(NO_DASHBOARD,{exceptions:[SYN,{...SYN,place:'tools/phase2/nowhere.mjs'}]})],
+      ['an exception to a service the place does not use',/^table benchmarks/,run(NO_DASHBOARD,{exceptions:[{...SYN,routesTo:'notification'}]})],
       ['a proxy_pass in a file that is not a place',/^sweep tools\/stray\.conf/,run({'tools/stray.conf':'server { location /api/ { proxy_pass http://core; } }'})],
       // nginx text: read the way nginx reads it, or refuse
       ['a regex with no space after ~',/^table deploy/,run(edit(SPLIT,CORE,'location ~^/api/vaccinations(/|$) { proxy_pass http://clinic; } '+CORE))],
@@ -1343,6 +1352,7 @@ const routingCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.
       ['a second server on [::]:8080',/^fail-closed frontend\/nginx.*2 server blocks listen on 8080/,run(append(TEMPLATE,'server { listen [::]:8080; location /api/ { proxy_pass http://clinic-api:5101; } }'))],
       ['a second server on 127.0.0.1:8080 with default_server',/^fail-closed deploy.*2 server blocks listen on 8080/,run(edit(SPLIT,'    # Core CLINIC_SERVICE_URL','    server { listen 127.0.0.1:8080 default_server; location / { proxy_pass http://clinic; } }\n    # Core CLINIC_SERVICE_URL'))],
       ['a ${…} that hides a location in the gateway server',/^fail-closed benchmarks.*does not list/,run(edit(STACK,'location /api/ { ${coreGateway}','${extraLocations} location /api/ { ${coreGateway}'))],
+      ['a ${…} that hides a location in the core-ingress gateway server',/^fail-closed benchmarks.*#core-ingress.*does not list/,run(edit(STACK,'return 404; } location /api/ { ${coreGateway}','return 404; } ${extraLocations} location /api/ { ${coreGateway}'))],
       ['a proxy_pass target taken from a ${…}',/^fail-closed benchmarks.*does not list/,run(edit(STACK,'location /api/ { ${coreGateway} proxy_pass http://core;','location /api/ { ${coreGateway} proxy_pass ${pickUpstream};'))],
       ['the P7 maintenance conditional is no longer the listed text',/^fail-closed tools\/phase2\/p7.*does not list/,run(edit(P7,'^(GET|HEAD|OPTIONS)$','^(GET|HEAD)$'))],
       ['a ${…} the resilience gateway does not list',/^fail-closed tools\/phase2\/resilience.*does not list/,run(edit(RES,'listen 127.0.0.1:${edge};','listen 127.0.0.1:${edge}; ${extra}'))],
@@ -1352,10 +1362,11 @@ const routingCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.
       ['createProxyMiddleware in a file that is not a place',/^sweep tools\/mw\.mjs/,run({'tools/mw.mjs':"import { createProxyMiddleware } from 'http-proxy-middleware';"})],
       ['a fetch of the request URL in a file that is not a place',/^sweep tools\/relay\.mjs/,run({'tools/relay.mjs':'const r = await fetch(base + req.url);'})],
       ['the billing stand-in is a proxy that only its ignore entry lets through',/^sweep tools\/phase2\/billing\.test\.mjs/,run({},{ignore:real.ignore.filter(e=>e.file!==BILLING)})],
-      ['a sweep ignore past its date',/^sweep ignore .*expired/,run({},{at:'2026-11-21'})],
+      ['a sweep ignore past its date',/^sweep ignore .*expired/,run(STRAY_QUOTE,{ignore:[...real.ignore,SYN_IGNORE],at:'2026-11-21'})],
       ['a sweep ignore for a file with no proxy',/^sweep ignore tools\/phase2\/arch-check\.mjs: stale/,run({},{ignore:[...real.ignore,{file:'tools/phase2/arch-check.mjs',reason:'a reason that is long enough'}]})],
       ['a sweep ignore with no reason',/^sweep ignore .*no reason/,run({},{ignore:real.ignore.map(e=>e.file===BILLING?{...e,reason:''}:e)})],
-      ['a sweep ignore with a date too far ahead',/^sweep ignore .*more than 60 days/,run({},{ignore:real.ignore.map(e=>e.until?{...e,until:'2027-06-01'}:e)})],
+      ['a sweep ignore with a date too far ahead',/^sweep ignore .*more than 60 days/,run(STRAY_QUOTE,{ignore:[...real.ignore,{...SYN_IGNORE,until:'2027-06-01'}]})],
+      ['a sweep ignore with a date that does not exist',/^sweep ignore .*until is not a date/,run(STRAY_QUOTE,{ignore:[...real.ignore,{...SYN_IGNORE,until:'2026-02-30'}]})],
       // the E2E proxy
       ['a template-literal fetch to Clinic in a branch before /api/',/^fail-closed tools\/phase2\/e2e.*outside the \/api\/ branch that is not the readiness probe/,run(e2eDetour('const r=await fetch(`${origins.clinic}${req.url}`);'))],
       ['a fetch through another variable in a branch before /api/',/^fail-closed tools\/phase2\/e2e.*outside the \/api\/ branch that is not the readiness probe/,run(e2eDetour('const base=origins.clinic;const r=await fetch(base+req.url);'))],
@@ -1396,10 +1407,23 @@ const routingCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.
       ['a numeric-id regex sends /api/vaccinations/1 to Clinic',/^table deploy/,run(edit(SPLIT,CORE,'location ~ "^/api/vaccinations/[0-9]+$" { proxy_pass http://clinic; } '+CORE))],
       ['a uuid regex sends /api/pets/<uuid> to Clinic',/^table deploy/,run(edit(SPLIT,CORE,'location ~ "^/api/pets/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" { proxy_pass http://clinic; } '+CORE))],
       // a JS template is read once, and every proxy_pass of the file is in it
-      ['a second nginx template earlier in stack.mjs',/^fail-closed benchmarks.*exactly one nginx template/,run({[STACK]:'const config=`server { listen 127.0.0.1:${ports.gateway}; location /api/ { proxy_pass http://core; } }`;\n'+real.read(STACK)})],
+      ['a second direct template earlier in stack.mjs',/^fail-closed benchmarks.*#direct.*exactly one nginx template/,run({[STACK]:'const directConfig=`server { listen 127.0.0.1:${ports.gateway}; location /api/ { proxy_pass http://core; } }`;\n'+real.read(STACK)})],
+      ['a second core-ingress template earlier in stack.mjs',/^fail-closed benchmarks.*#core-ingress.*exactly one nginx template/,run({[STACK]:'const coreIngressConfig=`server { listen 127.0.0.1:${ports.gateway}; location /api/ { proxy_pass http://core; } }`;\n'+real.read(STACK)})],
       ['a second nginx template earlier in resilience',/^fail-closed tools\/phase2\/resilience.*exactly one nginx template/,run({[RES]:'const config=`server {listen 127.0.0.1:${edge};location /api/ {proxy_pass http://core;}}`;\n'+real.read(RES)})],
       ['a proxy_pass outside the template that is read',/^fail-closed tools\/phase2\/resilience.*proxy_pass outside the template/,run(append(RES,"const decoy = 'proxy_pass http://clinic;';"))],
-      ['a second proxy_pass outside the template of stack.mjs (only the coreEdge one is listed)',/^fail-closed benchmarks.*2 proxy_pass outside the template/,run(append(STACK,"const decoy = 'proxy_pass http://clinic;';"))],
+      ['a proxy_pass outside both templates of stack.mjs is counted by the direct place',/^fail-closed benchmarks.*#direct.*4 proxy_pass outside the template/,run(append(STACK,"const decoy = 'proxy_pass http://clinic;';"))],
+      ['a proxy_pass outside both templates of stack.mjs is counted by the core-ingress place',/^fail-closed benchmarks.*#core-ingress.*6 proxy_pass outside the template/,run(append(STACK,"const decoy = 'proxy_pass http://clinic;';"))],
+      ['a proxy_pass added to the Core edge (outside both templates) fails the direct place',/^fail-closed benchmarks.*#direct.*4 proxy_pass outside the template/,run(edit(STACK,'proxy_pass http://core_internal;','proxy_pass http://core_internal; proxy_pass http://clinic;'))],
+      ['a proxy_pass added to the Core edge fails the core-ingress place too',/^fail-closed benchmarks.*#core-ingress.*6 proxy_pass outside the template/,run(edit(STACK,'proxy_pass http://core_internal;','proxy_pass http://core_internal; proxy_pass http://clinic;'))],
+      // the two topologies of stack.mjs are two places that read the same file, each against its own template
+      ['the direct template of stack.mjs without dashboard/clinic',/^table benchmarks\/phase2\/kaggle\/stack\.mjs#direct /,run(NO_DASHBOARD)],
+      ['the direct template of stack.mjs without the notifications location',/^table benchmarks\/phase2\/kaggle\/stack\.mjs#direct /,run(edit(STACK,'location ~ ^/api/notifications(/|$) { ${headers} proxy_pass ${origins.notification}; } ',''))],
+      ['the core-ingress template of stack.mjs with a Clinic location',/^fail-closed benchmarks\/phase2\/kaggle\/stack\.mjs#core-ingress: .*not to Core/,run(edit(STACK,'return 404; } location /api/ { ${coreGateway}','return 404; } location ~ ^/api/(appointments|medical-records|dashboard/clinic)(/|$) { ${headers} proxy_pass http://clinic; } location /api/ { ${coreGateway}'))],
+      ['the core-ingress template of stack.mjs with a Notification location',/^fail-closed benchmarks\/phase2\/kaggle\/stack\.mjs#core-ingress: .*not to Core/,run(edit(STACK,'return 404; } location /api/ { ${coreGateway}','return 404; } location ~ ^/api/notifications(/|$) { ${headers} proxy_pass http://notification; } location /api/ { ${coreGateway}'))],
+      ['the core-ingress template of stack.mjs is renamed',/^fail-closed benchmarks\/phase2\/kaggle\/stack\.mjs#core-ingress: exactly one nginx template expected in the file \(found 0\)/,run(edit(STACK,'const coreIngressConfig=','const coreIngressText='))],
+      ['the direct template of stack.mjs is renamed',/^fail-closed benchmarks\/phase2\/kaggle\/stack\.mjs#direct: exactly one nginx template expected in the file \(found 0\)/,run(edit(STACK,'const directConfig=','const directText='))],
+      ['two places that read the same file with the same template (the copy)',/^fail-closed benchmarks\/phase2\/kaggle\/stack\.mjs#copy: shares the file .* same template/,run({},{places:[...real.places,{...real.places.find(p=>p.id===DIRECT),id:STACK+'#copy'}]})],
+      ['two places that read the same file with the same template (the original is reported too)',/^fail-closed benchmarks\/phase2\/kaggle\/stack\.mjs#direct: shares the file/,run({},{places:[...real.places,{...real.places.find(p=>p.id===DIRECT),id:STACK+'#copy'}]})],
       // the E2E proxy: every other fetch is the readiness probe, and no other way to forward
       ['new URL(req.url, clinic) then fetch(t) before the /api/ branch',/^fail-closed tools\/phase2\/e2e.*not the readiness probe/,run(e2eDetour('const t=new URL(req.url,origins.clinic);const r=await fetch(t,{method:req.method});'))],
       ['the request path copied to a variable before the /api/ branch',/^fail-closed tools\/phase2\/e2e.*not the readiness probe/,run(e2eDetour('const p=path;const r=await fetch(origins.clinic+p);'))],
@@ -1422,16 +1446,16 @@ const routingCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.
       ['error_page to a URL',/^fail-closed frontend\/nginx.*error_page jumps to http/,run(edit(TEMPLATE,'index index.html;','index index.html;\n    error_page 404 http://clinic-api:5101/;'))],
       ['error_page that lands in a proxied location',/^fail-closed deploy.*lands in a proxied location/,run(edit(SPLIT,CORE,'location /api/ { proxy_pass http://core; error_page 404 /m; } location = /m { proxy_pass http://clinic; }'))],
       // exceptions, the ignore list and the specs
-      ['an exception that routes to something that is not a service',/^exception .*routesTo is not a service/,run({},{exceptions:real.exceptions.map(e=>({...e,routesTo:'cor'}))})],
+      ['an exception that routes to something that is not a service',/^exception .*routesTo is not a service/,run(NO_DASHBOARD,{exceptions:[{...SYN,routesTo:'cor'}]})],
       ['a sweep ignore listed twice',/^sweep ignore .*listed twice/,run({},{ignore:[...real.ignore,real.ignore[0]]})],
       ['a second proxy in a file whose ignore names one',/^sweep ignore tools\/phase2\/billing\.test\.mjs: expected exactly one proxy/,run({[BILLING]:real.read(BILLING)+'\nawait fetch(base + req.url);\n'})],
       ['the Clinic spec lists a path outside /api/, /internal/, /health and /metrics',/^openapi \(e\) \/pets/,run(json(CLINIC_SPEC,p=>{p['/pets']={get:{}};}))],
       // exceptions
-      ['an exception for a prefix that is not a gateway route',/^exception .*prefix is not one of gatewayRoutes/,run({},{exceptions:[...real.exceptions,{place:SPLIT,prefix:'/api',routesTo:'core',until:'2026-11-20',reason:'a reason that is long enough'}]})],
-      ['an exception that waives a whole topology',/^exception .*prefix is not one of gatewayRoutes/,run(edit(SPLIT,'proxy_pass http://clinic;','proxy_pass http://core;'),{exceptions:[...real.exceptions,{place:SPLIT,prefix:'/api',routesTo:'core',until:'2026-11-20',reason:'a reason that is long enough'}]})],
-      ['an exception with a date more than 60 days away',/^exception .*more than 60 days/,run({},{exceptions:real.exceptions.map(e=>({...e,until:'2027-06-01'}))})],
-      ['an exception listed twice',/^exception .*duplicate exception/,run({},{exceptions:[...real.exceptions,...real.exceptions]})],
-      ['an exception with a day that does not exist',/^exception .*until is not a date/,run({},{exceptions:real.exceptions.map(e=>({...e,until:'2026-02-30'}))})],
+      ['an exception for a prefix that is not a gateway route',/^exception .*prefix is not one of gatewayRoutes/,run({},{exceptions:[{place:SPLIT,prefix:'/api',routesTo:'core',until:'2026-11-20',reason:'a reason that is long enough'}]})],
+      ['an exception that waives a whole topology',/^exception .*prefix is not one of gatewayRoutes/,run(edit(SPLIT,'proxy_pass http://clinic;','proxy_pass http://core;'),{exceptions:[{place:SPLIT,prefix:'/api',routesTo:'core',until:'2026-11-20',reason:'a reason that is long enough'}]})],
+      ['an exception with a date more than 60 days away',/^exception .*more than 60 days/,run(NO_DASHBOARD,{exceptions:[{...SYN,until:'2027-06-01'}]})],
+      ['an exception listed twice',/^exception .*duplicate exception/,run(NO_DASHBOARD,{exceptions:[SYN,SYN]})],
+      ['an exception with a day that does not exist',/^exception .*until is not a date/,run(NO_DASHBOARD,{exceptions:[{...SYN,until:'2026-02-30'}]})],
       // the OpenAPI files, both directions
       ['the Clinic spec lists a path the gateway spec does not',/^openapi \(d\) \/api\/appointments\/secret/,run(json(CLINIC_SPEC,p=>{p['/api/appointments/secret']={get:{}};}))],
       ['the gateway spec drops a path the Clinic spec still lists',/^openapi \(d\) \/api\/appointments\/calendar/,run(json('backend/openapi.json',p=>{delete p['/appointments/calendar'];}))],
@@ -1444,8 +1468,8 @@ const routingCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.
       'CRLF line endings, split example':run({[SPLIT]:real.read(SPLIT).replace(/\r?\n/g,'\r\n')}),
       'CRLF line endings, compose template':run({[TEMPLATE]:real.read(TEMPLATE).replace(/\r?\n/g,'\r\n')}),
       'an exact location = /metrics':run(edit(SPLIT,'location / { return 404; }','location = /metrics { return 404; } location / { return 404; }')),
-      'an exception on its last day':run({},{at:'2026-11-20'}),
-      'a sweep ignore on its last day':run({},{at:'2026-11-20'}),
+      'an exception on its last day':run(NO_DASHBOARD,{exceptions:[SYN],at:'2026-11-20'}),
+      'a sweep ignore on its last day':run(STRAY_QUOTE,{ignore:[...real.ignore,SYN_IGNORE],at:'2026-11-20'}),
       'error_page 404 /index.html in the server (a single-page app)':run(edit(TEMPLATE,'index index.html;','index index.html;\n    error_page 404 /index.html;')),
       'the same error_page above the server':run(edit(SPLIT,'proxy_http_version 1.1;','error_page 404 /index.html;\n    proxy_http_version 1.1;')),
       'limit_except with deny in the gateway location':run(edit(SPLIT,CORE,'location /api/ { limit_except GET { deny all; } proxy_pass http://core; }')),
