@@ -2,6 +2,7 @@ import express from 'express';
 import type { Express, RequestHandler } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import type { PrismaClient } from '@prisma/client';
+import { servicePrefixes } from '@nipopeto/contracts';
 import openapi from '../../openapi.json' with { type: 'json' };
 import { HotelBookingsService } from '../application/services/hotelBookings.js';
 import { AuthService } from '../application/services/auth.js';
@@ -74,7 +75,8 @@ import { servesClinical, type CoreSettings } from './config.js';
 import { mountDirectory, mountNotificationAuthorization } from './internalRoutes.js';
 
 // Paths the gateway forwards to Clinic; the proxy checks them again after resolving the URL.
-const clinicPrefixes = ['/api/appointments', '/api/medical-records', '/api/dashboard/clinic'] as const;
+const clinicPrefixes = servicePrefixes('clinic');
+const notificationPrefixes = servicePrefixes('notification');
 
 export type CoreRouteOptions = {
   // The appointment and medical-record routers, the clinical list routes and the repository sources behind them. Off when a
@@ -264,7 +266,7 @@ export function mountSplitRoutes(app: Express, db: PrismaClient, settings: CoreS
     ? serviceProxy({
         name: 'notification',
         origin: notification,
-        prefixes: ['/api/notifications'],
+        prefixes: notificationPrefixes,
         forwardRequestHeaders: ['authorization', 'idempotency-key'],
         forwardResponseHeaders: ['retry-after', 'x-service-degraded', 'x-service-instance'],
         timeoutMs: 4000,
@@ -272,7 +274,7 @@ export function mountSplitRoutes(app: Express, db: PrismaClient, settings: CoreS
         notFoundMessage: 'Notification route not found.',
       })
     : null;
-  app.use('/api/notifications', express.json({ limit: '96kb' }), (req, res, next) => {
+  app.use([...notificationPrefixes], express.json({ limit: '96kb' }), (req, res, next) => {
     if (!notificationProxy) {
       res.status(503).json({ error: 'Notification service is not configured.' });
       return;
