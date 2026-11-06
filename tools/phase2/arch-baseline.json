@@ -38,10 +38,12 @@
       }
     },
     "S6": {
-      "kind": "manual",
-      "declared": {
-        "configurations": 7,
-        "variants": 4
+      "kind": "measured",
+      "better": "lower",
+      "values": {
+        "uncheckedPlaces": 0,
+        "variants": 4,
+        "exceptions": 2
       }
     },
     "S7": {

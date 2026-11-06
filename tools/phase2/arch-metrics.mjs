@@ -6,8 +6,11 @@
 import {readFileSync,readdirSync,writeFileSync,existsSync} from 'node:fs';
 import {resolve,dirname,relative,sep,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {realIo,routingMetrics} from './gateway-routing.mjs';
 
 const defaultRoot=resolve(import.meta.dirname,'../..');
+// S6 compares the routing places with the built contracts (packages/contracts/dist), the same module the services import.
+const builtContracts=resolve(defaultRoot,'packages/contracts/dist/index.js'),contracts=existsSync(builtContracts)?await import(pathToFileURL(builtContracts).href):null;
 export const BASELINE_PATH='tools/phase2/arch-baseline.json';
 
 // ---- source reading ------------------------------------------------------------------
@@ -369,8 +372,11 @@ export function measure(root=defaultRoot){
   const legacyTests=testFiles.filter(f=>LEGACY_APP.test(text(f))),productionTests=testFiles.filter(f=>PRODUCTION_APP.test(text(f)));
   put('S5','Test files on the monolith createApp, not the production composition','derived','lower',{legacyAppTests:legacyTests.length},{onProductionComposition:productionTests.map(rel),legacyAppTests:legacyTests.map(rel)},{note:'counts files importing backend app.js; the plan asks for a list chosen in K3'});
 
-  // S6: not measurable by machine (declared, never compared).
-  put('S6','Routing configurations and variants','manual',null,undefined,'plan section 3 F1: 7 configurations, 4 variants; gateway-routes-single-source (K5) will measure it',{declared:{configurations:7,variants:4}});
+  // S6: where the places that route /api traffic differ from the declared routes (packages/contracts/src/gatewayRoutes.ts), read by
+  // tools/phase2/gateway-routing.mjs: proxies not yet listed as a place, distinct routing tables among the places, listed exceptions.
+  if(!contracts)throw new Error('build packages/contracts first (npm run build -w @nipopeto/contracts); S6 reads the built gatewayRoutes');
+  const routing=routingMetrics(contracts,realIo(root));
+  put('S6','Routing configurations: unchecked places, distinct routing tables, exceptions','measured','lower',{uncheckedPlaces:routing.uncheckedPlaces,variants:routing.variants,exceptions:routing.exceptions},routing.detail,{note:'uncheckedPlaces: an nginx, a JS or Vite proxy or a fetch of the request URL in a file that is neither a place (ROUTING_PLACES: 8, the compose nginx, the split example, the measurement, resilience and P7 gateways, the E2E proxy, the frontend client, the Vite dev proxy) nor on the ignore list, or a place that cannot be read; variants: distinct probe-to-service tables among the places (all to Core, direct, and each place that differs); rule gateway-routes-single-source'});
 
   // S7: Clinic routes that escape the scope registry. A route is an element of the registry (http/routes) that mountRoutes mounts behind
   // its PEP: a direct router.get(...) is a route the registry does not know, and an element without `resource` leaves the scope of its URL
