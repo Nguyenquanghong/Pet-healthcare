@@ -555,14 +555,14 @@ export function analyze(contracts,io){
   return {probes,paths,spec,errors,tables,diffs,unlisted,variants};
 }
 
-const daysLeft=(today,until)=>Math.round((Date.parse(until)-Date.parse(today))/864e5);
-const isDate=text=>{
+export const daysLeft=(today,until)=>Math.round((Date.parse(until)-Date.parse(today))/864e5);
+export const isDate=text=>{
   if(!/^\d{4}-\d\d-\d\d$/.test(text??''))return false;
   const date=new Date(text+'T00:00:00Z');
   return !Number.isNaN(date.getTime())&&date.toISOString().slice(0,10)===text;
 };
 // The date of an exception or of a sweep ignore: a real day, not past (UTC, the last day counts), at most MAX_DAYS ahead.
-const untilFindings=(tag,until,today)=>{
+export const untilFindings=(tag,until,today)=>{
   if(!isDate(until))return [tag+'until is not a date (YYYY-MM-DD)'];
   if(today>until)return [tag+'expired on '+until+' ('+(-daysLeft(today,until))+' days ago); fix it or renew with a reason'];
   if(daysLeft(today,until)>MAX_DAYS)return [tag+'until '+until+' is more than '+MAX_DAYS+' days away'];

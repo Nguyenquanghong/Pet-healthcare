@@ -25,9 +25,16 @@
 //     and fails closed; mountRoutes puts the PEP of each route before its handler.
 // 10. No two .ts files in services/*/src or backend/src/{composition,gateway,workers,routes/internal} are identical: a copy
 //     belongs in packages/runtime or packages/messaging.
-// 11. Clinic reaches other systems over HTTP only from infrastructure/core/directory.ts and
-//     infrastructure/core/directorySync.ts (the Core calls, ADR-P13) and infrastructure/blob/blobStore.ts
-//     (object storage, not Core).
+// 11. Service calls are declared (K5, replaces clinic-core-calls-confined): every synchronous HTTP call between Core, Clinic and Notification
+//     (nine: the two Core proxies, three Core to Clinic billing calls, Clinic to Core directory, evidence and export, Notification to Core
+//     authorize-send) is in deploy/phase2/service-calls.json, and tools/phase2/service-calls.mjs reads the code against it: every file of the
+//     three services that makes an outbound HTTP call is declared (a call or an external system with a reason, S3 and VNPay), and every declared
+//     file still makes one; the literals '/internal...' of a caller are its declared matches and no other file names /internal; each path is a
+//     route of its receiver for the method and is in packages/contracts/internal/openapi.json, and a route with no caller is listed as
+//     uncalled with a reason; the declared timeout, token (scoped, one per receiver) and forwarded headers are those of the code; a nested call
+//     is shorter than the call around it or has a dated exception (UTC, at most 60 days ahead, stale ones fail); the receiver applies its gate.
+//     A declaration that cannot be read fails; nothing passes silently. The metric S13 (arch-metrics.mjs, same code) counts the directions
+//     with no declared call or with a call this rule faults, and the call sites it does not list; the ratchet holds both at 0.
 // 12. Structure ratchet: the measured structure metrics (tools/phase2/arch-metrics.mjs) never get
 //     worse than tools/phase2/arch-baseline.json; an improvement passes and asks to lower the baseline.
 // 13. Shared packages (contracts excepted) name no service route: no literal path under /api/, /auth/ or /public/.
@@ -54,6 +61,7 @@ import {readFileSync,readdirSync,existsSync} from 'node:fs';
 import {resolve,dirname,relative,sep,posix} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {realIo,fixtureIo,routingFindings,analyze,nginxRoute,nginxLocations,locationName,listenPort,nginxTokens,stripJsComments,callArguments,fetchCalls,fetchUses,sweepFiles,exceptionDays} from './gateway-routing.mjs';
+import {callsIo,fixtureCallsIo,serviceCallFindings,serviceCallMetrics,callExceptionDays,unconfinedHttpCalls,routesIn,DECLARATION} from './service-calls.mjs';
 
 const root=resolve(import.meta.dirname,'../..');
 const read=path=>readFileSync(resolve(root,path),'utf8');
@@ -520,53 +528,257 @@ rule('no-duplicated-service-modules',()=>{
   return modules.length+' modules, none identical';
 });
 
-// ---- 11. Clinic -> Core calls stay confined (ADR-P13) -----------------------------------
-// Clinic's synchronous dependency on Core is read-only authorization and lookup. Keeping every
-// outbound HTTP call in these files means a new Core call is a visible change to this list.
-const CLINIC_HTTP_FILES = new Map([
-  ['infrastructure/core/directory.ts', 'Core authorize / lookup / terminal evidence'],
-  ['infrastructure/core/directorySync.ts', 'Core directory export for the projection'],
-  ['infrastructure/blob/blobStore.ts', 'S3-compatible object storage (not Core)'],
-]);
-// A call to fetch, any reference to globalThis.fetch, or a static, dynamic or required import of an HTTP/socket client module.
-const HTTP_CALL = /(?:^|[^\w$])fetch\s*\(|\bglobalThis\s*(?:\.\s*fetch\b|\[\s*['"]fetch['"])|\b(?:from|import|require)\s*\(?\s*['"](?:(?:node:)?(?:https?|http2|net|tls)|undici|axios|node-fetch|got)['"]/;
-export function unconfinedHttpCalls(modules, allowed = CLINIC_HTTP_FILES) {
-  return modules.filter(m => !allowed.has(m.file) && HTTP_CALL.test(withoutComments(m.source))).map(m => m.file);
-}
-rule('clinic-core-calls-confined', () => {
-  const src = resolve(root, 'services/clinic/src');
-  const modules = files(src).filter(f => f.endsWith('.ts')).map(f => ({ file: relative(src, f).split(sep).join('/'), source: readFileSync(f, 'utf8') }));
-  assert.ok(modules.length >= 40, 'found the Clinic modules (' + modules.length + ')');
-  const stray = unconfinedHttpCalls(modules);
-  assert.deepEqual(stray, [], 'outbound HTTP outside ' + [...CLINIC_HTTP_FILES.keys()].join(', ') + ' (add it to the list with a reason, or call Core through directory.ts): ' + stray.join(', '));
-  const listed = [...CLINIC_HTTP_FILES.keys()].filter(f => !modules.some(m => m.file === f && HTTP_CALL.test(withoutComments(m.source))));
-  assert.deepEqual(listed, [], 'listed files that no longer make a call (remove them): ' + listed.join(', '));
-  // negative fixtures
-  const at = (file, source) => unconfinedHttpCalls([{ file, source }]);
-  assert.deepEqual(at('app.ts', "const r = await fetch(new URL('/internal/directory/authorize', origin));"), ['app.ts']);
-  assert.deepEqual(at('application/services/x.ts', 'await globalThis.fetch(url)'), ['application/services/x.ts']);
-  assert.deepEqual(at('x.ts', "import { request } from 'node:https';"), ['x.ts']);
-  assert.deepEqual(at('x.ts', "import axios from 'axios';"), ['x.ts']);
-  for (const source of [
-    "import { connect } from 'node:net';",
-    "import tls from 'tls';",
-    "import { connect } from 'node:http2';",
-    "import { request } from 'undici';",
-    "const net = await import('node:net');",
-    "const tls = require('node:tls');",
-    "import 'node:net';",
-    'const get = globalThis.fetch;',
-    "const get = globalThis['fetch'];",
-  ])
-    assert.deepEqual(at('x.ts', source), ['x.ts'], source);
-  assert.deepEqual(at('infrastructure/core/directory.ts', 'await fetch(url)'), []);
-  assert.deepEqual(at('directory.ts', 'await fetch(url)'), ['directory.ts'], 'the allowance is the path, not the file name');
-  assert.deepEqual(at('x.ts', "import { netmask } from './net.js'; const text = 'node:net'; const a = globalThis.fetchedAt;"), []);
-  assert.deepEqual(at('x.ts', '// import net from "node:net"' + String.fromCharCode(10) + '/* globalThis.fetch */'), []);
-  assert.deepEqual(at('x.ts', '// fetch(url) is what directory.ts does' + String.fromCharCode(10) + '/* fetch(url) */' + String.fromCharCode(10) + 'const fetched = refetch(url);'), []);
-  assert.deepEqual(at('x.ts', "const a = 'http://x'; // fetch(a)"), []);
-  return modules.length + ' modules; HTTP only in ' + [...CLINIC_HTTP_FILES.keys()].join(', ');
-});
+// ---- 11. Service calls are declared (ADR-P13, ADR-P15, K5) ----------------------------------
+// Core, Clinic and Notification call each other over HTTP, and the calls form cycles on purpose (ADR-P15). deploy/phase2/service-calls.json
+// declares each call (caller, callee, path, credential, timeout, nesting, reason) and every outbound call to a system that is not one of the
+// three; tools/phase2/service-calls.mjs reads the code against it (nine points, numbered in its header). This rule replaces
+// clinic-core-calls-confined, which only looked at Clinic: its HTTP_CALL, unconfinedHttpCalls and fixtures are kept and now cover the three
+// services, and the list of files that may call comes from the json.
+const callsCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.reject(new Error('build packages/contracts first (npm run build -w @nipopeto/contracts)')))
+  .then(contracts=>rule('service-calls-declared',()=>{
+    const real=callsIo(root),today=new Date().toISOString().slice(0,10),routes=contracts.gatewayRoutes;
+    const sources=real.sources();
+    assert.ok(sources.length>=100&&['backend/src','services/clinic/src','services/notification/src'].every(d=>sources.some(f=>f.startsWith(d+'/'))),'found the modules of the three services ('+sources.length+')');
+    const findings=serviceCallFindings(routes,today,real);
+    assert.deepEqual(findings,[],'service calls differ from deploy/phase2/service-calls.json: '+findings.join('; '));
+    // the calls of the first rule: outbound HTTP outside the declared files, now in any of the three services
+    const declaration=JSON.parse(real.read(DECLARATION)),allowed=new Set([...declaration.calls.map(c=>c.file),...declaration.external.map(x=>x.file)]);
+    // The days of the fixtures come from the exception in the declaration (24 days before its last day), so renewing it does not turn a fixture red.
+    const addDays=(day,n)=>new Date(Date.parse(day)+n*864e5).toISOString().slice(0,10);
+    const UNTIL=declaration.timeoutExceptions[0].until,FIXED=addDays(UNTIL,-24);
+    const CLINIC='services/clinic/src/';
+    const at=(file,source)=>unconfinedHttpCalls([{file:CLINIC+file,source}],allowed).map(f=>f.slice(CLINIC.length));
+    assert.deepEqual(at('app.ts', "const r = await fetch(new URL('/internal/directory/authorize', origin));"), ['app.ts']);
+    assert.deepEqual(at('application/services/x.ts', 'await globalThis.fetch(url)'), ['application/services/x.ts']);
+    assert.deepEqual(at('x.ts', "import { request } from 'node:https';"), ['x.ts']);
+    assert.deepEqual(at('x.ts', "import axios from 'axios';"), ['x.ts']);
+    for (const source of [
+      "import { connect } from 'node:net';",
+      "import tls from 'tls';",
+      "import { connect } from 'node:http2';",
+      "import { request } from 'undici';",
+      "const net = await import('node:net');",
+      "const tls = require('node:tls');",
+      "import 'node:net';",
+      'const get = globalThis.fetch;',
+      "const get = globalThis['fetch'];",
+    ])
+      assert.deepEqual(at('x.ts', source), ['x.ts'], source);
+    assert.deepEqual(at('infrastructure/core/directory.ts', 'await fetch(url)'), []);
+    assert.deepEqual(at('directory.ts', 'await fetch(url)'), ['directory.ts'], 'the allowance is the path, not the file name');
+    assert.deepEqual(at('x.ts', "import { netmask } from './net.js'; const text = 'node:net'; const a = globalThis.fetchedAt;"), []);
+    assert.deepEqual(at('x.ts', '// import net from "node:net"' + String.fromCharCode(10) + '/* globalThis.fetch */'), []);
+    assert.deepEqual(at('x.ts', '// fetch(url) is what directory.ts does' + String.fromCharCode(10) + '/* fetch(url) */' + String.fromCharCode(10) + 'const fetched = refetch(url);'), []);
+    assert.deepEqual(at('x.ts', "const a = 'http://x'; // fetch(a)"), []);
+    assert.deepEqual(at('x.ts', "const a = 'a//b'; await fetch(a);"), ['x.ts'], 'a // inside a string does not hide the call after it');
+    assert.deepEqual(at('x.ts', "import type { Server } from 'node:http';"), [], 'a type-only import loads no HTTP client');
+    assert.deepEqual(at('x.ts', "import type { Server } from 'node:http'; import http from 'node:http';"), ['x.ts'], 'a real import after a type import still counts');
+    assert.deepEqual(at('x.ts', "import { type Server } from 'node:http';"), ['x.ts'], 'an inline type specifier still loads the module');
+    assert.deepEqual(at('x.ts', 'import type T = NS.T\nconst r = await fetch(u)\nimport x from \'./x\'\n'), ['x.ts'], 'an import type with no semicolon does not swallow the lines after it');
+    assert.deepEqual(at('x.ts', "import type, { request } from 'node:https';"), ['x.ts'], 'a default import named type is an import');
+    assert.deepEqual(at('x.ts', "import type * as http from 'node:http';"), [], 'a type-only namespace import loads nothing');
+    assert.deepEqual(at('x.ts', "import type Http from 'node:http';"), [], 'a type-only default import loads nothing');
+    assert.deepEqual(at('x.ts', 'const send = fetch;\nexport const go = (u: string) => send(u);'), ['x.ts'], 'an alias of the global fetch');
+    assert.deepEqual(at('x.ts', 'export class S { constructor(private readonly f: typeof fetch = fetch) {} }'), ['x.ts'], 'fetch as a default value');
+    assert.deepEqual(at('x.ts', 'export const go = (u: string) => fetch?.(u);'), ['x.ts'], 'an optional call');
+
+    // negative fixtures: each must fail with a finding that starts with the number of its point
+    const CB='backend/src/infrastructure/http/clinicBillingRemote.ts',DIR=CLINIC+'infrastructure/core/directory.ts',SYNC=CLINIC+'infrastructure/core/directorySync.ts',
+      NA='services/notification/src/coreAuthorization.ts',PROXY='backend/src/gateway/serviceProxy.ts',ROUTES='backend/src/composition/coreRoutes.ts',
+      BILLING_ROUTE='backend/src/routes/internal/billing.ts',DIR_ROUTE='backend/src/routes/internal/directory.ts',NA_ROUTE='backend/src/routes/internal/notificationAuthorization.ts',
+      CLINIC_API=CLINIC+'http/billingApi.ts',CLINIC_INDEX=CLINIC+'index.ts',CONFIG='backend/src/composition/config.ts',SPEC='packages/contracts/internal/openapi.json',
+      BLOB=CLINIC+'infrastructure/blob/blobStore.ts',DECL=DECLARATION,EVIDENCE='clinic-core-billing-evidence',FINALIZE='core-clinic-billing-finalize';
+    const run=(files,date=FIXED)=>serviceCallFindings(routes,date,fixtureCallsIo(real,files));
+    const edit=(path,from,to)=>{const text=real.read(path);assert.ok(text.includes(from),'fixture edit not found in '+path+': '+from);return {[path]:text.replace(from,()=>to)};};
+    const editLast=(path,from,to)=>{const text=real.read(path),i=text.lastIndexOf(from);assert.ok(i>=0,'fixture edit not found in '+path+': '+from);return {[path]:text.slice(0,i)+to+text.slice(i+from.length)};};
+    const append=(path,text)=>({[path]:real.read(path)+'\n'+text+'\n'});
+    const change=fn=>{const d=structuredClone(declaration);fn(d);return {[DECL]:JSON.stringify(d)};};
+    const callOf=(id,fn)=>change(d=>fn(d.calls.find(c=>c.id===id)));
+    const specChange=fn=>{const s=JSON.parse(real.read(SPEC));fn(s.paths);return {[SPEC]:JSON.stringify(s)};};
+    const fails=[
+      // (0) the declaration is read or the rule fails
+      ['no declaration file',/^\(0\) cannot read/,run({[DECL]:null})],
+      ['a declaration that is not JSON',/^\(0\) cannot read/,run({[DECL]:'{ "calls": '})],
+      ['calls that is not an array',/^\(0\) .*calls is not an array/,run(change(d=>{d.calls={};}))],
+      ['a timeout that is a string',/^\(0\) .*core-clinic-proxy.*timeoutMs/,run(callOf('core-clinic-proxy',c=>{c.timeoutMs='6000';}))],
+      ['a gate that is not one the rule knows',/^\(0\) .*receiver needs a file and a gate/,run(callOf('clinic-core-directory',c=>{c.receiver.gate='trust';}))],
+      ['a call with no reason',/^\(0\) .*reason is missing/,run(callOf('clinic-core-directory',c=>{c.reason='';}))],
+      ['two calls with one id',/^\(0\) .*listed twice/,run(change(d=>{d.calls.push(structuredClone(d.calls[0]));}))],
+      ['a call that names an unknown service',/^\(0\) .*callee needs a service/,run(callOf('clinic-core-directory',c=>{c.callee.service='billing';}))],
+      ['a service that calls itself',/^\(0\) .*calls its own service/,run(callOf('clinic-core-directory',c=>{c.callee.service='clinic';}))],
+      ['a proxy with a credential',/^\(0\) .*credential of a proxy is null/,run(callOf('core-clinic-proxy',c=>{c.credential={header:'x',token:'y',actor:'none'};}))],
+      // (1) every call site is declared, every declared file still calls
+      ['a fetch in a new file of Notification',/^\(1\) services\/notification\/src\/relay\.ts makes an outbound HTTP call/,run({'services/notification/src/relay.ts':"export const go = () => fetch('http://core/x');"})],
+      ['a fetch in backend/src/application',/^\(1\) backend\/src\/application\/x\.ts makes an outbound HTTP call/,run({'backend/src/application/x.ts':"export const go = () => fetch('http://clinic/x');"})],
+      ['a fetch in the Core composition',/^\(1\) backend\/src\/composition\/hook\.ts makes/,run({'backend/src/composition/hook.ts':'export const go = (u: string) => fetch(u);'})],
+      ['a fetch in a new Clinic file',/^\(1\) services\/clinic\/src\/application\/services\/x\.ts makes/,run({'services/clinic/src/application/services/x.ts':'export const go = (u: string) => fetch(u);'})],
+      ['globalThis.fetch in Notification',/^\(1\) services\/notification\/src\/g\.ts makes/,run({'services/notification/src/g.ts':'export const f = globalThis.fetch;'})],
+      ['node:https in Core',/^\(1\) backend\/src\/lib\/h\.ts makes/,run({'backend/src/lib/h.ts':"import { request } from 'node:https';"})],
+      ['axios in Notification',/^\(1\) services\/notification\/src\/a\.ts makes/,run({'services/notification/src/a.ts':"import axios from 'axios';"})],
+      ['a // in a string before a fetch',/^\(1\) services\/notification\/src\/s\.ts makes/,run({'services/notification/src/s.ts':"const a = 'a//b'; await fetch(a);"})],
+      ['a declared call file that no longer calls',/^\(1\) .*directorySync\.ts is declared but makes no outbound HTTP call/,run(edit(SYNC,'const response = await fetch(url, {','const response = await send(url, {'))],
+      ['a declared external file that no longer calls',/^\(1\) .*blobStore\.ts is declared but makes no outbound HTTP call/,run(edit(BLOB,'return fetch(this.endpoint.origin','return send(this.endpoint.origin'))],
+      ['a declared file outside the services',/^\(1\) tools\/x\.mjs is declared but is not a \.ts file/,run(callOf('clinic-core-directory-export',c=>{c.file='tools/x.mjs';}))],
+      ['a file that is both a call file and external',/^\(1\) .* is both a call file and external/,run(change(d=>{d.external.push({...d.external[0],id:'dup',file:d.calls[2].file});}))],
+      ['an external file listed twice',/^\(1\) external file .* listed twice/,run(change(d=>{d.external.push({...d.external[0],id:'dup'});}))],
+      ['a call file that is not in the src of its caller',/^\(1\) .* is not in the src of its caller/,run(callOf('clinic-core-directory-export',c=>{c.caller.service='notification';}))],
+      // (2) paths, suffixes, methods against the caller
+      ['a path literal changed in directorySync',/^\(2\) .*directorySync\.ts: the literals .* differ.*exports/,run(edit(SYNC,"'/internal/directory/export'","'/internal/directory/exports'"))],
+      ['the evidence path literal changed',/^\(2\) .*directory\.ts: the literals .* differ.*billing-operation\//,run(edit(DIR,"'/internal/billing-operations/'","'/internal/billing-operation/'"))],
+      ['the billing path literal changed in Core',/^\(2\) .*clinicBillingRemote\.ts: the literals .* differ/,run(edit(CB,"'/internal/billing-sources/'","'/internal/billing-source/'"))],
+      ['a notification path literal changed',/^\(2\) .*coreAuthorization\.ts: the literals .* differ/,run(edit(NA,"'/internal/notifications/authorize-send'","'/internal/notifications/authorise-send'"))],
+      ['the suffix authorize changed in the code',/^\(2\) clinic-core-directory: the suffix 'authorize'/,run(edit(DIR,"'authorize'","'authorise'"))],
+      ['the suffix commit changed in the code',/^\(2\) core-clinic-billing-finalize: the suffix '\/commit'/,run(edit(CB,"'/commit'","'/comit'"))],
+      ['a method changed in the Notification code',/^\(2\) notification-core-authorize-send: the code .* uses PUT, the declaration says POST/,run(edit(NA,"method: 'POST',","method: 'PUT',"))],
+      ['a method changed in the Core billing code',/^\(2\) core-clinic-billing-source: the code .* uses POST, the declaration says GET/,run(edit(CB,"'GET', actor)","'POST', actor)"))],
+      ['a second call added to a declared Clinic file',/^\(2\) .*directory\.ts: fetch\( number 3 holds none of the declared paths/,run(append(DIR,"export const other = () => fetch('http://core/internal/other');"))],
+      ['a second call added to the Notification caller',/^\(2\) .*coreAuthorization\.ts: fetch\( number 2 holds none of the declared paths/,run(append(NA,"export const other = () => fetch('http://clinic/internal/billing-sources/x');"))],
+      // (2) every call of a call file is a declared call
+      ['a this.call( on a path that no declared call has (the uncalled GET reservation)',/^\(2\) .*clinicBillingRemote\.ts: this\.call\( number \d uses GET but the declared calls that hold its path use PUT/,run(edit(CB,'  async finalize(op: BillingOperationRecord) {',"  async peek(id: string) {\n    return this.call('/internal/billing-reservations/' + encodeURIComponent(id), 'GET');\n  }\n  async finalize(op: BillingOperationRecord) {"))],
+      ['a this.call( with a new suffix and method (DELETE .../purge)',/^\(2\) .*clinicBillingRemote\.ts: this\.call\( number \d uses DELETE but the declared calls/,run(edit(CB,'  async finalize(op: BillingOperationRecord) {',"  async purge(id: string) {\n    return this.call('/internal/billing-reservations/' + encodeURIComponent(id) + '/purge', 'DELETE');\n  }\n  async finalize(op: BillingOperationRecord) {"))],
+      ['a this.call( on a path of no declared call',/^\(2\) .*clinicBillingRemote\.ts: this\.call\( number \d holds none of the declared paths/,run(edit(CB,'  async finalize(op: BillingOperationRecord) {',"  async other() {\n    return this.call('/internal/other', 'GET');\n  }\n  async finalize(op: BillingOperationRecord) {"))],
+      ['a second fetch on a declared path with another method',/^\(2\) .*coreAuthorization\.ts: fetch\( number 2 uses GET but the declared calls that hold its path use POST/,run(append(NA,"export const peek = () => fetch(new URL('/internal/notifications/authorize-send', 'http://core'), { signal: AbortSignal.timeout(2000) });"))],
+      ['a method hidden in a spread of the fetch options',/^\(2\) .*directorySync\.ts: fetch\( number 1 uses a method this reader cannot read/,run(edit(SYNC,'const response = await fetch(url, {',"const init = { method: 'DELETE' } as const;\n    const response = await fetch(url, {\n      ...init,"))],
+      ['fetch options that are not an object literal',/^\(2\) .*directorySync\.ts: fetch\( number 1 uses a method this reader cannot read/,run(edit(SYNC,'const response = await fetch(url, {','const response = await fetch(url, init ?? {'))],
+      ['a computed key in the fetch options',/^\(2\) .*directorySync\.ts: fetch\( number 1 uses a method this reader cannot read/,run(edit(SYNC,'const response = await fetch(url, {',"const response = await fetch(url, {\n      [key]: 'DELETE',"))],
+      ['a method that is a variable in the fetch options',/^\(2\) .*directorySync\.ts: fetch\( number 1 uses a method this reader cannot read/,run(edit(SYNC,'const response = await fetch(url, {','const response = await fetch(url, {\n      method: verb,'))],
+      ['a declared path that does not start with its match',/^\(2\) clinic-core-directory-export: the declared path \/internal\/other does not start/,run(callOf('clinic-core-directory-export',c=>{c.paths=['/internal/other'];}))],
+      ['a match the code does not hold',/^\(2\) core-clinic-billing-source: no fetch\( or this\.call\(/,run(callOf('core-clinic-billing-source',c=>{c.match='/internal/billing-sourcez/';c.paths=['/internal/billing-sourcez/:id'];}))],
+      // (3) /internal named only where it is declared
+      ['a proxy file that names /internal',/^\(3\) backend\/src\/gateway\/serviceProxy\.ts holds a literal/,run(edit(PROXY,'const url = new URL(req.originalUrl, target.origin);',"const url = new URL(req.originalUrl.replace('/api/x', '/internal/billing-reservations'), target.origin);"))],
+      ['two ${…} before /internal',/^\(3\) services\/clinic\/src\/application\/p\.ts holds a literal/,run({[CLINIC+'application/p.ts']:'export const p = (a: string, b: string) => `${a}${b}/internal/directory/export`;'})],
+      ['a literal /internal in another Core file',/^\(3\) backend\/src\/application\/y\.ts holds a literal/,run({'backend/src/application/y.ts':"export const p = '/internal/directory/authorize';"})],
+      ['a literal /internal in Notification',/^\(3\) services\/notification\/src\/z\.ts holds a literal/,run({'services/notification/src/z.ts':'export const p = `/internal/x/${1}`;'})],
+      ['the literal /internal alone in Clinic',/^\(3\) services\/clinic\/src\/domain\/z\.ts holds a literal/,run({'services/clinic/src/domain/z.ts':"export const base = '/internal';"})],
+      // (4) paths against the routes of the receiver and the internal OpenAPI file
+      ['a declared path that is not a route',/^\(4\) clinic-core-directory-export: GET \/internal\/directory\/export\/nope is not a route/,run(callOf('clinic-core-directory-export',c=>{c.match='/internal/directory/export';c.paths=['/internal/directory/export','/internal/directory/export/nope'];}))],
+      ['a declared method that the route does not have',/^\(4\) clinic-core-billing-evidence: PUT .* is not a route of backend\/src\/routes\/internal\/billing\.ts/,run(callOf(EVIDENCE,c=>{c.method='PUT';}))],
+      ['a declared path missing from the internal OpenAPI file',/^\(4\) clinic-core-directory: POST \/internal\/directory\/lookup is not an operation of/,run(specChange(p=>{delete p['/internal/directory/lookup'];}))],
+      ['an operation of the internal OpenAPI file that no receiver has',/^\(4\) operation GET \/internal\/ghost\/\{\} of .* is a route of no declared receiver/,run(specChange(p=>{p['/internal/ghost/{id}']={get:{}};}))],
+      ['a route in a receiver that the OpenAPI file lacks',/^\(4\) route GET \/internal\/directory\/extra is in a receiver file but not in/,run(append(DIR_ROUTE,"app.get('/internal/directory/extra', (_req, res) => res.json({}));"))],
+      ['the ${action} of the Clinic routes cannot be opened',/^\(4\) .*billingApi\.ts: route POST .*cannot open \$\{action\}/,run(edit(CLINIC_API,"for (const action of ['commit', 'release'] as const)",'for (const action of actions)'))],
+      ['a route with a path that is not a literal',/^\(4\) .*directory\.ts: 1 route\(s\) whose path is not a string literal/,run(append(DIR_ROUTE,'app.get(EXTRA_PATH, handler);'))],
+      ['a route form the reader does not follow',/^\(4\) .*directory\.ts: app\.all\( or \.route\(/,run(append(DIR_ROUTE,"app.route('/internal/directory/x').get(handler);"))],
+      ['a proxy that declares a prefix the contracts do not give its service',/^\(4\) core-clinic-proxy: the declared prefixes/,run(callOf('core-clinic-proxy',c=>{c.paths=['/api/appointments','/api/medical-records'];}))],
+      ['a receiver file that is not in the src of its callee',/^\(4\) .* is not in the src of its callee/,run(callOf('clinic-core-directory-export',c=>{c.receiver.file='services/clinic/src/http/billingApi.ts';}))],
+      ['a receiver file that does not exist',/^\(4\) receiver file .* cannot be read/,run(callOf('clinic-core-directory-export',c=>{c.receiver.file='backend/src/routes/internal/missing.ts';}))],
+      // (5) every /internal route has a caller or a reason
+      ['a new Core route that nobody calls',/^\(5\) route GET \/internal\/directory\/extra of backend\/src\/routes\/internal\/directory\.ts has no declared call/,run(append(DIR_ROUTE,"app.get('/internal/directory/extra', (_req, res) => res.json({}));"))],
+      ['a new Clinic route that nobody calls',/^\(5\) route GET \/internal\/billing-extra\/\{\} of services\/clinic\/src\/http\/billingApi\.ts has no declared call/,run(edit(CLINIC_API,"router.get('/billing-sources/:id'","router.get('/billing-extra/:id', async () => undefined);\n  router.get('/billing-sources/:id'"))],
+      ['the uncalled route loses its entry',/^\(5\) route GET \/internal\/billing-reservations\/\{\} of .* has no declared call/,run(change(d=>{d.uncalledRoutes=[];}))],
+      ['an uncalled entry for a route that now has a caller',/^\(5\) uncalledRoutes POST \/internal\/billing-reservations\/\{\}\/commit \(clinic\): stale, a declared call/,run(change(d=>{d.uncalledRoutes.push({callee:'clinic',method:'POST',path:'/internal/billing-reservations/:operationId/commit',reason:'a reason that is long enough'});}))],
+      ['an uncalled entry for a route that does not exist',/^\(5\) uncalledRoutes GET \/internal\/nothing\/\{\} \(clinic\): stale, no receiver/,run(change(d=>{d.uncalledRoutes.push({callee:'clinic',method:'GET',path:'/internal/nothing/:id',reason:'a reason that is long enough'});}))],
+      ['an uncalled entry listed twice',/^\(5\) uncalledRoutes .* listed twice/,run(change(d=>{d.uncalledRoutes.push(structuredClone(d.uncalledRoutes[0]));}))],
+      ['an uncalled entry for the wrong callee',/^\(5\) uncalledRoutes .*\(core\): stale, no receiver/,run(change(d=>{d.uncalledRoutes[0].callee='core';}))],
+      ['an uncalled entry with no reason',/^\(0\) .*uncalledRoutes\[0\] needs callee, method, path and a reason/,run(change(d=>{d.uncalledRoutes[0].reason='';}))],
+      // (6) the declared timeout is the one of the code
+      ['the evidence timeout changed in the code',/^\(6\) clinic-core-billing-evidence: declared timeout 2000 ms, the code says 1500 ms/,run(edit(DIR,'AbortSignal.timeout(2000)','AbortSignal.timeout(1500)'))],
+      ['the directory timeout changed in the code',/^\(6\) clinic-core-directory: declared timeout 2000 ms, the code says 2500 ms/,run(editLast(DIR,'AbortSignal.timeout(2000)','AbortSignal.timeout(2500)'))],
+      ['the billing default timeout changed',/^\(6\) core-clinic-billing-source: declared timeout 1800 ms, the code says 2500 ms \(default of timeout\)/,run(edit(CB,'private readonly timeout = 1800,','private readonly timeout = 2500,'))],
+      ['the Clinic proxy timeout changed',/^\(6\) core-clinic-proxy: declared timeout 6000 ms, the code says 7000 ms/,run(edit(ROUTES,'timeoutMs: 6000,','timeoutMs: 7000,'))],
+      ['the Notification proxy timeout changed',/^\(6\) core-notification-proxy: declared timeout 4000 ms, the code says 5000 ms/,run(edit(ROUTES,'timeoutMs: 4000,','timeoutMs: 5000,'))],
+      ['the export timeout changed',/^\(6\) clinic-core-directory-export: declared timeout 2000 ms, the code says 3000 ms/,run(edit(SYNC,'AbortSignal.timeout(2000)','AbortSignal.timeout(3000)'))],
+      ['the authorize-send default timeout changed',/^\(6\) notification-core-authorize-send: declared timeout 2000 ms, the code says 2500 ms/,run(edit(NA,'private readonly timeoutMs = 2000,','private readonly timeoutMs = 2500,'))],
+      ['a declared timeout that the code does not have',/^\(6\) clinic-core-directory-export: declared timeout 2500 ms, the code says 2000/,run(callOf('clinic-core-directory-export',c=>{c.timeoutMs=2500;}))],
+      ['a fetch with no timeout',/^\(6\) core-clinic-proxy: the fetch\( of .* has no AbortSignal\.timeout/,run(edit(PROXY,'signal: AbortSignal.timeout(target.timeoutMs),',''))],
+      ['a timeout the reader cannot read',/^\(6\) clinic-core-directory-export: cannot read the timeout from AbortSignal\.timeout\(LIMIT\)/,run(edit(SYNC,'AbortSignal.timeout(2000)','AbortSignal.timeout(LIMIT)'))],
+      ['a serviceProxy that is not in the config file',/^\(6\) core-clinic-proxy: .* holds 0 serviceProxy/,run(callOf('core-clinic-proxy',c=>{c.config.proxy='archive';}))],
+      // (7) nested timeouts
+      ['an exception past its date',new RegExp('^\\(7\\) exception core-clinic-billing-finalize > clinic-core-billing-evidence: expired on '+UNTIL),run({},addDays(UNTIL,1))],
+      ['an exception that no longer applies',/^\(7\) exception .*stale, the inner timeout/,run(callOf(EVIDENCE,c=>{c.timeoutMs=1500;}))],
+      ['the exception was written for other timeouts (the evidence timeout grew)',/^\(7\) exception .*written for 2000 ms inside 1800 ms, the timeouts are now 2500 ms inside 1800 ms/,run({...edit(DIR,'AbortSignal.timeout(2000)','AbortSignal.timeout(2500)'),...callOf(EVIDENCE,c=>{c.timeoutMs=2500;})})],
+      ['an exception with no pinned timeouts',/^\(0\) .*timeoutExceptions\[0\] needs outer and inner ids and the timeouts/,run(change(d=>{delete d.timeoutExceptions[0].innerMs;}))],
+      ['a call to another service from an external file, written after a host',/^\(3\) .*blobStore\.ts holds a literal/,run(append(BLOB,"export const sneak = () => send('http://core/internal/directory/export');"))],
+      ['an exception with no reason',/^\(7\) exception .*no reason/,run(change(d=>{d.timeoutExceptions[0].reason='';}))],
+      ['an exception more than 60 days ahead',/^\(7\) exception .*more than 60 days/,run(change(d=>{d.timeoutExceptions[0].until=addDays(FIXED,61);}))],
+      ['an exception with a day that does not exist',/^\(7\) exception .*until is not a date/,run(change(d=>{d.timeoutExceptions[0].until='2026-02-30';}))],
+      ['an exception for a call that is not declared',/^\(7\) exception .*a call id is not declared/,run(change(d=>{d.timeoutExceptions[0].inner='ghost';}))],
+      ['an exception listed twice',/^\(7\) exception .*duplicate exception/,run(change(d=>{d.timeoutExceptions.push(structuredClone(d.timeoutExceptions[0]));}))],
+      ['an exception for a pair that is not nested',/^\(7\) exception .* is not nested in/,run(change(d=>{d.timeoutExceptions[0].inner='clinic-core-directory-export';}))],
+      ['a nested call with no exception',/^\(7\) clinic-core-billing-evidence: timeout 2000 ms is not shorter than core-clinic-billing-finalize \(1800 ms\)/,run(change(d=>{d.timeoutExceptions=[];}))],
+      ['nested timeouts reversed: the directory call outlasts its proxy',/^\(7\) clinic-core-directory: timeout 2000 ms is not shorter than core-clinic-proxy \(1500 ms\)/,run(callOf('core-clinic-proxy',c=>{c.timeoutMs=1500;}))],
+      ['a call nested in a call that does not reach its caller',/^\(7\) clinic-core-directory: nested in core-notification-proxy/,run(callOf('clinic-core-directory',c=>{c.nestedIn='core-notification-proxy';}))],
+      ['a call nested in an id that is not declared',/^\(7\) clinic-core-directory: nestedIn ghost is not a declared call/,run(callOf('clinic-core-directory',c=>{c.nestedIn='ghost';}))],
+      // (8) credentials
+      ['a token that is not in the scoped list',/^\(8\) clinic-core-directory-export: token CORE_OTHER_TOKEN is not in the scoped list/,run(callOf('clinic-core-directory-export',c=>{c.credential.token='CORE_OTHER_TOKEN';}))],
+      ['two receivers opened by one token',/^\(8\) token CORE_DIRECTORY_TOKEN opens more than one receiver/,run(callOf(EVIDENCE,c=>{c.credential.token='CORE_DIRECTORY_TOKEN';}))],
+      ['a receiver called with two tokens',/^\(8\) receiver .*directory\.ts is called with more than one token/,run(callOf('clinic-core-directory-export',c=>{c.credential.token='CORE_BILLING_EVIDENCE_TOKEN';}))],
+      ['a token renamed in the caller code',/^\(8\) clinic-core-billing-evidence: token CORE_BILLING_EVIDENCE_TOKEN is not named in services\/clinic\/src\/index\.ts, where the caller clinic reads it/,run(edit(CLINIC_INDEX,"credential('CORE_BILLING_EVIDENCE_TOKEN')","credential('CORE_EVIDENCE_TOKEN')"))],
+      ['a token dropped from the scoped list',/^\(8\) notification-core-authorize-send: token CORE_NOTIFICATION_SEND_TOKEN is not in the scoped list/,run(edit(CONFIG,"'CORE_NOTIFICATION_SEND_TOKEN',",''))],
+      ['the scoped list cannot be read',/^\(8\) cannot read the scoped credentials list/,run(edit(CONFIG,'const scoped = [','const scopedList = ['))],
+      ['a token named only in the caller',/^\(8\) core-clinic-billing-source: token CLINIC_BILLING_TOKEN is not named in services\/clinic\/src\/index\.ts, where the callee clinic reads it/,run({[CLINIC_INDEX]:real.read(CLINIC_INDEX).replaceAll('CLINIC_BILLING_TOKEN','CLINIC_BILLING_TOKEN_X')})],
+      ['a token that the caller wiring file does not name',/^\(8\) clinic-core-directory-export: token CORE_DIRECTORY_TOKEN is not named in services\/clinic\/src\/application\/services\/bookingLifecycle\.ts, where the caller clinic reads it/,run(callOf('clinic-core-directory-export',c=>{c.credential.wiring.caller=CLINIC+'application\/services\/bookingLifecycle.ts';}))],
+      ['a wiring file outside the service it belongs to',/^\(8\) clinic-core-directory-export: the caller wiring file backend\/src\/composition\/config\.ts is not in the src of clinic/,run(callOf('clinic-core-directory-export',c=>{c.credential.wiring.caller=CONFIG;}))],
+      ['a credential with no wiring',/^\(0\) .*credential needs header, token, actor .* and wiring/,run(callOf('clinic-core-directory-export',c=>{delete c.credential.wiring;}))],
+      ['the token of one service renamed only in its Core config (callee wiring)',/^\(8\) clinic-core-directory: token CORE_DIRECTORY_TOKEN is not named in backend\/src\/composition\/config\.ts, where the callee core reads it/,run({[CONFIG]:real.read(CONFIG).replaceAll('CORE_DIRECTORY_TOKEN','CORE_DIR_TOKEN')})],
+      ['a proxy that forwards another header',/^\(8\) core-clinic-proxy: the proxy forwards \[authorization, idempotency-key, cookie\]/,run(edit(ROUTES,"forwardRequestHeaders: ['authorization', 'idempotency-key'],","forwardRequestHeaders: ['authorization', 'idempotency-key', 'cookie'],"))],
+      ['the service header renamed in a caller',/^\(8\) notification-core-authorize-send: the header x-service-token is not named in services\/notification\/src\/coreAuthorization\.ts/,run(edit(NA,"'X-Service-Token': this.credential,","'X-Svc': this.credential,"))],
+      ['the signed actor no longer signed',/^\(8\) core-clinic-billing-source: declared with a signed actor/,run(edit(CB,'signToken(actor.sub, actor.role)','makeToken(actor.sub, actor.role)'))],
+      ['a bearer actor with no Authorization header',/^\(8\) clinic-core-directory-export: declared with a bearer actor/,run(callOf('clinic-core-directory-export',c=>{c.credential.actor='bearer';}))],
+      // (9) the receiver applies its gate
+      ['the evidence route loses its credential check',/^\(9\) receiver backend\/src\/routes\/internal\/billing\.ts does not apply its gate acceptsCredential/,run(edit(BILLING_ROUTE,'acceptsCredential(req.headers','check(req.headers'))],
+      ['the directory routes lose credentialGate',/^\(9\) receiver backend\/src\/routes\/internal\/directory\.ts does not apply its gate credentialGate/,run(edit(DIR_ROUTE,"app.use('/internal/directory', credentialGate(credential));",''))],
+      ['the Clinic billing router loses acceptsService',/^\(9\) receiver .*billingApi\.ts does not apply its gate acceptsService/,run(edit(CLINIC_API,'source.acceptsService(','source.accepts('))],
+      ['the authorize-send route loses its credential check',/^\(9\) receiver .*notificationAuthorization\.ts does not apply its gate acceptsCredential/,run(edit(NA_ROUTE,'acceptsCredential(req.headers','check(req.headers'))],
+      // the review of C5
+      ['a fetch in a .mts file',/^\(1\) services\/clinic\/src\/application\/relay\.mts makes/,run({[CLINIC+'application/relay.mts']:'export const r = (u: string) => fetch(u);'})],
+      ['a fetch in a .cts file',/^\(1\) services\/notification\/src\/relay\.cts makes/,run({'services/notification/src/relay.cts':'export const r = (u: string) => fetch(u);'})],
+      ['a fetch in a generated folder that is not the root one',/^\(1\) services\/clinic\/src\/application\/generated\/x\.ts makes/,run({[CLINIC+'application/generated/x.ts']:'export const r = () => fetch(u);'})],
+      ['a fetch aliased in Notification',/^\(1\) services\/notification\/src\/send\.ts makes/,run({'services/notification/src/send.ts':'const send = fetch;\nexport const go = (u: string) => send(u);'})],
+      ['an optional call fetch?.( in Notification',/^\(1\) services\/notification\/src\/o\.ts makes/,run({'services/notification/src/o.ts':'export const go = (u: string) => fetch?.(u);'})],
+      ['a call file that imports node:https as well',/^\(1\) clinic-core-directory-export: .*directorySync\.ts imports an HTTP client module/,run(append(SYNC,"import { request } from 'node:https';"))],
+      ['a call file that imports axios',/^\(1\) notification-core-authorize-send: .*coreAuthorization\.ts imports an HTTP client module/,run(append(NA,"import axios from 'axios';"))],
+      ['the default of the timeout is not a constructor parameter',/^\(6\) core-clinic-billing-source: the default of timeout is not a constructor parameter/,run(edit(CB,'export class ClinicBillingRemote implements BillingRemote {','export const ClinicBillingRemote = class implements BillingRemote {'))],
+      ['Core builds ClinicBillingRemote with a timeout of its own (coreRoutes)',/^\(6\) core-clinic-billing-source: backend\/src\/composition\/coreRoutes\.ts: new ClinicBillingRemote\( passes 3 arguments, argument 3 overrides the default of timeout/,run(edit(ROUTES,'new ClinicBillingRemote(clinic, config.clinicToken!)','new ClinicBillingRemote(clinic, config.clinicToken!, 5000)'))],
+      ['the core-billing worker builds it with a timeout of its own',/^\(6\) core-clinic-billing-prepare: backend\/src\/workers\/billing\.ts: new ClinicBillingRemote\( passes 3 arguments/,run(edit('backend/src/workers/billing.ts','new ClinicBillingRemote(target, credential)','new ClinicBillingRemote(target, credential, 5000)'))],
+      ['Notification builds CoreSendAuthorization with a timeout of its own',/^\(6\) notification-core-authorize-send: services\/notification\/src\/index\.ts: new CoreSendAuthorization\( passes 3 arguments/,run(edit('services/notification/src/index.ts','new CoreSendAuthorization(process.env.CORE_SERVICE_URL, token!)','new CoreSendAuthorization(process.env.CORE_SERVICE_URL, token!, 9000)'))],
+      ['a construction with a spread argument',/^\(6\) notification-core-authorize-send: .* with a spread argument/,run(edit('services/notification/src/index.ts','new CoreSendAuthorization(process.env.CORE_SERVICE_URL, token!)','new CoreSendAuthorization(...args)'))],
+      ['the router is assigned to another name',/^\(4\) .*directory\.ts: the router is named r, not router/,run(append(DIR_ROUTE,"export function more(app: Express) { const r = express.Router(); r.get('/internal/directory/dump', (_q, s) => s.json({})); app.use(r); }"))],
+      ['a second mount of the router',/^\(4\) .*billingApi\.ts: 2 mounts of router/,run(edit(CLINIC_API,"app.use('/internal', router);","app.use('/internal', router);\n  app.use('/api/billing', router);"))],
+      ['the router mounted without a prefix',/^\(4\) .*billingApi\.ts: the mount of router is not/,run(edit(CLINIC_API,"app.use('/internal', router);",'app.use(router);'))],
+      ['a route on an object that is not app or router',/^\(4\) .*directory\.ts: server\.get\('\/internal…' is a route on an object/,run(append(DIR_ROUTE,"export function more(server: Express) { server.get('/internal/directory/dump', (_q, s) => s.json({})); }"))],
+      ['a route written as app[\'get\'](',/^\(4\) .*directory\.ts: app\['get'\]\( is a route written in a form/,run(append(DIR_ROUTE,"export function more(app: Express) { app['get']('/internal/directory/dump', (_q: any, s: any) => s.json({})); }"))],
+      ['the core-billing worker reads another token name',/^\(8\) core-clinic-billing-source: token CLINIC_BILLING_TOKEN is not named in backend\/src\/workers\/billing\.ts, where the caller core reads it/,run(edit('backend/src/workers/billing.ts','process.env.CLINIC_BILLING_TOKEN ?? ','process.env.CLINIC_TOKEN ?? '))],
+      ['a wiring list that is empty',/^\(0\) .*credential needs header, token, actor/,run(callOf('core-clinic-billing-source',c=>{c.credential.wiring.caller=[];}))],
+      ['the signed actor sends no Authorization header',/^\(8\) core-clinic-billing-source: declared with a signed actor/,run(edit(CB,"...(actor ? { Authorization: 'Bearer ' + signToken(actor.sub, actor.role) } : {}),","...(actor ? { 'X-Actor': signToken(actor.sub, actor.role) } : {}),"))],
+      ['credentialGate mounted on another prefix',/^\(9\) receiver .*directory\.ts: credentialGate guards '\/internal\/directory-old' but the declared path/,run(edit(DIR_ROUTE,"app.use('/internal/directory', credentialGate(credential));","app.use('/internal/directory-old', credentialGate(credential));"))],
+      ['credentialGate with a prefix that is not a literal',/^\(9\) receiver .*directory\.ts: the prefix of credentialGate is not a string literal/,run(edit(DIR_ROUTE,"app.use('/internal/directory', credentialGate(credential));",'app.use(PREFIX, credentialGate(credential));'))],
+      ['credentialGate mounted after the routes',/^\(9\) receiver .*directory\.ts: a route is mounted before credentialGate/,run({[DIR_ROUTE]:real.read(DIR_ROUTE).replace("  app.use('/internal/directory', credentialGate(credential));","").replace("app.get('/internal/directory/export', exportHandler(reader));","app.get('/internal/directory/export', exportHandler(reader));\n  app.use('/internal/directory', credentialGate(credential));")})],
+    ];
+    for(const [reason,tag,found] of fails)assert.ok(found.some(f=>tag.test(f)),'must fail ('+tag+'): '+reason+(found.length?'; got '+found.slice(0,3).join(' | '):'; got nothing'));
+    // must pass: text a careless reader misreads
+    const lf2crlf=path=>({[path]:real.read(path).replace(/\r?\n/g,'\r\n')});
+    const passes={
+      'a comment with fetch( in Notification':run({'services/notification/src/c.ts':'// await fetch(url) is what coreAuthorization.ts does\n/* fetch(url) */\nexport const f = refetch(prefetch(1));'}),
+      'a comment naming /internal/ in a Core file':run({'backend/src/application/c.ts':"// the route '/internal/directory/authorize' is Core's\nexport const a = 1;"}),
+      'a string with /internal/ in a test, which is not under a src':run({'services/clinic/tests/x.ts':"export const p = '/internal/billing-sources/x'; await fetch(p);",'backend/tests/y.ts':"fetch('/internal/x');"}),
+      'a type-only import of node:http in Core':run({'backend/src/lib/t.ts':"import type { Server } from 'node:http';\nexport type S = Server;"}),
+      'an import path that contains /internal/':run({'backend/src/composition/i.ts':"import { x } from '../routes/internal/billing.js';"}),
+      'a file under generated/ with a fetch':run({'services/clinic/src/generated/client/x.ts':'export const f = (u: string) => fetch(u);'}),
+      'CRLF line endings in the callers':run({...lf2crlf(CB),...lf2crlf(DIR),...lf2crlf(SYNC),...lf2crlf(NA)}),
+      'CRLF line endings in the receivers':run({...lf2crlf(BILLING_ROUTE),...lf2crlf(DIR_ROUTE),...lf2crlf(NA_ROUTE),...lf2crlf(CLINIC_API)}),
+      'a new file with a fetch that the declaration lists as external':run({'services/notification/src/push.ts':'export const go = (u: string) => fetch(u);',...change(d=>{d.external.push({id:'push',service:'notification',file:'services/notification/src/push.ts',system:'a push provider',reason:'a third-party system, not a service'});})}),
+      'a type-only import of node:http in a call file':run(append(NA,"import type { Server } from 'node:http';")),
+      'a fetch in <src>/generated (the Prisma client)':run({'services/clinic/src/generated/x.ts':'export const r = (u: string) => fetch(u);'}),
+      'a router mounted once with a prefix, and routes on app and router':run(append(DIR_ROUTE,"export const unrelated = (app: Express) => app.get('/api/x', h);")),
+      'the exception on its last day':run({},UNTIL),
+      'the exception 60 days ahead (the last day that is not too far)':run(change(d=>{d.timeoutExceptions[0].until=addDays(FIXED,60);})),
+      'a route that is only used as a setting (app.get with a string)':run(append(DIR_ROUTE,"const setting = app.get('trust proxy');")),
+    };
+    for(const [reason,found] of Object.entries(passes))assert.deepEqual(found,[],'must pass: '+reason+': '+found.join('; '));
+    // the reader of routes
+    assert.deepEqual(routesIn("app.get('/internal/a/:id', h); app.post(\n  '/internal/b', h); app.get('/api/x', h);").routes,[{method:'GET',path:'/internal/a/:id'},{method:'POST',path:'/internal/b'}],'app routes under /internal only');
+    assert.deepEqual(routesIn("const router = express.Router(); router.get('/a', h); for (const x of ['u','v']) router.post(`/b/${x}`, h); app.use('/internal', router);").routes,[{method:'GET',path:'/internal/a'},{method:'POST',path:'/internal/b/u'},{method:'POST',path:'/internal/b/v'}],'router routes behind a mount, ${x} opened from its loop');
+    assert.deepEqual(routesIn("router.get('/a', h);").routes,[],'a router with no /internal mount has no /internal route');
+    // the metric: a clean tree has no unchecked direction, and an undeclared call, a finding on a call or no declaration shows
+    const metric=(files,date=FIXED)=>serviceCallMetrics(routes,date,fixtureCallsIo(real,files));
+    assert.deepEqual([metric({}).uncheckedDirections,metric({}).undeclaredCallSites],[0,0],'the real tree');
+    assert.deepEqual([metric({'backend/src/application/x.ts':'export const f = (u: string) => fetch(u);'}).uncheckedDirections,metric({'backend/src/application/x.ts':'export const f = (u: string) => fetch(u);'}).undeclaredCallSites],[0,1],'an undeclared call site');
+    assert.equal(metric(edit(NA,'private readonly timeoutMs = 2000,','private readonly timeoutMs = 2500,')).uncheckedDirections,1,'a finding on one call leaves its direction unchecked');
+    assert.deepEqual([metric({[DECL]:null}).uncheckedDirections,metric({[DECL]:null}).undeclaredCallSites],[4,7],'no declaration: every direction unchecked, every call site undeclared');
+    assert.equal(metric({},addDays(UNTIL,1)).uncheckedDirections,0,'an expired exception does not move the metric');
+    return declaration.calls.length+' calls in '+serviceCallMetrics(routes,today,real).detail.directions.filter(d=>d.calls.length).length+' directions, '+declaration.external.length+' external, '+declaration.uncalledRoutes.length+' uncalled route, '+declaration.timeoutExceptions.length+' timeout exception ('+callExceptionDays(today,real).join('; ')+'); '+fails.length+' must-fail, '+Object.keys(passes).length+' must-pass, the call-site fixtures of the first rule and 3 reader fixtures';
+  }),error=>rule('service-calls-declared',()=>{throw error;}));
 
 // ---- 13. Shared packages carry no business route -------------------------------------------
 // packages/* (the declaration of the API in contracts excepted) never name a route of a service: a literal path under
@@ -1306,6 +1518,7 @@ const routingCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.
 
 await envelopeCheck;
 await routingCheck;
+await callsCheck;
 await lifecycleCheck;
 await grantsCheck;
 await permissionCheck;
@@ -1314,4 +1527,4 @@ await categoryCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write(`Architecture rules PASS (${results.length} rules): service layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, Clinic routes declare their scope, no duplicated service modules, Clinic HTTP calls confined, shared packages without business routes, services declare limit rules, structure ratchet, Core module map, legacy isolation, gateway routes from one source, negative fixtures.\n`);
+else process.stdout.write(`Architecture rules PASS (${results.length} rules): service layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, Clinic routes declare their scope, no duplicated service modules, service calls declared, shared packages without business routes, services declare limit rules, structure ratchet, Core module map, legacy isolation, gateway routes from one source, negative fixtures.\n`);

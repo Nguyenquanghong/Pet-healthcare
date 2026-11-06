@@ -94,10 +94,11 @@
       }
     },
     "S13": {
-      "kind": "derived",
-      "better": "higher",
+      "kind": "measured",
+      "better": "lower",
       "values": {
-        "rules": 1
+        "uncheckedDirections": 0,
+        "undeclaredCallSites": 0
       }
     },
     "S14": {

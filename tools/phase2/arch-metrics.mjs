@@ -7,6 +7,7 @@ import {readFileSync,readdirSync,writeFileSync,existsSync} from 'node:fs';
 import {resolve,dirname,relative,sep,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {realIo,routingMetrics} from './gateway-routing.mjs';
+import {callsIo,serviceCallMetrics} from './service-calls.mjs';
 
 const defaultRoot=resolve(import.meta.dirname,'../..');
 // S6 compares the routing places with the built contracts (packages/contracts/dist), the same module the services import.
@@ -328,7 +329,6 @@ const CORE_SPLIT_ENTRIES=/^(index\.ts|workers\/(outbox|billing|notification)\.ts
 // backend/src/legacy now, so every edge into it is cut.
 const CORE_CUT=(from,to)=>to.startsWith('legacy/');
 const PROOF_CLASSES=/\bclass (ClinicBilling|CoreBilling)\b/;
-const SYNC_CALL_RULES=/calls-(confined|declared)/;
 const LEGACY_DIR='/legacy/';
 
 // ---- measurement ----------------------------------------------------------------------
@@ -428,9 +428,12 @@ export function measure(root=defaultRoot){
   const proofClassFiles=[...coreFiles,...clinicFiles].filter(f=>PROOF_CLASSES.test(text(f))),proofBranches=[...coreFiles,...clinicFiles].filter(f=>!proofClassFiles.includes(f)&&/\bProofAppointment\b/.test(text(f)));
   put('S12','Proof-only code in src (classes used by proof.test.mjs, ProofAppointment branches)','derived','lower',{files:proofClassFiles.length,branches:proofBranches.length},{files:proofClassFiles.map(rel),branches:proofBranches.map(rel)});
 
-  // S13: rules that confine synchronous service calls (a count of rules, not of call directions).
-  const rulesSource=text(abs('tools/phase2/check-architecture-rules.mjs')),syncRules=[...rulesSource.matchAll(/^rule\('([^']+)'/gm)].map(m=>m[1]).filter(n=>SYNC_CALL_RULES.test(n));
-  put('S13','Rules that check synchronous service-to-service calls','derived','higher',{rules:syncRules.length},syncRules,{note:'plan target is every direction (Core->Clinic, Clinic->Core, Core->Notification, Notification->Core)'});
+  // S13: the synchronous calls between Core, Clinic and Notification, read against deploy/phase2/service-calls.json by
+  // tools/phase2/service-calls.mjs (the same code as the rule service-calls-declared): directions with no declared call or a call the rule
+  // faults, and files that make an outbound HTTP call the declaration does not list. The detail lists every direction and the external systems.
+  if(!contracts)throw new Error('build packages/contracts first (npm run build -w @nipopeto/contracts); S13 reads the built gatewayRoutes');
+  const calls=serviceCallMetrics(contracts.gatewayRoutes,new Date().toISOString().slice(0,10),callsIo(root));
+  put('S13','Synchronous service-to-service calls: unchecked directions, undeclared call sites','measured','lower',{uncheckedDirections:calls.uncheckedDirections,undeclaredCallSites:calls.undeclaredCallSites},calls.detail,{note:'uncheckedDirections: of Core->Clinic, Clinic->Core, Core->Notification, Notification->Core (and any other declared), those with no declared call or with a call that service-calls-declared faults; undeclaredCallSites: files of the three services with an outbound HTTP call that is neither a declared call nor a declared external system (S3, VNPay); a declaration that cannot be read counts every direction and every call site; an exception whose date has passed is a finding of the rule, not of this metric'});
 
   // S14: backend files over 400 lines.
   const over400=backendFiles.map(f=>({file:rel(f),lines:wcl(text(f))})).filter(f=>f.lines>400).sort((a,b)=>b.lines-a.lines);
