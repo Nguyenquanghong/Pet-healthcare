@@ -56,7 +56,6 @@ export const ROUTING_PLACES=[
 // ahead). The prefix is one of gatewayRoutes and routesTo a service. An exception that no longer differs is stale and fails as well.
 export const ROUTING_EXCEPTIONS=[
   {place:'benchmarks/phase2/kaggle/stack.mjs',prefix:'/api/dashboard/clinic',routesTo:'core',until:'2026-11-20',reason:'The bridge study measured /api/dashboard/clinic through Core and the H-M numbers were taken that way; K9 changes the harness (H3 direct, H3c through Core) and this exception goes stale (ADR-P14 4.1, K5 Q3).'},
-  {place:'tools/phase2/resilience.test.mjs',prefix:'/api/notifications',routesTo:'core',until:'2026-11-20',reason:'The resilience edge sends Notification through Core until K5 C4 moves it to the direct topology (Q4).'},
 ];
 // Files with a proxy that are not places: text that only quotes a config, or a hop that is not the /api gateway. An entry with
 // `until` is a debt: after that date it fails like an exception; one that no longer holds a proxy is stale; `only` narrows it to the
