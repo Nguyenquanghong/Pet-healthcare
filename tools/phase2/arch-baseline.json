@@ -42,8 +42,8 @@
       "better": "lower",
       "values": {
         "uncheckedPlaces": 0,
-        "variants": 4,
-        "exceptions": 2
+        "variants": 3,
+        "exceptions": 1
       }
     },
     "S7": {
