@@ -1,6 +1,7 @@
 // `npm run arch:check`: every architecture fitness function in one run, with a
-// PASS/FAIL table; exit 1 if any check fails. Read-only (builds contracts only;
-// the permission matrix runs the built services, so run phase2:build first).
+// PASS/FAIL table; exit 1 if any check fails. Read-only apart from the contracts build inside `phase2:test:contracts`.
+// Run phase2:build first: the permission matrix runs the built services, and the architecture rules (gateway-routes-single-source)
+// and the metric S6 read the already built packages/contracts/dist, which that later step does not rebuild in time.
 import {spawnSync} from 'node:child_process';
 import {resolve} from 'node:path';
 

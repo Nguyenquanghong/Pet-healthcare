@@ -41,11 +41,19 @@
 // 17. Legacy isolation (K4): outside backend/src/legacy, nothing imports legacy/ (composition/ excepted) and nothing reads a clinical
 //     table: no delegate, raw SQL table, relation key (generated from the Prisma schema) or Prisma type of Appointment, MedicalRecord,
 //     MedicalImage or Notification. A self-check fails the rule if its reader stops seeing the reads inside legacy/.
+// 18. Gateway routes from one source (K5): every place that routes /api traffic (tools/phase2/gateway-routing.mjs ROUTING_PLACES) sends
+//     the probe paths where packages/contracts/src/gatewayRoutes.ts says (core-ingress or direct), except listed exceptions (a prefix of
+//     gatewayRoutes, a reason, a day at most 60 ahead; checked on their last day UTC); the places are the nginx configs (read like nginx
+//     reads them, one server per port, only listed directives, anything it cannot follow fails), the E2E proxy, the frontend client and the Vite dev proxy;
+//     no proxy (proxy_pass, a Vite or Node proxy, a fetch of the request URL) in a file that is neither a place nor on the dated ignore
+//     list, phase2-plan/evidence excepted; the gateway and service OpenAPI files list the same paths and agree on the owner of each;
+//     Core's routes take their prefixes from the contracts, and only the three legacy mounts of mountCoreRoutes name one.
 // Each rule also runs a negative fixture so a broken rule fails loudly.
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
 import {resolve,dirname,relative,sep,posix} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {realIo,fixtureIo,routingFindings,analyze,nginxRoute,nginxLocations,locationName,listenPort,nginxTokens,stripJsComments,callArguments,fetchCalls,fetchUses,sweepFiles,exceptionDays} from './gateway-routing.mjs';
 
 const root=resolve(import.meta.dirname,'../..');
 const read=path=>readFileSync(resolve(root,path),'utf8');
@@ -1039,7 +1047,265 @@ rule('legacy-isolated', () => {
   return modules.length + ' modules; ' + inLegacy + ' clinical reads inside legacy/, none outside; keys ' + [...schema.keys].sort().join(', ') + '; ' + (Object.keys(fails).length + Object.keys(imports).length + 1) + ' must-fail and ' + (Object.keys(passes).length + Object.keys(fails).length + 4) + ' must-pass fixtures';
 });
 
+// ---- 18. Gateway routes from one source (K5) ---------------------------------------------------
+// Which service answers an /api path is declared once in packages/contracts/src/gatewayRoutes.ts. Every place that routes /api
+// traffic (tools/phase2/gateway-routing.mjs ROUTING_PLACES: the compose nginx, the split example, the measurement and resilience
+// gateways, the P7 rehearsal, the E2E proxy, the frontend client, the Vite dev proxy) must send a fixed set of probe paths where its topology says
+// (core-ingress: all to Core; direct: each owned prefix to its owner), unless a listed exception with a reason and an end date says
+// otherwise. A proxy_pass in a file that is not a place fails, and so does a place that reads as empty. The gateway and service
+// OpenAPI files must agree on who owns each path, and Core's routes take the prefixes from the contracts.
+const routingCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.reject(new Error('build packages/contracts first (npm run build -w @nipopeto/contracts)')))
+  .then(contracts=>rule('gateway-routes-single-source',()=>{
+    const real=realIo(root),today=new Date().toISOString().slice(0,10),FIXED='2026-11-06';
+    const findings=routingFindings(contracts,today,real);
+    assert.deepEqual(findings,[],'gateway routing differs from packages/contracts/src/gatewayRoutes.ts: '+findings.join('; '));
+    // negative fixtures: each must fail (a finding starts with the tag), every edit must change the text it names
+    const SPLIT='deploy/phase2/nginx.split.conf.example',TEMPLATE='frontend/nginx/default.conf.template',E2E='tools/phase2/e2e-server.mjs',CLIENT='frontend/src/services/apiClient.ts',
+      STACK='benchmarks/phase2/kaggle/stack.mjs',ROUTES='backend/src/composition/coreRoutes.ts',APP='backend/src/composition/coreApp.ts',
+      VITE='frontend/vite.config.ts',RES='tools/phase2/resilience.test.mjs',P7='tools/phase2/p7-rehearsal.test.mjs',BILLING='tools/phase2/billing.test.mjs',
+      SOURCE='packages/contracts/src/gatewayRoutes.ts',CLINIC_SPEC='services/clinic/openapi.json',NOTIFICATION_SPEC='services/notification/openapi.json';
+    const edit=(path,from,to)=>{const text=real.read(path);assert.ok(text.includes(from),'fixture edit not found in '+path+': '+from);return {[path]:text.replace(from,()=>to)};};
+    const edits=(path,pairs)=>{let text=real.read(path);for(const [from,to] of pairs){assert.ok(text.includes(from),'fixture edit not found in '+path+': '+from);text=text.replace(from,()=>to);}return {[path]:text};};
+    const append=(path,text)=>({[path]:real.read(path)+'\n'+text+'\n'});
+    const json=(path,change)=>{const spec=JSON.parse(real.read(path));change(spec.paths);return {[path]:JSON.stringify(spec)};};
+    const run=(files,{routes,exceptions,ignore,at=FIXED}={})=>{
+      const c=routes?{...contracts,gatewayRoutes:routes,routeOwner:p=>routes.find(r=>p===r.prefix||p.startsWith(r.prefix+'/'))?.service??'core'}:contracts;
+      return routingFindings(c,at,fixtureIo(real,files,{...(exceptions?{exceptions}:{}),...(ignore?{ignore}:{})}),{dist:!routes});
+    };
+    const VACC='location ~ ^/api/vaccinations(/|$) { proxy_pass http://clinic; }';
+    const CORE='location /api/ { proxy_pass http://core; }',CLINIC_LOCATION='location ~ ^/api/(appointments|medical-records|dashboard/clinic)(/|$) { proxy_pass http://clinic; }';
+    const e2eBranch="if(path.startsWith('/api/')){",e2eForward='fetch(origins.core+req.url';
+    const e2eDetour=(call)=>edit(E2E,e2eBranch,"if(path.startsWith('/api/appointments')){"+call+"res.writeHead(200);res.end();return;}\n    "+e2eBranch);
+    const ghost=[...contracts.gatewayRoutes,{prefix:'/api/ghost',service:'clinic'}],nested=[...contracts.gatewayRoutes,{prefix:'/api/appointments/archive',service:'clinic'}];
+    const stray=real.exceptions[0];
+    const fails=[
+      ['direct config without dashboard/clinic',/^table deploy/,run(edit(SPLIT,'(appointments|medical-records|dashboard/clinic)','(appointments|medical-records)'))],
+      ['direct config also sends vaccinations to Clinic',/^table deploy/,run(edit(SPLIT,'location /api/ { proxy_pass http://core; }','location ~ ^/api/vaccinations(/|$) { proxy_pass http://clinic; } location /api/ { proxy_pass http://core; }'))],
+      ['core-ingress config with a Clinic regex',/^fail-closed frontend\/nginx.*not to Core/,run(edit(TEMPLATE,'location /api/ {','location ~ ^/api/appointments(/|$) { proxy_pass http://clinic; }\n    location /api/ {'))],
+      ['~* sends /api/Appointments to Clinic',/^table deploy/,run(edit(SPLIT,'location ~ ^/api/(appointments','location ~* ^/api/(appointments'))],
+      ['^~ /api/ stops the regexes',/^table deploy/,run(edit(SPLIT,'location /api/ {','location ^~ /api/ {'))],
+      ['a regex with no segment boundary takes /api/appointmentsx',/^table deploy/,run(edit(SPLIT,'dashboard/clinic)(/|$)','dashboard/clinic)'))],
+      ['a target that is no known service',/^table deploy/,run(edit(SPLIT,'proxy_pass http://notification','proxy_pass http://elsewhere'))],
+      ['/api/pets does not go to Core',/^fail-closed deploy/,run(edit(SPLIT,'location /api/ { proxy_pass http://core; }','location /api/ { proxy_pass http://clinic; }'))],
+      ['a server block with no location',/^fail-closed deploy/,run({[SPLIT]:'server { listen 127.0.0.1:8080; }'})],
+      ['the listen address matches no server',/^fail-closed frontend\/nginx/,run({[TEMPLATE]:'server { listen 9999; location /api/ { proxy_pass http://api:${API_PORT}; } }'})],
+      ['no nginx template in a JS file',/^fail-closed benchmarks/,run({[STACK]:'export const x = 1;'})],
+      ['the E2E proxy forwards to Clinic',/^fail-closed tools\/phase2\/e2e/,run(edit(E2E,'fetch(origins.core+req.url','fetch(origins.clinic+req.url'))],
+      ['the E2E proxy forwards to a computed origin',/^fail-closed tools\/phase2\/e2e/,run(edit(E2E,'fetch(origins.core+req.url','fetch(origins[pick(req)]+req.url'))],
+      ['a second frontend variable VITE_CLINIC_URL',/^fail-closed frontend\/src/,run(append(CLIENT,'const c = import.meta.env.VITE_CLINIC_URL;'))],
+      ['the frontend names a service port',/^fail-closed frontend\/src/,run(append(CLIENT,"const d = 'http://localhost:5101/api';"))],
+      ['the frontend names a service prefix',/^fail-closed frontend\/src/,run(append(CLIENT,"const p = '/api/appointments';"))],
+      ['a second fetch in the frontend',/^fail-closed frontend\/src/,run(append(CLIENT,"await fetch('/x');"))],
+      ['the Clinic spec lists /api/vaccinations',/^openapi \(b\)/,run(json(CLINIC_SPEC,p=>{p['/api/vaccinations']={get:{}};}))],
+      ['a Clinic path of the gateway is missing from the Clinic spec',/^openapi \(a\)/,run(json(CLINIC_SPEC,p=>{delete p['/api/appointments/availability'];}))],
+      ['a method of the gateway is missing from the Clinic spec',/^openapi \(a\).*methods differ/,run(json(CLINIC_SPEC,p=>{delete p['/api/appointments'].post;}))],
+      ['the Notification spec lists a path of the Clinic prefix',/^openapi \(b\)/,run(json(NOTIFICATION_SPEC,p=>{p['/api/appointments/zz']={get:{}};}))],
+      ['a prefix that covers no path',/^openapi \(c\) prefix \/api\/ghost covers/,run({},{routes:ghost})],
+      ['one prefix inside another',/^openapi \(c\).* is a prefix of /,run({},{routes:nested})],
+      ['a literal prefix in an app.use of coreRoutes',/^literal .*coreRoutes/,run(append(ROUTES,"app.use('/api/appointments', express.json(), handler);"))],
+      ['a literal prefix list in coreRoutes',/^literal .*coreRoutes/,run(append(ROUTES,"const p = { prefixes: ['/api/notifications'] };"))],
+      ['a literal prefix in coreApp',/^literal .*coreApp/,run(append(APP,"const p = '/api/medical-records';"))],
+      ['coreRoutes no longer imports the contracts',/^literal .*does not take/,run(edit(ROUTES,"from '@nipopeto/contracts'","from './nope.js'"))],
+      ['the built contracts are older than the source',/^dist/,run(edit(SOURCE,"'/api/medical-records'","'/api/medical-record'"))],
+      ['an exception past its date',/^exception .*expired/,run({},{at:'2026-11-21'})],
+      ['an exception that no longer differs',/^exception .*stale/,run({},{exceptions:[...real.exceptions,{place:SPLIT,prefix:'/api/dashboard/clinic',routesTo:'core',until:'2027-01-01',reason:'a reason of some length'}]})],
+      ['an exception with no reason',/^exception .*no reason/,run({},{exceptions:real.exceptions.map(e=>({...e,reason:''}))})],
+      ['an exception for a place that is not listed',/^exception .*place not found/,run({},{exceptions:[...real.exceptions,{...stray,place:'tools/phase2/nowhere.mjs'}]})],
+      ['an exception to a service the place does not use',/^table benchmarks/,run({},{exceptions:real.exceptions.map(e=>e.place===STACK?{...e,routesTo:'notification'}:e)})],
+      ['a proxy_pass in a file that is not a place',/^sweep tools\/stray\.conf/,run({'tools/stray.conf':'server { location /api/ { proxy_pass http://core; } }'})],
+      // nginx text: read the way nginx reads it, or refuse
+      ['a regex with no space after ~',/^table deploy/,run(edit(SPLIT,CORE,'location ~^/api/vaccinations(/|$) { proxy_pass http://clinic; } '+CORE))],
+      ['a ~* regex with no space after it',/^table deploy/,run(edit(SPLIT,CORE,'location ~*^/api/appointments(/|$) { proxy_pass http://clinic; } '+CORE))],
+      ['= with no space sends /api/pets to Clinic',/^fail-closed deploy.*\/api\/pets goes to clinic/,run(edit(SPLIT,CORE,'location =/api/pets { proxy_pass http://clinic; } '+CORE))],
+      ['a quoted regex',/^table deploy/,run(edit(SPLIT,CORE,'location ~ "^/api/vaccinations(/|$)" { proxy_pass http://clinic; } '+CORE))],
+      ['a quoted prefix',/^table deploy/,run(edit(SPLIT,CORE,'location "/api/vaccinations" { proxy_pass http://clinic; } '+CORE))],
+      ['a location nested in the /api/ location',/^fail-closed frontend\/nginx.*nested location/,run(edit(TEMPLATE,'proxy_pass http://api:${API_PORT};','proxy_pass http://api:${API_PORT};\n        location ~ ^/api/appointments { proxy_pass http://clinic-api:5101; }'))],
+      ['a proxy_pass inside an if',/^fail-closed frontend\/nginx.*proxy_pass in an if/,run(edit(TEMPLATE,'proxy_pass http://api:${API_PORT};','proxy_pass http://api:${API_PORT};\n        if ($uri ~ ^/api/appointments) { proxy_pass http://clinic-api:5101; }'))],
+      ['a redirect inside an if',/^fail-closed frontend\/nginx.*return redirect in an if/,run(edit(TEMPLATE,'proxy_pass http://api:${API_PORT};','proxy_pass http://api:${API_PORT};\n        if ($uri ~ ^/api/appointments) { return 307 http://clinic-api:5101; }'))],
+      ['a rewrite',/^fail-closed frontend\/nginx.*rewrite in the gateway server/,run(edit(TEMPLATE,'location /api/ {','location /clinic/ { proxy_pass http://clinic-api:5101/api/; }\n    location /api/ {\n        rewrite ^/api/appointments(.*)$ /clinic/appointments$1 last;'))],
+      ['an include',/^fail-closed frontend\/nginx.*include/,run(edit(TEMPLATE,'location /api/ {','include /etc/nginx/extra/*.conf;\n    location /api/ {'))],
+      ['an error_page to a named location',/^fail-closed deploy.*error_page jumps to @clinic/,run(edit(SPLIT,CORE,'location /api/ { proxy_pass http://core; error_page 404 = @clinic; }'))],
+      ['a named location',/^fail-closed deploy.*named location/,run(edit(SPLIT,CORE,'location @clinic { proxy_pass http://clinic; } '+CORE))],
+      ['a try_files that falls back to a named location',/^fail-closed frontend\/nginx.*try_files falls back to the named location @clinic/,run(edit(TEMPLATE,'try_files $uri =404;','try_files $uri @clinic;'))],
+      ['a second server on port 8080 with default_server',/^fail-closed frontend\/nginx.*2 server blocks listen on 8080/,run(append(TEMPLATE,'server { listen 8080 default_server; location /api/ { proxy_pass http://clinic-api:5101; } }'))],
+      ['a second server on [::]:8080',/^fail-closed frontend\/nginx.*2 server blocks listen on 8080/,run(append(TEMPLATE,'server { listen [::]:8080; location /api/ { proxy_pass http://clinic-api:5101; } }'))],
+      ['a second server on 127.0.0.1:8080 with default_server',/^fail-closed deploy.*2 server blocks listen on 8080/,run(edit(SPLIT,'    # Core CLINIC_SERVICE_URL','    server { listen 127.0.0.1:8080 default_server; location / { proxy_pass http://clinic; } }\n    # Core CLINIC_SERVICE_URL'))],
+      ['a ${…} that hides a location in the gateway server',/^fail-closed benchmarks.*does not list/,run(edit(STACK,'location /api/ { ${coreGateway}','${extraLocations} location /api/ { ${coreGateway}'))],
+      ['a proxy_pass target taken from a ${…}',/^fail-closed benchmarks.*does not list/,run(edit(STACK,'location /api/ { ${coreGateway} proxy_pass http://core;','location /api/ { ${coreGateway} proxy_pass ${pickUpstream};'))],
+      ['the P7 maintenance conditional is no longer the listed text',/^fail-closed tools\/phase2\/p7.*does not list/,run(edit(P7,'^(GET|HEAD|OPTIONS)$','^(GET|HEAD)$'))],
+      ['a ${…} the resilience gateway does not list',/^fail-closed tools\/phase2\/resilience.*does not list/,run(edit(RES,'listen 127.0.0.1:${edge};','listen 127.0.0.1:${edge}; ${extra}'))],
+      // the sweep
+      ['a proxy_pass in a directory named evidence that is not the frozen one',/^sweep tools\/evidence\/stray\.conf/,run({'tools/evidence/stray.conf':'server { location /api/ { proxy_pass http://core; } }'})],
+      ['a Vite proxy in a file that is not a place',/^sweep tools\/other\.config\.ts/,run({'tools/other.config.ts':'export default { server: { proxy: { "/api": "http://localhost:5101" } } };'})],
+      ['createProxyMiddleware in a file that is not a place',/^sweep tools\/mw\.mjs/,run({'tools/mw.mjs':"import { createProxyMiddleware } from 'http-proxy-middleware';"})],
+      ['a fetch of the request URL in a file that is not a place',/^sweep tools\/relay\.mjs/,run({'tools/relay.mjs':'const r = await fetch(base + req.url);'})],
+      ['the billing stand-in is a proxy that only its ignore entry lets through',/^sweep tools\/phase2\/billing\.test\.mjs/,run({},{ignore:real.ignore.filter(e=>e.file!==BILLING)})],
+      ['a sweep ignore past its date',/^sweep ignore .*expired/,run({},{at:'2026-11-21'})],
+      ['a sweep ignore for a file with no proxy',/^sweep ignore tools\/phase2\/arch-check\.mjs: stale/,run({},{ignore:[...real.ignore,{file:'tools/phase2/arch-check.mjs',reason:'a reason that is long enough'}]})],
+      ['a sweep ignore with no reason',/^sweep ignore .*no reason/,run({},{ignore:real.ignore.map(e=>e.file===BILLING?{...e,reason:''}:e)})],
+      ['a sweep ignore with a date too far ahead',/^sweep ignore .*more than 60 days/,run({},{ignore:real.ignore.map(e=>e.until?{...e,until:'2027-06-01'}:e)})],
+      // the E2E proxy
+      ['a template-literal fetch to Clinic in a branch before /api/',/^fail-closed tools\/phase2\/e2e.*outside the \/api\/ branch that is not the readiness probe/,run(e2eDetour('const r=await fetch(`${origins.clinic}${req.url}`);'))],
+      ['a fetch through another variable in a branch before /api/',/^fail-closed tools\/phase2\/e2e.*outside the \/api\/ branch that is not the readiness probe/,run(e2eDetour('const base=origins.clinic;const r=await fetch(base+req.url);'))],
+      ['a second fetch inside the /api/ branch',/^fail-closed tools\/phase2\/e2e.*must hold exactly one fetch/,run(edit(E2E,'const r=await fetch(origins.core+req.url','await fetch(origins.clinic+"/x");const r=await fetch(origins.core+req.url'))],
+      ['req.url copied into a variable',/^fail-closed tools\/phase2\/e2e.*req\.url is used outside/,run(edit(E2E,"const path=new URL(req.url,'http://127.0.0.1').pathname;","const path=new URL(req.url,'http://127.0.0.1').pathname;const raw=req.url;"))],
+      // the frontend
+      ['a second origin variable VITE_CLINIC_ORIGIN',/^fail-closed frontend\/src.*VITE_API_BASE_URL is the one origin variable/,run(edit(CLIENT,'const response = await fetch(`${API_BASE_URL}','const base = endpoint.startsWith("/appointments") ? import.meta.env.VITE_CLINIC_ORIGIN : API_BASE_URL;\n  const response = await fetch(`${base}'))],
+      ['a Clinic host written in the client',/^fail-closed frontend\/src.*names a second origin/,run(edit(CLIENT,'const response = await fetch(`${API_BASE_URL}','const base = endpoint.startsWith("/appointments") ? "http://clinic-api/api" : API_BASE_URL;\n  const response = await fetch(`${base}'))],
+      ['a second origin in another literal of the client',/^fail-closed frontend\/src.*names a second origin/,run(append(CLIENT,"const other = 'https://other.example';"))],
+      ['an /api URL in another frontend file',/^fail-closed frontend\/src.*names an \/api URL/,run({'frontend/src/other.ts':"export const u = 'https://svc.example/api/x';"})],
+      ['window.fetch next to the client',/^fail-closed frontend\/src.*exactly one use of fetch/,run({'frontend/src/other.ts':'export const f = () => window.fetch("/x");'})],
+      ['a WebSocket in the frontend',/^fail-closed frontend\/src.*another way to reach the network/,run({'frontend/src/other.ts':'export const w = new WebSocket("ws://x");'})],
+      ['an API_BASE_URL with a literal that is not listed',/^fail-closed frontend\/src.*API_BASE_URL may name only/,run(edit(CLIENT,': "/api")',': "/api/v2")'))],
+      ['a fetch that does not start from API_BASE_URL',/^fail-closed frontend\/src.*does not start from API_BASE_URL/,run(edit(CLIENT,'fetch(`${API_BASE_URL}','fetch(`${String(1)}'))],
+      // the Vite dev proxy
+      ['a second key in the Vite proxy',/^fail-closed frontend\/vite.*exactly "\/api"/,run(edit(VITE,'proxy: { "/api": "http://localhost:5000" }','proxy: { "/api/appointments": "http://localhost:5101", "/api": "http://localhost:5000" }'))],
+      ['the Vite proxy target is not Core',/^fail-closed frontend\/vite.*exactly "\/api"/,run(edit(VITE,'"http://localhost:5000"','"http://localhost:5101"'))],
+      ['a Vite proxy entry with an options object',/^fail-closed frontend\/vite.*shape this reader does not know/,run(edit(VITE,'"/api": "http://localhost:5000"','"/api": { target: "http://localhost:5000" }'))],
+      ['a second proxy in the Vite config',/^fail-closed frontend\/vite.*exactly one proxy/,run(edit(VITE,'plugins: [react()],','plugins: [react()],\n  preview: { proxy: { "/api": "http://localhost:5101" } },'))],
+      ['a proxy written in a Vite server hook',/^fail-closed frontend\/vite.*proxy written as code/,run(edit(VITE,'plugins: [react()],','plugins: [react(), { name: "x", configureServer(s) { s.middlewares.use(() => {}); } }],'))],
+      // Core's routes
+      ['an owned prefix mounted in mountSplitRoutes before the proxy',/^literal .*coreRoutes.*outside the legacy mounts/,run(edit(ROUTES,'  mountDirectory(app, db,',"  app.use('/api/notifications', requireAuth, localNotifications);\n  mountDirectory(app, db,"))],
+      ['a second legacy mount of /api/appointments in the clinical block',/^literal .*coreRoutes.*(expected one legacy mount of \/api\/appointments|outside the legacy mounts)/,run(edit(ROUTES,"      '/api/medical-records',","      '/api/appointments',\n      requireAuth,\n      handler,\n    );\n    app.use(\n      '/api/medical-records',"))],
+      ['the clinical legacy mounts lose their if (clinical) guard',/^literal .*coreRoutes.*expected one legacy mount of \/api\/appointments/,run(edit(ROUTES,'if (clinical) {','if (clinical || true) {'))],
+      ['the legacy notifications mount loses its monolith guard',/^literal .*coreRoutes.*expected one legacy mount of \/api\/notifications/,run(edit(ROUTES,'if (monolith && clinical)','if (monolith)'))],
+      ['an owned prefix with a path after it',/^literal .*coreRoutes.*\/api\/appointments outside the legacy mounts/,run(append(ROUTES,"app.get('/api/appointments/:id/summary', handler);"))],
+      ['an owned prefix in a template literal',/^literal .*coreRoutes.*\/api\/notifications outside the legacy mounts/,run(append(ROUTES,'app.use(`/api/notifications/${x}`, handler);'))],
+      ['an owned prefix written as two strings',/^literal .*coreRoutes.*\/api\/appointments outside the legacy mounts/,run(append(ROUTES,"const p = '/api/' + 'appointments';"))],
+      // the nginx tokenizer reads # and quotes like nginx
+      ['a quote inside a word does not open a string: the clinic location after it counts',/^table deploy/,run(edit(SPLIT,CORE,"set $a x'y; # '\n        "+VACC+"\n        set $b u' ;#x';\n        "+CORE))],
+      ['a backslash-quote at the start of a word does not open a string either',/^table deploy/,run(edit(SPLIT,CORE,'set $a \\"y; # "\n        '+VACC+'\n        set $b u" ;#x";\n        '+CORE))],
+      // regexes are read with the u flag, so PCRE-only syntax fails instead of matching nothing
+      ['a PCRE \\A anchor',/^fail-closed deploy.*Invalid regular expression/,run(edit(SPLIT,CORE,'location ~ \\A/api/vaccinations { proxy_pass http://clinic; } '+CORE))],
+      ['a PCRE \\Q…\\E quote',/^fail-closed deploy.*Invalid regular expression/,run(edit(SPLIT,CORE,'location ~ ^\\Q/api/vaccinations\\E { proxy_pass http://clinic; } '+CORE))],
+      ['an inline (?i) flag',/^fail-closed deploy.*Invalid regular expression/,run(edit(SPLIT,CORE,'location ~ (?i)^/api/vaccinations { proxy_pass http://clinic; } '+CORE))],
+      // structure of a core-ingress gateway, and probes with an id in them
+      ['a numeric-id regex proxies /api/pets/<digits> to Clinic in a core-ingress gateway',/^fail-closed frontend\/nginx.*not to Core, in a core-ingress gateway/,run(edit(TEMPLATE,'location /api/ {','location ~ ^/api/pets/[0-9]+$ { proxy_pass http://clinic-api:5101; }\n    location /api/ {'))],
+      ['a numeric-id regex sends /api/vaccinations/1 to Clinic',/^table deploy/,run(edit(SPLIT,CORE,'location ~ "^/api/vaccinations/[0-9]+$" { proxy_pass http://clinic; } '+CORE))],
+      ['a uuid regex sends /api/pets/<uuid> to Clinic',/^table deploy/,run(edit(SPLIT,CORE,'location ~ "^/api/pets/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" { proxy_pass http://clinic; } '+CORE))],
+      // a JS template is read once, and every proxy_pass of the file is in it
+      ['a second nginx template earlier in stack.mjs',/^fail-closed benchmarks.*exactly one nginx template/,run({[STACK]:'const config=`server { listen 127.0.0.1:${ports.gateway}; location /api/ { proxy_pass http://core; } }`;\n'+real.read(STACK)})],
+      ['a second nginx template earlier in resilience',/^fail-closed tools\/phase2\/resilience.*exactly one nginx template/,run({[RES]:'const config=`server {listen 127.0.0.1:${edge};location /api/ {proxy_pass http://core;}}`;\n'+real.read(RES)})],
+      ['a proxy_pass outside the template that is read',/^fail-closed tools\/phase2\/resilience.*proxy_pass outside the template/,run(append(RES,"const decoy = 'proxy_pass http://clinic;';"))],
+      ['a second proxy_pass outside the template of stack.mjs (only the coreEdge one is listed)',/^fail-closed benchmarks.*2 proxy_pass outside the template/,run(append(STACK,"const decoy = 'proxy_pass http://clinic;';"))],
+      // the E2E proxy: every other fetch is the readiness probe, and no other way to forward
+      ['new URL(req.url, clinic) then fetch(t) before the /api/ branch',/^fail-closed tools\/phase2\/e2e.*not the readiness probe/,run(e2eDetour('const t=new URL(req.url,origins.clinic);const r=await fetch(t,{method:req.method});'))],
+      ['the request path copied to a variable before the /api/ branch',/^fail-closed tools\/phase2\/e2e.*not the readiness probe/,run(e2eDetour('const p=path;const r=await fetch(origins.clinic+p);'))],
+      ['a fetch of a name built from the request URL',/^fail-closed tools\/phase2\/e2e.*not the readiness probe/,run(e2eDetour('const s=origins.clinic+new URL(req.url,origins.core).pathname;const r=await fetch(s);'))],
+      ['http.request with a pipe instead of fetch',/^fail-closed tools\/phase2\/e2e.*another way to forward a request/,run(e2eDetour('const u=new URL(req.url,origins.clinic);http.request(u,x=>x.pipe(res)).end();'))],
+      ['origins.core assigned after it is built',/^fail-closed tools\/phase2\/e2e.*origins is assigned/,run(edit(E2E,e2eBranch,'origins.core=origins.clinic;\n    '+e2eBranch))],
+      // the frontend list is walked: types/generated and every script extension count, a fixture goes through the same filter
+      ['a fetch in frontend/src/types/generated',/^fail-closed frontend\/src.*exactly one use of fetch.*types\/generated/,run({'frontend/src/types/generated/client.ts':"export const g = () => fetch('http://localhost:5101/api/appointments');"})],
+      ['a fetch in a .jsx file',/^fail-closed frontend\/src.*exactly one use of fetch.*legacy\.jsx/,run({'frontend/src/legacy.jsx':"export const g = () => fetch('/x');"})],
+      ['a fetch in a .mts file',/^fail-closed frontend\/src.*exactly one use of fetch.*tool\.mts/,run({'frontend/src/tool.mts':"export const g = () => fetch('/x');"})],
+      ['a computed member of the global object',/^fail-closed frontend\/src.*computed key/,run({'frontend/src/o.ts':"export const g = () => (globalThis as any)['fe'+'tch']('/x');"})],
+      ['another origin variable named like one (VITE_PROXY_HOST)',/^fail-closed frontend\/src.*one origin variable/,run({'frontend/src/o.ts':'export const h = import.meta.env.VITE_PROXY_HOST;'})],
+      // the directives the gateway server may hold
+      ['mirror in a gateway location',/^fail-closed deploy.*the directive mirror is not one the reader follows/,run(edit(SPLIT,CORE,'location /api/ { mirror /m; proxy_pass http://core; } location = /m { internal; proxy_pass http://clinic; }'))],
+      ['auth_request in a gateway location',/^fail-closed deploy.*the directive auth_request is not one/,run(edit(SPLIT,CORE,'location /api/ { auth_request /auth; proxy_pass http://core; } location = /auth { proxy_pass http://clinic; }'))],
+      ['proxy_cache in a gateway location',/^fail-closed deploy.*the directive proxy_cache is not one/,run(edit(SPLIT,CORE,'location /api/ { proxy_cache zone; proxy_pass http://core; }'))],
+      ['a block the reader does not know in a gateway location',/^fail-closed deploy.*the directive map \(a block\)/,run(edit(SPLIT,CORE,'location /api/ { map $x $y { default 1; } proxy_pass http://core; }'))],
+      ['mirror above the server (http level, inherited)',/^fail-closed deploy.*the directive mirror above the server/,run(edit(SPLIT,'proxy_http_version 1.1;','mirror /m;\n    proxy_http_version 1.1;'))],
+      ['error_page to /api above the server (http level, inherited)',/^fail-closed deploy.*error_page jumps to \/api\/appointments/,run(edit(SPLIT,'proxy_http_version 1.1;','error_page 404 /api/appointments;\n    proxy_http_version 1.1;'))],
+      ['error_page to a URL',/^fail-closed frontend\/nginx.*error_page jumps to http/,run(edit(TEMPLATE,'index index.html;','index index.html;\n    error_page 404 http://clinic-api:5101/;'))],
+      ['error_page that lands in a proxied location',/^fail-closed deploy.*lands in a proxied location/,run(edit(SPLIT,CORE,'location /api/ { proxy_pass http://core; error_page 404 /m; } location = /m { proxy_pass http://clinic; }'))],
+      // exceptions, the ignore list and the specs
+      ['an exception that routes to something that is not a service',/^exception .*routesTo is not a service/,run({},{exceptions:real.exceptions.map(e=>({...e,routesTo:'cor'}))})],
+      ['a sweep ignore listed twice',/^sweep ignore .*listed twice/,run({},{ignore:[...real.ignore,real.ignore[0]]})],
+      ['a second proxy in a file whose ignore names one',/^sweep ignore tools\/phase2\/billing\.test\.mjs: expected exactly one proxy/,run({[BILLING]:real.read(BILLING)+'\nawait fetch(base + req.url);\n'})],
+      ['the Clinic spec lists a path outside /api/, /internal/, /health and /metrics',/^openapi \(e\) \/pets/,run(json(CLINIC_SPEC,p=>{p['/pets']={get:{}};}))],
+      // exceptions
+      ['an exception for a prefix that is not a gateway route',/^exception .*prefix is not one of gatewayRoutes/,run({},{exceptions:[...real.exceptions,{place:SPLIT,prefix:'/api',routesTo:'core',until:'2026-11-20',reason:'a reason that is long enough'}]})],
+      ['an exception that waives a whole topology',/^exception .*prefix is not one of gatewayRoutes/,run(edit(SPLIT,'proxy_pass http://clinic;','proxy_pass http://core;'),{exceptions:[...real.exceptions,{place:SPLIT,prefix:'/api',routesTo:'core',until:'2026-11-20',reason:'a reason that is long enough'}]})],
+      ['an exception with a date more than 60 days away',/^exception .*more than 60 days/,run({},{exceptions:real.exceptions.map(e=>({...e,until:'2027-06-01'}))})],
+      ['an exception listed twice',/^exception .*duplicate exception/,run({},{exceptions:[...real.exceptions,...real.exceptions]})],
+      ['an exception with a day that does not exist',/^exception .*until is not a date/,run({},{exceptions:real.exceptions.map(e=>({...e,until:'2026-02-30'}))})],
+      // the OpenAPI files, both directions
+      ['the Clinic spec lists a path the gateway spec does not',/^openapi \(d\) \/api\/appointments\/secret/,run(json(CLINIC_SPEC,p=>{p['/api/appointments/secret']={get:{}};}))],
+      ['the gateway spec drops a path the Clinic spec still lists',/^openapi \(d\) \/api\/appointments\/calendar/,run(json('backend/openapi.json',p=>{delete p['/appointments/calendar'];}))],
+    ];
+    for(const [reason,tag,found] of fails)assert.ok(found.some(f=>tag.test(f)),'must fail ('+tag+'): '+reason+(found.length?'; got '+found[0]:'; got nothing'));
+    // must pass: text a careless parser misreads
+    const passes={
+      'a commented-out Clinic location':run(edit(TEMPLATE,'location /api/ {','# location ~ ^/api/appointments(/|$) { proxy_pass http://clinic; }\n    location /api/ {')),
+      'a comment with braces, a quote and a semicolon':run(edit(SPLIT,'location ~ ^/(internal',"# nothing; it's { odd\n        location ~ ^/(internal")),
+      'CRLF line endings, split example':run({[SPLIT]:real.read(SPLIT).replace(/\r?\n/g,'\r\n')}),
+      'CRLF line endings, compose template':run({[TEMPLATE]:real.read(TEMPLATE).replace(/\r?\n/g,'\r\n')}),
+      'an exact location = /metrics':run(edit(SPLIT,'location / { return 404; }','location = /metrics { return 404; } location / { return 404; }')),
+      'an exception on its last day':run({},{at:'2026-11-20'}),
+      'a sweep ignore on its last day':run({},{at:'2026-11-20'}),
+      'error_page 404 /index.html in the server (a single-page app)':run(edit(TEMPLATE,'index index.html;','index index.html;\n    error_page 404 /index.html;')),
+      'the same error_page above the server':run(edit(SPLIT,'proxy_http_version 1.1;','error_page 404 /index.html;\n    proxy_http_version 1.1;')),
+      'limit_except with deny in the gateway location':run(edit(SPLIT,CORE,'location /api/ { limit_except GET { deny all; } proxy_pass http://core; }')),
+      'a nginx ${name} variable in the split example (a plain file is not a JS template)':run(edit(SPLIT,CORE,'location /api/ { proxy_set_header X-Request-Id ${req_id}; proxy_pass http://core; }')),
+      'a comment with ${ in the split example':run(edit(SPLIT,'# Never enable','# costs ${ nothing\n    # Never enable')),
+      'a server-level if that only sets a variable':run(edit(SPLIT,'location ~ ^/(internal','if ($uri ~ ^/api/vacc) { set $z 1; }\n        location ~ ^/(internal')),
+      'a # inside a quoted add_header':run(edit(SPLIT,CORE,'add_header X "a # b"; '+CORE)),
+      'CRLF line endings in stack.mjs':run({[STACK]:real.read(STACK).replace(/\r?\n/g,'\r\n')}),
+      'a BOM at the start of the split example':run({[SPLIT]:'﻿'+real.read(SPLIT)}),
+      'frontend text: "Failed to fetch", a key named fetch, obj.fetch, VITE_APP_TITLE and a dev link on 5173':run({'frontend/src/utils/ok.ts':'export const offline = (e: Error) => e.message === "Failed to fetch";\nexport const opts = { fetch: false };\nexport const t = import.meta.env.VITE_APP_TITLE ?? "Pet";\nexport const dev = "http://localhost:5173/";\nexport const q = (c: any) => c.fetch();'}),
+      'a fetch inside a node_modules folder of frontend/src is not read':run({'frontend/src/node_modules/x.ts':"export const g = () => fetch('/x');"}),
+      'a regex written ~^/ with no space (the same location)':run(edit(SPLIT,'location ~ ^/api/(appointments','location ~^/api/(appointments')),
+      'a quoted regex and a quoted prefix (the same locations)':run(edits(SPLIT,[['location ~ ^/api/notifications(/|$)','location ~ "^/api/notifications(/|$)"'],['location /api/ {','location "/api/" {']])),
+      'listen with default_server and an IPv6 line in the one server':run(edit(TEMPLATE,'listen 8080;','listen 8080 default_server;\n    listen [::]:8080;')),
+      'listen 127.0.0.1:8080 with default_server':run(edit(SPLIT,'listen 127.0.0.1:8080;','listen 127.0.0.1:8080 default_server;')),
+      'an if with a 4xx return in the gateway location':run(edit(TEMPLATE,'location /api/ {','location /api/ {\n        if ($request_method = TRACE) { return 405; }')),
+      'a try_files fallback to a page':run(edit(TEMPLATE,'try_files $uri =404;','try_files $uri /404.html;')),
+      'the E2E forward written as a template literal to Core':run(edit(E2E,e2eForward,'fetch(`${origins.core}${req.url}`')),
+      'an image URL and a comment about fetch( in another frontend file':run({'frontend/src/ok.ts':"export const img = 'https://img.example/pet.png'; // fetch( and https://x.example/api/y are only a comment"}),
+    };
+    for(const [reason,found] of Object.entries(passes))assert.deepEqual(found,[],'must pass: '+reason+': '+found.join('; '));
+    // the selector follows nginx: = first, longest prefix, ^~ stops the regexes, then regexes in order, then the prefix
+    const pick=(conf,path)=>nginxRoute(nginxLocations('server { listen 1; '+conf+' }','1'),path)?.target??null;
+    const selector=[
+      ['= beats regex and prefix','location /a { proxy_pass P; } location ~ ^/a$ { proxy_pass R; } location = /a { proxy_pass E; }','/a','E'],
+      ['= is exact only','location /a { proxy_pass P; } location = /a { proxy_pass E; }','/a/b','P'],
+      ['the longest prefix wins, shorter first','location /a/ { proxy_pass S; } location /a/b/ { proxy_pass L; }','/a/b/c','L'],
+      ['the longest prefix wins, longer first','location /a/b/ { proxy_pass L; } location /a/ { proxy_pass S; }','/a/b/c','L'],
+      ['^~ stops the regexes','location ^~ /a/ { proxy_pass N; } location ~ ^/a/b { proxy_pass R; }','/a/b','N'],
+      ['a plain prefix loses to a regex','location /a/ { proxy_pass P; } location ~ ^/a/b { proxy_pass R; }','/a/b','R'],
+      ['the first matching regex wins','location ~ ^/a { proxy_pass R1; } location ~ ^/a/b { proxy_pass R2; }','/a/b','R1'],
+      ['~ is case-sensitive','location ~ ^/a { proxy_pass S; }','/A',null],
+      ['~* is not','location ~* ^/a { proxy_pass I; }','/A','I'],
+      ['the prefix answers when no regex matches','location /a/ { proxy_pass P; } location ~ ^/b { proxy_pass R; }','/a/x','P'],
+      ['nothing matches','location /a/ { proxy_pass P; }','/b',null],
+      ['a location without proxy_pass has no target','location /a/ { return 404; }','/a/x',null],
+    ];
+    for(const [reason,conf,path,want] of selector)assert.equal(pick(conf,path),want,'selector: '+reason);
+    const words=text=>nginxTokens(text).map(t=>t.v??t.t);
+    assert.deepEqual(words('a;# x\r\nb;# y'),['a',';','b',';'],'a comment ends at the line end, CRLF or LF');
+    assert.deepEqual(words("add_header X 'a; # kept'; # gone"),['add_header','X','a; # kept',';'],'a # inside quotes is text');
+    assert.deepEqual(words('proxy_pass http://h/a#b;'),['proxy_pass','http://h/a#b',';'],'a # inside a token is text');
+    assert.deepEqual(words("set $a x'y; # '\nb;"),['set','$a',"x'y",';','b',';'],'a quote inside a word is text, so the comment after it ends at its own line');
+    assert.deepEqual(words('set $a \\"y; # "\nb;'),['set','$a','\\"y',';','b',';'],'a backslash-quote at the start of a word is text too');
+    assert.deepEqual(words('x "a \\" # b" y'),['x','a " # b','y'],'a backslash inside a string escapes the quote');
+    assert.deepEqual(words('add_header X ${req_id}; return 404}'),['add_header','X','${req_id}',';','return','404}'],'${name} is one word and a } inside a word is text');
+    // the parser reads a location name and a listen port as nginx does
+    const names=[
+      [['/api/'],'','/api/'],[['='  ,'/a'],'=','/a'],[['=/a'],'=','/a'],[['^~/a'],'^~','/a'],[['~^/a'],'~','^/a'],[['~*^/a'],'~*','^/a'],[['~','^/a(/|$)'],'~','^/a(/|$)'],
+    ];
+    for(const [args,modifier,path] of names)assert.deepEqual(locationName(args),{modifier,path},'location '+args.join(' '));
+    for(const bad of [['@x'],['=','/a','/b'],['!','/a']])assert.throws(()=>locationName(bad),/named location|accept/,'location '+bad.join(' '));
+    const listens=[['8080','8080'],['127.0.0.1:8080','8080'],['*:8080','8080'],['[::]:8080','8080'],['localhost:8080','8080'],['127.0.0.1:${p}','${p}'],['${p}','${p}'],['127.0.0.1',null],['[::]',null],['unix:/tmp/x.sock',null]];
+    for(const [arg,port] of listens)assert.equal(listenPort(arg),port,'listen '+arg);
+    assert.deepEqual(nginxTokens('a "b ; {" \'\' c${x}d; }').map(t=>t.v??t.t),['a','b ; {','','c${x}d',';','}'],'quotes hold ; and {, ${…} stays in a word');
+    assert.throws(()=>nginxLocations('server { listen 1; location /a { proxy_pass x }','1'),/no ;|not closed/,'a block that is not closed');
+    assert.throws(()=>nginxLocations('server { listen 1; location /a { proxy_pass x; }','1'),/not closed/,'a server that is not closed');
+    // the JS reader: comments and strings, calls, the sweep
+    const commented="a('x//y'); // c\nb(/^\\/api\\//); /* d */ c(`//${'/*'}`)";
+    assert.equal(stripJsComments(commented).replace(/ +/g,' '),"a('x//y'); \nb(/^\\/api\\//); c(`//${'/*'}`)",'comments blanked, a // inside a string, a regex or a template stays');
+    assert.equal(stripJsComments(commented).length,commented.length,'every offset stays');
+    assert.equal(fetchUses("const m = 'Failed to fetch'; const o = { fetch: false }; obj.fetch(1); globalThis.fetch(2); fetch(3); // fetch\nconst t = `${fetch(4)} fetch`; /fetch/.test(x); window . fetch(5);").length,4,'fetch counts as code only: not in a string, a comment, a regex, as a key or as obj.fetch');
+    assert.deepEqual(fetchCalls("window.fetch(`${a}/x`, {m:(1,2)}); prefetch(1); fetch(b + c)").map(c=>c.arg),['`${a}/x`','b+c'],'fetch calls with their first argument');
+    assert.deepEqual(callArguments('f(a, [1,2], g(3,4), "x,y")',1).args,['a',' [1,2]',' g(3,4)',' "x,y"'],'call arguments split at top-level commas');
+    const tree={'/r':['phase2-plan','tools','a.json'],'/r/phase2-plan':['evidence','plan.json'],'/r/phase2-plan/evidence':['k.conf'],'/r/tools':['evidence','c.conf','node_modules'],'/r/tools/evidence':['b.conf'],'/r/tools/node_modules':['z.conf']};
+    const fakeFs={readdirSync:dir=>tree[dir.replaceAll('\\','/')].map(name=>({name,isDirectory:()=>(dir.replaceAll('\\','/')+'/'+name) in tree})),statSync:()=>({size:1})};
+    assert.deepEqual(sweepFiles('/r',fakeFs).sort(),['a.json','phase2-plan/plan.json','tools/c.conf','tools/evidence/b.conf'],'the sweep skips phase2-plan/evidence by its path, and a directory called evidence elsewhere is swept');
+    return real.places.length+' places, '+analyze(contracts,real).probes.length+' probes, '+real.exceptions.length+' exceptions ('+exceptionDays(today,real).join('; ')+'); no proxy outside the places or the ignore list; '+fails.length+' must-fail, '+Object.keys(passes).length+' must-pass and '+(selector.length+7+names.length+3+listens.length+9)+' parser fixtures';
+  }),error=>rule('gateway-routes-single-source',()=>{throw error;}));
+
 await envelopeCheck;
+await routingCheck;
 await lifecycleCheck;
 await grantsCheck;
 await permissionCheck;
@@ -1048,4 +1314,4 @@ await categoryCheck;
 const failed=results.filter(r=>r.status!=='PASS');
 for(const r of results)process.stdout.write(`${r.status.padEnd(4)} ${r.rule}${r.detail?' — '+r.detail:''}\n`);
 if(failed.length)process.exitCode=1;
-else process.stdout.write(`Architecture rules PASS (${results.length} rules): service layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, Clinic routes declare their scope, no duplicated service modules, Clinic HTTP calls confined, shared packages without business routes, services declare limit rules, structure ratchet, Core module map, legacy isolation, negative fixtures.\n`);
+else process.stdout.write(`Architecture rules PASS (${results.length} rules): service layering, event contracts, gateway exposure, runtime grants, permission matrix, shared OpenAPI schemas, notification tabs, deferred reads, Clinic routes declare their scope, no duplicated service modules, Clinic HTTP calls confined, shared packages without business routes, services declare limit rules, structure ratchet, Core module map, legacy isolation, gateway routes from one source, negative fixtures.\n`);
