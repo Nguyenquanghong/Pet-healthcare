@@ -35,17 +35,21 @@ const CORE_APP='backend/src/composition/coreApp.ts';
 const MAX_DAYS=60;
 const SERVICES=['core','clinic','notification'];
 
-// The places. `topology` is a key of gatewayTopologies: core-ingress sends every /api path to Core; direct sends each owned prefix
-// straight to its service. `template` picks the nginx text out of a JS file (exactly one match; `outsideProxyPass` proxy_pass
-// elsewhere in the file are allowed, for text the reader does not follow); `port` picks the server block by its `listen` port (a number
-// or a listed `${...}`); `interp` lists the `${...}` of a JS template that may appear in the gateway server (`as`: the nginx text the
-// reader parses in its place, none = the `${...}` itself); `targets` turns a proxy_pass argument into a service.
+// The places (nine). `id` names a place and is the file it reads, unless `file` says otherwise: stack.mjs holds two gateway templates
+// (the bridge study's direct and core-ingress topologies), so it is two places, `stack.mjs#direct` and `stack.mjs#core-ingress`, with the
+// same `file` and a `template` each; places that share a file must have different templates. `topology` is a key of gatewayTopologies:
+// core-ingress sends every /api path to Core; direct sends each owned prefix straight to its service. `template` picks the nginx text
+// out of a JS file (exactly one match; `outsideProxyPass` proxy_pass elsewhere in the file are allowed, for text the reader does not
+// follow: the other template and the Core edge of stack.mjs); `port` picks the server block by its `listen` port (a number or a listed
+// `${...}`); `interp` lists the `${...}` of a JS template that may appear in the gateway server (`as`: the nginx text the reader
+// parses in its place, none = the `${...}` itself); `targets` turns a proxy_pass argument into a service.
 const PAUSED=String.raw`paused?'if ($request_method !~ ^(GET|HEAD|OPTIONS)$) {return 503 \'{"error":"Migration maintenance; retry later."}\';}':''`;
 const PAUSED_AS=String.raw`if ($request_method !~ ^(GET|HEAD|OPTIONS)$) {return 503 '{"error":"Migration maintenance; retry later."}';}`;
 export const ROUTING_PLACES=[
   {id:'frontend/nginx/default.conf.template',kind:'nginx',topology:'core-ingress',port:'8080',targets:[[/^http:\/\/api:\$\{API_PORT\}$/,'core']]},
   {id:'deploy/phase2/nginx.split.conf.example',kind:'nginx',topology:'direct',port:'8080',targets:[[/^http:\/\/core$/,'core'],[/^http:\/\/clinic$/,'clinic'],[/^http:\/\/notification$/,'notification']]},
-  {id:'benchmarks/phase2/kaggle/stack.mjs',kind:'nginx',topology:'direct',template:/const config=`([^`]*)`/,outsideProxyPass:1,port:'${ports.gateway}',interp:[{expr:'ports.gateway'},{expr:'headers',as:''},{expr:'coreGateway',as:''},{expr:'origins.notification'}],targets:[[/^http:\/\/core$/,'core'],[/^http:\/\/clinic$/,'clinic'],[/^\$\{origins\.notification\}$/,'notification']]},
+  {id:'benchmarks/phase2/kaggle/stack.mjs#direct',file:'benchmarks/phase2/kaggle/stack.mjs',kind:'nginx',topology:'direct',template:/const directConfig=`([^`]*)`/,outsideProxyPass:3,port:'${ports.gateway}',interp:[{expr:'ports.gateway'},{expr:'headers',as:''},{expr:'coreGateway',as:''},{expr:'origins.notification'}],targets:[[/^http:\/\/core$/,'core'],[/^http:\/\/clinic$/,'clinic'],[/^\$\{origins\.notification\}$/,'notification']]},
+  {id:'benchmarks/phase2/kaggle/stack.mjs#core-ingress',file:'benchmarks/phase2/kaggle/stack.mjs',kind:'nginx',topology:'core-ingress',template:/const coreIngressConfig=`([^`]*)`/,outsideProxyPass:5,port:'${ports.gateway}',interp:[{expr:'ports.gateway'},{expr:'headers',as:''},{expr:'coreGateway',as:''}],targets:[[/^http:\/\/core$/,'core']]},
   {id:'tools/phase2/resilience.test.mjs',kind:'nginx',topology:'direct',template:/const config=`([^`]*)`/,port:'${edge}',interp:[{expr:'edge'},{expr:'n'}],targets:[[/^http:\/\/core$/,'core'],[/^http:\/\/clinic$/,'clinic'],[/^http:\/\/127\.0\.0\.1:\$\{n\}$/,'notification']]},
   {id:'tools/phase2/p7-rehearsal.test.mjs',kind:'nginx',topology:'core-ingress',template:/const config=`([^`]*)`/,port:'${ports.gateway}',interp:[{expr:'ports.gateway'},{expr:'upstream'},{expr:'marker',as:'m'},{expr:PAUSED,as:PAUSED_AS}],targets:[[/^\$\{upstream\}$/,'core']]},
   {id:'tools/phase2/e2e-server.mjs',kind:'js-proxy',topology:'core-ingress'},
@@ -54,9 +58,7 @@ export const ROUTING_PLACES=[
 ];
 // A place may differ from its topology for a reason and until a date (UTC, inclusive; the day after, the rule fails; at most 60 days
 // ahead). The prefix is one of gatewayRoutes and routesTo a service. An exception that no longer differs is stale and fails as well.
-export const ROUTING_EXCEPTIONS=[
-  {place:'benchmarks/phase2/kaggle/stack.mjs',prefix:'/api/dashboard/clinic',routesTo:'core',until:'2026-11-20',reason:'The bridge study measured /api/dashboard/clinic through Core and the H-M numbers were taken that way; K9 changes the harness (H3 direct, H3c through Core) and this exception goes stale (ADR-P14 4.1, K5 Q3).'},
-];
+export const ROUTING_EXCEPTIONS=[];
 // Files with a proxy that are not places: text that only quotes a config, or a hop that is not the /api gateway. An entry with
 // `until` is a debt: after that date it fails like an exception; one that no longer holds a proxy is stale; `only` narrows it to the
 // one proxy it names (a second one fails); a file is listed once.
@@ -64,7 +66,6 @@ export const PROXY_SWEEP_IGNORE=[
   {file:'tools/phase2/check-architecture-rules.mjs',reason:'the rule and its fixtures'},
   {file:'tools/phase2/gateway-routing.mjs',reason:'the reader and its patterns'},
   {file:'tools/phase2/billing.test.mjs',only:'fetch(clinicBases[0]+req.url',reason:'a stand-in for the private Core to Clinic billing hop (CLINIC_SERVICE_URL), which carries no /api gateway traffic'},
-  {file:'benchmarks/phase2/kaggle/test_bridge_study.py',reason:'locks the text of stack.mjs; K9 rewrites both together',until:'2026-11-20'},
 ];
 
 // ---- JS text ----------------------------------------------------------------------------
@@ -540,7 +541,9 @@ export function analyze(contracts,io){
   for(const place of io.places){
     let table;
     try{
-      table=READERS[place.kind](place,io.read(place.id),probes,io,contracts.gatewayRoutes);
+      const twin=io.places.find(o=>o!==place&&(o.file??o.id)===(place.file??place.id)&&String(o.template)===String(place.template));
+      if(twin)throw new Error('shares the file '+(place.file??place.id)+' with '+twin.id+' and has the same template; places that share a file need different templates');
+      table=READERS[place.kind](place,io.read(place.file??place.id),probes,io,contracts.gatewayRoutes);
       if(table['/api/pets']!=='core')throw new Error('/api/pets goes to '+table['/api/pets']+', not core');
     }catch(error){
       errors.push('fail-closed '+place.id+': '+error.message);
@@ -549,7 +552,7 @@ export function analyze(contracts,io){
     tables[place.id]=table;
     diffs[place.id]=probes.filter(p=>table[p]!==(place.topology==='direct'?contracts.routeOwner(p):'core')).map(p=>({probe:p,actual:table[p],expected:place.topology==='direct'?contracts.routeOwner(p):'core'}));
   }
-  const placeIds=new Set(io.places.map(p=>p.id)),ignored=new Set(io.ignore.map(e=>e.file));
+  const placeIds=new Set(io.places.map(p=>p.file??p.id)),ignored=new Set(io.ignore.map(e=>e.file));
   const unlisted=io.sweep().filter(f=>!placeIds.has(f)&&!ignored.has(f)&&PROXY.test(io.read(f)));
   const variants=new Set(Object.values(tables).map(t=>JSON.stringify(probes.map(p=>t[p])))).size;
   return {probes,paths,spec,errors,tables,diffs,unlisted,variants};
