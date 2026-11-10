@@ -98,7 +98,7 @@ try {
   console.log('Building shared Docker layers; project '+project);
   appendFileSync(log,await compose('build','api','migrate','notification-api','notification-migrate','notification-worker','core-outbox',...(strict?['clinic-api','clinic-migrate','clinic-worker','core-billing']:[])));
   console.log('Starting isolated Compose stack');
-  appendFileSync(log,await compose('up','-d','--no-build','--pull','never','--wait','--wait-timeout','150','api','core-outbox','notification-worker',...(strict?['clinic-worker','core-billing']:[])));
+  appendFileSync(log,await compose('up','-d','--no-build','--pull','missing','--wait','--wait-timeout','150','api','core-outbox','notification-worker',...(strict?['clinic-worker','core-billing']:[])));
   for(const service of ['postgres','notification-postgres','rabbitmq','api','notification-api','core-outbox','notification-worker',...(strict?['clinic-postgres','clinic-api','clinic-worker','core-billing','redis']:[])])await owned(service);
   for(const service of ['postgres','notification-postgres',...(strict?['clinic-postgres']:[])]) {
     const expected=dbName(service)+'|'+dbUser(service);

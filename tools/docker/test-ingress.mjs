@@ -91,7 +91,7 @@ try {
     assert.equal(config.networks.default.ipam.config[0].subnet, prefix + '.0/24');
   });
   appendFileSync(log, await compose('build', 'api', 'migrate', 'notification-api', 'notification-migrate', 'notification-worker', 'core-outbox', 'clinic-api', 'clinic-migrate', 'clinic-worker', 'core-billing', 'frontend'));
-  appendFileSync(log, await compose('up', '-d', '--no-build', '--pull', 'never', '--wait', '--wait-timeout', '240', 'api', 'core-outbox', 'notification-worker', 'clinic-worker', 'core-billing', 'frontend'));
+  appendFileSync(log, await compose('up', '-d', '--no-build', '--pull', 'missing', '--wait', '--wait-timeout', '240', 'api', 'core-outbox', 'notification-worker', 'clinic-worker', 'core-billing', 'frontend'));
   for (const id of (await compose('ps', '-q')).trim().split(/\s+/)) {
     const [container] = JSON.parse(await docker(['inspect', id]));
     assert.equal(container.Config.Labels['com.docker.compose.project'], project);
