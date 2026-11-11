@@ -15,9 +15,30 @@ services/*/src/generated/
 playwright-report/
 test-results/
 __pycache__/
-MANUAL_TEST_CHECKLIST.md
-# Keep phase 2 handoff instructions despite machine-local *.md exclusions.
-!phase2-plan/*.md
-!phase2-plan/evidence/*.md
-!deploy/phase2/*.md
-!tools/vendor/braces/PATCH-NOTES.md
+
+# Raw measurement data and local build output: large, and specific to the machine that produced it.
+# A clone that generates or receives it must not commit it (this list used to live only in one clone's .git/info/exclude).
+/backend/target/
+/benchmarks/phase2/*.bin
+/benchmarks/phase2/*.zip
+/benchmarks/phase2/Results/K2-result/
+/benchmarks/phase2/Results/K3-result/
+/benchmarks/phase2/Results/k2v2-result/
+/benchmarks/phase2/Results/k3v2-result/
+/benchmarks/phase2/Results/realk2v2/
+/benchmarks/phase2/Results/Heavy query 1/
+/benchmarks/phase2/Results/pcn 1/
+/benchmarks/phase2/Results/bridge*/
+/benchmarks/phase2/Results/clinic-activity-*/
+/benchmarks/phase2/Results/cqrs-list-*/
+/phase2-plan/cqrs/list-study/k2-479455b5/
+/phase2-plan/cqrs/list-study/k3-8804fb3c/
+/phase2-plan/cqrs/list-study/combine-k2-k3-20261022.json
+/phase2-plan/cqrs/list-study/k2v2-*/
+/phase2-plan/cqrs/list-study/k3v2-*/
+/phase2-plan/cqrs/list-study/combine-v2-*.json
+/phase2-plan/cqrs/final/kf-*/
+/phase2-plan/cqrs/final/combine-*.json
+/phase2-plan/evidence/arch-metrics-*/
+/phase2-plan/evidence/k*-gates-*/
+
