@@ -1,0 +1,19 @@
+# ADR-CQRS-02 — Schema, version và hydrate cùng Clinic DB
+
+Ngày 14/10/2026, cập nhật 15/10. **IMPLEMENTED Q2 trong trial**; evidence và giới hạn (`q2-projector.md`). Q1 không thay schema; Q2 thêm hai migration additive, registry/event/projector và kiểm PostgreSQL/RabbitMQ thật. Chưa phục vụ query từ projection.
+
+Chọn event báo thay đổi `clinic.appointment-read-changed.v1`, không dùng notification làm nguồn appointment và không Event Sourcing. Event chỉ có appointmentId/sourceVersion/deleted, ràng buộc ID/version với envelope, không note/PII/bệnh án. Worker Clinic đọc nguồn của chính Clinic; ghi version của snapshot đã hydrate, không gắn version message cũ vào dữ liệu mới.
+
+`ClinicReadRevision` khóa `(kind, aggregateId)`, kind appointment, version Int độc lập `statusRevision`, phạm vi 1..2147483647. Khởi tạo row lịch sử ở version 1 dưới freeze; actual mutation tăng một lần cùng source+outbox, no-op/dedup không tăng. Chạm giới hạn phải từ chối mutation và rollback, không wrap/reset; Q2 bắt buộc test overflow. Tombstone registry không bị FK cascade khi nguồn xóa; không tự thêm API delete.
+
+`AppointmentReadRow` khóa `(generation, appointmentId)`, có sourceVersion/deletedAt/projectedAt; allowlist source gồm petId, ownerId, doctorId, type, serviceName, clinicName, appointmentDate, appointmentTime, status, statusRevision, ownerNote, internalNote, createdBy, createdAt, updatedAt. Thêm billingHeld/billingInvoiced từ AppointmentReservation thật. Date/type/status giữ schema/enum Clinic; JSON dùng serializer hiện tại (date/time alias, Dates→ISO, internalNote chỉ staff). Không copy owner/pet name/email/phone vào row; related vẫn lấy Core. Không copy medical/image DTO hoặc counter tổng hợp.
+
+Chọn reuse `InboxEvent` với consumerName `clinic-read-v1:<generation UUID>` và eventId; độc lập `clinic-v1`. Generation có BUILDING/READY/ACTIVE/RETIRED và control pointer; read rows+projection inbox cùng transaction. Queue/DLQ `clinic-read-v1` riêng chỉ bind event mới, không tranh directory/billing. Schema/topology/validator này đã implement Q2.
+
+Thứ tự writer giữ khóa hiện tại: dedup hoặc inbox key nếu có → appointment/source lock → reservation/history/source writes → revision registry → outbox, cùng commit. Projector khóa registry một aggregate, đọc nguồn bằng MVCC **không khóa source row**, dùng ReadCommitted, giữ registry tới commit inbox/read row. Writer chưa có registry row và concurrent create phải retry nguyên transaction theo unique/locking protocol được Q2 kiểm. Nếu implementation dùng RepeatableRead, serialization retry phải mở transaction mới. Không đảo thành registry→source FOR UPDATE hoặc khóa nhiều aggregate không có thứ tự xác định.
+
+Registry lock bảo vệ snapshot/version vì writer không thể commit source+revision khi chưa lấy khóa đó. Q2 phải chứng minh bằng PostgreSQL race thật, kể cả prepare/terminal HTTP và inbox, no-op, completion, crash/rollback, delayed commit. Trước proof không bật projection. Index được chọn theo query profile/EXPLAIN, chưa tạo index dự đoán hàng loạt. Inventory (`writer-query-inventory.md`) và thiết kế (`../01-design.md`) là đầu vào.
+
+Q2 đã kiểm các race/crash nói trên trong trial. Projector lấy thêm control FOR SHARE sau registry để giữ tập generation trong transaction; Q3 operator thay generation phải tuân thủ control lock/freeze/drain. Runtime có UPDATE riêng cột `lockAnchor` (CHECK true) để PostgreSQL cho phép row lock, không có quyền đổi pointer/mode. Thu hồi runtime phải revoke cả grant cấp cột. Ca P7 non-owner kiểm thực thi projector và quyền này.
+
+Initial adoption/backfill registry dùng source SQL fence; không tạo snapshot lịch sử đầy đủ hoặc activate generation. Import P7 từ chối khi projection đã khởi tạo; muốn nhập lại phải dùng quy trình rebuild được giao riêng ở Q3. Không reset registry/tombstone để import tiếp.
