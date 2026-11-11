@@ -1,5 +1,6 @@
 """Offline checks for the M/H bridge studies (Kaggle v1 and VM v1): booking grid, ABBA and balanced-order grading,
-member metrics, VM configurations and pinning, archive validation."""
+member metrics, VM configurations and pinning, archive validation, and the harness the VM study runs on: worker layouts, Prisma pool,
+application_name, the pg_stat_activity sampler, 800 owners."""
 import base64
 import hashlib
 import importlib.util
@@ -9,6 +10,7 @@ import math
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import tempfile
 import types
@@ -154,8 +156,32 @@ class Booking(unittest.TestCase):
                                    'notifications': 1, 'appointment': 2, 'rescue': 1})
         self.assertIs(dict((t.__name__, t) for t in bl.PcnUser.tasks)['appointment'], bl.appointment)
 
+    def test_the_booking_grid_gives_800_owners_a_slot_each_after_the_fixture_visits(self):
+        # Load without locust: the module only needs the adapter's names, so a stub stands in for them.
+        class Stub:
+            def appointment(self):
+                pass
 
-TRUE_P95 = {'M': 10.0, 'H0': 50.0, 'H1': 40.0, 'H2': 30.0}
+            def rescue(self):
+                pass
+
+            def on_start(self):
+                pass
+            tasks = [appointment, rescue]
+        legacy = types.SimpleNamespace(PcnUser=Stub, USERS=[{}] * 800)
+        with patch.dict(sys.modules, {'pcn_locust': types.SimpleNamespace(legacy=legacy)}):
+            spec = importlib.util.spec_from_file_location('bridge_locust_800', HERE / 'bridge_locust.py')
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        # Each user books at index round * users + its own offset; 60 rounds of 800 is more than a 300 s window at 800 users books.
+        slots = [module.booking(number * 800 + offset) for number in range(60) for offset in range(800)]
+        self.assertEqual(len(set(slots)), len(slots))  # no slot twice, so none is full and no pet overlaps its own booking
+        self.assertGreater(min(day for day, _ in slots), '2098-12-31')  # after the fixture visits (2098-01-01 .. 2098-02-12) and stays (to 2098-07-10)
+        self.assertLess(max(day for day, _ in slots), '2200-01-01')
+        self.assertEqual({t for _, t in slots}, {f'{m // 60:02d}:{m % 60:02d}' for m in range(480, 1021, 30)})  # the 19 slots of 08:00-17:00
+
+
+TRUE_P95 ={'M': 10.0, 'H0': 50.0, 'H1': 40.0, 'H2': 30.0}
 TRUE_CPU = {'M': 0.5, 'H0': 2.0, 'H1': 1.6, 'H2': 1.6}
 
 
@@ -490,6 +516,76 @@ class HarnessSource(unittest.TestCase):
             self.assertEqual(config.count('worker_connections'), 1)
         self.assertNotIn('worker_connections 1024', self.text)
 
+    def test_core_layouts_are_exact_and_the_context_must_name_the_one_the_tree_has(self):
+        self.assertIn("const CORE_LAYOUTS={workers:{notification:'backend/dist/src/workers/notification.js',billing:'backend/dist/src/workers/billing.js'},"
+                      "phase2:{notification:'backend/dist/src/phase2/notificationWorker.js',billing:'backend/dist/src/phase2/billingWorker.js'}};", self.text)
+        self.assertIn("const coreLayout=context.coreLayout??'workers';", self.text)  # absent in every older context: the tree of today
+        self.assertRegex(self.text, r"import \{[^}]*\bexistsSync\b[^}]*\} from 'node:fs';")
+        self.assertIn('const builtLayouts=Object.keys(CORE_LAYOUTS).filter(name=>Object.values(CORE_LAYOUTS[name]).every(file=>existsSync(file)));', self.text)
+        # Exactly one layout is built, and it is the one the context names; checked before any database is touched.
+        self.assertIn('assert.deepEqual(builtLayouts,[coreLayout],', self.text)
+        self.assertLess(self.text.index('assert.deepEqual(builtLayouts'), self.text.index('const clients='))
+        # Both Core workers take their path from the table: each path is written once.
+        self.assertIn("await child('core-outbox',CORE_LAYOUTS[coreLayout].notification,{", self.text)
+        self.assertIn("await child('billing-worker',CORE_LAYOUTS[coreLayout].billing,{", self.text)
+        self.assertEqual(self.text.count('backend/dist/src/workers/'), 2)
+        self.assertEqual(self.text.count('backend/dist/src/phase2/'), 2)
+        self.assertIn('coreLayout,dbPoolLimit,coreUpstream:', self.text)  # ready.json.gateway records both
+
+    def test_the_layout_paths_exist_in_the_trees_they_name(self):
+        table = dict((name, (n, b)) for name, n, b in re.findall(r"(workers|phase2):\{notification:'([^']+)',billing:'([^']+)'\}", self.text))
+        self.assertEqual(set(table), {'workers', 'phase2'})
+        source = lambda built: re.sub(r'\.js$', '.ts', built.replace('/dist/', '/'))
+        if not (HERE.parents[2] / 'backend/src/workers').is_dir():
+            self.skipTest('product source not in this tree')
+        for built in table['workers']:
+            self.assertTrue((HERE.parents[2] / source(built)).is_file(), built)  # H3, the tree of today
+        for built in table['phase2']:
+            self.assertFalse((HERE.parents[2] / source(built)).exists(), built)  # exactly one layout in a tree
+        try:  # H1, 2841d1b: the tree before backend/src/phase2 was split up
+            listing = nb.git('ls-tree', '-r', '--name-only', '2841d1b', 'backend/src/phase2', 'backend/src/workers').decode().split()
+        except (OSError, nb.subprocess.CalledProcessError):
+            self.skipTest('commit 2841d1b not available here')
+        for built in table['phase2']:
+            self.assertIn(source(built), listing)
+        self.assertFalse([name for name in listing if name.startswith('backend/src/workers/')])
+
+    def test_the_prisma_pool_comes_from_the_context_between_4_and_8(self):
+        self.assertIn('const dbPoolLimit=context.dbPoolLimit??4;', self.text)  # absent in every older context: 4
+        self.assertIn('Number.isInteger(dbPoolLimit)&&dbPoolLimit>=4&&dbPoolLimit<=8', self.text)
+        self.assertLess(self.text.index('const dbPoolLimit='), self.text.index('const clients='))
+        self.assertIn('DB_POOL_LIMIT:String(dbPoolLimit),', self.text)
+        self.assertNotIn("DB_POOL_LIMIT:'4'", self.text)
+        # The CQRS studies keep today's layout and the pool of 4.
+        self.assertIn("assert.equal(coreLayout,'workers');assert.equal(dbPoolLimit,4);", self.text)
+
+    def test_every_process_names_its_database_connections_after_itself(self):
+        self.assertIn("const withApplicationName=(url,name)=>{const u=new URL(url);u.searchParams.set('application_name','p8-'+name);return u.toString();};", self.text)
+        self.assertIn('if(env.DATABASE_URL)env.DATABASE_URL=withApplicationName(env.DATABASE_URL,name);', self.text)
+        self.assertIn('spawn(process.execPath,[file],{env,stdio:', self.text)
+        # The name is the one of the process (p8-core, or p8-core-0 and p8-core-1; p8-clinic-0, p8-clinic-1; p8-notification-worker ...), never one per kind of service.
+        calls = re.findall(r"child\(((?:'[a-z-]+'|coreReplicas===1\?'core':'core-'\+i|'clinic-'\+i)),", self.text)
+        self.assertEqual(calls, ["'clinic-read-worker'", "coreReplicas===1?'core':'core-'+i", "'clinic-'+i", "'notification'", "'core-outbox'",
+                                 "'clinic-worker'", "'notification-worker'", "'billing-worker'"])
+        self.assertEqual(self.text.count('DATABASE_URL:context.urls.'), len(calls))  # every one of them is given a database URL to name
+        self.assertEqual(self.text.count('withApplicationName('), 1)  # one call, in child(), for every process
+        self.assertEqual(native_stack.PgSampler.QUERY.count("'^(p8-|m-api$)'"), 1)  # what the sampler looks for: these names and the monolith's
+
+    def test_the_database_url_function_of_the_services_keeps_the_application_name_and_the_engine_knows_it(self):
+        config = HERE.parents[2] / 'packages/runtime/src/config.ts'
+        if not config.is_file():
+            self.skipTest('product source not in this tree')
+        text = config.read_text(encoding='utf-8')
+        # databaseUrl() starts from the URL it is given and sets these three only: any other parameter, application_name, stays as given.
+        self.assertRegex(text, r'url = new URL\(value\);')
+        self.assertEqual(sorted(re.findall(r"url\.searchParams\.set\('(\w+)'", text)), ['connect_timeout', 'connection_limit', 'pool_timeout'])
+        self.assertRegex(text, r"integer\('DB_POOL_LIMIT',\s*4,\s*1,\s*32\)")
+        engines = [p for pattern in ('libquery_engine*.node', 'query_engine*.node') for p in (HERE.parents[2] / 'node_modules/@prisma/engines').glob(pattern)]
+        if not engines:
+            self.skipTest('no Prisma query engine installed here')
+        # The connection string of the engine reads application_name (quaint's PostgreSQL URL); a string search, not a connection.
+        self.assertIn(b'application_name', engines[0].read_bytes())
+
     def test_core_upstreams_instances_and_the_internal_hop(self):
         self.assertEqual(self.text.count('upstream core { ${coreServers} }'), 2)  # one per template
         self.assertEqual(self.text.count(self.CORE_LOCATION), 2)
@@ -569,6 +665,289 @@ class HarnessSource(unittest.TestCase):
     def test_shell_scripts_are_lf_in_the_repository(self):
         attributes = (HERE.parents[2] / '.gitattributes').read_text(encoding='utf-8').splitlines()
         self.assertIn('*.sh text eol=lf', attributes)
+
+
+def activity_text(samples):
+    """What PgSampler's psql writes: per sample one `epoch|name|busy|total` row for each application and a `*` row."""
+    lines = []
+    for moment, rows in samples:
+        lines += [f'{moment:.3f}|{name}|{busy}|{total}' for name, (busy, total) in rows.items()] + [f'{moment:.3f}|*|0|0', '']
+    return '\n'.join(lines) + '\n'
+
+
+SAMPLES = [(100.0, {'p8-core': (4, 4), 'p8-clinic-0': (1, 3)}),
+           (100.2, {'p8-core': (4, 4)}),  # p8-clinic-0 has no connection in this sample
+           (100.4, {'p8-core': (2, 4), 'p8-clinic-0': (2, 3)}),
+           (100.6, {'p8-core': (4, 4), 'p8-clinic-0': (0, 3)}),
+           (100.8, {'p8-core': (1, 1)})]  # the last sample is dropped: the stop can cut it short
+
+
+class OwnedStackOptions(unittest.TestCase):
+    """800 owners, the worker layout and the Prisma pool reach NativeStack and its context."""
+
+    def stack(self, **kwargs):
+        with patch('native_stack.platform.system', return_value='Linux'), patch('native_stack.Path.mkdir'):
+            return native_stack.NativeStack(REPO, **kwargs)
+
+    def test_pcn_takes_800_owners_and_the_other_profiles_keep_their_limits(self):
+        for kwargs in ({'accounts': 2, 'dataset_profile': 'pcn'}, {'accounts': 800, 'dataset_profile': 'pcn'}, {'accounts': 40},
+                       {'accounts': 100, 'dataset_profile': 'query-heavy'}):
+            self.stack(**kwargs)
+        for kwargs in ({'accounts': 801, 'dataset_profile': 'pcn'}, {'accounts': 1, 'dataset_profile': 'pcn'}, {'accounts': 2.0, 'dataset_profile': 'pcn'},
+                       {'accounts': 41}, {'accounts': 800, 'dataset_profile': 'query-heavy'}, {'accounts': 99, 'dataset_profile': 'query-heavy'},
+                       {'accounts': 100, 'dataset_profile': 'unknown'}):
+            with self.assertRaises(ValueError, msg=str(kwargs)):
+                self.stack(**kwargs)
+        self.assertEqual(native_stack.MAX_ACCOUNTS, {'deep': 40, 'pcn': 800, 'query-heavy': 100})
+
+    def test_layout_and_pool_default_to_today_and_are_validated(self):
+        plain = self.stack(accounts=2, dataset_profile='pcn')
+        self.assertEqual((plain.core_layout, plain.db_pool_limit), ('workers', 4))
+        for layout, pool in (('phase2', 4), ('workers', 8), ('phase2', 8), ('workers', 6)):
+            built = self.stack(accounts=2, dataset_profile='pcn', core_layout=layout, db_pool_limit=pool, core_proxy=True)
+            self.assertEqual((built.core_layout, built.db_pool_limit), (layout, pool))
+        for kwargs in ({'core_layout': 'other'}, {'core_layout': None}, {'db_pool_limit': 3}, {'db_pool_limit': 9}, {'db_pool_limit': '4'},
+                       {'db_pool_limit': 4.0}, {'db_pool_limit': True}):
+            with self.assertRaises(ValueError, msg=str(kwargs)):
+                self.stack(**{'accounts': 2, 'dataset_profile': 'pcn', **kwargs})
+        # Only the bridge study (pcn profile, no CQRS configuration) leaves the defaults.
+        for kwargs in ({'dataset_profile': 'pcn', 'cqrs_configuration': 'O', 'core_layout': 'phase2'},
+                       {'dataset_profile': 'pcn', 'cqrs_configuration': 'F', 'db_pool_limit': 8},
+                       {'dataset_profile': 'deep', 'core_layout': 'phase2'}, {'dataset_profile': 'deep', 'db_pool_limit': 8},
+                       {'dataset_profile': 'query-heavy', 'accounts': 100, 'db_pool_limit': 8}):
+            with self.assertRaises(ValueError, msg=str(kwargs)):
+                self.stack(**{'accounts': 2, **kwargs})
+        self.stack(accounts=2, dataset_profile='pcn', cqrs_configuration='O', core_layout='workers', db_pool_limit=4)
+
+    def test_the_context_stack_mjs_reads_carries_both(self):
+        import inspect
+        start = inspect.getsource(native_stack.NativeStack.start)
+        self.assertIn("'coreLayout': self.core_layout, 'dbPoolLimit': self.db_pool_limit", start)
+
+    def test_the_sampler_connects_to_the_cluster_of_the_stack(self):
+        stack = self.stack(accounts=2, dataset_profile='pcn')
+        stack.pg_port = 5444
+        sampler = stack.pg_sampler('activity.txt')
+        self.assertEqual(sampler.command[sampler.command.index('-h') + 1], str(stack.private))
+        self.assertEqual(sampler.command[sampler.command.index('-p') + 1], '5444')
+        self.assertEqual(sampler.output, Path('activity.txt'))
+
+
+class PgSampling(unittest.TestCase):
+    def test_the_summary_skips_junk_and_the_last_sample_and_counts_missing_rows_as_zero(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'activity.txt'
+            path.write_text('Thu 12 Nov 2026 (every 0.2s)\n' + activity_text(SAMPLES) + '100.9|p8-cl', encoding='utf-8')  # a cut-off line at the end
+            summary = native_stack.read_activity(path, pool_limit=4)
+            self.assertEqual((summary['samples'], summary['first_s'], summary['last_s'], summary['pool_limit']), (4, 100.0, 100.6, 4))
+            core, clinic = summary['applications']['p8-core'], summary['applications']['p8-clinic-0']
+            self.assertEqual((core['busy_max'], core['busy_mean'], core['total_max'], core['at_pool_limit_share']), (4, 3.5, 4, 0.75))
+            self.assertEqual((clinic['busy_max'], clinic['busy_mean'], clinic['total_max'], clinic['at_pool_limit_share']), (2, 0.75, 3, 0.0))
+            self.assertEqual(sorted(summary['applications']), ['p8-clinic-0', 'p8-core'])
+            # No pool limit (the monolith: its pool is the Prisma default): no share.
+            self.assertNotIn('at_pool_limit_share', native_stack.read_activity(path)['applications']['p8-core'])
+            # since/until keep the steady part only.
+            window = native_stack.read_activity(path, 4, since=100.2, until=100.4)
+            self.assertEqual((window['samples'], window['applications']['p8-core']['busy_mean'], window['applications']['p8-core']['at_pool_limit_share']), (2, 3.0, 0.5))
+            self.assertEqual(native_stack.read_activity(path, 4, since=500.0)['samples'], 0)
+            path.write_text('', encoding='utf-8')
+            self.assertEqual(native_stack.read_activity(path)['applications'], {})
+
+    def test_psql_repeats_one_query_until_it_is_stopped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'activity.txt'
+            sampler = native_stack.PgSampler('/tmp/pg-socket', 5433, output)
+            self.assertEqual(sampler.command, ['psql', '-X', '-q', '-A', '-t', '-F', '|', '-h', '/tmp/pg-socket', '-p', '5433', '-U', 'postgres', '-d', 'postgres',
+                                               '-v', 'ON_ERROR_STOP=1'])
+            fake = MagicMock()
+            fake.poll.return_value = None
+            with patch('native_stack.subprocess.Popen', return_value=fake) as popen:
+                sampler.start()
+                self.assertEqual(popen.call_args.args[0], sampler.command)
+                self.assertIs(popen.call_args.kwargs['stdin'], subprocess.PIPE)
+                sent = fake.stdin.write.call_args.args[0].decode()
+                self.assertTrue(sent.startswith('WITH a AS (SELECT application_name'))
+                self.assertTrue(sent.endswith(' \\watch 0.2\n'))
+                self.assertEqual(sent.count('\\watch'), 1)
+                self.assertIn('FROM pg_stat_activity', sent)
+                self.assertIn("backend_type = 'client backend'", sent)
+                self.assertIn("count(*) FILTER (WHERE state <> 'idle')", sent)
+                fake.terminate.side_effect = lambda: output.write_text(activity_text(SAMPLES), encoding='utf-8')
+                result = sampler.stop(pool_limit=4)
+            fake.terminate.assert_called_once()
+            self.assertEqual((result['status'], result['samples'], result['interval_s']), ('COMPLETE', 4, 0.2))
+            self.assertNotIn('psql_exit_code', result)
+            with self.assertRaisesRegex(RuntimeError, 'not running'):
+                sampler.stop()
+
+    def test_a_psql_that_wrote_nothing_or_ended_early_is_reported_not_hidden(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for poll, status in ((None, 'NO_SAMPLES'), (2, 'EXITED_EARLY')):
+                sampler = native_stack.PgSampler('/tmp/pg-socket', 5433, Path(directory) / f'{status}.txt')
+                fake = MagicMock()
+                fake.poll.return_value = poll
+                with patch('native_stack.subprocess.Popen', return_value=fake):
+                    sampler.start()
+                    result = sampler.stop(pool_limit=4)
+                self.assertEqual((result['status'], result.get('psql_exit_code')), (status, poll))
+                self.assertEqual(fake.terminate.called, poll is None)  # psql that already ended is not signalled
+            # A psql that ignores the stop is killed.
+            sampler = native_stack.PgSampler('/tmp/pg-socket', 5433, Path(directory) / 'stubborn.txt')
+            fake = MagicMock()
+            fake.poll.return_value = None
+            fake.wait.side_effect = [subprocess.TimeoutExpired('psql', 5), 0]
+            with patch('native_stack.subprocess.Popen', return_value=fake):
+                sampler.start()
+                sampler.stop()
+            fake.kill.assert_called_once()
+
+    def test_a_sampler_that_cannot_start_is_written_into_the_manifest_and_the_load_goes_on(self):
+        with tempfile.TemporaryDirectory() as directory:
+            sampler, manifest = native_stack.PgSampler('/tmp/pg-socket', 5433, Path(directory) / 'activity.txt'), {}
+            with patch('native_stack.subprocess.Popen', side_effect=FileNotFoundError('psql')):
+                self.assertIsNone(native_stack.start_pg_sampler(sampler, manifest))
+            self.assertEqual(manifest['pg_activity'], {'status': 'NOT_STARTED', 'error_type': 'FileNotFoundError'})
+            self.assertTrue(sampler.sink.closed)
+            self.assertIsNone(sampler.process)
+            started = MagicMock()
+            self.assertIs(native_stack.start_pg_sampler(started, {}), started.start.return_value)
+
+    def test_pool_timeouts_are_counted_per_log_as_a_lower_bound(self):
+        with tempfile.TemporaryDirectory() as directory:
+            d = Path(directory)
+            (d / 'core.log').write_text('listening\nPrismaClientKnownRequestError code P2024\nTimed out fetching a new connection from the connection pool. More info\n')
+            (d / 'clinic-0.log').write_text('listening\n')
+            (d / 'notification.log').write_text('x P2024 y\n')
+            (d / 'setup.txt').write_text('P2024\n')  # not a log
+            self.assertEqual(native_stack.count_pool_timeouts(d), {'p2024_log_lines': 3, 'by_log': {'core.log': 2, 'notification.log': 1}})
+            self.assertEqual(native_stack.count_pool_timeouts(Path(directory) / 'nothing'), {'p2024_log_lines': 0, 'by_log': {}})
+
+    def test_the_steady_window_is_the_one_member_metrics_keeps_and_the_outbox_is_read_from_inspect(self):
+        settings = {'users': 100, 'seconds': 300, 'warmup': 30, 'spawn_rate': 10}
+        self.assertEqual(runner.steady_window(settings, 1000.0, 1400.0), (1045.0, 1385.0))  # ramp 10 s + warmup 30 s + 5 s; minus the 15 s drain
+        self.assertEqual(runner.outbox_pending({'pendingCore': 3, 'pendingClinic': 0, 'appointments': []}), {'core': 3, 'clinic': 0})
+        self.assertEqual(runner.outbox_pending({}), {'core': None, 'clinic': None})
+
+
+class PoolEvidenceInAMember(unittest.TestCase):
+    """run_pcn on a fake stack: the new options reach NativeStack, and the sampler, the pool timeouts and the outbox land in the manifest."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        # A repo copy with the exact harness bytes, so the integrity check passes.
+        (self.root / 'empty').mkdir()
+        with patch.object(runner, 'NativeStack', side_effect=RuntimeError('stack-not-needed')):
+            runner.run_pcn(self.root / 'empty', self.root / 'probe', mode='smoke', progress=lambda text: None, locustfile=bs.LOCUSTFILE)
+        self.repo = self.root / 'repo'
+        for name in json.loads((self.root / 'probe/manifest.json').read_text())['harness_mismatch']:
+            (self.repo / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.repo / name).write_bytes((REPO / name).read_bytes())
+
+    def run_member(self, label, sampler_start=None, **options):
+        private = self.root / ('private-' + label)
+        (private / 'pgdata').mkdir(parents=True)
+        (private / 'pgdata/postmaster.pid').write_text('123\n')
+        (private / 'nginx.pid').write_text('456\n')
+        (private / 'pcn-created.jsonl').write_text('')
+        (private / 'core.log').write_text('listening\nPrismaClientKnownRequestError code P2024\nP2024 again\n')
+        stack = MagicMock()
+        stack.__enter__.return_value = stack
+        stack.private, stack.run, stack.db_pool_limit, stack.processes = private, 'run-1', options.get('db_pool_limit', 4), []
+        stack.fixture = {'baseUrl': 'http://127.0.0.1:1', 'gateway': {'topology': 'direct', 'coreLayout': options.get('core_layout', 'workers'), 'dbPoolLimit': 4},
+                         'dataset': {}, 'dbCrossConnectDenied': 6, 'processes': [{'name': 'core', 'pid': 1}], 'accounts': []}
+        stack.control.side_effect = [{'pendingCore': 3, 'pendingClinic': 1}, {'pendingCore': 7, 'pendingClinic': 0}]
+        sampler = MagicMock()
+        sampler.start.return_value = sampler
+        sampler.start.side_effect = sampler_start
+        sampler.stop.return_value = {'status': 'COMPLETE', 'samples': 7}
+        stack.pg_sampler.return_value = sampler
+        output = self.root / ('out-' + label)
+
+        def locust(*args, **kwargs):  # the generator "runs": it leaves the evidence files and has already ended
+            (output / 'load-final.json').write_text(json.dumps({'requests': 10, 'failures': 2, 'measured_seconds': 5.0}))
+            (output / 'http.csv').write_text('status,failed\n' + '200,False\n' * 8 + '503,True\n' * 2)
+            (output / 'generator.json').write_text(json.dumps({'user_errors': 0}))
+            child = MagicMock()
+            child.poll.return_value, child.returncode, child.pid = 0, 0, 99
+            return child
+        clock = []
+        def now():
+            clock.append(1)
+            return 1000.0 if len(clock) == 1 else 1100.0
+        fake_time = types.SimpleNamespace(time=now, monotonic=runner.time.monotonic, sleep=runner.time.sleep)
+        with patch.object(runner, 'NativeStack', return_value=stack) as native, patch.object(runner, 'Client', return_value=types.SimpleNamespace(
+                actors=[{'token': 't', 'pets': [{'id': 'p', 'qrToken': 'q'}]}])), patch.object(runner.subprocess, 'Popen', side_effect=locust), \
+                patch.object(runner, 'reconcile', return_value={'status': 'PASS_IN_SCOPE'}), patch.object(runner, 'verdict', return_value={}), \
+                patch.object(runner, 'time', fake_time):
+            runner.run_pcn(self.repo, output, mode='smoke', progress=lambda text: None, locustfile=bs.LOCUSTFILE, **options)
+        return json.loads((output / 'manifest.json').read_text()), native, stack, sampler, private
+
+    def test_the_sampler_the_pool_timeouts_and_the_outbox_are_recorded_when_asked_for(self):
+        manifest, native, stack, sampler, private = self.run_member('on', pg_sampler=True, core_layout='phase2', db_pool_limit=8)
+        self.assertEqual(manifest['status'], 'COMPLETE', manifest)
+        self.assertEqual((native.call_args.kwargs['core_layout'], native.call_args.kwargs['db_pool_limit']), ('phase2', 8))
+        self.assertEqual(manifest['gateway'], stack.fixture['gateway'])  # ready.json.gateway: topology, layout and pool of the member
+        self.assertTrue(manifest['pg_sampler'])
+        stack.pg_sampler.assert_called_once_with(private / 'pg-activity.txt')
+        sampler.start.assert_called_once()
+        pool_limit, since, until = sampler.stop.call_args.args
+        self.assertEqual(pool_limit, 8)
+        self.assertAlmostEqual(since, 1000.0 + 2 / 10 + 2 + 5)  # the smoke settings: 2 users, spawn 10, warmup 2
+        self.assertEqual(until, 1100.0 - 15)
+        sampler.stop.assert_called_once()  # the load's own stop; the final clean-up does not stop it twice
+        self.assertEqual(manifest['pg_activity'], {'status': 'COMPLETE', 'samples': 7})
+        self.assertEqual(manifest['pool_timeouts'], {'p2024_log_lines': 2, 'by_log': {'core.log': 2}, 'http_503': 2})
+        self.assertEqual(manifest['outbox'], {'pending_before': {'core': 3, 'clinic': 1}, 'pending_after': {'core': 7, 'clinic': 0}})
+
+    def test_without_the_flag_no_sampler_runs_and_the_stack_keeps_its_defaults(self):
+        manifest, native, stack, sampler, private = self.run_member('off')
+        self.assertEqual(manifest['status'], 'COMPLETE', manifest)
+        self.assertNotIn('core_layout', native.call_args.kwargs)
+        self.assertNotIn('db_pool_limit', native.call_args.kwargs)
+        for key in ('pg_sampler', 'pg_activity', 'pool_timeouts'):
+            self.assertNotIn(key, manifest)
+        stack.pg_sampler.assert_not_called()
+        sampler.start.assert_not_called()
+        self.assertEqual(manifest['outbox']['pending_after'], {'core': 7, 'clinic': 0})  # free to read, so always recorded
+        import inspect
+        for function in (runner.run_pcn,):
+            self.assertIs(inspect.signature(function).parameters['pg_sampler'].default, False)
+
+    def test_a_sampler_that_cannot_start_does_not_fail_the_member(self):
+        manifest, native, stack, sampler, private = self.run_member('broken', sampler_start=FileNotFoundError('psql'), pg_sampler=True)
+        self.assertEqual(manifest['status'], 'COMPLETE', manifest)
+        self.assertEqual(manifest['pg_activity'], {'status': 'NOT_STARTED', 'error_type': 'FileNotFoundError'})
+        sampler.stop.assert_not_called()
+        self.assertEqual(manifest['pool_timeouts']['http_503'], 2)  # the 503 count still stands
+
+
+class MonolithSampling(unittest.TestCase):
+    text = (HERE / 'bridge_monolith.py').read_text(encoding='utf-8')
+
+    def module(self):
+        with patch.dict(sys.modules, {'pcn_runner': runner}):  # the phase-2 runner, whatever else is called pcn_runner
+            return importlib.import_module('bridge_monolith')
+
+    def test_only_the_api_names_its_connections_m_api(self):
+        self.assertIn("api_env = {**self.env, 'DATABASE_URL': self.env['DATABASE_URL'] + '&application_name=m-api'}", self.text)
+        api = self.text[self.text.index("'node', 'backend/dist/src/index.js'"):]
+        self.assertTrue(api.startswith("'node', 'backend/dist/src/index.js'], cwd=self.root, env=api_env,"))
+        self.assertEqual(self.text.count('application_name'), 1)  # only the API's environment: the setup commands (migrate, seed) keep self.env
+        self.assertIn('?schema=public', self.text)  # the URL the name is appended to already has a query
+
+    def test_the_monolith_member_samples_its_own_cluster_only_when_asked(self):
+        import inspect
+        module = self.module()
+        self.assertIs(inspect.signature(module.run_monolith).parameters['pg_sampler'].default, False)
+        app = module.Monolith.__new__(module.Monolith)
+        app.private, app.port = Path(tempfile.gettempdir()) / 'bridge-m-x', 5455
+        sampler = app.pg_sampler('activity.txt')
+        self.assertEqual((sampler.command[sampler.command.index('-h') + 1], sampler.command[sampler.command.index('-p') + 1]), (str(app.private), '5455'))
+        # The M pool is Prisma's default, so no pool limit is given; the window is the one of the H members.
+        self.assertIn('sampler.stop(None, *steady_window(settings, started_epoch, time.time()))', self.text)
+        self.assertLess(self.text.index('start_pg_sampler(app.pg_sampler('), self.text.index("subprocess.Popen([*taskset_prefix(pinning), sys.executable"))
 
 
 class HarnessIntegrity(unittest.TestCase):

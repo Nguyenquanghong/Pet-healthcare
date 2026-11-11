@@ -11,7 +11,7 @@ import sys
 import time
 from collections import Counter
 
-from native_stack import NativeStack
+from native_stack import NativeStack, count_pool_timeouts, start_pg_sampler
 from benchmark import Client, reconcile
 from cqrs_probe import preflight as cqrs_preflight
 from cqrs_diagnostics import collect as collect_read_diagnostics
@@ -113,6 +113,16 @@ def observed_affinity(tracked, pinning):
     return {'observed': seen, 'verified': verified and 'generator' in seen}
 
 
+def steady_window(settings, started, ended):
+    """Epoch seconds that bound the steady part of a member, as bridge_study.member_metrics trims its CPU samples: after ramp, warmup and 5 s, before the 15 s drain."""
+    return started + settings['users'] / settings['spawn_rate'] + settings['warmup'] + 5, ended - 15
+
+
+def outbox_pending(inspected):
+    """Events still waiting in the Core and Clinic outboxes in a control 'inspect' answer: a backlog at the end of the load shows what the workers did not keep up with."""
+    return {'core': inspected.get('pendingCore'), 'clinic': inspected.get('pendingClinic')}
+
+
 def stop_load(child):
     if child and child.poll() is None:
         child.terminate()
@@ -124,12 +134,14 @@ def stop_load(child):
 
 def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_configuration=None,
             settings=None, locustfile='benchmarks/phase2/kaggle/pcn_locust.py', service_env=None,
-            core_replicas=1, core_proxy=False, pinning=None, vm=False):
+            core_replicas=1, core_proxy=False, pinning=None, vm=False, core_layout=None, db_pool_limit=None, pg_sampler=False):
     # settings/locustfile/service_env: the M/H bridge study (bridge_study.py) runs a
     # shorter window, its own booking grid and raised per-IP limiter thresholds.
     # core_replicas/core_proxy/pinning/vm: the bridge VM study runs outside Kaggle, with
     # Clinic and Notification reaching Core through an nginx upstream (two instances in H2),
     # the generator and the controller pinned to their own CPU and the servers to the others.
+    # core_layout/db_pool_limit: the Core worker layout of the tree and the Prisma pool of every service (NativeStack, stack.mjs). pg_sampler: the pg_stat_activity
+    # sampler and the P2024 count for the pool question (bridge VM study, Part 2 and the pool block); it adds a psql process and a query every 0.2 s, so other members run without.
     if cqrs_configuration not in (None, 'O', 'A', 'B'): raise ValueError('Unknown CQRS configuration')
     settings = configuration(mode) if settings is None else dict(settings)
     repo, output = Path(repo).resolve(), Path(output).resolve()
@@ -152,6 +164,8 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
                 'resource_limitations': 'CPU per PID/create-time; short-lived processes between samples missed; RSS sum double-counts shared pages.'}
     if vm:
         manifest['vm'] = True
+    if pg_sampler:
+        manifest['pg_sampler'] = True
     if pinning:
         manifest['pinning'] = {**pinning, 'method': PINNING_METHOD}
     # Relative to the tree this file belongs to: the bridge VM study runs several trees with one harness.
@@ -169,6 +183,7 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
     summary = legacy_report()
     summary.update({'load_status': 'NOT_RUN', 'scope': 'PCN01/PCN02 load only', 'capacity_accepted': False})
     child = None
+    sampler = None
     stage = 'startup'
     stack = None
     try:
@@ -185,6 +200,10 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
             options['core_replicas'] = core_replicas
         if core_proxy:
             options['core_proxy'] = True
+        if core_layout is not None:
+            options['core_layout'] = core_layout
+        if db_pool_limit is not None:
+            options['db_pool_limit'] = db_pool_limit
         if pinning:
             options['server_cpus'] = pinning['server']
         stack = NativeStack(repo, accounts=settings['users'], replicas=replicas, dataset_profile='pcn', **options)
@@ -213,6 +232,9 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
                        PCN_HTTP=str(output / 'http.csv'), PCN_WRITES=str(writes_path),
                        PCN_GENERATOR=str(output / 'generator.json'))
             stage = 'load'
+            if pg_sampler:
+                sampler = start_pg_sampler(stack.pg_sampler(stack.private / 'pg-activity.txt'), manifest)
+            started_epoch = time.time()
             with (stack.private / 'pcn-load.log').open('w') as log:
                 child = subprocess.Popen([*taskset_prefix(pinning), sys.executable, '-m', 'locust', '-f',
                     str(repo / locustfile), '--headless', '--only-summary',
@@ -251,14 +273,21 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
                             time.sleep(1)
                 finally:
                     stop_load(child)
+                    if sampler is not None:
+                        manifest['pg_activity'] = sampler.stop(stack.db_pool_limit, *steady_window(settings, started_epoch, time.time()))
+                        sampler = None
             manifest['locust_exit_code'] = child.returncode
             manifest['process_sample_errors'] = process_errors
             stage = 'reconciliation'
             load = json.loads((output / 'load-final.json').read_text())
             http = http_summary(output / 'http.csv')
+            if pg_sampler:
+                manifest['pool_timeouts'] = {**count_pool_timeouts(stack.private), 'http_503': http['http_503']}
             generator = json.loads((output / 'generator.json').read_text())
             created = [json.loads(line)['id'] for line in writes_path.read_text().splitlines()]
-            reconciliation = reconcile(before, stack.control('inspect'), created)
+            after = stack.control('inspect')
+            manifest['outbox'] = {'pending_before': outbox_pending(before), 'pending_after': outbox_pending(after)}
+            reconciliation = reconcile(before, after, created)
             (output / 'reconciliation.json').write_text(json.dumps(reconciliation, indent=2))
             (output / 'http-summary.json').write_text(json.dumps(http, indent=2))
             summary = verdict(load, http, kaggle=kaggle and mode == 'full',
@@ -277,6 +306,8 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
         progress(f'PCN stopped at {stage}: {type(error).__name__}; private logs remain in /tmp')
     finally:
         stop_load(child)
+        if sampler is not None:
+            sampler.stop()
         if cqrs_configuration in ('A','B') and stack is not None:
             manifest['read_diagnostics'] = collect_read_diagnostics(stack.private, replicas, output)
         (output / 'manifest.json').write_text(json.dumps(manifest, indent=2))

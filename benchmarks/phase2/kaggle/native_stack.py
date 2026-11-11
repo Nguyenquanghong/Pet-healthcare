@@ -8,12 +8,18 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import secrets
 import shutil
 import socket
 import subprocess
 import time
 import uuid
+
+# Bridge VM study: the worker layouts of the trees it runs (stack.mjs CORE_LAYOUTS), the Prisma pool sizes (DB_POOL_LIMIT) and the most owners per profile.
+CORE_LAYOUTS = ('workers', 'phase2')
+DB_POOL_LIMITS = (4, 8)
+MAX_ACCOUNTS = {'deep': 40, 'pcn': 800, 'query-heavy': 100}
 
 
 def free_port():
@@ -35,19 +41,136 @@ def wait_port(port, process, seconds=90):
     raise RuntimeError('Owned infrastructure readiness timeout')
 
 
+class PgSampler:
+    """pg_stat_activity of an owned cluster every 0.2 s through `psql ... \\watch 0.2` (bridge VM study: Part 2 and the pool block only).
+
+    One row per application_name (p8-<process>, m-api for the monolith) and sample: its client connections that are not idle (running a statement or
+    inside a transaction: a busy Prisma pool slot) and all of its client connections. psql keeps the CPU affinity of the controller (the generator
+    CPU); each query still runs in a postgres backend on the server CPUs, so the sampler costs the servers a little and is not free.
+    """
+    INTERVAL = 0.2
+    QUERY = ("WITH a AS (SELECT application_name AS name, count(*) FILTER (WHERE state <> 'idle') AS busy, count(*) AS total FROM pg_stat_activity "
+             "WHERE backend_type = 'client backend' AND application_name ~ '^(p8-|m-api$)' GROUP BY application_name) "
+             "SELECT extract(epoch FROM now())::numeric(16,3), name, busy, total FROM a "
+             "UNION ALL SELECT extract(epoch FROM now())::numeric(16,3), '*', 0, 0")  # the '*' row keeps a sample with no connection visible
+
+    def __init__(self, socket_dir, port, output, *, database='postgres'):
+        self.command = ['psql', '-X', '-q', '-A', '-t', '-F', '|', '-h', str(socket_dir), '-p', str(port), '-U', 'postgres', '-d', database,
+                        '-v', 'ON_ERROR_STOP=1']
+        self.output, self.process, self.sink = Path(output), None, None
+
+    def start(self):
+        self.sink = self.output.open('wb')
+        try:
+            self.process = subprocess.Popen(self.command, stdin=subprocess.PIPE, stdout=self.sink, stderr=subprocess.STDOUT)
+            # A query followed by the watch command repeats until psql ends; stdin stays open so that psql does not end by itself.
+            self.process.stdin.write(f'{self.QUERY} \\watch {self.INTERVAL:g}\n'.encode())
+            self.process.stdin.flush()
+        except BaseException:
+            self.sink.close()
+            self.process = None
+            raise
+        return self
+
+    def stop(self, pool_limit=None, since=None, until=None):
+        """Ends psql and returns read_activity of what it wrote, with a status: COMPLETE, NO_SAMPLES (psql ran but wrote none: a failed query) or
+        EXITED_EARLY (psql ended before this stop)."""
+        process, self.process = self.process, None
+        if process is None:
+            raise RuntimeError('pg sampler is not running')
+        early = process.poll()
+        try:
+            if early is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+        finally:
+            for stream in (process.stdin, self.sink):
+                try:
+                    stream.close()
+                except OSError:
+                    pass  # psql is already gone: the pipe is broken
+        summary = read_activity(self.output, pool_limit, since, until)
+        status = 'EXITED_EARLY' if early is not None else 'COMPLETE' if summary['samples'] else 'NO_SAMPLES'
+        return {'status': status, **({'psql_exit_code': early} if early is not None else {}), **summary}
+
+
+def read_activity(path, pool_limit=None, since=None, until=None):
+    """Summary of a PgSampler output file. Lines that are not `epoch|name|busy|total` (a line cut off when psql stopped) are skipped, and so is the
+    last sample, which the stop can have cut short. since/until (epoch seconds) keep the samples of the steady part of a member; pool_limit is the
+    Prisma pool of the process, which gives the share of samples with every connection of a process busy (None for the monolith: its pool is the Prisma default)."""
+    samples = {}
+    for line in Path(path).read_text(encoding='utf-8', errors='replace').splitlines():
+        parts = line.strip().split('|')
+        try:
+            moment, busy, total = float(parts[0]), int(parts[2]), int(parts[3])
+        except (ValueError, IndexError):
+            continue
+        if len(parts) != 4:
+            continue
+        samples.setdefault(moment, {})
+        if parts[1] != '*':
+            samples[moment][parts[1]] = (busy, total)
+    moments = [m for m in sorted(samples)[:-1] if (since is None or m >= since) and (until is None or m <= until)]
+    applications = {}
+    for name in sorted({name for m in moments for name in samples[m]}):
+        busy = [samples[m].get(name, (0, 0))[0] for m in moments]
+        entry = {'busy_max': max(busy), 'busy_mean': sum(busy) / len(busy), 'total_max': max(samples[m].get(name, (0, 0))[1] for m in moments)}
+        if pool_limit is not None:
+            entry['at_pool_limit_share'] = sum(value >= pool_limit for value in busy) / len(busy)
+        applications[name] = entry
+    return {'samples': len(moments), 'first_s': moments[0] if moments else None, 'last_s': moments[-1] if moments else None,
+            'interval_s': PgSampler.INTERVAL, 'pool_limit': pool_limit, 'applications': applications}
+
+
+def start_pg_sampler(sampler, manifest):
+    """Starts a sampler for a member. One that cannot start is written into the member's manifest and the load runs on: the pool reading is then
+    unknown, the load result is unaffected."""
+    try:
+        return sampler.start()
+    except OSError as error:
+        manifest['pg_activity'] = {'status': 'NOT_STARTED', 'error_type': type(error).__name__}
+        return None
+
+
+POOL_TIMEOUT = re.compile(rb'P2024|Timed out fetching a new connection from the connection pool')
+
+
+def count_pool_timeouts(private):
+    """Prisma pool timeouts (P2024) in the private logs of an owned stack, per log file (files without one are left out).
+    A lower bound: the services answer a pool timeout with a 503 and Retry-After and log nothing (packages/runtime failures.ts), so this finds only
+    what a process happens to print. The 503 count of the load is the signal that does not depend on that."""
+    found = {}
+    for path in sorted(Path(private).glob('*.log')):
+        with path.open('rb') as handle:
+            lines = sum(bool(POOL_TIMEOUT.search(line)) for line in handle)
+        if lines:
+            found[path.name] = lines
+    return {'p2024_log_lines': sum(found.values()), 'by_log': found}
+
+
 class NativeStack:
-    def __init__(self, repo, accounts=40, replicas=1, dataset_profile='deep', *, cqrs_configuration=None, service_env=None, core_replicas=1, core_proxy=False, server_cpus=None):
+    def __init__(self, repo, accounts=40, replicas=1, dataset_profile='deep', *, cqrs_configuration=None, service_env=None, core_replicas=1, core_proxy=False, server_cpus=None,
+                 core_layout='workers', db_pool_limit=4):
         if platform.system() != 'Linux':
             raise RuntimeError('Native stack requires Linux (Kaggle CPU notebook)')
-        maximum = 100 if dataset_profile in ('pcn', 'query-heavy') else 40
-        if dataset_profile not in ('deep', 'pcn', 'query-heavy') or not isinstance(accounts, int) or not 2 <= accounts <= maximum or replicas not in (1, 2):
-            raise ValueError('deep accounts 2..40 / pcn or query-heavy accounts 2..100; Clinic replicas 1 or 2')
+        maximum = MAX_ACCOUNTS.get(dataset_profile, 40)
+        if dataset_profile not in MAX_ACCOUNTS or not isinstance(accounts, int) or not 2 <= accounts <= maximum or replicas not in (1, 2):
+            raise ValueError('deep accounts 2..40 / pcn accounts 2..800 / query-heavy accounts 100; Clinic replicas 1 or 2')
         # Bridge VM study: Clinic and Notification reach Core through an nginx upstream (core_proxy), with one or two
         # instances behind it; the CQRS and query-heavy studies keep the plain single Core.
         if core_replicas not in (1, 2) or (core_replicas != 1 or core_proxy) and (cqrs_configuration is not None or dataset_profile != 'pcn'):
             raise ValueError('Core replicas 1 or 2 and core_proxy only for the pcn profile without a CQRS configuration')
         if not isinstance(core_proxy, bool) or server_cpus is not None and (not server_cpus or not all(isinstance(c, int) and c >= 0 for c in server_cpus)):
             raise ValueError('core_proxy is a boolean; server_cpus a non-empty list of CPU numbers')
+        # Bridge VM study: the worker layout of the tree (stack.mjs CORE_LAYOUTS: H1 phase2, H3 workers) and the Prisma pool of every service; the others keep the defaults.
+        if core_layout not in CORE_LAYOUTS or type(db_pool_limit) is not int or not DB_POOL_LIMITS[0] <= db_pool_limit <= DB_POOL_LIMITS[1]:
+            raise ValueError('core_layout workers or phase2; db_pool_limit an integer from 4 to 8')
+        if (core_layout, db_pool_limit) != ('workers', 4) and (cqrs_configuration is not None or dataset_profile != 'pcn'):
+            raise ValueError('core_layout phase2 and db_pool_limit above 4 only for the pcn profile without a CQRS configuration')
         if dataset_profile == 'query-heavy' and (accounts != 100 or replicas != 1):
             raise ValueError('query-heavy requires 100 accounts and exactly one Clinic')
         if cqrs_configuration is not None and (cqrs_configuration not in ('O', 'A', 'B', 'F')
@@ -67,6 +190,7 @@ class NativeStack:
         self.processes, self.logs = [], []
         self.pg_started = False
         self.accounts, self.replicas, self.core_replicas, self.core_proxy = accounts, replicas, core_replicas, core_proxy
+        self.core_layout, self.db_pool_limit = core_layout, db_pool_limit
         # Every process the stack starts (databases, broker, services) runs on these CPUs when given; the controller is elsewhere.
         self.server_prefix = ['taskset', '-c', ','.join(str(c) for c in server_cpus)] if server_cpus else []
         self.application = None
@@ -145,7 +269,8 @@ class NativeStack:
         wait_port(rabbit, self.rabbit)
         context = {'kind': 'phase2-kaggle-native-v1', 'run': self.run, 'directory': str(self.private),
             'urls': urls, 'pgData': str(data), 'pgPort': pg, 'accounts': self.accounts, 'replicas': self.replicas,
-            'coreReplicas': self.core_replicas, 'coreProxy': self.core_proxy, 'datasetProfile': self.dataset_profile,
+            'coreReplicas': self.core_replicas, 'coreProxy': self.core_proxy, 'coreLayout': self.core_layout, 'dbPoolLimit': self.db_pool_limit,
+            'datasetProfile': self.dataset_profile,
             'cqrsConfiguration': self.cqrs_configuration, 'serviceEnv': self.service_env,
             'broker': f'amqp://p8:{rabbit_password}@127.0.0.1:{rabbit}', 'redis': f'redis://127.0.0.1:{redis}'}
         path = self.private / 'context.json'
@@ -163,6 +288,9 @@ class NativeStack:
                 return self
             time.sleep(.5)
         raise RuntimeError('Three-service startup timed out')
+
+    def pg_sampler(self, output):
+        return PgSampler(self.private, self.pg_port, output)
 
     def control(self, action, **extra):
         request = str(uuid.uuid4())

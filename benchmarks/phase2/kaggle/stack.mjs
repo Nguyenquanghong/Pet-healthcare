@@ -1,6 +1,6 @@
 // Dedicated native Kaggle fixture. Does not modify the Compose/E2E guards.
 import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync,realpathSync,mkdirSync,openSync,closeSync,renameSync} from 'node:fs';
+import {readFileSync,writeFileSync,realpathSync,mkdirSync,openSync,closeSync,renameSync,existsSync} from 'node:fs';
 import {resolve,dirname} from 'node:path';
 import {execFileSync,spawn} from 'node:child_process';
 import {randomUUID,generateKeyPairSync,randomBytes} from 'node:crypto';
@@ -32,6 +32,16 @@ const coreProxy=context.coreProxy===true||coreReplicas>1;
 // forwards the owned prefixes itself, as compose, the demo and E2E do (one more hop for Clinic and Notification traffic; K9 H3c).
 const gatewayTopology=context.gatewayTopology??'direct';
 assert.ok(['direct','core-ingress'].includes(gatewayTopology),'context.gatewayTopology must be direct or core-ingress, got '+JSON.stringify(gatewayTopology));
+// Bridge VM study, where this tree keeps the Core workers: `workers` is the tree of today (H3), `phase2` the tree of 2841d1b (H1), before backend/src/phase2 was split up.
+// Exactly one layout must be built in the tree stack.mjs runs from (the paths are relative to the repository, as every child below), and context.coreLayout must name it.
+// Absent in every older context: workers.
+const CORE_LAYOUTS={workers:{notification:'backend/dist/src/workers/notification.js',billing:'backend/dist/src/workers/billing.js'},phase2:{notification:'backend/dist/src/phase2/notificationWorker.js',billing:'backend/dist/src/phase2/billingWorker.js'}};
+const coreLayout=context.coreLayout??'workers';
+const builtLayouts=Object.keys(CORE_LAYOUTS).filter(name=>Object.values(CORE_LAYOUTS[name]).every(file=>existsSync(file)));
+assert.deepEqual(builtLayouts,[coreLayout],'context.coreLayout is '+JSON.stringify(coreLayout)+' but the tree has the Core worker layout(s) '+JSON.stringify(builtLayouts)+' (workers: backend/dist/src/workers, phase2: backend/dist/src/phase2)');
+// Bridge VM study, the Prisma pool of every service process (DB_POOL_LIMIT, the pool the H3p8 block widens): 4 to 8, 4 in every older context.
+const dbPoolLimit=context.dbPoolLimit??4;
+assert.ok(Number.isInteger(dbPoolLimit)&&dbPoolLimit>=4&&dbPoolLimit<=8,'context.dbPoolLimit must be an integer from 4 to 8, got '+JSON.stringify(dbPoolLimit));
 const cleanEnv=Object.fromEntries(['PATH','HOME','LANG','TMPDIR'].filter(k=>process.env[k]).map(k=>[k,process.env[k]]));
 // Apps import dotenv; an existing file must not inject a target or secret.
 for(const file of ['.env','backend/.env','services/clinic/.env','services/notification/.env']){
@@ -86,7 +96,7 @@ try{
   const cqrsMode=context.cqrsConfiguration;
   let cqrs,cqrsTools;
   if(cqrsMode!==undefined&&cqrsMode!==null){
-    assert.equal(context.replicas,1);assert.equal(coreReplicas,1);assert.ok(!coreProxy);assert.equal(gatewayTopology,'direct');assert.ok(['pcn','query-heavy'].includes(profile));
+    assert.equal(context.replicas,1);assert.equal(coreReplicas,1);assert.ok(!coreProxy);assert.equal(gatewayTopology,'direct');assert.equal(coreLayout,'workers');assert.equal(dbPoolLimit,4);assert.ok(['pcn','query-heavy'].includes(profile));
     cqrsTools=await import('./cqrs_runtime.mjs');
     cqrs=await cqrsTools.prepareReadModel(cqrsMode,context.urls.clinic,context);
   }
@@ -97,7 +107,7 @@ try{
   const credentials=Object.fromEntries(['CORE_DIRECTORY_TOKEN','CORE_BILLING_EVIDENCE_TOKEN','CLINIC_BILLING_TOKEN','CLINIC_BOOTSTRAP_TOKEN','CORE_NOTIFICATION_SEND_TOKEN'].map(k=>[k,secret()]));
   // Read diagnostics are a study aid for the maintained-projection members only; F runs the product defaults.
   const cqrsEnv=cqrsTools?{...cqrsTools.apiEnvironment(cqrsMode,secret()),CLINIC_READ_DIAGNOSTICS:['A','B'].includes(cqrsMode)?'1':'0'}:{CLINIC_READ_DIAGNOSTICS:'0'};
-  const common={HOST:'127.0.0.1',PHASE2_RUNTIME_REQUIRED:'1',JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:keys.publicKey.export({type:'spki',format:'pem'}).toString(),JWT_KEY_ID:'p8-kaggle',JWT_ISSUER:'p8-core',JWT_AUDIENCE:'pet-healthcare',JWT_SECRET:'',REDIS_URL:context.redis,RATE_LIMIT_NAMESPACE:'p8-'+context.run,RATE_LIMIT_KEY_SECRET:secret(),OBSERVABILITY_TOKEN:secret(),DB_POOL_LIMIT:'4',HASH_CONCURRENCY:'2',HASH_PENDING_LIMIT:'16',TRUST_PROXY_CIDRS:'',BROKER_URL:context.broker,BROKER_PREFIX:'p8.'+context.run,PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',BANK_TRANSFER_ENABLED:'false',CORS_ORIGIN:''};
+  const common={HOST:'127.0.0.1',PHASE2_RUNTIME_REQUIRED:'1',JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:keys.publicKey.export({type:'spki',format:'pem'}).toString(),JWT_KEY_ID:'p8-kaggle',JWT_ISSUER:'p8-core',JWT_AUDIENCE:'pet-healthcare',JWT_SECRET:'',REDIS_URL:context.redis,RATE_LIMIT_NAMESPACE:'p8-'+context.run,RATE_LIMIT_KEY_SECRET:secret(),OBSERVABILITY_TOKEN:secret(),DB_POOL_LIMIT:String(dbPoolLimit),HASH_CONCURRENCY:'2',HASH_PENDING_LIMIT:'16',TRUST_PROXY_CIDRS:'',BROKER_URL:context.broker,BROKER_PREFIX:'p8.'+context.run,PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',BANK_TRANSFER_ENABLED:'false',CORS_ORIGIN:''};
   // Bridge study: raise named limiter thresholds only; the limiter still runs.
   for(const [key,value] of Object.entries(context.serviceEnv??{})){assert.match(key,/^(API|RESCUE_REPORT)_[A-Z_]+_LIMIT$/);assert.match(String(value),/^[0-9]+$/);common[key]=String(value);}
   const ports={core:await port(),notification:await port(),clinic:await port(),gateway:await port()};
@@ -108,9 +118,14 @@ try{
   const origins=Object.fromEntries(Object.entries(ports).map(([k,v])=>[k,'http://127.0.0.1:'+v]));
   common.CORE_SERVICE_URL=origins.core;common.CLINIC_SERVICE_URL=origins.clinic;common.NOTIFICATION_SERVICE_URL=origins.notification;
   const metrics=[];
+  // Every process names its database connections p8-<process> (application_name, which Prisma passes on from the connection string and databaseUrl() keeps),
+  // so the pg_stat_activity sampler of the bridge VM study can tell which pool is busy; the monolith member uses m-api.
+  const withApplicationName=(url,name)=>{const u=new URL(url);u.searchParams.set('application_name','p8-'+name);return u.toString();};
   async function child(name,file,extra,readyPort){
     const fd=openSync(resolve(dir,name+'.log'),'a',0o600);
-    const c=spawn(process.execPath,[file],{env:{...cleanEnv,...common,...extra},stdio:['ignore',fd,fd,'ipc']});closeSync(fd);
+    const env={...cleanEnv,...common,...extra};
+    if(env.DATABASE_URL)env.DATABASE_URL=withApplicationName(env.DATABASE_URL,name);
+    const c=spawn(process.execPath,[file],{env,stdio:['ignore',fd,fd,'ipc']});closeSync(fd);
     const handle={name,child:c,expected:false};handles.push(handle);
     c.once('exit',(code)=>{if(!handle.expected){failed=true;dump('unexpected-exit.json',{name,code});}});
     c.once('error',()=>{failed=true;});
@@ -153,14 +168,14 @@ try{
   nginx=spawn('nginx',['-p',dir+'/', '-c',resolve(dir,'nginx.conf'),'-g','daemon off;'],{stdio:['ignore',nginxFd,nginxFd]});closeSync(nginxFd);
   await until(async()=>{if(nginx.exitCode!==null)throw new Error('nginx startup failed');try{return(await fetch(origins.gateway+'/api/appointments')).status===401;}catch{return false;}},'nginx');
   const workerBase={JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:'',JWT_KEY_ID:'',JWT_ISSUER:'',JWT_AUDIENCE:'',REDIS_URL:'',RATE_LIMIT_KEY_SECRET:'',OBSERVABILITY_TOKEN:''};
-  await child('core-outbox','backend/dist/src/workers/notification.js',{...workerBase,DATABASE_URL:context.urls.core});
+  await child('core-outbox',CORE_LAYOUTS[coreLayout].notification,{...workerBase,DATABASE_URL:context.urls.core});
   await child('clinic-worker','services/clinic/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.clinic,CORE_DIRECTORY_TOKEN:credentials.CORE_DIRECTORY_TOKEN});
   const notificationWorker=()=>child('notification-worker','services/notification/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.notification});
   let consumer=await notificationWorker();
-  await child('billing-worker','backend/dist/src/workers/billing.js',{...credentials,JWT_PRIVATE_KEY:privateKey,DATABASE_URL:context.urls.core});
+  await child('billing-worker',CORE_LAYOUTS[coreLayout].billing,{...credentials,JWT_PRIVATE_KEY:privateKey,DATABASE_URL:context.urls.core});
   dump('ready.json',{run:context.run,cqrs,password,accounts:dataset.accounts,admin:{id:admin.id,username:admin.username},dataset:dataset.description,baseUrl:origins.gateway,metrics,metricsToken:common.OBSERVABILITY_TOKEN,processes:handles.map(h=>({name:h.name,pid:h.child.pid})),clinicReplicas:context.replicas,coreReplicas,
     // direct: /api/notifications goes straight to Notification as in deploy/phase2/nginx.split.conf.example; core-ingress and the Kaggle bridge v1 harness send it through Core.
-    gateway:{topology:gatewayTopology,notificationsRoute:gatewayTopology==='direct'?'direct-to-notification':'through-core',coreUpstream:coreProxy?'Clinic and Notification reach Core through nginx upstream core_internal (keepalive 16); gateway through upstream core':'one Core, called directly',coreInstances:handles.filter(h=>/^core(-\d+)?$/.test(h.name)).map(h=>h.name)},dbCrossConnectDenied:6});
+    gateway:{topology:gatewayTopology,notificationsRoute:gatewayTopology==='direct'?'direct-to-notification':'through-core',coreLayout,dbPoolLimit,coreUpstream:coreProxy?'Clinic and Notification reach Core through nginx upstream core_internal (keepalive 16); gateway through upstream core':'one Core, called directly',coreInstances:handles.filter(h=>/^core(-\d+)?$/.test(h.name)).map(h=>h.name)},dbCrossConnectDenied:6});
   const lines=createInterface({input:process.stdin});
   for await(const line of lines){
     const command=JSON.parse(line);

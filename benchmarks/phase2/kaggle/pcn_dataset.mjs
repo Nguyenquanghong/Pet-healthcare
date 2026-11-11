@@ -4,8 +4,10 @@ import {randomUUID} from 'node:crypto';
 // One-night stay, at most 5 per night (AQ-10: 10 standard rooms per night).
 export function existingStay(i){const day=Math.floor(i/5);return{checkIn:new Date(Date.UTC(2098,1,1+day)),checkOut:new Date(Date.UTC(2098,1,2+day))};}
 export function existingVisit(i){const m=480+30*(i%19);return{appointmentDate:new Date(Date.UTC(2098,0,1+Math.floor(i/19))),appointmentTime:`${String(m/60|0).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`};}
+// Up to 800 owners (the bridge VM study's top step): 800 visits fill 43 days of 19 slots from 2098-01-01, 800 stays 160 nights from 2098-02-01, both before the 2099 grid the load books on.
+export const MAX_ACCOUNTS=800;
 export async function createPcnDataset(db,{run,hash,count}){
-  if(!Number.isInteger(count)||count<2||count>100)throw new Error('PCN_ACCOUNT_COUNT_OUT_OF_BOUNDS');
+  if(!Number.isInteger(count)||count<2||count>MAX_ACCOUNTS)throw new Error('PCN_ACCOUNT_COUNT_OUT_OF_BOUNDS');
   const accounts=[];
   for(let i=0;i<count;i++){
     const owner=await db.core.user.create({data:{id:randomUUID(),email:`load-${run}-${i}@example.test`,fullName:`Synthetic owner ${i}`,role:'owner',...hash}});
