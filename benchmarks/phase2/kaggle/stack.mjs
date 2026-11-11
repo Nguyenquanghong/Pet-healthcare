@@ -59,7 +59,7 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const dump=(file,value)=>{const temporary=resolve(dir,file+'.tmp');writeFileSync(temporary,JSON.stringify(value,null,2),{mode:0o600});renameSync(temporary,resolve(dir,file));};
 async function until(check,label,timeout=45000){const end=Date.now()+timeout;while(Date.now()<end){if(await check())return;await delay(100);}throw new Error('Timeout '+label);}
 async function port(){const s=createServer().listen(0,'127.0.0.1');await once(s,'listening');const p=s.address().port;await new Promise(r=>s.close(r));return p;}
-let failed=false,stopping=false,nginx;
+let failed=false,stopping=false,nginx,probe;
 async function stop(handle){
   if(handle.child.exitCode!==null){if(handle.child.exitCode!==0)failed=true;return;}
   handle.expected=true;
@@ -71,6 +71,7 @@ async function cleanup(){
   if(stopping)return;stopping=true;
   if(nginx&&nginx.exitCode===null){nginx.kill('SIGQUIT');try{await until(()=>nginx.exitCode!==null,'nginx drain',5000);}catch{nginx.kill('SIGKILL');failed=true;}}
   for(const handle of [...handles].reverse())try{await stop(handle);}catch{failed=true;handle.child.kill('SIGKILL');}
+  if(probe){await probe.connection.close().catch(()=>{});probe=undefined;}
   await Promise.allSettled(Object.values(db).map(c=>c.$disconnect()));
 }
 process.once('SIGTERM',()=>void cleanup().then(()=>process.exit(failed?1:0)));
@@ -190,6 +191,80 @@ try{
     // direct: /api/notifications goes straight to Notification as in deploy/phase2/nginx.split.conf.example; core-ingress and the Kaggle bridge v1 harness send it through Core.
     gateway:{topology:gatewayTopology,notificationsRoute:gatewayTopology==='direct'?'direct-to-notification':'through-core',coreLayout,dbPoolLimit,coreUpstream:coreProxy?'Clinic and Notification reach Core through nginx upstream core_internal (keepalive 16); gateway through upstream core':'one Core, called directly',coreInstances:handles.filter(h=>/^core(-\d+)?$/.test(h.name)).map(h=>h.name),
       clinicUpstream:{servers:clinicPorts.length,maxFails:coreProxy?0:null,proxyNextUpstream:coreProxy?'off':'error timeout http_502 http_503 http_504'}},dbCrossConnectDenied:6});
+  // Bridge VM study (K9 S3-S5), the notification burst. `notification-burst` writes N notification.requested.v1 envelopes into the Clinic outbox in one transaction, shaped like the ones
+  // writeNotification (services/clinic/src/infrastructure/messaging/notificationOutbox.ts) writes for a new appointment: producer clinic, appointment_created, recipient admin, every
+  // related id null. Clinic's relay publishes them and the Notification workers apply them, so everything after the commit takes the real path. One burst per stack, pcn profile, no CQRS.
+  // `burst-observe` samples the broker and the databases, `burst-report` reads the outcome back as raw numbers; benchmarks/phase2/kaggle/pcn_runner.py does the arithmetic.
+  // The contracts, the topology and amqplib are imported when a burst action first needs them, never at start: the H1 tree runs these bytes too and has no burst.
+  const INBOX='notification-v1';  // the consumerName NotificationInbox writes for the notification queue (and the identity queue)
+  const pieces=(list,size)=>{const out=[];for(let i=0;i<list.length;i+=size)out.push(list.slice(i,i+size));return out;};
+  let burst,burstNames;
+  const queueNames=async()=>burstNames??=(await import('../../../packages/messaging/dist/index.js')).topology(common.BROKER_PREFIX);
+  async function fireBurst(count){
+    assert.ok(profile==='pcn'&&!cqrsTools,'notification-burst needs the pcn profile without a CQRS configuration');
+    assert.ok(Number.isInteger(count)&&count>=1&&count<=20000,'notification-burst count must be an integer from 1 to 20000');
+    assert.equal(burst,undefined,'one notification burst per stack');
+    const {parseEnvelope}=await import('../../../packages/contracts/dist/index.js');
+    const rows=[],occurred=new Map();
+    for(let n=1;n<=count;n++){
+      const id=randomUUID(),notificationId=randomUUID(),occurredAt=new Date().toISOString();
+      const event={eventId:id,eventType:'notification.requested.v1',schemaVersion:1,producer:'clinic',aggregateType:'notification',aggregateId:notificationId,aggregateVersion:1,occurredAt,correlationId:id,
+        payload:{recipientRole:'admin',recipientOwnerId:null,type:'appointment_created',title:'New appointment',message:'Burst notification '+n+' of '+count+'.',actionUrl:'/admin/appointments',relatedPetId:null,relatedAppointmentId:null,relatedBookingId:null,notificationId,createdAt:occurredAt,sentAt:occurredAt}};
+      parseEnvelope(JSON.stringify(event));
+      rows.push({id,envelope:event});occurred.set(id,Date.parse(occurredAt));
+    }
+    const began=Date.now();
+    await db.clinic.$transaction(pieces(rows,1000).map(data=>db.clinic.outboxEvent.createMany({data})));
+    const committedAtMs=Date.now(),ids=rows.map(r=>r.id);
+    burst={count,ids,pieces:pieces(ids,1000),occurred,committedAtMs,insertMs:committedAtMs-began,applied:0,done:false};
+    return {count,committedAtMs,insertMs:burst.insertMs,unexpectedExit:failed};
+  }
+  async function observeBurst(){
+    const names=await queueNames(),observed={atMs:Date.now(),fired:burst!==undefined};
+    // checkQueue answers messageCount (ready messages, not the unacknowledged ones) and consumerCount (one per Notification worker); a queue that is not there closes the channel, so a failure drops the probe.
+    try{
+      if(!probe){const amqp=(await import('amqplib')).default;const connection=await amqp.connect(context.broker,{timeout:5000});connection.on('error',()=>{});const channel=await connection.createChannel();channel.on('error',()=>{});probe={connection,channel};}
+      const queue=await probe.channel.checkQueue(names.notification),dlq=await probe.channel.checkQueue(names.notification+'.dlq');
+      observed.queue={messageCount:queue.messageCount,consumerCount:queue.consumerCount};observed.dlq={messageCount:dlq.messageCount};
+    }catch{
+      observed.queue=null;observed.dlq=null;observed.probeError=true;
+      const dead=probe;probe=undefined;if(dead)await dead.connection.close().catch(()=>{});
+    }
+    observed.clinicOutboxPending=await db.clinic.outboxEvent.count({where:{publishedAt:null}});
+    if(burst){
+      if(!burst.done){
+        let applied=0;
+        for(const ids of burst.pieces)applied+=await db.notification.inboxEvent.count({where:{consumerName:INBOX,eventId:{in:ids}}});
+        burst.applied=applied;burst.done=applied===burst.count;
+      }
+      observed.burstApplied=burst.applied;
+    }
+    observed.unexpectedExit=failed;
+    return observed;
+  }
+  async function reportBurst(){
+    assert.ok(burst,'burst-report before notification-burst');
+    const ids=new Set(burst.ids);
+    // InboxEvent.createdAt is `now()` written into a timestamp column, so it holds the server's local time when that is not UTC: its age against the same clock gives the instant.
+    const inbox=await db.notification.$queryRaw`SELECT "eventId",(extract(epoch FROM (now()::timestamp-"createdAt"))*1000)::float8 AS "ageMs",(extract(epoch FROM now())*1000)::float8 AS "nowMs" FROM "InboxEvent" WHERE "consumerName"=${INBOX}`;
+    const applied=[],other=[];
+    for(const row of inbox)(ids.has(row.eventId)?applied:other).push({id:row.eventId,at:row.nowMs-row.ageMs});
+    let published=0,lastPublishedAtMs=null;
+    for(const piece of burst.pieces){
+      const part=await db.clinic.outboxEvent.aggregate({where:{id:{in:piece}},_count:{publishedAt:true},_max:{publishedAt:true}});
+      published+=part._count.publishedAt;
+      if(part._max.publishedAt)lastPublishedAtMs=Math.max(lastPublishedAtMs??0,part._max.publishedAt.getTime());
+    }
+    // The other notifications of the run (the load's own): when each was requested, from its outbox envelope in Core or Clinic; an inbox row with none (a session revocation) is counted, not guessed.
+    const occurredBy=new Map();
+    for(const source of [db.clinic,db.core])
+      for(const row of await source.$queryRaw`SELECT id,envelope->>'occurredAt' AS "occurredAt" FROM "OutboxEvent" WHERE envelope->>'eventType'='notification.requested.v1'`)if(!ids.has(row.id))occurredBy.set(row.id,Date.parse(row.occurredAt));
+    const pairs=[];let unmatched=0;
+    for(const row of other){const occurredAtMs=occurredBy.get(row.id);if(Number.isFinite(occurredAtMs))pairs.push([occurredAtMs,row.at-occurredAtMs]);else unmatched++;}
+    return {count:burst.count,notificationWorkers,committedAtMs:burst.committedAtMs,insertMs:burst.insertMs,
+      inbox:{applied:applied.length,firstAtMs:applied.reduce((a,r)=>a===null?r.at:Math.min(a,r.at),null),lastAtMs:applied.reduce((a,r)=>a===null?r.at:Math.max(a,r.at),null)},
+      relay:{published,lastPublishedAtMs},latencyMs:applied.map(r=>r.at-burst.occurred.get(r.id)),background:{pairs,unmatched},unexpectedExit:failed};
+  }
   const lines=createInterface({input:process.stdin});
   for await(const line of lines){
     const command=JSON.parse(line);
@@ -205,6 +280,9 @@ try{
       }
       else if(command.action==='pause-notification'){for(const worker of consumers)await stop(worker);response={paused:true};}
       else if(command.action==='resume-notification'){assert.ok(consumers.every(worker=>worker.child.exitCode!==null||worker.child.signalCode!==null),'resume-notification while a worker runs');consumers=await startNotificationWorkers();response={resumed:true};}
+      else if(command.action==='notification-burst')response=await fireBurst(command.count);
+      else if(command.action==='burst-observe')response=await observeBurst();
+      else if(command.action==='burst-report')response=await reportBurst();
       else if(command.action==='query-snapshot'||command.action==='query-observe'){
         assert.equal(profile,'query-heavy');
         const {querySnapshot,queryObserve}=await import('./query_dataset.mjs');
@@ -221,7 +299,11 @@ try{
         response={appointments,notifications,invoices,reservations,pendingCore:await db.core.outboxEvent.count({where:{publishedAt:null}}),pendingClinic:await db.clinic.outboxEvent.count({where:{publishedAt:null}}),unexpectedExit:failed};
       }else throw new Error('unknown-action');
       dump(command.id+'.json',response);
-    }catch{dump(command.id+'.json',{error:'control-action-failed'});}
+    }catch(error){
+      // The answer stays opaque (credentials suppressed); a burst action leaves its name and the error class in the private application log, which is all a VM run has to go on.
+      if(command.action==='notification-burst'||String(command.action).startsWith('burst-'))process.stderr.write('BURST_ACTION_FAILED: '+command.action+' '+(error?.name??'Error')+'\n');
+      dump(command.id+'.json',{error:'control-action-failed'});
+    }
   }
 }catch(error){
   dump('failure.json',{name:error?.name??'Error',message:error?.message??'Unknown error',stack:error?.stack??''});

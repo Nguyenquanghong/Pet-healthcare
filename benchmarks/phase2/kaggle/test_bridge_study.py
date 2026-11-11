@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import types
 import unittest
 from unittest.mock import MagicMock, mock_open, patch
@@ -28,6 +29,22 @@ import native_stack  # noqa: E402
 spec = importlib.util.spec_from_file_location('phase2_pcn_runner_bridge', HERE / 'pcn_runner.py')
 runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
+
+
+class Clock:
+    """A stand-in for the time module: one second per sleep, and the epoch 1.7e9 s ahead of the monotonic clock."""
+
+    def __init__(self):
+        self.t = 1000.0
+
+    def monotonic(self):
+        return self.t
+
+    def time(self):
+        return 1_700_000_000.0 + self.t
+
+    def sleep(self, seconds):
+        self.t += seconds
 
 
 def member(p95, cpu=0.5, valid=True):
@@ -179,6 +196,71 @@ class Booking(unittest.TestCase):
         self.assertGreater(min(day for day, _ in slots), '2098-12-31')  # after the fixture visits (2098-01-01 .. 2098-02-12) and stays (to 2098-07-10)
         self.assertLess(max(day for day, _ in slots), '2200-01-01')
         self.assertEqual({t for _, t in slots}, {f'{m // 60:02d}:{m % 60:02d}' for m in range(480, 1021, 30)})  # the 19 slots of 08:00-17:00
+
+
+class BridgeWindow(unittest.TestCase):
+    """bridge_locust.py hands the controller the moment the measurement window opens, and only when asked to (PCN_WINDOW)."""
+
+    def load(self, **environment):
+        class Stub:
+            def appointment(self):
+                pass
+
+            def rescue(self):
+                pass
+
+            def on_start(self):
+                pass
+            tasks = [appointment, rescue]
+        legacy = types.SimpleNamespace(PcnUser=Stub, USERS=[{}], STATE={'start': None})
+        listeners, spawned = [], []
+        events = types.SimpleNamespace(test_start=types.SimpleNamespace(add_listener=lambda function: listeners.append(function) or function))
+        gevent = types.SimpleNamespace(spawn=lambda *args: spawned.append(args), sleep=lambda seconds: None)
+        modules = {'pcn_locust': types.SimpleNamespace(legacy=legacy), 'locust': types.SimpleNamespace(events=events), 'gevent': gevent}
+        clean = {key: value for key, value in os.environ.items() if key != 'PCN_WINDOW'}
+        with patch.dict(sys.modules, modules), patch.dict(os.environ, {**clean, **environment}, clear=True):
+            spec = importlib.util.spec_from_file_location('bridge_locust_window', HERE / 'bridge_locust.py')
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        return module, legacy, listeners, spawned, gevent
+
+    def test_without_the_variable_nothing_is_registered_and_locust_is_not_even_imported(self):
+        module, legacy, listeners, spawned, gevent = self.load()
+        self.assertIsNone(module.WINDOW)
+        self.assertEqual((listeners, spawned), ([], []))
+        self.assertFalse(hasattr(module, 'watch_window'))
+        text = (HERE / 'bridge_locust.py').read_text(encoding='utf-8')
+        self.assertIn("WINDOW = os.environ.get('PCN_WINDOW')", text)
+        self.assertLess(text.index('if WINDOW:'), text.index('import gevent'))  # both imports sit under the condition
+        self.assertLess(text.index('if WINDOW:'), text.index('from locust import events'))
+
+    def test_with_the_variable_one_test_start_listener_publishes_the_window_of_the_phase_1_state(self):
+        module, legacy, listeners, spawned, gevent = self.load(PCN_WINDOW='/tmp/window.json')
+        self.assertEqual(module.WINDOW, '/tmp/window.json')
+        self.assertEqual(len(listeners), 1)
+        self.assertIs(listeners[0], module.watch_window)
+        self.assertEqual(spawned, [])  # nothing runs until locust starts the test
+        module.watch_window(environment=None)
+        self.assertEqual(spawned, [(module.publish_window, '/tmp/window.json', legacy.STATE, gevent.sleep)])  # the very dict pcn_locustfile.measure sets 'start' in
+
+    def test_the_window_is_written_once_atomically_when_the_start_is_set(self):
+        module = self.load()[0]
+        with tempfile.TemporaryDirectory() as directory:
+            path = str(Path(directory) / 'window.json')
+            state, sleeps = {'start': None}, []
+
+            def sleep(seconds):
+                sleeps.append(seconds)
+                if len(sleeps) == 3:
+                    state['start'] = 12345.678
+            record = module.publish_window(path, state, sleep, monotonic=lambda: 12346.0, epoch=lambda: 1_700_012_346.0)
+            self.assertEqual(len(sleeps), 3)  # polled until the phase-1 file set its start
+            self.assertEqual(record, {'start_monotonic': 12345.678, 'seen_monotonic': 12346.0, 'seen_epoch': 1_700_012_346.0})
+            self.assertEqual(json.loads(Path(path).read_text(encoding='utf-8')), record)
+            self.assertEqual([p.name for p in Path(directory).iterdir()], ['window.json'])  # the temporary file is gone: a reader never sees half a file
+            # A start that is already there is written without waiting.
+            module.publish_window(path, {'start': 5.0}, lambda seconds: self.fail('slept'), monotonic=lambda: 6.0, epoch=lambda: 7.0)
+            self.assertEqual(json.loads(Path(path).read_text(encoding='utf-8'))['start_monotonic'], 5.0)
 
 
 TRUE_P95 ={'M': 10.0, 'H0': 50.0, 'H1': 40.0, 'H2': 30.0}
@@ -692,6 +774,91 @@ class HarnessSource(unittest.TestCase):
         self.assertLess(self.text.index('clinicWorkers:1,'), self.text.index('gateway:{topology:gatewayTopology,'))
         self.assertLess(self.text.index('clinicUpstream:{servers:'), self.text.index('dbCrossConnectDenied:6'))
 
+    def test_the_three_burst_actions_exist_and_a_burst_is_one_per_stack_pcn_only_and_bounded(self):
+        for action in ('notification-burst', 'burst-observe', 'burst-report'):
+            self.assertEqual(self.text.count(f"else if(command.action==='{action}')"), 1, action)
+        self.assertIn("else if(command.action==='notification-burst')response=await fireBurst(command.count);", self.text)
+        self.assertIn("assert.ok(profile==='pcn'&&!cqrsTools,", self.text)  # no CQRS configuration, no other profile
+        self.assertIn('assert.ok(Number.isInteger(count)&&count>=1&&count<=20000,', self.text)
+        self.assertIn("assert.equal(burst,undefined,'one notification burst per stack');", self.text)
+        self.assertIn("assert.ok(burst,'burst-report before notification-burst');", self.text)
+        self.assertEqual(len(re.findall(r'(?<![\w.])burst=\{', self.text)), 1)  # one place sets it
+
+    def test_the_burst_is_clinic_outbox_rows_committed_once_in_the_shape_of_a_new_appointment_notification(self):
+        self.assertIn('await db.clinic.$transaction(pieces(rows,1000).map(data=>db.clinic.outboxEvent.createMany({data})));', self.text)
+        self.assertEqual(self.text.count('$transaction('), 1)  # one commit for all the rows
+        self.assertIn('const pieces=(list,size)=>', self.text)
+        self.assertLess(self.text.index('parseEnvelope(JSON.stringify(event));'), self.text.index('$transaction('))  # every envelope is checked before any row is written
+        self.assertLess(self.text.index('$transaction('), self.text.index('const committedAtMs=Date.now()'))
+        self.assertIn("burst={count,ids,pieces:pieces(ids,1000),occurred,committedAtMs,insertMs:committedAtMs-began,applied:0,done:false};", self.text)
+        self.assertIn('return {count,committedAtMs,insertMs:burst.insertMs,unexpectedExit:failed};', self.text)
+        self.assertIn("const {parseEnvelope}=await import('../../../packages/contracts/dist/index.js');", self.text)  # the dist path, not the package name (the H1 tree predates the package)
+        # The envelope is the one writeNotification writes, with the recipient and the related ids of a new appointment's notification for the admins.
+        for needle in ("eventType:'notification.requested.v1',", 'schemaVersion:1,', "producer:'clinic',", "aggregateType:'notification',", 'aggregateVersion:1,',
+                       "recipientRole:'admin',recipientOwnerId:null,type:'appointment_created',", 'relatedPetId:null,relatedAppointmentId:null,relatedBookingId:null,'):
+            self.assertIn(needle, self.text)
+        source = REPO / 'services/clinic/src/infrastructure/messaging/notificationOutbox.ts'
+        if source.is_file():
+            written = source.read_text(encoding='utf-8')
+            for needle in ("eventType: 'notification.requested.v1',", 'schemaVersion: 1,', "producer: 'clinic',", "aggregateType: 'notification',", 'aggregateVersion: 1,',
+                           'parseEnvelope(JSON.stringify(event));'):
+                self.assertIn(needle, written)
+        booked = REPO / 'services/clinic/src/application/services/appointments.ts'
+        if booked.is_file():
+            self.assertIn("recipientRole: 'admin',\n        type: 'appointment_created',", booked.read_text(encoding='utf-8').replace('\r\n', '\n'))
+
+    def test_queue_names_and_the_inbox_consumer_come_from_the_product_not_from_a_guess(self):
+        self.assertIn("const queueNames=async()=>burstNames??=(await import('../../../packages/messaging/dist/index.js')).topology(common.BROKER_PREFIX);", self.text)
+        self.assertIn("BROKER_PREFIX:'p8.'+context.run", self.text)  # the prefix the services run with: the topology is asked for the same one
+        self.assertIn("names.notification+'.dlq'", self.text)
+        topology = REPO / 'packages/messaging/src/topology.ts'
+        index = REPO / 'packages/messaging/src/index.ts'
+        if topology.is_file() and index.is_file():
+            written = topology.read_text(encoding='utf-8')
+            self.assertIn('notification: `${prefix}.notification`,', written)
+            self.assertIn('`${t[consumer]}.dlq`', written)  # how the dead-letter queue of a consumer is named
+            self.assertRegex(index.read_text(encoding='utf-8'), r"export \{[^}]*\btopology\b[^}]*\} from './topology\.js'")
+        inbox = REPO / 'services/notification/src/inbox.ts'
+        self.assertIn("const INBOX='notification-v1';", self.text)
+        if inbox.is_file():
+            self.assertIn("VALUES ('notification-v1',", inbox.read_text(encoding='utf-8'))
+
+    def test_amqplib_the_contracts_and_the_topology_are_imported_only_when_a_burst_action_needs_them(self):
+        header = self.text[:self.text.index('const context=')]  # the static imports
+        for name in ('amqplib', 'packages/contracts', 'packages/messaging'):
+            self.assertNotIn(name, header)
+        self.assertNotRegex(self.text, r"(?m)^import .* from 'amqplib'")
+        self.assertEqual(self.text.count("import('amqplib')"), 1)
+        self.assertEqual(self.text.count("import('../../../packages/contracts/dist/index.js')"), 1)
+        self.assertEqual(self.text.count("import('../../../packages/messaging/dist/index.js')"), 1)
+        self.assertIn("let failed=false,stopping=false,nginx,probe;", self.text)
+        self.assertIn('if(probe){await probe.connection.close().catch(()=>{});probe=undefined;}', self.text)  # cleanup closes the probe's connection
+
+    def test_burst_observe_reads_the_queue_the_dead_letter_queue_the_outbox_and_the_inbox_without_the_management_plugin(self):
+        for needle in ('probe.channel.checkQueue(names.notification)', "checkQueue(names.notification+'.dlq')",
+                       'messageCount:queue.messageCount,consumerCount:queue.consumerCount', 'observed.dlq={messageCount:dlq.messageCount}',
+                       'observed.clinicOutboxPending=await db.clinic.outboxEvent.count({where:{publishedAt:null}});',
+                       'db.notification.inboxEvent.count({where:{consumerName:INBOX,eventId:{in:ids}}})', 'observed.burstApplied=burst.applied;', 'observed.unexpectedExit=failed;'):
+            self.assertIn(needle, self.text)
+        for forbidden in ('rabbitmqctl', '15672', 'rabbitmq_management', '/api/queues'):
+            self.assertNotIn(forbidden, self.text)
+        # A queue that is not there closes the channel: the probe is dropped and the answer says so instead of failing the control action.
+        self.assertIn('observed.queue=null;observed.dlq=null;observed.probeError=true;', self.text)
+
+    def test_burst_report_returns_raw_timestamps_and_latencies_for_the_runner_to_summarise(self):
+        for needle in ('FROM "InboxEvent" WHERE "consumerName"=${INBOX}', 'now()::timestamp-"createdAt"', 'extract(epoch FROM now())',
+                       '_count:{publishedAt:true},_max:{publishedAt:true}', "envelope->>'eventType'='notification.requested.v1'", 'for(const source of [db.clinic,db.core])',
+                       'latencyMs:applied.map(r=>r.at-burst.occurred.get(r.id))', 'background:{pairs,unmatched}', 'relay:{published,lastPublishedAtMs}'):
+            self.assertIn(needle, self.text)
+        # The inbox instant is read as an age against the database clock: InboxEvent.createdAt is now() in a timestamp column, local time when the server is not on UTC.
+        self.assertEqual(self.text.count('"createdAt"'), 1)
+        self.assertLess(self.text.index('async function reportBurst'), self.text.index('FROM "InboxEvent"'))
+
+    def test_a_failed_burst_action_leaves_its_name_and_error_class_in_the_application_log_and_an_opaque_answer(self):
+        self.assertIn("process.stderr.write('BURST_ACTION_FAILED: '+command.action+' '+(error?.name??'Error')+'\\n')", self.text)
+        self.assertIn("dump(command.id+'.json',{error:'control-action-failed'});", self.text)
+        self.assertNotIn('error.message', self.text.replace('error?.message??', ''))  # a message can carry a connection string: only the class is logged
+
     def test_upstream_keepalive_stays_below_cores(self):
         core = HERE.parents[2] / 'backend/src/index.ts'
         if not core.is_file():
@@ -1023,6 +1190,354 @@ class PoolEvidenceInAMember(unittest.TestCase):
         self.assertEqual(manifest['pg_activity'], {'status': 'NOT_STARTED', 'error_type': 'FileNotFoundError'})
         sampler.stop.assert_not_called()
         self.assertEqual(manifest['pool_timeouts']['http_503'], 2)  # the 503 count still stands
+
+    def run_burst_member(self, label, *, burst, observe, report, polls=4, fire_fails=False, **options):
+        """run_pcn on a fake stack with a fake clock (1 s per sleep). The generator "starts" at clock 1000 and writes the window file when it is given one; the load loop turns
+        `polls` times. `observe(applied)` and `report(committed_ms)` build the burst-observe and burst-report answers."""
+        private = self.root / ('private-' + label)
+        (private / 'pgdata').mkdir(parents=True)
+        (private / 'pgdata/postmaster.pid').write_text('123\n')
+        (private / 'nginx.pid').write_text('456\n')
+        (private / 'pcn-created.jsonl').write_text('')
+        clock, calls, state, environments = Clock(), [], {'applied': 0, 'committed': None}, []
+        stack = MagicMock()
+        stack.__enter__.return_value = stack
+        stack.private, stack.run, stack.db_pool_limit, stack.processes = private, 'run-1', 4, []
+        stack.fixture = {'baseUrl': 'http://127.0.0.1:1', 'gateway': {'topology': 'direct'}, 'dataset': {}, 'dbCrossConnectDenied': 6,
+                         'processes': [{'name': 'core', 'pid': 1}], 'accounts': []}
+
+        def control(action, **extra):
+            calls.append((action, extra, clock.t))
+            if action == 'inspect':
+                return {'pendingCore': 0, 'pendingClinic': 0}
+            if action == 'notification-burst':
+                if fire_fails:
+                    raise RuntimeError('Stack control failed: control-action-failed')
+                state['applied'], state['committed'] = extra['count'], clock.time() * 1000 + 40
+                return {'count': extra['count'], 'committedAtMs': state['committed'], 'insertMs': 700.0, 'unexpectedExit': False}
+            if action == 'burst-observe':
+                return observe(state['applied'])
+            if action == 'burst-report':
+                return report(state['committed'])
+            raise AssertionError(action)
+        stack.control.side_effect = control
+        output = self.root / ('out-' + label)
+
+        def locust(*args, **kwargs):
+            environments.append(kwargs['env'])
+            (output / 'load-final.json').write_text(json.dumps({'requests': 10, 'failures': 0, 'measured_seconds': 5.0}))
+            (output / 'http.csv').write_text('status,failed\n' + '200,False\n' * 10)
+            (output / 'generator.json').write_text(json.dumps({'user_errors': 0}))
+            if 'PCN_WINDOW' in kwargs['env']:  # what bridge_locust.py does once the measurement window opens
+                Path(kwargs['env']['PCN_WINDOW']).write_text(json.dumps({'start_monotonic': clock.monotonic(), 'seen_monotonic': clock.monotonic(), 'seen_epoch': clock.time()}))
+            child = MagicMock()
+            child.poll.side_effect = [None] * polls + [0] * 1000
+            child.returncode, child.pid = 0, 99
+            return child
+        with patch.object(runner, 'NativeStack', return_value=stack) as native, patch.object(runner, 'Client', return_value=types.SimpleNamespace(
+                actors=[{'token': 't', 'pets': [{'id': 'p', 'qrToken': 'q'}]}])), patch.object(runner.subprocess, 'Popen', side_effect=locust), \
+                patch.object(runner, 'reconcile', return_value={'status': 'PASS_IN_SCOPE'}), patch.object(runner, 'verdict', return_value={}), \
+                patch.object(runner, 'resource_sample', return_value=[]), patch.object(runner, 'time', clock):
+            runner.run_pcn(self.repo, output, mode='smoke', progress=lambda text: None, locustfile=bs.LOCUSTFILE, burst=burst, **options)
+        manifest = json.loads((output / 'manifest.json').read_text())
+        return manifest, output, calls, environments, private, native
+
+    @staticmethod
+    def burst_observation(applied):
+        return {'atMs': 1.0, 'fired': applied > 0, 'queue': {'messageCount': 4, 'consumerCount': 1}, 'dlq': {'messageCount': 0}, 'clinicOutboxPending': 2,
+                **({'burstApplied': applied} if applied else {}), 'unexpectedExit': False}
+
+    @staticmethod
+    def burst_report(committed):
+        return {'count': 6, 'notificationWorkers': 1, 'committedAtMs': committed, 'insertMs': 700.0,
+                'inbox': {'applied': 6, 'firstAtMs': committed + 500, 'lastAtMs': committed + 4000}, 'relay': {'published': 6, 'lastPublishedAtMs': committed + 1500},
+                'latencyMs': [900.0, 1000.0, 1100.0, 1200.0, 1300.0, 4100.0],
+                'background': {'pairs': [[committed - 2040 - 5000, 7.0], [committed - 1000, 25.0], [committed + 1000, 900.0]], 'unmatched': 0},
+                'unexpectedExit': False}
+
+    def test_a_burst_is_fired_in_the_window_sampled_every_second_drained_and_reported_after_the_reconciliation(self):
+        manifest, output, calls, environments, private, native = self.run_burst_member(
+            'burst', burst={'count': 6, 'at_s': 2}, observe=self.burst_observation, report=self.burst_report)
+        self.assertEqual(manifest['status'], 'COMPLETE', manifest)
+        self.assertEqual(environments[0]['PCN_WINDOW'], str(private / 'pcn-window.json'))
+        # Window opened at clock 1000, so the burst is due at 1002: fired once by the third tick, before the 'after' snapshot; the drain wait and the report come after it.
+        self.assertEqual([(action, clock) for action, _, clock in calls],
+                         [('inspect', 1000.0), ('burst-observe', 1000.0), ('burst-observe', 1001.0), ('notification-burst', 1002.0), ('burst-observe', 1002.0),
+                          ('burst-observe', 1003.0), ('inspect', 1004.0), ('burst-observe', 1004.0), ('burst-report', 1004.0)])
+        self.assertEqual(next(extra for action, extra, _ in calls if action == 'notification-burst'), {'count': 6})
+        result = json.loads((output / 'burst.json').read_text(encoding='utf-8'))
+        self.assertEqual((result['status'], result['valid'], result['reasons']), ('COMPLETE', True, []))
+        self.assertEqual((result['count'], result['at_s'], result['workers'], result['fired_s']), (6, 2, 1, 2.0))
+        self.assertAlmostEqual(result['committed_s'], 2.04)
+        self.assertEqual((result['drained'], result['drain_s'], result['relay_drain_s'], result['drain_reading']), (True, 4.0, 1.5, 'đã xả xong'))
+        self.assertEqual(result['latency_ms'], {'n': 6, 'p50_ms': 1100.0, 'p95_ms': 4100.0, 'max_ms': 4100.0})
+        self.assertEqual({name: part['n'] for name, part in result['background_latency_ms'].items()}, {'before': 1, 'during': 1, 'after': 0})  # the event before the window is not counted
+        self.assertEqual(result['observations'], 5)
+        self.assertEqual(len((output / 'burst.jsonl').read_text().splitlines()), 5)  # one per tick of the load (four) and one while waiting for the drain
+        self.assertEqual(manifest['burst'], {'count': 6, 'at_s': 2, 'status': 'COMPLETE', 'valid': True})
+
+    def test_a_burst_the_window_never_reaches_is_reported_as_not_fired(self):
+        manifest, output, calls, environments, private, native = self.run_burst_member(
+            'late', burst={'count': 6, 'at_s': 10}, observe=self.burst_observation, report=self.burst_report)
+        self.assertEqual(manifest['status'], 'COMPLETE', manifest)
+        self.assertNotIn('notification-burst', [action for action, _, _ in calls])
+        self.assertNotIn('burst-report', [action for action, _, _ in calls])
+        result = json.loads((output / 'burst.json').read_text(encoding='utf-8'))
+        self.assertEqual((result['status'], result['valid'], result['window_opened']), ('NOT_FIRED', False, True))
+        self.assertEqual(manifest['burst'], {'count': 6, 'at_s': 10, 'status': 'NOT_FIRED', 'valid': False})
+
+    def test_a_burst_that_cannot_be_fired_fails_the_member_and_closes_its_log(self):
+        manifest, output, calls, environments, private, native = self.run_burst_member(
+            'unfired', burst={'count': 6, 'at_s': 2}, observe=self.burst_observation, report=self.burst_report, fire_fails=True)
+        self.assertEqual((manifest['status'], manifest['failed_stage'], manifest['error_type']), ('FAILED', 'load', 'RuntimeError'))
+        self.assertEqual(manifest['burst'], {'count': 6, 'at_s': 2})  # asked for, never completed
+        self.assertFalse((output / 'burst.json').exists())
+        self.assertTrue((output / 'burst.jsonl').exists())
+
+    def test_a_member_without_a_burst_sets_no_window_variable_and_writes_no_burst_file(self):
+        manifest, output, calls, environments, private, native = self.run_burst_member(
+            'none', burst=None, observe=self.burst_observation, report=self.burst_report)
+        self.assertEqual(manifest['status'], 'COMPLETE', manifest)
+        self.assertNotIn('PCN_WINDOW', environments[0])
+        self.assertNotIn('burst', manifest)
+        self.assertEqual([action for action, _, _ in calls], ['inspect', 'inspect'])
+        self.assertFalse((output / 'burst.json').exists() or (output / 'burst.jsonl').exists())
+        import inspect
+        self.assertIsNone(inspect.signature(runner.run_pcn).parameters['burst'].default)
+
+    def test_a_burst_is_refused_before_anything_starts_when_it_is_malformed_or_the_member_has_a_cqrs_configuration(self):
+        for burst, options in (({'count': 6}, {}), ({'count': 0, 'at_s': 2}, {}), ({'count': 6, 'at_s': 15}, {}), ({'count': 6, 'at_s': 2}, {'cqrs_configuration': 'O'})):
+            with patch.object(runner, 'NativeStack') as native, self.assertRaises(ValueError, msg=str(burst)):
+                runner.run_pcn(self.repo, self.root / 'refused', mode='smoke', progress=lambda text: None, locustfile=bs.LOCUSTFILE, burst=burst, **options)
+            native.assert_not_called()
+            self.assertFalse((self.root / 'refused').exists())  # not even the output directory
+
+
+WINDOW_MS = (1000.0 + 1_700_000_000.0) * 1000  # the window of the burst tests: opened at monotonic 1000 s, epoch = monotonic + 1.7e9 s
+
+
+def burst_report(**changes):
+    """A burst-report answer for 10 events fired 120 s into the window, drained 8 s later; `changes` replace whole keys."""
+    committed = WINDOW_MS + 120_000
+    report = {'count': 10, 'notificationWorkers': 2, 'committedAtMs': committed, 'insertMs': 850.0,
+              'inbox': {'applied': 10, 'firstAtMs': committed + 500, 'lastAtMs': committed + 8000},
+              'relay': {'published': 10, 'lastPublishedAtMs': committed + 3500},
+              'latencyMs': [1000.0 * k for k in range(1, 11)],
+              'background': {'pairs': [[WINDOW_MS - 5000, 900.0],        # before the window: not counted
+                                       [WINDOW_MS + 10_000, 30.0], [committed - 1, 40.0],           # before the burst
+                                       [committed, 2000.0], [committed + 5000, 6000.0], [committed + 7999, 7000.0],  # during: from the commit up to the last event applied
+                                       [committed + 8000, 50.0], [committed + 80_000, 60.0]],       # after
+                             'unmatched': 3},
+              'unexpectedExit': False}
+    return {**report, **changes}
+
+
+def burst_samples(consumers=2):
+    """Four burst-observe samples: two that read the queue, one the broker did not answer and one whose control call failed."""
+    row = {'queue': {'messageCount': 0, 'consumerCount': consumers}, 'dlq': {'messageCount': 0}, 'clinicOutboxPending': 0, 'unexpectedExit': False}
+    return [{'monotonic_s': 1100.0, **row},
+            {'monotonic_s': 1101.0, **row, 'queue': {'messageCount': 5800, 'consumerCount': consumers}, 'clinicOutboxPending': 12},
+            {'monotonic_s': 1102.0, 'queue': None, 'dlq': None, 'probeError': True, 'clinicOutboxPending': 3, 'unexpectedExit': False},
+            {'monotonic_s': 1103.0, 'error': 'control-failed'}]
+
+
+class BurstArithmetic(unittest.TestCase):
+    """The pure part of the notification burst: when it is due, how its latencies are cut and what burst.json says."""
+
+    def test_the_burst_is_due_once_the_window_has_reached_its_moment(self):
+        self.assertFalse(runner.burst_due(None, 5000.0, 120))        # the window has not opened
+        self.assertFalse(runner.burst_due(1000.0, 1119.9, 120))
+        self.assertTrue(runner.burst_due(1000.0, 1120.0, 120))
+        self.assertTrue(runner.burst_due(1000.0, 1500.0, 120))       # a tick that came late still fires
+        self.assertFalse(runner.burst_due(1000.0, 1500.0, 120, fired=True))
+        self.assertTrue(runner.burst_due(0.0, 0.0, 0))
+
+    def test_a_burst_is_a_count_and_a_moment_inside_the_window(self):
+        settings = {'seconds': 300}
+        self.assertEqual(runner.burst_spec({'count': 6000, 'at_s': 120}, settings), {'count': 6000, 'at_s': 120})
+        self.assertEqual(runner.burst_spec({'count': 1, 'at_s': 0}, settings), {'count': 1, 'at_s': 0})
+        self.assertEqual(runner.burst_spec({'count': 20000, 'at_s': 299.5}, settings), {'count': 20000, 'at_s': 299.5})
+        for burst in ({'count': 6000}, {'at_s': 120}, {'count': 6000, 'at_s': 120, 'extra': 1}, {'count': 0, 'at_s': 120}, {'count': 20001, 'at_s': 120},
+                      {'count': 6000.0, 'at_s': 120}, {'count': True, 'at_s': 120}, {'count': '6000', 'at_s': 120}, {'count': 6000, 'at_s': -1},
+                      {'count': 6000, 'at_s': 300}, {'count': 6000, 'at_s': True}, {'count': 6000, 'at_s': '120'}, None, [6000, 120], 6000):
+            with self.assertRaises(ValueError, msg=str(burst)):
+                runner.burst_spec(burst, settings)
+        with self.assertRaises(ValueError):
+            runner.burst_spec({'count': 6000, 'at_s': 120}, settings, cqrs_configuration='F')
+
+    def test_latencies_are_cut_before_during_and_after_by_the_burst_and_its_drain(self):
+        points = [(0.0, 10.0), (99.9, 30.0), (100.0, 100.0), (150.0, 400.0), (199.9, 700.0), (200.0, 5.0), (900.0, 9.0)]
+        stats = runner.segment_stats(points, (100.0, 200.0))
+        self.assertEqual(stats['before'], {'n': 2, 'p50_ms': 10.0, 'p95_ms': 30.0, 'max_ms': 30.0})  # [0, 100): the burst moment itself is `during`
+        self.assertEqual(stats['during'], {'n': 3, 'p50_ms': 400.0, 'p95_ms': 700.0, 'max_ms': 700.0})  # [100, 200): the drained moment itself is `after`
+        self.assertEqual(stats['after'], {'n': 2, 'p50_ms': 5.0, 'p95_ms': 9.0, 'max_ms': 9.0})
+        # Nearest rank, as pcn_contract.percentile: 20 values, p95 is the 19th.
+        twenty = runner.latency_stats(range(1, 21))
+        self.assertEqual((twenty['p50_ms'], twenty['p95_ms'], twenty['max_ms'], twenty['n']), (10, 19, 20, 20))
+        # A burst that never drained: everything from the burst on is `during`; a segment with nothing in it says so.
+        open_ended = runner.segment_stats(points, (100.0, math.inf))
+        self.assertEqual((open_ended['during']['n'], open_ended['after']), (5, {'n': 0, 'p50_ms': None, 'p95_ms': None, 'max_ms': None}))
+        self.assertEqual(runner.segment_stats([], (1.0, 2.0))['before']['n'], 0)
+        self.assertEqual(runner.segment_stats(points, (100.0, 100.0))['during']['n'], 0)  # a burst drained at the instant it was fired
+        with self.assertRaises(ValueError):
+            runner.segment_stats(points, (200.0, 100.0))
+
+    def test_a_drained_burst_with_one_consumer_per_worker_is_valid_and_every_figure_is_in_window_seconds(self):
+        result = runner.burst_summary(burst_report(), burst_samples(2), workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)
+        self.assertTrue(result['valid'], result['reasons'])
+        self.assertEqual(result['reasons'], [])
+        self.assertEqual((result['count'], result['workers'], result['committed_s'], result['insert_ms']), (10, 2, 120.0, 850.0))
+        self.assertEqual((result['drained'], result['drain_s'], result['drain_reading'], result['relay_drain_s']), (True, 8.0, 'đã xả xong', 3.5))
+        self.assertEqual(result['latency_ms'], {'n': 10, 'p50_ms': 5000.0, 'p95_ms': 10000.0, 'max_ms': 10000.0})
+        background = result['background_latency_ms']
+        self.assertEqual(background['before'], {'n': 2, 'p50_ms': 30.0, 'p95_ms': 40.0, 'max_ms': 40.0})  # the one before the window is left out
+        self.assertEqual(background['during'], {'n': 3, 'p50_ms': 6000.0, 'p95_ms': 7000.0, 'max_ms': 7000.0})  # from the commit to the last burst event applied
+        self.assertEqual(background['after'], {'n': 2, 'p50_ms': 50.0, 'p95_ms': 60.0, 'max_ms': 60.0})
+        self.assertEqual(result['background_unmatched'], 3)
+        self.assertEqual(result['queue'], {'samples': 2, 'consumer_counts': [2], 'ready_max': 5800, 'dlq_max': 0, 'probe_errors': 1,
+                                           'clinic_outbox_pending_max': 12, 'control_errors': 1})
+        json.dumps(result)  # burst.json
+
+    def test_the_consumer_count_must_be_the_number_of_workers_in_every_sample(self):
+        for consumers, workers in ((1, 2), (2, 1), (0, 1)):
+            result = runner.burst_summary(burst_report(), burst_samples(consumers), workers=workers, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)
+            self.assertFalse(result['valid'])
+            self.assertEqual(len(result['reasons']), 1)
+            self.assertIn(f'consumerCount [{consumers}], not {workers}', result['reasons'][0])
+        mixed = burst_samples(2) + [{**burst_samples(2)[0], 'queue': {'messageCount': 0, 'consumerCount': 1}}]  # a worker that dropped out for a moment
+        self.assertIn('consumerCount [1, 2]', runner.burst_summary(burst_report(), mixed, workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)['reasons'][0])
+        # No sample could read the queue at all: the count is unknown, not assumed.
+        blind = [{'monotonic_s': 1100.0, 'queue': None, 'dlq': None, 'probeError': True}]
+        self.assertIn('never', runner.burst_summary(burst_report(), blind, workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)['reasons'][0])
+
+    def test_a_message_in_the_dead_letter_queue_or_a_process_that_exited_makes_the_burst_invalid(self):
+        dead = burst_samples(2)
+        dead[1] = {**dead[1], 'dlq': {'messageCount': 3}}
+        result = runner.burst_summary(burst_report(), dead, workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)
+        self.assertEqual((result['valid'], result['queue']['dlq_max']), (False, 3))
+        self.assertEqual(result['reasons'], ['the dead-letter queue held up to 3 message(s)'])
+        exited = runner.burst_summary(burst_report(unexpectedExit=True), burst_samples(2), workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)
+        self.assertEqual(exited['reasons'], ['a process of the stack exited unexpectedly'])
+        sampled = burst_samples(2)
+        sampled[0] = {**sampled[0], 'unexpectedExit': True}
+        self.assertFalse(runner.burst_summary(burst_report(), sampled, workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)['valid'])
+
+    def test_a_burst_that_is_not_drained_has_no_drain_time_and_is_not_valid(self):
+        committed = WINDOW_MS + 120_000
+        report = burst_report(inbox={'applied': 9, 'firstAtMs': committed + 500, 'lastAtMs': committed + 170_000}, relay={'published': 10, 'lastPublishedAtMs': committed + 3500})
+        result = runner.burst_summary(report, burst_samples(2), workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['reasons'], ['the notification inbox holds 9 of the 10 events'])
+        self.assertEqual((result['drained'], result['drain_s'], result['drain_reading']), (False, None, 'không đọc được'))
+        self.assertEqual(result['relay_drain_s'], 3.5)  # the relay did finish; only the workers did not
+        # Nothing is `after` a drain that never came.
+        self.assertEqual(result['background_latency_ms']['after']['n'], 0)
+        self.assertEqual(result['background_latency_ms']['during']['n'], 5)
+        slow_relay = burst_report(relay={'published': 7, 'lastPublishedAtMs': committed + 3500}, inbox={'applied': 10, 'firstAtMs': committed, 'lastAtMs': committed + 9000})
+        self.assertIsNone(runner.burst_summary(slow_relay, burst_samples(2), workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)['relay_drain_s'])
+        self.assertIsNone(runner.burst_summary(burst_report(inbox={'applied': 0, 'firstAtMs': None, 'lastAtMs': None}), burst_samples(2), workers=2,
+                                               start_monotonic=1000.0, epoch_offset=1_700_000_000.0)['drain_s'])
+
+
+class BurstControl(unittest.TestCase):
+    """BurstRun against a fake stack: it fires once when the window has reached the burst moment, samples every tick and waits for the drain with a bound."""
+
+    class FakeStack:
+        def __init__(self, **answers):
+            self.calls, self.answers = [], answers
+
+        def control(self, action, **extra):
+            self.calls.append((action, extra))
+            answer = self.answers[action]
+            if isinstance(answer, Exception):
+                raise answer
+            return answer(self) if callable(answer) else dict(answer)
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.window, self.log = Path(self.directory.name) / 'window.json', Path(self.directory.name) / 'burst.jsonl'
+
+    def run_of(self, stack, count=5, at_s=10):
+        run = runner.BurstRun(stack, {'count': count, 'at_s': at_s}, 1, self.window, self.log)
+        self.addCleanup(run.close)
+        return run
+
+    def test_it_waits_for_the_window_fires_once_and_samples_every_tick(self):
+        stack = self.FakeStack(**{'burst-observe': {'queue': {'messageCount': 0, 'consumerCount': 1}}, 'notification-burst': {'count': 5, 'committedAtMs': 1.0}})
+        run = self.run_of(stack)
+        run.tick(100.0)  # the generator has not written the window yet
+        self.assertEqual((run.start, run.fired, [action for action, _ in stack.calls]), (None, None, ['burst-observe']))
+        self.window.write_text(json.dumps({'start_monotonic': 100.0, 'seen_monotonic': 100.1, 'seen_epoch': 1.7e9}))
+        run.tick(109.9)
+        self.assertEqual((run.start, run.fired), (100.0, None))
+        run.tick(110.0)
+        self.assertEqual(run.fired['monotonic_s'], 110.0)
+        self.assertAlmostEqual(run.fired['epoch_offset_s'], time.time() - time.monotonic(), delta=1.0)
+        self.assertEqual(run.fired['response']['count'], 5)
+        run.tick(111.0)
+        run.tick(500.0)
+        self.assertEqual([action for action, _ in stack.calls].count('notification-burst'), 1)  # once, however late the next ticks are
+        self.assertEqual(next(extra for action, extra in stack.calls if action == 'notification-burst'), {'count': 5})
+        self.assertEqual([action for action, _ in stack.calls][-3:], ['burst-observe', 'burst-observe', 'burst-observe'])
+        self.assertEqual(len(run.observations), 5)  # one per tick, the burst or not
+        written = [json.loads(line) for line in self.log.read_text().splitlines()]
+        self.assertEqual([row['monotonic_s'] for row in written], [100.0, 109.9, 110.0, 111.0, 500.0])  # the file is flushed as it goes, so it is complete even if the run dies
+
+    def test_a_window_file_that_is_missing_cut_off_or_wrong_is_not_a_start(self):
+        run = self.run_of(self.FakeStack())
+        self.assertIsNone(run.window_start())  # no file
+        for text in ('', '{', '{"start_monotonic"', '[]', '{}', '{"start_monotonic": "100"}', '{"start_monotonic": true}', '{"start_monotonic": null}'):
+            self.window.write_text(text)
+            self.assertIsNone(run.window_start(), text)
+        self.window.write_text('{"start_monotonic": 100}')
+        self.assertEqual(run.window_start(), 100)
+
+    def test_a_sample_that_fails_is_recorded_and_the_load_goes_on_but_a_burst_that_fails_is_not_hidden(self):
+        stack = self.FakeStack(**{'burst-observe': RuntimeError('Stack control timeout'), 'notification-burst': RuntimeError('Stack control failed: control-action-failed')})
+        run = self.run_of(stack)
+        run.tick(100.0)
+        self.assertEqual(run.observations, [{'monotonic_s': 100.0, 'error': 'control-failed'}])
+        self.window.write_text('{"start_monotonic": 100.0}')
+        with self.assertRaises(RuntimeError):
+            run.tick(110.0)
+        self.assertIsNone(run.fired)
+
+    def test_finish_waits_for_the_inbox_to_hold_the_burst_then_reads_the_report(self):
+        applied = iter([2, 4, 5])
+        stack = self.FakeStack(**{'burst-observe': lambda s: {'queue': {'messageCount': 0, 'consumerCount': 1}, 'dlq': {'messageCount': 0}, 'burstApplied': next(applied)},
+                                  'burst-report': lambda s: burst_report(count=5, inbox={'applied': 5, 'firstAtMs': WINDOW_MS + 121_000, 'lastAtMs': WINDOW_MS + 124_000},
+                                                                         relay={'published': 5, 'lastPublishedAtMs': WINDOW_MS + 122_000}, latencyMs=[1.0] * 5)})
+        run = self.run_of(stack)
+        run.start, run.fired = 1000.0, {'monotonic_s': 1120.0, 'epoch_offset_s': 1_700_000_000.0, 'response': {}}
+        clock = Clock()
+        with patch.object(runner, 'time', clock):
+            result = run.finish(progress=lambda text: None)
+        self.assertEqual([action for action, _ in stack.calls], ['burst-observe'] * 3 + ['burst-report'])
+        self.assertEqual(clock.t, 1002.0)  # one second between samples, none after the last
+        self.assertEqual((result['status'], result['valid'], result['drain_s'], result['fired_s'], result['observations']), ('COMPLETE', True, 4.0, 120.0, 3))
+        self.assertEqual((result['count'], result['at_s'], result['start_monotonic']), (5, 10, 1000.0))
+
+    def test_finish_gives_up_after_the_drain_wait_and_reports_what_it_has(self):
+        stack = self.FakeStack(**{'burst-observe': {'queue': {'messageCount': 900, 'consumerCount': 1}, 'dlq': {'messageCount': 0}, 'burstApplied': 3},
+                                  'burst-report': lambda s: burst_report(count=5, inbox={'applied': 3, 'firstAtMs': WINDOW_MS + 121_000, 'lastAtMs': WINDOW_MS + 130_000},
+                                                                         relay={'published': 5, 'lastPublishedAtMs': WINDOW_MS + 122_000}, latencyMs=[1.0] * 3)})
+        run = self.run_of(stack)
+        run.start, run.fired = 1000.0, {'monotonic_s': 1120.0, 'epoch_offset_s': 1_700_000_000.0, 'response': {}}
+        clock = Clock()
+        with patch.object(runner, 'time', clock):
+            result = run.finish(progress=lambda text: None)
+        self.assertEqual(runner.BURST_DRAIN_WAIT_S, 180)
+        self.assertEqual(clock.t, 1000.0 + 180)  # sampled once a second until the 180 s were over
+        self.assertEqual([action for action, _ in stack.calls].count('burst-observe'), 181)
+        self.assertEqual((result['status'], result['valid'], result['drained'], result['drain_s'], result['drain_reading']), ('COMPLETE', False, False, None, 'không đọc được'))
+
+    def test_finish_without_a_burst_fired_says_so_and_asks_for_no_report(self):
+        stack = self.FakeStack()
+        run = self.run_of(stack, count=7, at_s=300)
+        self.assertEqual(run.finish(progress=lambda text: None), {'status': 'NOT_FIRED', 'valid': False, 'window_opened': False, 'count': 7, 'at_s': 300,
+                                                                   'reasons': ['the measurement window never reached the burst moment']})
+        self.assertEqual(stack.calls, [])
 
 
 class MonolithSampling(unittest.TestCase):
