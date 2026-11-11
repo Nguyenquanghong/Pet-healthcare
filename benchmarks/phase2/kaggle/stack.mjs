@@ -1,6 +1,6 @@
 // Dedicated native Kaggle fixture. Does not modify the Compose/E2E guards.
 import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync,realpathSync,mkdirSync,openSync,closeSync,renameSync} from 'node:fs';
+import {readFileSync,writeFileSync,realpathSync,mkdirSync,openSync,closeSync,renameSync,existsSync} from 'node:fs';
 import {resolve,dirname} from 'node:path';
 import {execFileSync,spawn} from 'node:child_process';
 import {randomUUID,generateKeyPairSync,randomBytes} from 'node:crypto';
@@ -27,11 +27,25 @@ const coreReplicas=context.coreReplicas??1;
 assert.ok([1,2].includes(coreReplicas));
 assert.ok(context.coreProxy===undefined||typeof context.coreProxy==='boolean');
 const coreProxy=context.coreProxy===true||coreReplicas>1;
+// Bridge VM study (K9), Notification workers on the one notification queue: 1 or 2, never with a CQRS configuration. RabbitMQ deals the messages round-robin (prefetch 1 per worker);
+// a message redelivered to the other worker is applied once, as InboxEvent(consumerName,eventId) is inserted in the effect's own transaction. Absent in every older context: one.
+const notificationWorkers=context.notificationWorkers??1;
+assert.ok([1,2].includes(notificationWorkers),'context.notificationWorkers must be 1 or 2, got '+JSON.stringify(notificationWorkers));
 // Bridge VM study: how the gateway reaches the services. `direct` (the default, and the only one the CQRS studies use) sends each prefix of
 // gatewayRoutes straight to its service, as deploy/phase2/nginx.split.conf.example does; `core-ingress` sends every /api path to Core, which
 // forwards the owned prefixes itself, as compose, the demo and E2E do (one more hop for Clinic and Notification traffic; K9 H3c).
 const gatewayTopology=context.gatewayTopology??'direct';
 assert.ok(['direct','core-ingress'].includes(gatewayTopology),'context.gatewayTopology must be direct or core-ingress, got '+JSON.stringify(gatewayTopology));
+// Bridge VM study, where this tree keeps the Core workers: `workers` is the tree of today (H3), `phase2` the tree of 2841d1b (H1), before backend/src/phase2 was split up.
+// Exactly one layout must be built in the tree stack.mjs runs from (the paths are relative to the repository, as every child below), and context.coreLayout must name it.
+// Absent in every older context: workers.
+const CORE_LAYOUTS={workers:{notification:'backend/dist/src/workers/notification.js',billing:'backend/dist/src/workers/billing.js'},phase2:{notification:'backend/dist/src/phase2/notificationWorker.js',billing:'backend/dist/src/phase2/billingWorker.js'}};
+const coreLayout=context.coreLayout??'workers';
+const builtLayouts=Object.keys(CORE_LAYOUTS).filter(name=>Object.values(CORE_LAYOUTS[name]).every(file=>existsSync(file)));
+assert.deepEqual(builtLayouts,[coreLayout],'context.coreLayout is '+JSON.stringify(coreLayout)+' but the tree has the Core worker layout(s) '+JSON.stringify(builtLayouts)+' (workers: backend/dist/src/workers, phase2: backend/dist/src/phase2)');
+// Bridge VM study, the Prisma pool of every service process (DB_POOL_LIMIT, the pool the H3p8 block widens): 4 to 8, 4 in every older context.
+const dbPoolLimit=context.dbPoolLimit??4;
+assert.ok(Number.isInteger(dbPoolLimit)&&dbPoolLimit>=4&&dbPoolLimit<=8,'context.dbPoolLimit must be an integer from 4 to 8, got '+JSON.stringify(dbPoolLimit));
 const cleanEnv=Object.fromEntries(['PATH','HOME','LANG','TMPDIR'].filter(k=>process.env[k]).map(k=>[k,process.env[k]]));
 // Apps import dotenv; an existing file must not inject a target or secret.
 for(const file of ['.env','backend/.env','services/clinic/.env','services/notification/.env']){
@@ -45,7 +59,7 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const dump=(file,value)=>{const temporary=resolve(dir,file+'.tmp');writeFileSync(temporary,JSON.stringify(value,null,2),{mode:0o600});renameSync(temporary,resolve(dir,file));};
 async function until(check,label,timeout=45000){const end=Date.now()+timeout;while(Date.now()<end){if(await check())return;await delay(100);}throw new Error('Timeout '+label);}
 async function port(){const s=createServer().listen(0,'127.0.0.1');await once(s,'listening');const p=s.address().port;await new Promise(r=>s.close(r));return p;}
-let failed=false,stopping=false,nginx;
+let failed=false,stopping=false,nginx,probe;
 async function stop(handle){
   if(handle.child.exitCode!==null){if(handle.child.exitCode!==0)failed=true;return;}
   handle.expected=true;
@@ -57,6 +71,7 @@ async function cleanup(){
   if(stopping)return;stopping=true;
   if(nginx&&nginx.exitCode===null){nginx.kill('SIGQUIT');try{await until(()=>nginx.exitCode!==null,'nginx drain',5000);}catch{nginx.kill('SIGKILL');failed=true;}}
   for(const handle of [...handles].reverse())try{await stop(handle);}catch{failed=true;handle.child.kill('SIGKILL');}
+  if(probe){await probe.connection.close().catch(()=>{});probe=undefined;}
   await Promise.allSettled(Object.values(db).map(c=>c.$disconnect()));
 }
 process.once('SIGTERM',()=>void cleanup().then(()=>process.exit(failed?1:0)));
@@ -86,7 +101,7 @@ try{
   const cqrsMode=context.cqrsConfiguration;
   let cqrs,cqrsTools;
   if(cqrsMode!==undefined&&cqrsMode!==null){
-    assert.equal(context.replicas,1);assert.equal(coreReplicas,1);assert.ok(!coreProxy);assert.equal(gatewayTopology,'direct');assert.ok(['pcn','query-heavy'].includes(profile));
+    assert.equal(context.replicas,1);assert.equal(coreReplicas,1);assert.ok(!coreProxy);assert.equal(gatewayTopology,'direct');assert.equal(coreLayout,'workers');assert.equal(dbPoolLimit,4);assert.equal(notificationWorkers,1);assert.ok(['pcn','query-heavy'].includes(profile));
     cqrsTools=await import('./cqrs_runtime.mjs');
     cqrs=await cqrsTools.prepareReadModel(cqrsMode,context.urls.clinic,context);
   }
@@ -97,7 +112,7 @@ try{
   const credentials=Object.fromEntries(['CORE_DIRECTORY_TOKEN','CORE_BILLING_EVIDENCE_TOKEN','CLINIC_BILLING_TOKEN','CLINIC_BOOTSTRAP_TOKEN','CORE_NOTIFICATION_SEND_TOKEN'].map(k=>[k,secret()]));
   // Read diagnostics are a study aid for the maintained-projection members only; F runs the product defaults.
   const cqrsEnv=cqrsTools?{...cqrsTools.apiEnvironment(cqrsMode,secret()),CLINIC_READ_DIAGNOSTICS:['A','B'].includes(cqrsMode)?'1':'0'}:{CLINIC_READ_DIAGNOSTICS:'0'};
-  const common={HOST:'127.0.0.1',PHASE2_RUNTIME_REQUIRED:'1',JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:keys.publicKey.export({type:'spki',format:'pem'}).toString(),JWT_KEY_ID:'p8-kaggle',JWT_ISSUER:'p8-core',JWT_AUDIENCE:'pet-healthcare',JWT_SECRET:'',REDIS_URL:context.redis,RATE_LIMIT_NAMESPACE:'p8-'+context.run,RATE_LIMIT_KEY_SECRET:secret(),OBSERVABILITY_TOKEN:secret(),DB_POOL_LIMIT:'4',HASH_CONCURRENCY:'2',HASH_PENDING_LIMIT:'16',TRUST_PROXY_CIDRS:'',BROKER_URL:context.broker,BROKER_PREFIX:'p8.'+context.run,PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',BANK_TRANSFER_ENABLED:'false',CORS_ORIGIN:''};
+  const common={HOST:'127.0.0.1',PHASE2_RUNTIME_REQUIRED:'1',JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:keys.publicKey.export({type:'spki',format:'pem'}).toString(),JWT_KEY_ID:'p8-kaggle',JWT_ISSUER:'p8-core',JWT_AUDIENCE:'pet-healthcare',JWT_SECRET:'',REDIS_URL:context.redis,RATE_LIMIT_NAMESPACE:'p8-'+context.run,RATE_LIMIT_KEY_SECRET:secret(),OBSERVABILITY_TOKEN:secret(),DB_POOL_LIMIT:String(dbPoolLimit),HASH_CONCURRENCY:'2',HASH_PENDING_LIMIT:'16',TRUST_PROXY_CIDRS:'',BROKER_URL:context.broker,BROKER_PREFIX:'p8.'+context.run,PAYMENTS_DEMO:'1',VNPAY_ENABLED:'false',BANK_TRANSFER_ENABLED:'false',CORS_ORIGIN:''};
   // Bridge study: raise named limiter thresholds only; the limiter still runs.
   for(const [key,value] of Object.entries(context.serviceEnv??{})){assert.match(key,/^(API|RESCUE_REPORT)_[A-Z_]+_LIMIT$/);assert.match(String(value),/^[0-9]+$/);common[key]=String(value);}
   const ports={core:await port(),notification:await port(),clinic:await port(),gateway:await port()};
@@ -108,9 +123,14 @@ try{
   const origins=Object.fromEntries(Object.entries(ports).map(([k,v])=>[k,'http://127.0.0.1:'+v]));
   common.CORE_SERVICE_URL=origins.core;common.CLINIC_SERVICE_URL=origins.clinic;common.NOTIFICATION_SERVICE_URL=origins.notification;
   const metrics=[];
+  // Every process names its database connections p8-<process> (application_name, which Prisma passes on from the connection string and databaseUrl() keeps),
+  // so the pg_stat_activity sampler of the bridge VM study can tell which pool is busy; the monolith member uses m-api.
+  const withApplicationName=(url,name)=>{const u=new URL(url);u.searchParams.set('application_name','p8-'+name);return u.toString();};
   async function child(name,file,extra,readyPort){
     const fd=openSync(resolve(dir,name+'.log'),'a',0o600);
-    const c=spawn(process.execPath,[file],{env:{...cleanEnv,...common,...extra},stdio:['ignore',fd,fd,'ipc']});closeSync(fd);
+    const env={...cleanEnv,...common,...extra};
+    if(env.DATABASE_URL)env.DATABASE_URL=withApplicationName(env.DATABASE_URL,name);
+    const c=spawn(process.execPath,[file],{env,stdio:['ignore',fd,fd,'ipc']});closeSync(fd);
     const handle={name,child:c,expected:false};handles.push(handle);
     c.once('exit',(code)=>{if(!handle.expected){failed=true;dump('unexpected-exit.json',{name,code});}});
     c.once('error',()=>{failed=true;});
@@ -131,19 +151,24 @@ try{
   for(let i=0;i<clinicPorts.length;i++)await child('clinic-'+i,'services/clinic/dist/index.js',{...credentials,...cqrsEnv,CORE_NOTIFICATION_SEND_TOKEN:'',DATABASE_URL:context.urls.clinic,PORT:String(clinicPorts[i]),SERVICE_INSTANCE_ID:'p8-clinic-'+i},clinicPorts[i]);
   await child('notification','services/notification/dist/index.js',{CORE_NOTIFICATION_SEND_TOKEN:credentials.CORE_NOTIFICATION_SEND_TOKEN,DATABASE_URL:context.urls.notification,PORT:String(ports.notification)},ports.notification);
   mkdirSync(resolve(dir,'nginx-temp'));
-  const headers='proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Request-ID $request_id; proxy_connect_timeout 1s; proxy_read_timeout 15s; proxy_next_upstream error timeout http_502 http_503 http_504;';
-  // The gateway's Core location: with coreProxy no retry on another instance either (one policy for one Core or two, as on the internal hop); otherwise `headers` as ever.
-  const coreGateway=coreProxy?headers.replace('proxy_next_upstream error timeout http_502 http_503 http_504;','proxy_next_upstream off;'):headers;
+  const retryHeaders='proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Request-ID $request_id; proxy_connect_timeout 1s; proxy_read_timeout 15s; proxy_next_upstream error timeout http_502 http_503 http_504;';
+  // With coreProxy (every H configuration of the bridge VM study, and two Core instances) no location retries on another instance and no upstream server is put aside after a failure,
+  // for Core and for Clinic alike (K9 S2): one policy for one instance or two, so a second Clinic changes the capacity and nothing about how errors are handled. `headers` is what the
+  // gateway's Clinic and Notification locations and the listener on ports.clinic use, `coreGateway` the gateway's Core location; the two templates below name them and stay as they are.
+  // Without coreProxy (the CQRS studies, every older context) both are the plain `retryHeaders` and the upstreams keep nginx's defaults, as ever.
+  const headers=coreProxy?retryHeaders.replace('proxy_next_upstream error timeout http_502 http_503 http_504;','proxy_next_upstream off;'):retryHeaders;
+  const coreGateway=headers;
   const coreServers=corePorts.map(p=>'server 127.0.0.1:'+p+' max_fails=0;').join(' ');
+  const clinicServers=clinicPorts.map(p=>'server 127.0.0.1:'+p+(coreProxy?' max_fails=0':'')+';').join(' ');
   // Clinic and Notification reach Core here (coreProxy): HTTP/1.1 with upstream keepalive (idle 4 s, below Core's 5 s keepAliveTimeout), the caller's request id kept,
   // no retry on another instance (one policy for one Core or two). The gateway's own path to Core (upstream core) has no keepalive, as before.
   const coreEdge=coreProxy?`map $http_x_request_id $core_req_id { default $http_x_request_id; "" $request_id; } upstream core_internal { ${coreServers} keepalive 16; keepalive_timeout 4s; } server { listen 127.0.0.1:${ports.core}; location / { proxy_http_version 1.1; proxy_set_header Connection ""; proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Request-ID $core_req_id; proxy_connect_timeout 1s; proxy_read_timeout 15s; proxy_next_upstream off; proxy_pass http://core_internal; } } `:'';
   // Two full templates, one per gateway topology, that differ only in the gateway server (tools/phase2/gateway-routing.mjs reads each against gatewayRoutes
   // and keeps them apart). Both raise the nginx descriptors and connections so the gateway is not the ceiling at 800 users.
   // direct: appointments, medical-records and dashboard/clinic go to Clinic, notifications to Notification, the rest to Core.
-  const directConfig=`pid ${dir}/nginx.pid; error_log ${dir}/nginx.log; worker_rlimit_nofile 8192; events { worker_connections 4096; } http { access_log off; client_body_temp_path ${dir}/nginx-temp; proxy_temp_path ${dir}/nginx-temp; upstream clinic { ${clinicPorts.map(p=>'server 127.0.0.1:'+p+';').join(' ')} } upstream core { ${coreServers} } server { listen 127.0.0.1:${ports.clinic}; location / { ${headers} proxy_pass http://clinic; } } ${coreEdge}server { listen 127.0.0.1:${ports.gateway}; location ~ ^/(internal|metrics|health) { return 404; } location ~ ^/api/(appointments|medical-records|dashboard/clinic)(/|$) { ${headers} proxy_pass http://clinic; } location ~ ^/api/notifications(/|$) { ${headers} proxy_pass ${origins.notification}; } location /api/ { ${coreGateway} proxy_pass http://core; } location / { return 404; } } }`;
+  const directConfig=`pid ${dir}/nginx.pid; error_log ${dir}/nginx.log; worker_rlimit_nofile 8192; events { worker_connections 4096; } http { access_log off; client_body_temp_path ${dir}/nginx-temp; proxy_temp_path ${dir}/nginx-temp; upstream clinic { ${clinicServers} } upstream core { ${coreServers} } server { listen 127.0.0.1:${ports.clinic}; location / { ${headers} proxy_pass http://clinic; } } ${coreEdge}server { listen 127.0.0.1:${ports.gateway}; location ~ ^/(internal|metrics|health) { return 404; } location ~ ^/api/(appointments|medical-records|dashboard/clinic)(/|$) { ${headers} proxy_pass http://clinic; } location ~ ^/api/notifications(/|$) { ${headers} proxy_pass ${origins.notification}; } location /api/ { ${coreGateway} proxy_pass http://core; } location / { return 404; } } }`;
   // core-ingress: every /api path goes to Core.
-  const coreIngressConfig=`pid ${dir}/nginx.pid; error_log ${dir}/nginx.log; worker_rlimit_nofile 8192; events { worker_connections 4096; } http { access_log off; client_body_temp_path ${dir}/nginx-temp; proxy_temp_path ${dir}/nginx-temp; upstream clinic { ${clinicPorts.map(p=>'server 127.0.0.1:'+p+';').join(' ')} } upstream core { ${coreServers} } server { listen 127.0.0.1:${ports.clinic}; location / { ${headers} proxy_pass http://clinic; } } ${coreEdge}server { listen 127.0.0.1:${ports.gateway}; location ~ ^/(internal|metrics|health) { return 404; } location /api/ { ${coreGateway} proxy_pass http://core; } location / { return 404; } } }`;
+  const coreIngressConfig=`pid ${dir}/nginx.pid; error_log ${dir}/nginx.log; worker_rlimit_nofile 8192; events { worker_connections 4096; } http { access_log off; client_body_temp_path ${dir}/nginx-temp; proxy_temp_path ${dir}/nginx-temp; upstream clinic { ${clinicServers} } upstream core { ${coreServers} } server { listen 127.0.0.1:${ports.clinic}; location / { ${headers} proxy_pass http://clinic; } } ${coreEdge}server { listen 127.0.0.1:${ports.gateway}; location ~ ^/(internal|metrics|health) { return 404; } location /api/ { ${coreGateway} proxy_pass http://core; } location / { return 404; } } }`;
   const config=gatewayTopology==='core-ingress'?coreIngressConfig:directConfig;
   writeFileSync(resolve(dir,'nginx.conf'),config);
   // Fail fast with nginx's own message when the generated config is wrong (skipped only when there is no nginx binary, which the spawn below reports).
@@ -153,14 +178,93 @@ try{
   nginx=spawn('nginx',['-p',dir+'/', '-c',resolve(dir,'nginx.conf'),'-g','daemon off;'],{stdio:['ignore',nginxFd,nginxFd]});closeSync(nginxFd);
   await until(async()=>{if(nginx.exitCode!==null)throw new Error('nginx startup failed');try{return(await fetch(origins.gateway+'/api/appointments')).status===401;}catch{return false;}},'nginx');
   const workerBase={JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:'',JWT_KEY_ID:'',JWT_ISSUER:'',JWT_AUDIENCE:'',REDIS_URL:'',RATE_LIMIT_KEY_SECRET:'',OBSERVABILITY_TOKEN:''};
-  await child('core-outbox','backend/dist/src/workers/notification.js',{...workerBase,DATABASE_URL:context.urls.core});
+  await child('core-outbox',CORE_LAYOUTS[coreLayout].notification,{...workerBase,DATABASE_URL:context.urls.core});
   await child('clinic-worker','services/clinic/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.clinic,CORE_DIRECTORY_TOKEN:credentials.CORE_DIRECTORY_TOKEN});
-  const notificationWorker=()=>child('notification-worker','services/notification/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.notification});
-  let consumer=await notificationWorker();
-  await child('billing-worker','backend/dist/src/workers/billing.js',{...credentials,JWT_PRIVATE_KEY:privateKey,DATABASE_URL:context.urls.core});
+  // One worker is `notification-worker`, two are `notification-worker-0/1` (each its own log, application_name and instance id, as Core's and Clinic's instances); pause and resume act on all of them.
+  const notificationWorker=i=>{const name=notificationWorkers===1?'notification-worker':'notification-worker-'+i;return child(name,'services/notification/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.notification,SERVICE_INSTANCE_ID:'p8-'+name});};
+  const startNotificationWorkers=async()=>{const started=[];for(let i=0;i<notificationWorkers;i++)started.push(await notificationWorker(i));return started;};
+  let consumers=await startNotificationWorkers();
+  await child('billing-worker',CORE_LAYOUTS[coreLayout].billing,{...credentials,JWT_PRIVATE_KEY:privateKey,DATABASE_URL:context.urls.core});
   dump('ready.json',{run:context.run,cqrs,password,accounts:dataset.accounts,admin:{id:admin.id,username:admin.username},dataset:dataset.description,baseUrl:origins.gateway,metrics,metricsToken:common.OBSERVABILITY_TOKEN,processes:handles.map(h=>({name:h.name,pid:h.child.pid})),clinicReplicas:context.replicas,coreReplicas,
+    // The process layout of the member: Clinic API instances (clinic-0, clinic-1), Notification workers on the one queue, and the single Clinic worker (relay and consumer), which no configuration multiplies.
+    clinicInstances:handles.filter(h=>/^clinic-\d+$/.test(h.name)).map(h=>h.name),notificationWorkers,clinicWorkers:1,
     // direct: /api/notifications goes straight to Notification as in deploy/phase2/nginx.split.conf.example; core-ingress and the Kaggle bridge v1 harness send it through Core.
-    gateway:{topology:gatewayTopology,notificationsRoute:gatewayTopology==='direct'?'direct-to-notification':'through-core',coreUpstream:coreProxy?'Clinic and Notification reach Core through nginx upstream core_internal (keepalive 16); gateway through upstream core':'one Core, called directly',coreInstances:handles.filter(h=>/^core(-\d+)?$/.test(h.name)).map(h=>h.name)},dbCrossConnectDenied:6});
+    gateway:{topology:gatewayTopology,notificationsRoute:gatewayTopology==='direct'?'direct-to-notification':'through-core',coreLayout,dbPoolLimit,coreUpstream:coreProxy?'Clinic and Notification reach Core through nginx upstream core_internal (keepalive 16); gateway through upstream core':'one Core, called directly',coreInstances:handles.filter(h=>/^core(-\d+)?$/.test(h.name)).map(h=>h.name),
+      clinicUpstream:{servers:clinicPorts.length,maxFails:coreProxy?0:null,proxyNextUpstream:coreProxy?'off':'error timeout http_502 http_503 http_504'}},dbCrossConnectDenied:6});
+  // Bridge VM study (K9 S3-S5), the notification burst. `notification-burst` writes N notification.requested.v1 envelopes into the Clinic outbox in one transaction, shaped like the ones
+  // writeNotification (services/clinic/src/infrastructure/messaging/notificationOutbox.ts) writes for a new appointment: producer clinic, appointment_created, recipient admin, every
+  // related id null. Clinic's relay publishes them and the Notification workers apply them, so everything after the commit takes the real path. One burst per stack, pcn profile, no CQRS.
+  // `burst-observe` samples the broker and the databases, `burst-report` reads the outcome back as raw numbers; benchmarks/phase2/kaggle/pcn_runner.py does the arithmetic.
+  // The contracts, the topology and amqplib are imported when a burst action first needs them, never at start: the H1 tree runs these bytes too and has no burst.
+  const INBOX='notification-v1';  // the consumerName NotificationInbox writes for the notification queue (and the identity queue)
+  const pieces=(list,size)=>{const out=[];for(let i=0;i<list.length;i+=size)out.push(list.slice(i,i+size));return out;};
+  let burst,burstNames;
+  const queueNames=async()=>burstNames??=(await import('../../../packages/messaging/dist/index.js')).topology(common.BROKER_PREFIX);
+  async function fireBurst(count){
+    assert.ok(profile==='pcn'&&!cqrsTools,'notification-burst needs the pcn profile without a CQRS configuration');
+    assert.ok(Number.isInteger(count)&&count>=1&&count<=9000,'notification-burst count must be an integer from 1 to 9000');
+    assert.equal(burst,undefined,'one notification burst per stack');
+    const {parseEnvelope}=await import('../../../packages/contracts/dist/index.js');
+    const rows=[],occurred=new Map();
+    for(let n=1;n<=count;n++){
+      const id=randomUUID(),notificationId=randomUUID(),occurredAt=new Date().toISOString();
+      const event={eventId:id,eventType:'notification.requested.v1',schemaVersion:1,producer:'clinic',aggregateType:'notification',aggregateId:notificationId,aggregateVersion:1,occurredAt,correlationId:id,
+        payload:{recipientRole:'admin',recipientOwnerId:null,type:'appointment_created',title:'New appointment',message:'Burst notification '+n+' of '+count+'.',actionUrl:'/admin/appointments',relatedPetId:null,relatedAppointmentId:null,relatedBookingId:null,notificationId,createdAt:occurredAt,sentAt:occurredAt}};
+      parseEnvelope(JSON.stringify(event));
+      rows.push({id,envelope:event});occurred.set(id,Date.parse(occurredAt));
+    }
+    const began=Date.now();
+    await db.clinic.$transaction(pieces(rows,1000).map(data=>db.clinic.outboxEvent.createMany({data})));
+    const committedAtMs=Date.now(),ids=rows.map(r=>r.id);
+    burst={count,ids,pieces:pieces(ids,1000),occurred,committedAtMs,insertMs:committedAtMs-began,applied:0,done:false};
+    return {count,committedAtMs,insertMs:burst.insertMs,unexpectedExit:failed};
+  }
+  async function observeBurst(){
+    const names=await queueNames(),observed={atMs:Date.now(),fired:burst!==undefined};
+    // checkQueue answers messageCount (ready messages, not the unacknowledged ones) and consumerCount (one per Notification worker); a queue that is not there closes the channel, so a failure drops the probe.
+    try{
+      if(!probe){const amqp=(await import('amqplib')).default;const connection=await amqp.connect(context.broker,{timeout:5000});connection.on('error',()=>{});const channel=await connection.createChannel();channel.on('error',()=>{});probe={connection,channel};}
+      const queue=await probe.channel.checkQueue(names.notification),dlq=await probe.channel.checkQueue(names.notification+'.dlq');
+      observed.queue={messageCount:queue.messageCount,consumerCount:queue.consumerCount};observed.dlq={messageCount:dlq.messageCount};
+    }catch{
+      observed.queue=null;observed.dlq=null;observed.probeError=true;
+      const dead=probe;probe=undefined;if(dead)await dead.connection.close().catch(()=>{});
+    }
+    observed.clinicOutboxPending=await db.clinic.outboxEvent.count({where:{publishedAt:null}});
+    if(burst){
+      if(!burst.done){
+        let applied=0;
+        for(const ids of burst.pieces)applied+=await db.notification.inboxEvent.count({where:{consumerName:INBOX,eventId:{in:ids}}});
+        burst.applied=applied;burst.done=applied===burst.count;
+      }
+      observed.burstApplied=burst.applied;
+    }
+    observed.unexpectedExit=failed;
+    return observed;
+  }
+  async function reportBurst(){
+    assert.ok(burst,'burst-report before notification-burst');
+    const ids=new Set(burst.ids);
+    // InboxEvent.createdAt is `now()` written into a timestamp column, so it holds the server's local time when that is not UTC: its age against the same clock gives the instant.
+    const inbox=await db.notification.$queryRaw`SELECT "eventId",(extract(epoch FROM (now()::timestamp-"createdAt"))*1000)::float8 AS "ageMs",(extract(epoch FROM now())*1000)::float8 AS "nowMs" FROM "InboxEvent" WHERE "consumerName"=${INBOX}`;
+    const applied=[],other=[];
+    for(const row of inbox)(ids.has(row.eventId)?applied:other).push({id:row.eventId,at:row.nowMs-row.ageMs});
+    let published=0,lastPublishedAtMs=null;
+    for(const piece of burst.pieces){
+      const part=await db.clinic.outboxEvent.aggregate({where:{id:{in:piece}},_count:{publishedAt:true},_max:{publishedAt:true}});
+      published+=part._count.publishedAt;
+      if(part._max.publishedAt)lastPublishedAtMs=Math.max(lastPublishedAtMs??0,part._max.publishedAt.getTime());
+    }
+    // The other notifications of the run (the load's own): when each was requested, from its outbox envelope in Core or Clinic; an inbox row with none (a session revocation) is counted, not guessed.
+    const occurredBy=new Map();
+    for(const source of [db.clinic,db.core])
+      for(const row of await source.$queryRaw`SELECT id,envelope->>'occurredAt' AS "occurredAt" FROM "OutboxEvent" WHERE envelope->>'eventType'='notification.requested.v1'`)if(!ids.has(row.id))occurredBy.set(row.id,Date.parse(row.occurredAt));
+    const pairs=[];let unmatched=0;
+    for(const row of other){const occurredAtMs=occurredBy.get(row.id);if(Number.isFinite(occurredAtMs))pairs.push([occurredAtMs,row.at-occurredAtMs]);else unmatched++;}
+    return {count:burst.count,notificationWorkers,committedAtMs:burst.committedAtMs,insertMs:burst.insertMs,
+      inbox:{applied:applied.length,firstAtMs:applied.reduce((a,r)=>a===null?r.at:Math.min(a,r.at),null),lastAtMs:applied.reduce((a,r)=>a===null?r.at:Math.max(a,r.at),null)},
+      relay:{published,lastPublishedAtMs},latencyMs:applied.map(r=>r.at-burst.occurred.get(r.id)),background:{pairs,unmatched},unexpectedExit:failed};
+  }
   const lines=createInterface({input:process.stdin});
   for await(const line of lines){
     const command=JSON.parse(line);
@@ -174,8 +278,11 @@ try{
         const {collectQueryPlans}=await import('./cqrs_query_plans.mjs');
         response=await collectQueryPlans(db.clinic,context.urls.clinic,context);
       }
-      else if(command.action==='pause-notification'){await stop(consumer);response={paused:true};}
-      else if(command.action==='resume-notification'){consumer=await notificationWorker();response={resumed:true};}
+      else if(command.action==='pause-notification'){for(const worker of consumers)await stop(worker);response={paused:true};}
+      else if(command.action==='resume-notification'){assert.ok(consumers.every(worker=>worker.child.exitCode!==null||worker.child.signalCode!==null),'resume-notification while a worker runs');consumers=await startNotificationWorkers();response={resumed:true};}
+      else if(command.action==='notification-burst')response=await fireBurst(command.count);
+      else if(command.action==='burst-observe')response=await observeBurst();
+      else if(command.action==='burst-report')response=await reportBurst();
       else if(command.action==='query-snapshot'||command.action==='query-observe'){
         assert.equal(profile,'query-heavy');
         const {querySnapshot,queryObserve}=await import('./query_dataset.mjs');
@@ -192,7 +299,11 @@ try{
         response={appointments,notifications,invoices,reservations,pendingCore:await db.core.outboxEvent.count({where:{publishedAt:null}}),pendingClinic:await db.clinic.outboxEvent.count({where:{publishedAt:null}}),unexpectedExit:failed};
       }else throw new Error('unknown-action');
       dump(command.id+'.json',response);
-    }catch{dump(command.id+'.json',{error:'control-action-failed'});}
+    }catch(error){
+      // The answer stays opaque (credentials suppressed); a burst action leaves its name and the error class in the private application log, which is all a VM run has to go on.
+      if(command.action==='notification-burst'||String(command.action).startsWith('burst-'))process.stderr.write('BURST_ACTION_FAILED: '+command.action+' '+(error?.name??'Error')+'\n');
+      dump(command.id+'.json',{error:'control-action-failed'});
+    }
   }
 }catch(error){
   dump('failure.json',{name:error?.name??'Error',message:error?.message??'Unknown error',stack:error?.stack??''});

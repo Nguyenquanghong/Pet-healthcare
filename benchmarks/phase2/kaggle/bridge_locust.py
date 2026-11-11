@@ -13,6 +13,9 @@ accepts the monolith's plain arrays. Two tasks change, identically for M and H:
   and a notification for every report.
 """
 import itertools
+import json
+import os
+import time
 from datetime import date, timedelta
 
 import pcn_locust as adapter
@@ -56,3 +59,31 @@ SWAP = {legacy.PcnUser.appointment: appointment, legacy.PcnUser.rescue: rescue}
 legacy.PcnUser.tasks = [SWAP.get(task, task) for task in legacy.PcnUser.tasks]
 legacy.PcnUser.on_start = on_start
 PcnUser = legacy.PcnUser
+
+
+# The notification burst (K9) is fired relative to the moment the measurement window opens, which only this process knows: the phase-1 locustfile sets
+# legacy.STATE['start'] (time.monotonic()) once the population is complete and the warmup is over. With PCN_WINDOW set, that moment is written there once, as JSON, atomically.
+# Without it (every member that has no burst, and the monolith's) nothing below runs and locust is not imported by this module.
+WINDOW = os.environ.get('PCN_WINDOW')
+
+
+def publish_window(path, state, sleep, monotonic=time.monotonic, epoch=time.time):
+    """Waits until state['start'] has a value, then writes {'start_monotonic', 'seen_monotonic', 'seen_epoch'} to `path` (through a temporary file, so a reader never sees half of it).
+    time.monotonic is one clock for every process of the machine, so the controller compares its own readings with start_monotonic directly; seen_* are the offset between epoch and monotonic."""
+    while state['start'] is None:
+        sleep(0.05)
+    record = {'start_monotonic': state['start'], 'seen_monotonic': monotonic(), 'seen_epoch': epoch()}
+    temporary = f'{path}.tmp'
+    with open(temporary, 'w', encoding='utf-8') as handle:
+        json.dump(record, handle)
+    os.replace(temporary, path)
+    return record
+
+
+if WINDOW:
+    import gevent
+    from locust import events
+
+    @events.test_start.add_listener
+    def watch_window(environment, **kwargs):
+        gevent.spawn(publish_window, WINDOW, legacy.STATE, gevent.sleep)

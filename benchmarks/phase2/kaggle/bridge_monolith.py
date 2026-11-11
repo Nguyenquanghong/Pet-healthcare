@@ -20,8 +20,9 @@ import urllib.request
 import uuid
 
 from benchmark import reconcile
-from native_stack import free_port
-from pcn_runner import PINNING_METHOD, generator_ok, http_summary, observed_affinity, resource_sample, server_taskset_prefix, stop_load, taskset_prefix, verdict
+from native_stack import PgSampler, free_port, start_pg_sampler, stop_pg_sampler
+from pcn_runner import (PINNING_METHOD, generator_ok, http_summary, observed_affinity, resource_sample, server_taskset_prefix, steady_window, stop_load,
+                        taskset_prefix, verdict)
 
 PROTOCOL = 'bridge-m-h-pcn-v1'
 
@@ -80,7 +81,9 @@ class Monolith:
         self.fixture_path.chmod(0o600)
         log = (self.private / 'api.log').open('w')
         self.logs.append(log)
-        self.api = subprocess.Popen([*self.server_prefix, 'node', 'backend/dist/src/index.js'], cwd=self.root, env=self.env,
+        # Only the API process names its connections (m-api): the pg_stat_activity sampler then sees its pool and not the setup commands, which ended before.
+        api_env = {**self.env, 'DATABASE_URL': self.env['DATABASE_URL'] + '&application_name=m-api'}
+        self.api = subprocess.Popen([*self.server_prefix, 'node', 'backend/dist/src/index.js'], cwd=self.root, env=api_env,
                                     stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         self.base_url = f'http://127.0.0.1:{api_port}'
         deadline = time.monotonic() + 60
@@ -97,6 +100,9 @@ class Monolith:
                 raise RuntimeError('Monolith API readiness timeout')
             time.sleep(.5)
         return self
+
+    def pg_sampler(self, output):
+        return PgSampler(self.private, self.port, output)
 
     def inspect(self):
         rows = self.psql("SELECT coalesce(json_agg(json_build_object('id', id, 'petId', pet_id, 'appointmentDate', appointment_date, "
@@ -133,8 +139,9 @@ class Monolith:
         self.close()
 
 
-def run_monolith(root, harness, output, *, settings, locustfile, progress=print, kaggle=False, pinning=None):
-    """root: built M tree; harness: tree holding the locustfiles (the H tree). pinning: bridge VM study, see pcn_runner.taskset_prefix."""
+def run_monolith(root, harness, output, *, settings, locustfile, progress=print, kaggle=False, pinning=None, pg_sampler=False):
+    """root: built M tree; harness: tree holding the locustfiles (the H tree). pinning: bridge VM study, see pcn_runner.taskset_prefix.
+    pg_sampler: the pg_stat_activity sampler (PgSampler), for the pool question only; M's Prisma pool is its default, so no pool limit is given."""
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     manifest = {'protocol': PROTOCOL, **settings, 'configuration': 'M', 'kaggle': kaggle, 'python': sys.version,
@@ -142,8 +149,10 @@ def run_monolith(root, harness, output, *, settings, locustfile, progress=print,
                 'service_env': 'monolith defaults: Prisma pool, /api/auth limiter only'}
     if pinning:
         manifest['pinning'] = {**pinning, 'method': PINNING_METHOD}
+    if pg_sampler:
+        manifest['pg_sampler'] = True
     summary = {'load_status': 'NOT_RUN', 'capacity_accepted': False}
-    child, stage, created = None, 'startup', []
+    child, stage, created, sampler = None, 'startup', [], None
     try:
         progress(f"M: {settings['users']} users, {settings['seconds']}s measured")
         with Monolith(root, settings['users'], pinning['server'] if pinning else None) as app:
@@ -157,6 +166,9 @@ def run_monolith(root, harness, output, *, settings, locustfile, progress=print,
                        PCN_HTTP=str(output / 'http.csv'), PCN_WRITES=str(writes_path),
                        PCN_GENERATOR=str(output / 'generator.json'))
             stage = 'load'
+            if pg_sampler:
+                sampler = start_pg_sampler(app.pg_sampler(app.private / 'pg-activity.txt'), manifest)
+            started_epoch = time.time()
             with (app.private / 'pcn-load.log').open('w') as log:
                 child = subprocess.Popen([*taskset_prefix(pinning), sys.executable, '-m', 'locust', '-f', str(Path(harness) / locustfile), '--headless',
                                           '--only-summary', '--host', app.base_url, '--users', str(settings['users']),
@@ -189,6 +201,9 @@ def run_monolith(root, harness, output, *, settings, locustfile, progress=print,
                             time.sleep(1)
                 finally:
                     stop_load(child)
+                    if sampler is not None:
+                        stopping, sampler = sampler, None  # the clean-up below must not stop it a second time
+                        manifest['pg_activity'] = stop_pg_sampler(stopping, None, *steady_window(settings, started_epoch, time.time()))
             manifest['locust_exit_code'] = child.returncode
             manifest['process_sample_errors'] = process_errors
             stage = 'reconciliation'
@@ -212,6 +227,8 @@ def run_monolith(root, harness, output, *, settings, locustfile, progress=print,
         progress(f'M stopped at {stage}: {type(error).__name__}; private logs remain in /tmp')
     finally:
         stop_load(child)
+        if sampler is not None:
+            stop_pg_sampler(sampler)
         (output / 'manifest.json').write_text(json.dumps(manifest, indent=2))
         (output / 'pcn-report.json').write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding='utf-8')
     return summary
