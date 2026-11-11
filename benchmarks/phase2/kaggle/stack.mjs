@@ -202,7 +202,7 @@ try{
   const queueNames=async()=>burstNames??=(await import('../../../packages/messaging/dist/index.js')).topology(common.BROKER_PREFIX);
   async function fireBurst(count){
     assert.ok(profile==='pcn'&&!cqrsTools,'notification-burst needs the pcn profile without a CQRS configuration');
-    assert.ok(Number.isInteger(count)&&count>=1&&count<=20000,'notification-burst count must be an integer from 1 to 20000');
+    assert.ok(Number.isInteger(count)&&count>=1&&count<=9000,'notification-burst count must be an integer from 1 to 9000');
     assert.equal(burst,undefined,'one notification burst per stack');
     const {parseEnvelope}=await import('../../../packages/contracts/dist/index.js');
     const rows=[],occurred=new Map();

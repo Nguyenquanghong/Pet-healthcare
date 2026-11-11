@@ -779,7 +779,9 @@ class HarnessSource(unittest.TestCase):
             self.assertEqual(self.text.count(f"else if(command.action==='{action}')"), 1, action)
         self.assertIn("else if(command.action==='notification-burst')response=await fireBurst(command.count);", self.text)
         self.assertIn("assert.ok(profile==='pcn'&&!cqrsTools,", self.text)  # no CQRS configuration, no other profile
-        self.assertIn('assert.ok(Number.isInteger(count)&&count>=1&&count<=20000,', self.text)
+        # 9000 at most: the product degrades /health/ready at 10000 unpublished outbox events (OUTBOX_SOFT_LIMIT, packages/runtime/src/http.ts) and refuses at 20000.
+        self.assertIn("assert.ok(Number.isInteger(count)&&count>=1&&count<=9000,'notification-burst count must be an integer from 1 to 9000');", self.text)
+        self.assertNotIn('20000', self.text)
         self.assertIn("assert.equal(burst,undefined,'one notification burst per stack');", self.text)
         self.assertIn("assert.ok(burst,'burst-report before notification-burst');", self.text)
         self.assertEqual(len(re.findall(r'(?<![\w.])burst=\{', self.text)), 1)  # one place sets it
@@ -951,6 +953,23 @@ class OwnedStackOptions(unittest.TestCase):
                 self.stack(**{'accounts': 2, **kwargs})
         self.stack(accounts=2, dataset_profile='pcn', cqrs_configuration='O', core_layout='workers', db_pool_limit=4)
 
+    def test_a_pool_above_4_is_only_for_one_core_one_clinic_and_one_notification_worker(self):
+        for pool in (5, 8):
+            built = self.stack(accounts=2, dataset_profile='pcn', core_proxy=True, db_pool_limit=pool)
+            self.assertEqual((built.db_pool_limit, built.core_replicas, built.replicas, built.notification_workers), (pool, 1, 1, 1))
+            self.stack(accounts=2, dataset_profile='pcn', core_proxy=True, db_pool_limit=pool, gateway_topology='core-ingress')   # the gateway adds no pool
+            for extra in ({'core_replicas': 2}, {'replicas': 2}, {'notification_workers': 2}, {'core_replicas': 2, 'replicas': 2, 'notification_workers': 2}):
+                with self.assertRaisesRegex(ValueError, 'db_pool_limit above 4 only with one Core, one Clinic and one Notification worker', msg=(pool, extra)):
+                    self.stack(accounts=2, dataset_profile='pcn', core_proxy=True, db_pool_limit=pool, **extra)
+        # The default pool takes every instance count: H3x2cl2 and the burst configurations run at 4.
+        built = self.stack(accounts=2, dataset_profile='pcn', core_proxy=True, core_replicas=2, replicas=2, notification_workers=2, db_pool_limit=4)
+        self.assertEqual((built.db_pool_limit, built.core_replicas, built.replicas, built.notification_workers), (4, 2, 2, 2))
+        # The configurations of the study agree with the rule.
+        for config, plan in bs.VM2_CONFIGS.items():
+            if config != 'M':
+                self.stack(accounts=2, dataset_profile='pcn', core_proxy=True, core_replicas=plan['core'], replicas=plan['clinic'], notification_workers=plan['nw'],
+                           db_pool_limit=plan['pool'], core_layout=plan['layout'], gateway_topology=plan['topology'])
+
     def test_notification_workers_and_the_gateway_topology_default_to_today_and_are_validated(self):
         plain = self.stack(accounts=2, dataset_profile='pcn')
         self.assertEqual((plain.notification_workers, plain.gateway_topology), (1, 'direct'))
@@ -1067,6 +1086,18 @@ class PgSampling(unittest.TestCase):
             started = MagicMock()
             self.assertIs(native_stack.start_pg_sampler(started, {}), started.start.return_value)
 
+    def test_stop_pg_sampler_gives_a_status_instead_of_failing(self):
+        working = MagicMock()
+        working.stop.return_value = {'status': 'COMPLETE', 'samples': 3}
+        self.assertEqual(native_stack.stop_pg_sampler(working, 4, 1.0, 2.0), {'status': 'COMPLETE', 'samples': 3})
+        working.stop.assert_called_once_with(4, 1.0, 2.0)
+        for error in (RuntimeError('pg sampler is not running'), OSError('broken pipe'), ValueError('x')):
+            broken = MagicMock()
+            broken.stop.side_effect = error
+            self.assertEqual(native_stack.stop_pg_sampler(broken), {'status': 'STOP_FAILED', 'error_type': type(error).__name__})
+        sampler = native_stack.PgSampler('/tmp', 1, '/tmp/x.txt')
+        self.assertEqual(native_stack.stop_pg_sampler(sampler), {'status': 'STOP_FAILED', 'error_type': 'RuntimeError'})   # never started, or stopped already
+
     def test_pool_timeouts_are_counted_per_log_as_a_lower_bound(self):
         with tempfile.TemporaryDirectory() as directory:
             d = Path(directory)
@@ -1101,6 +1132,7 @@ class PoolEvidenceInAMember(unittest.TestCase):
             (self.repo / name).write_bytes((REPO / name).read_bytes())
 
     def run_member(self, label, sampler_start=None, **options):
+        stop_error = options.pop('stop_error', None)
         private = self.root / ('private-' + label)
         (private / 'pgdata').mkdir(parents=True)
         (private / 'pgdata/postmaster.pid').write_text('123\n')
@@ -1117,6 +1149,7 @@ class PoolEvidenceInAMember(unittest.TestCase):
         sampler.start.return_value = sampler
         sampler.start.side_effect = sampler_start
         sampler.stop.return_value = {'status': 'COMPLETE', 'samples': 7}
+        sampler.stop.side_effect = stop_error
         stack.pg_sampler.return_value = sampler
         output = self.root / ('out-' + label)
 
@@ -1183,6 +1216,14 @@ class PoolEvidenceInAMember(unittest.TestCase):
         import inspect
         for function in (runner.run_pcn,):
             self.assertIs(inspect.signature(function).parameters['pg_sampler'].default, False)
+
+    def test_a_sampler_that_cannot_be_stopped_is_written_down_and_the_manifest_is_still_written(self):
+        manifest, native, stack, sampler, private = self.run_member('stuck', pg_sampler=True, stop_error=RuntimeError('pg sampler is not running'))
+        self.assertEqual(manifest['status'], 'COMPLETE', manifest)   # the manifest was written, and the member is not failed for its sampler
+        self.assertEqual(manifest['pg_activity'], {'status': 'STOP_FAILED', 'error_type': 'RuntimeError'})
+        sampler.stop.assert_called_once()   # the clean-up after the load did not try a second time
+        self.assertEqual(manifest['pool_timeouts']['http_503'], 2)
+        self.assertTrue(bs.pool_evidence(manifest)['available'] is False)   # the pool reading is unknown, the 503 count stands
 
     def test_a_sampler_that_cannot_start_does_not_fail_the_member(self):
         manifest, native, stack, sampler, private = self.run_member('broken', sampler_start=FileNotFoundError('psql'), pg_sampler=True)
@@ -1286,13 +1327,45 @@ class PoolEvidenceInAMember(unittest.TestCase):
         self.assertEqual((result['status'], result['valid'], result['window_opened']), ('NOT_FIRED', False, True))
         self.assertEqual(manifest['burst'], {'count': 6, 'at_s': 10, 'status': 'NOT_FIRED', 'valid': False})
 
-    def test_a_burst_that_cannot_be_fired_fails_the_member_and_closes_its_log(self):
+    def test_a_burst_that_cannot_be_fired_is_written_down_and_the_member_still_completes(self):
         manifest, output, calls, environments, private, native = self.run_burst_member(
             'unfired', burst={'count': 6, 'at_s': 2}, observe=self.burst_observation, report=self.burst_report, fire_fails=True)
-        self.assertEqual((manifest['status'], manifest['failed_stage'], manifest['error_type']), ('FAILED', 'load', 'RuntimeError'))
-        self.assertEqual(manifest['burst'], {'count': 6, 'at_s': 2})  # asked for, never completed
-        self.assertFalse((output / 'burst.json').exists())
+        self.assertEqual(manifest['status'], 'COMPLETE', manifest)   # a side measurement does not take the member, and the session, down
+        self.assertEqual(manifest['burst'], {'count': 6, 'at_s': 2, 'status': 'FIRE_FAILED', 'valid': False})
+        result = json.loads((output / 'burst.json').read_text(encoding='utf-8'))
+        self.assertEqual((result['status'], result['valid'], result['window_opened']), ('FIRE_FAILED', False, True))
+        self.assertEqual(result['reasons'], ['the burst could not be fired: RuntimeError: Stack control failed: control-action-failed'])
+        actions = [action for action, _, _ in calls]
+        self.assertEqual(actions.count('notification-burst'), 1)   # not fired again on the next ticks
+        self.assertNotIn('burst-report', actions)
+        self.assertGreaterEqual(actions.count('burst-observe'), 3)   # the sampling went on
         self.assertTrue((output / 'burst.jsonl').exists())
+        self.assertTrue((output / 'pcn-report.json').exists())
+
+    def test_a_burst_report_that_cannot_be_read_is_written_down_and_the_member_still_completes(self):
+        def broken(committed):
+            raise RuntimeError('Stack control timeout')
+        manifest, output, calls, environments, private, native = self.run_burst_member(
+            'unreported', burst={'count': 6, 'at_s': 2}, observe=self.burst_observation, report=broken)
+        self.assertEqual(manifest['status'], 'COMPLETE', manifest)
+        self.assertEqual(manifest['burst'], {'count': 6, 'at_s': 2, 'status': 'REPORT_FAILED', 'valid': False})
+        result = json.loads((output / 'burst.json').read_text(encoding='utf-8'))
+        self.assertEqual((result['status'], result['valid'], result['count']), ('REPORT_FAILED', False, 6))
+        self.assertEqual([action for action, _, _ in calls].count('burst-report'), 1)
+
+    def test_a_burst_needs_the_locustfile_that_writes_the_window_and_is_refused_before_anything_starts_otherwise(self):
+        self.assertEqual(runner.BURST_LOCUSTFILE, 'bridge_locust.py')
+        self.assertEqual(Path(bs.LOCUSTFILE).name, runner.BURST_LOCUSTFILE)   # what VmStudy2 passes
+        for options in ({}, {'locustfile': 'benchmarks/phase2/kaggle/pcn_locust.py'}, {'locustfile': 'benchmarks/kaggle/pcn_locustfile.py'},
+                        {'locustfile': 'benchmarks/phase2/kaggle/bridge_locust.py.bak'}):
+            with patch.object(runner, 'NativeStack') as native, self.assertRaisesRegex(ValueError, 'bridge_locust.py'):
+                runner.run_pcn(self.repo, self.root / 'refused-locust', mode='smoke', progress=lambda text: None, burst={'count': 6, 'at_s': 2}, **options)
+            native.assert_not_called()
+            self.assertFalse((self.root / 'refused-locust').exists())
+        # Without a burst any locustfile is fine, as ever; with one the bridge file passes (every burst test above runs it).
+        with patch.object(runner, 'NativeStack', side_effect=RuntimeError('stack-not-needed')):
+            runner.run_pcn(self.repo, self.root / 'no-burst', mode='smoke', progress=lambda text: None)
+        self.assertEqual(json.loads((self.root / 'no-burst/manifest.json').read_text())['failed_stage'], 'startup')
 
     def test_a_member_without_a_burst_sets_no_window_variable_and_writes_no_burst_file(self):
         manifest, output, calls, environments, private, native = self.run_burst_member(
@@ -1333,12 +1406,13 @@ def burst_report(**changes):
 
 
 def burst_samples(consumers=2):
-    """Four burst-observe samples: two that read the queue, one the broker did not answer and one whose control call failed."""
+    """Four burst-observe samples around the burst of burst_report (committed at second 1120, drained at 1128): two that read the queue (one just before the burst, one just after),
+    one the broker did not answer and one whose control call failed."""
     row = {'queue': {'messageCount': 0, 'consumerCount': consumers}, 'dlq': {'messageCount': 0}, 'clinicOutboxPending': 0, 'unexpectedExit': False}
-    return [{'monotonic_s': 1100.0, **row},
-            {'monotonic_s': 1101.0, **row, 'queue': {'messageCount': 5800, 'consumerCount': consumers}, 'clinicOutboxPending': 12},
-            {'monotonic_s': 1102.0, 'queue': None, 'dlq': None, 'probeError': True, 'clinicOutboxPending': 3, 'unexpectedExit': False},
-            {'monotonic_s': 1103.0, 'error': 'control-failed'}]
+    return [{'monotonic_s': 1119.0, **row},
+            {'monotonic_s': 1121.0, **row, 'queue': {'messageCount': 5800, 'consumerCount': consumers}, 'clinicOutboxPending': 12},
+            {'monotonic_s': 1122.0, 'queue': None, 'dlq': None, 'probeError': True, 'clinicOutboxPending': 3, 'unexpectedExit': False},
+            {'monotonic_s': 1123.0, 'error': 'control-failed'}]
 
 
 class BurstArithmetic(unittest.TestCase):
@@ -1356,8 +1430,11 @@ class BurstArithmetic(unittest.TestCase):
         settings = {'seconds': 300}
         self.assertEqual(runner.burst_spec({'count': 6000, 'at_s': 120}, settings), {'count': 6000, 'at_s': 120})
         self.assertEqual(runner.burst_spec({'count': 1, 'at_s': 0}, settings), {'count': 1, 'at_s': 0})
-        self.assertEqual(runner.burst_spec({'count': 20000, 'at_s': 299.5}, settings), {'count': 20000, 'at_s': 299.5})
-        for burst in ({'count': 6000}, {'at_s': 120}, {'count': 6000, 'at_s': 120, 'extra': 1}, {'count': 0, 'at_s': 120}, {'count': 20001, 'at_s': 120},
+        self.assertEqual(runner.burst_spec({'count': 9000, 'at_s': 299.5}, settings), {'count': 9000, 'at_s': 299.5})
+        self.assertEqual((runner.BURST_MAX, runner.OUTBOX_SOFT_LIMIT), (9000, 10000))
+        self.assertLess(runner.BURST_MAX, runner.OUTBOX_SOFT_LIMIT)
+        self.assertLess(bs.BURST_FULL['count'], runner.BURST_MAX)
+        for burst in ({'count': 6000}, {'at_s': 120}, {'count': 6000, 'at_s': 120, 'extra': 1}, {'count': 0, 'at_s': 120}, {'count': 9001, 'at_s': 120}, {'count': 20000, 'at_s': 120},
                       {'count': 6000.0, 'at_s': 120}, {'count': True, 'at_s': 120}, {'count': '6000', 'at_s': 120}, {'count': 6000, 'at_s': -1},
                       {'count': 6000, 'at_s': 300}, {'count': 6000, 'at_s': True}, {'count': 6000, 'at_s': '120'}, None, [6000, 120], 6000):
             with self.assertRaises(ValueError, msg=str(burst)):
@@ -1379,8 +1456,10 @@ class BurstArithmetic(unittest.TestCase):
         self.assertEqual((open_ended['during']['n'], open_ended['after']), (5, {'n': 0, 'p50_ms': None, 'p95_ms': None, 'max_ms': None}))
         self.assertEqual(runner.segment_stats([], (1.0, 2.0))['before']['n'], 0)
         self.assertEqual(runner.segment_stats(points, (100.0, 100.0))['during']['n'], 0)  # a burst drained at the instant it was fired
-        with self.assertRaises(ValueError):
-            runner.segment_stats(points, (200.0, 100.0))
+        # A drained moment before the burst moment (clocks that disagree) is taken as the burst moment: nothing is `during`, and it is not an error.
+        clamped = runner.segment_stats(points, (200.0, 100.0))
+        self.assertEqual(clamped, runner.segment_stats(points, (200.0, 200.0)))
+        self.assertEqual((clamped['before']['n'], clamped['during']['n'], clamped['after']['n']), (5, 0, 2))
 
     def test_a_drained_burst_with_one_consumer_per_worker_is_valid_and_every_figure_is_in_window_seconds(self):
         result = runner.burst_summary(burst_report(), burst_samples(2), workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)
@@ -1421,6 +1500,61 @@ class BurstArithmetic(unittest.TestCase):
         sampled = burst_samples(2)
         sampled[0] = {**sampled[0], 'unexpectedExit': True}
         self.assertFalse(runner.burst_summary(burst_report(), sampled, workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)['valid'])
+
+    def test_a_dead_letter_in_the_middle_of_the_series_counts_even_when_the_last_sample_is_empty(self):
+        base = burst_samples(2)
+        for series in ([base[0], {**base[1], 'dlq': {'messageCount': 3}}, {**base[0], 'monotonic_s': 1124.0}],     # 0, 3, 0: the last reading is empty
+                       [{**base[0], 'dlq': {'messageCount': 1}}, base[1], {**base[0], 'monotonic_s': 1124.0}],     # 1, 0, 0: the first only
+                       [base[0], {**base[1], 'dlq': {'messageCount': 2}}, {**base[1], 'monotonic_s': 1124.0}, {**base[0], 'monotonic_s': 1125.0}]):   # 0, 2, 0, 0
+            result = runner.burst_summary(burst_report(), series, workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)
+            self.assertFalse(result['valid'], series)
+            self.assertEqual(len(result['reasons']), 1)
+            self.assertRegex(result['reasons'][0], r'the dead-letter queue held up to [123] message\(s\)')
+        # Every reading empty: valid.
+        self.assertTrue(runner.burst_summary(burst_report(), base + [{**base[0], 'monotonic_s': 1124.0}], workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)['valid'])
+
+    def test_the_burst_needs_a_sample_that_read_the_queue_between_the_burst_and_its_drain(self):
+        readable = lambda moment, **more: {'monotonic_s': moment, 'queue': {'messageCount': 0, 'consumerCount': 2}, 'dlq': {'messageCount': 0}, 'clinicOutboxPending': 0,
+                                           'unexpectedExit': False, **more}
+        summary = lambda samples, report=None: runner.burst_summary(report or burst_report(), samples, workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)
+        reason = 'no sample read the queue between the burst and its drain, so the consumer count is not known for the burst itself'
+        # Committed at 1120.0, last event applied at 1128.0, a sample may come up to 2 s after that.
+        self.assertEqual(runner.BURST_SAMPLE_GRACE_S, 2.0)
+        for samples in ([readable(1100.0), readable(1119.9)],                                          # only before the burst
+                        [readable(1130.1)],                                                            # only after the drain and the grace
+                        [readable(1121.0, queue=None, probeError=True)],                               # the broker did not answer
+                        [readable(1125.0, queue=None, dlq=None, probeError=True), {'monotonic_s': 1126.0, 'error': 'control-failed'}],
+                        [readable(1100.0), {'monotonic_s': 1126.0, 'error': 'control-failed'}]):
+            result = summary(samples)
+            self.assertFalse(result['valid'], samples)
+            self.assertIn(reason, result['reasons'])
+        for samples in ([readable(1120.01)], [readable(1129.99)], [readable(1100.0), readable(1124.0)]):   # just inside the two edges; one sample is enough
+            self.assertEqual(summary(samples)['reasons'], [], samples)
+        # A burst that never drained has no end: a sample at any later moment is one of the burst.
+        committed = WINDOW_MS + 120_000
+        open_ended = burst_report(inbox={'applied': 9, 'firstAtMs': committed + 500, 'lastAtMs': committed + 170_000})
+        self.assertNotIn(reason, summary([readable(1290.0)], open_ended)['reasons'])
+        self.assertIn(reason, summary([readable(1119.0)], open_ended)['reasons'])
+
+    def test_a_clinic_outbox_at_the_soft_limit_of_the_product_makes_the_burst_invalid(self):
+        for pending, valid in ((9999, True), (10000, False), (12345, False)):
+            samples = burst_samples(2)
+            samples[1] = {**samples[1], 'clinicOutboxPending': pending}
+            result = runner.burst_summary(burst_report(), samples, workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)
+            self.assertEqual(result['valid'], valid, pending)
+            self.assertEqual(result['queue']['clinic_outbox_pending_max'], pending)
+            if not valid:
+                self.assertEqual(result['reasons'], [f'the Clinic outbox held {pending} unpublished events, at or above the 10000 at which the product reports itself degraded'])
+
+    def test_clocks_that_disagree_clamp_the_drain_and_say_so_instead_of_failing(self):
+        committed = WINDOW_MS + 120_000
+        report = burst_report(inbox={'applied': 10, 'firstAtMs': committed - 500, 'lastAtMs': committed - 100})   # the last event "applied" 100 ms before the commit
+        result = runner.burst_summary(report, burst_samples(2), workers=2, start_monotonic=1000.0, epoch_offset=1_700_000_000.0)
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['reasons'], ['the last event was applied before the burst was committed (the clocks of the databases and of the controller disagree): the drain time is taken as 0'])
+        self.assertEqual((result['drained'], result['drain_s']), (True, 0.0))
+        self.assertEqual(result['background_latency_ms']['during']['n'], 0)
+        json.dumps(result)
 
     def test_a_burst_that_is_not_drained_has_no_drain_time_and_is_not_valid(self):
         committed = WINDOW_MS + 120_000
@@ -1493,15 +1627,39 @@ class BurstControl(unittest.TestCase):
         self.window.write_text('{"start_monotonic": 100}')
         self.assertEqual(run.window_start(), 100)
 
-    def test_a_sample_that_fails_is_recorded_and_the_load_goes_on_but_a_burst_that_fails_is_not_hidden(self):
+    def test_a_sample_that_fails_is_recorded_and_a_burst_that_fails_is_marked_for_burst_json_and_never_fired_again(self):
         stack = self.FakeStack(**{'burst-observe': RuntimeError('Stack control timeout'), 'notification-burst': RuntimeError('Stack control failed: control-action-failed')})
         run = self.run_of(stack)
         run.tick(100.0)
         self.assertEqual(run.observations, [{'monotonic_s': 100.0, 'error': 'control-failed'}])
         self.window.write_text('{"start_monotonic": 100.0}')
-        with self.assertRaises(RuntimeError):
-            run.tick(110.0)
+        run.tick(110.0)  # the load goes on: a side measurement does not take a six-hour run down
         self.assertIsNone(run.fired)
+        self.assertEqual(run.failure, {'monotonic_s': 110.0, 'error_type': 'RuntimeError', 'error': 'Stack control failed: control-action-failed'})
+        run.tick(111.0)
+        run.tick(500.0)
+        actions = [action for action, _ in stack.calls]
+        self.assertEqual(actions.count('notification-burst'), 1)  # one attempt, never a retry
+        self.assertEqual(len(run.observations), 4)  # the samples go on
+        result = run.finish(progress=lambda text: None)
+        self.assertEqual((result['status'], result['valid'], result['window_opened'], result['fired_s'], result['observations']), ('FIRE_FAILED', False, True, 10.0, 4))
+        self.assertEqual(result['reasons'], ['the burst could not be fired: RuntimeError: Stack control failed: control-action-failed'])
+        self.assertEqual((result['count'], result['at_s']), (5, 10))
+        self.assertNotIn('burst-report', [action for action, _ in stack.calls])  # nothing to report, no drain to wait for
+        json.dumps(result)
+
+    def test_a_report_that_cannot_be_read_is_marked_and_not_raised(self):
+        observed = lambda s: {'queue': {'messageCount': 0, 'consumerCount': 1}, 'dlq': {'messageCount': 0}, 'burstApplied': 5}
+        for report, name in ((RuntimeError('Stack control timeout'), 'RuntimeError'), ({}, 'KeyError'), (OSError('pipe'), 'OSError')):
+            stack = self.FakeStack(**{'burst-observe': observed, 'burst-report': report})
+            run = self.run_of(stack)
+            run.start, run.fired = 1000.0, {'monotonic_s': 1120.0, 'epoch_offset_s': 1_700_000_000.0, 'response': {}}
+            with patch.object(runner, 'time', Clock()):
+                result = run.finish(progress=lambda text: None)
+            self.assertEqual((result['status'], result['valid'], result['fired_s']), ('REPORT_FAILED', False, 120.0), name)
+            self.assertTrue(result['reasons'][0].startswith(f'the burst report could not be read: {name}'), result['reasons'])
+            self.assertEqual((result['count'], result['at_s'], result['observations']), (5, 10, 1))
+            json.dumps(result)
 
     def test_finish_waits_for_the_inbox_to_hold_the_burst_then_reads_the_report(self):
         applied = iter([2, 4, 5])
@@ -1511,10 +1669,11 @@ class BurstControl(unittest.TestCase):
         run = self.run_of(stack)
         run.start, run.fired = 1000.0, {'monotonic_s': 1120.0, 'epoch_offset_s': 1_700_000_000.0, 'response': {}}
         clock = Clock()
+        clock.t = 1121.0  # just after the commit at 1120 s
         with patch.object(runner, 'time', clock):
             result = run.finish(progress=lambda text: None)
         self.assertEqual([action for action, _ in stack.calls], ['burst-observe'] * 3 + ['burst-report'])
-        self.assertEqual(clock.t, 1002.0)  # one second between samples, none after the last
+        self.assertEqual(clock.t, 1123.0)  # one second between samples, none after the last
         self.assertEqual((result['status'], result['valid'], result['drain_s'], result['fired_s'], result['observations']), ('COMPLETE', True, 4.0, 120.0, 3))
         self.assertEqual((result['count'], result['at_s'], result['start_monotonic']), (5, 10, 1000.0))
 
@@ -1563,7 +1722,11 @@ class MonolithSampling(unittest.TestCase):
         sampler = app.pg_sampler('activity.txt')
         self.assertEqual((sampler.command[sampler.command.index('-h') + 1], sampler.command[sampler.command.index('-p') + 1]), (str(app.private), '5455'))
         # The M pool is Prisma's default, so no pool limit is given; the window is the one of the H members.
-        self.assertIn('sampler.stop(None, *steady_window(settings, started_epoch, time.time()))', self.text)
+        self.assertIn('stopping, sampler = sampler, None', self.text)
+        self.assertIn('stop_pg_sampler(stopping, None, *steady_window(settings, started_epoch, time.time()))', self.text)
+        self.assertLess(self.text.index('stopping, sampler = sampler, None'), self.text.index('stop_pg_sampler(stopping, None'))   # forgotten before it is stopped
+        self.assertIn('            stop_pg_sampler(sampler)\n        (output / \'manifest.json\')', self.text.replace('\r\n', '\n'))   # the clean-up before the manifest cannot raise
+        self.assertNotIn('.stop(', self.text.replace('stop_pg_sampler(', ''))
         self.assertLess(self.text.index('start_pg_sampler(app.pg_sampler('), self.text.index("subprocess.Popen([*taskset_prefix(pinning), sys.executable"))
 
 

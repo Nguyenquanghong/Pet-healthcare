@@ -20,7 +20,7 @@ import urllib.request
 import uuid
 
 from benchmark import reconcile
-from native_stack import PgSampler, free_port, start_pg_sampler
+from native_stack import PgSampler, free_port, start_pg_sampler, stop_pg_sampler
 from pcn_runner import (PINNING_METHOD, generator_ok, http_summary, observed_affinity, resource_sample, server_taskset_prefix, steady_window, stop_load,
                         taskset_prefix, verdict)
 
@@ -202,8 +202,8 @@ def run_monolith(root, harness, output, *, settings, locustfile, progress=print,
                 finally:
                     stop_load(child)
                     if sampler is not None:
-                        manifest['pg_activity'] = sampler.stop(None, *steady_window(settings, started_epoch, time.time()))
-                        sampler = None
+                        stopping, sampler = sampler, None  # the clean-up below must not stop it a second time
+                        manifest['pg_activity'] = stop_pg_sampler(stopping, None, *steady_window(settings, started_epoch, time.time()))
             manifest['locust_exit_code'] = child.returncode
             manifest['process_sample_errors'] = process_errors
             stage = 'reconciliation'
@@ -228,7 +228,7 @@ def run_monolith(root, harness, output, *, settings, locustfile, progress=print,
     finally:
         stop_load(child)
         if sampler is not None:
-            sampler.stop()
+            stop_pg_sampler(sampler)
         (output / 'manifest.json').write_text(json.dumps(manifest, indent=2))
         (output / 'pcn-report.json').write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding='utf-8')
     return summary

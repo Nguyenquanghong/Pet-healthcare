@@ -12,7 +12,7 @@ import sys
 import time
 from collections import Counter
 
-from native_stack import NativeStack, count_pool_timeouts, start_pg_sampler
+from native_stack import NativeStack, count_pool_timeouts, start_pg_sampler, stop_pg_sampler
 from benchmark import Client, reconcile
 from cqrs_probe import preflight as cqrs_preflight
 from cqrs_diagnostics import collect as collect_read_diagnostics
@@ -125,8 +125,12 @@ def outbox_pending(inspected):
 
 
 # ---- the notification burst (bridge VM study, K9): the controller fires it, samples the queue, waits for the drain and does the arithmetic ----
-BURST_MAX = 20000      # stack.mjs notification-burst: count from 1 to this
+BURST_MAX = 9000       # stack.mjs notification-burst: count from 1 to this. The product reports /health/ready degraded from 10000 unpublished outbox events (OUTBOX_SOFT_LIMIT) and refuses writes
+#                        at 20000 (OUTBOX_HARD_LIMIT, packages/runtime/src/http.ts): a burst plus the load's own backlog must stay under the soft limit
+OUTBOX_SOFT_LIMIT = 10000
 BURST_DRAIN_WAIT_S = 180   # how long after the load the controller waits for the Notification workers to apply the whole burst
+BURST_SAMPLE_GRACE_S = 2.0   # a queue sample taken up to this long after the last event was applied still belongs to the burst: the controller samples about once a second
+BURST_LOCUSTFILE = 'bridge_locust.py'   # the locustfile that writes the moment the window opens (PCN_WINDOW); another one never lets the burst fire
 
 
 def burst_spec(burst, settings, cqrs_configuration=None):
@@ -153,10 +157,10 @@ def latency_stats(values):
 
 def segment_stats(points, edges):
     """latency_stats of (moment, latency) points cut at two moments: before [.., burst), during [burst, drained) and after [drained, ..). `drained` is math.inf while
-    the burst is not drained, so everything from the burst on is `during`."""
+    the burst is not drained, so everything from the burst on is `during`. A drained moment before the burst moment (clocks that disagree: burst_summary says so) is taken as
+    the burst moment itself: nothing is `during`, and the member is not lost for it."""
     burst, drained = edges
-    if burst > drained:
-        raise ValueError('the burst moment cannot come after the drained moment')
+    drained = max(drained, burst)
     segments = {'before': [], 'during': [], 'after': []}
     for moment, latency in points:
         segments['before' if moment < burst else 'during' if moment < drained else 'after'].append(latency)
@@ -168,8 +172,9 @@ def burst_summary(report, observations, *, workers, start_monotonic, epoch_offse
     in the member), `start_monotonic` (when the measurement window opened) and `epoch_offset` (epoch seconds minus monotonic seconds on this machine, which turns the epoch
     milliseconds of the databases into window seconds).
 
-    Valid means: the queue showed one consumer per worker in every sample, the dead-letter queue stayed empty, the Notification inbox holds exactly the burst's events and
-    no process exited. A burst that has not drained has no drain time (`drain_s` None, 'không đọc được'), however long the controller waited."""
+    Valid means: the queue showed one consumer per worker in every sample, at least one sample read the queue between the burst and its drain, the dead-letter queue was empty in
+    every sample, the Clinic outbox never held 10000 unpublished events, the Notification inbox holds exactly the burst's events and no process exited. A burst that has not
+    drained has no drain time (`drain_s` None, 'không đọc được'), however long the controller waited."""
     count, committed = report['count'], report['committedAtMs']
     inbox, relay = report['inbox'], report['relay']
     drained = inbox['applied'] == count and inbox['lastAtMs'] is not None
@@ -177,11 +182,23 @@ def burst_summary(report, observations, *, workers, start_monotonic, epoch_offse
     queues = [o['queue'] for o in observations if o.get('queue')]
     dead = [o['dlq']['messageCount'] for o in observations if o.get('dlq')]
     consumers = sorted({q['consumerCount'] for q in queues})
+    # Everything below is in monotonic seconds of this machine: the epoch milliseconds of the databases minus the offset of the clocks.
+    committed_s = committed / 1000 - epoch_offset
+    drained_s = inbox['lastAtMs'] / 1000 - epoch_offset if drained else math.inf
+    during = [o for o in observations if o.get('queue') and not o.get('probeError') and o.get('monotonic_s') is not None
+              and committed_s <= o['monotonic_s'] <= drained_s + BURST_SAMPLE_GRACE_S]
+    pending = max((o['clinicOutboxPending'] for o in observations if o.get('clinicOutboxPending') is not None), default=None)
     reasons = []
     if consumers != [workers]:
         reasons.append(f'the queue showed consumerCount {consumers or "never"}, not {workers} (one per Notification worker)')
-    if any(dead):
+    if not during:
+        reasons.append('no sample read the queue between the burst and its drain, so the consumer count is not known for the burst itself')
+    if any(dead):  # any sample: a message that was dead-lettered and then drained away is still a failed event
         reasons.append(f'the dead-letter queue held up to {max(dead)} message(s)')
+    if pending is not None and pending >= OUTBOX_SOFT_LIMIT:
+        reasons.append(f'the Clinic outbox held {pending} unpublished events, at or above the {OUTBOX_SOFT_LIMIT} at which the product reports itself degraded')
+    if drained and inbox['lastAtMs'] < committed:
+        reasons.append('the last event was applied before the burst was committed (the clocks of the databases and of the controller disagree): the drain time is taken as 0')
     if inbox['applied'] != count:
         reasons.append(f"the notification inbox holds {inbox['applied']} of the {count} events")
     if report.get('unexpectedExit') or any(o.get('unexpectedExit') for o in observations):
@@ -191,7 +208,7 @@ def burst_summary(report, observations, *, workers, start_monotonic, epoch_offse
     points = [(moment, latency) for moment, latency in report['background']['pairs'] if moment >= window_ms]
     return {'valid': not reasons, 'reasons': reasons, 'count': count, 'workers': workers,
             'committed_s': (committed - window_ms) / 1000, 'insert_ms': report['insertMs'],
-            'drained': drained, 'drain_s': (inbox['lastAtMs'] - committed) / 1000 if drained else None,
+            'drained': drained, 'drain_s': max(0.0, (inbox['lastAtMs'] - committed) / 1000) if drained else None,
             'drain_reading': 'đã xả xong' if drained else 'không đọc được',
             'relay_drain_s': (relay['lastPublishedAtMs'] - committed) / 1000 if relay_done else None,
             'latency_ms': latency_stats(report['latencyMs']),
@@ -199,7 +216,7 @@ def burst_summary(report, observations, *, workers, start_monotonic, epoch_offse
             'background_unmatched': report['background']['unmatched'],
             'queue': {'samples': len(queues), 'consumer_counts': consumers, 'ready_max': max((q['messageCount'] for q in queues), default=None),
                       'dlq_max': max(dead, default=None), 'probe_errors': sum(bool(o.get('probeError')) for o in observations),
-                      'clinic_outbox_pending_max': max((o['clinicOutboxPending'] for o in observations if o.get('clinicOutboxPending') is not None), default=None),
+                      'clinic_outbox_pending_max': pending,
                       'control_errors': sum('error' in o for o in observations)}}
 
 
@@ -209,7 +226,7 @@ class BurstRun:
 
     def __init__(self, stack, spec, workers, window_path, log_path):
         self.stack, self.spec, self.workers, self.window_path = stack, spec, workers, Path(window_path)
-        self.start, self.fired, self.observations = None, None, []
+        self.start, self.fired, self.failure, self.observations = None, None, None, []
         self.log = Path(log_path).open('w', encoding='utf-8')
 
     def window_start(self):
@@ -234,12 +251,19 @@ class BurstRun:
     def tick(self, now):
         if self.start is None:
             self.start = self.window_start()
-        if burst_due(self.start, now, self.spec['at_s'], self.fired is not None):
+        if burst_due(self.start, now, self.spec['at_s'], self.fired is not None or self.failure is not None):
             offset = time.time() - time.monotonic()
-            self.fired = {'monotonic_s': now, 'epoch_offset_s': offset, 'response': self.stack.control('notification-burst', count=self.spec['count'])}
+            try:
+                self.fired = {'monotonic_s': now, 'epoch_offset_s': offset, 'response': self.stack.control('notification-burst', count=self.spec['count'])}
+            except Exception as error:
+                # The burst is a side measurement: its failure is written into burst.json (finish) and the load goes on, and it is never fired again (one burst per stack).
+                self.failure = {'monotonic_s': now, 'error_type': type(error).__name__, 'error': str(error)[:200]}
         self.observe(now)
 
     def finish(self, progress=print):
+        if self.failure is not None:
+            return {'status': 'FIRE_FAILED', 'valid': False, 'reasons': [f"the burst could not be fired: {self.failure['error_type']}: {self.failure['error']}"], **self.spec,
+                    'window_opened': self.start is not None, 'fired_s': self.failure['monotonic_s'] - self.start, 'observations': len(self.observations)}
         if self.fired is None:
             return {'status': 'NOT_FIRED', 'valid': False, 'reasons': ['the measurement window never reached the burst moment'], **self.spec, 'window_opened': self.start is not None}
         deadline = time.monotonic() + BURST_DRAIN_WAIT_S
@@ -249,8 +273,13 @@ class BurstRun:
                 break
             time.sleep(1)
         progress(f"PCN burst: {row.get('burstApplied')} of {self.spec['count']} notifications applied")
-        summary = burst_summary(self.stack.control('burst-report'), self.observations, workers=self.workers, start_monotonic=self.start,
-                                epoch_offset=self.fired['epoch_offset_s'])
+        try:
+            summary = burst_summary(self.stack.control('burst-report'), self.observations, workers=self.workers, start_monotonic=self.start,
+                                    epoch_offset=self.fired['epoch_offset_s'])
+        except Exception as error:
+            # Six hours of members are not thrown away for the report of one burst: it is marked, and the member stays COMPLETE.
+            return {'status': 'REPORT_FAILED', 'valid': False, 'reasons': [f'the burst report could not be read: {type(error).__name__}: {str(error)[:200]}'], **self.spec,
+                    'fired_s': self.fired['monotonic_s'] - self.start, 'observations': len(self.observations)}
         return {'status': 'COMPLETE', **self.spec, 'fired_s': self.fired['monotonic_s'] - self.start, 'epoch_offset_s': self.fired['epoch_offset_s'],
                 'start_monotonic': self.start, 'observations': len(self.observations), **summary}
 
@@ -286,6 +315,8 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
     settings = configuration(mode) if settings is None else dict(settings)
     if burst is not None:
         burst = burst_spec(burst, settings, cqrs_configuration)
+        if Path(locustfile).name != BURST_LOCUSTFILE:
+            raise ValueError(f'a burst needs {BURST_LOCUSTFILE}, which writes the moment the measurement window opens; {locustfile!r} never would and the burst would not fire')
     repo, output = Path(repo).resolve(), Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     kaggle = platform.system() == 'Linux' and Path('/kaggle/working').is_dir()
@@ -431,8 +462,8 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
                 finally:
                     stop_load(child)
                     if sampler is not None:
-                        manifest['pg_activity'] = sampler.stop(stack.db_pool_limit, *steady_window(settings, started_epoch, time.time()))
-                        sampler = None
+                        stopping, sampler = sampler, None  # the clean-up below must not stop it a second time
+                        manifest['pg_activity'] = stop_pg_sampler(stopping, stack.db_pool_limit, *steady_window(settings, started_epoch, time.time()))
             manifest['locust_exit_code'] = child.returncode
             manifest['process_sample_errors'] = process_errors
             stage = 'reconciliation'
@@ -470,7 +501,7 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
     finally:
         stop_load(child)
         if sampler is not None:
-            sampler.stop()
+            stop_pg_sampler(sampler)
         if burst_run is not None:
             burst_run.close()
         if cqrs_configuration in ('A','B') and stack is not None:

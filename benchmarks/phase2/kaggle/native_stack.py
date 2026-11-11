@@ -129,6 +129,14 @@ def read_activity(path, pool_limit=None, since=None, until=None):
             'interval_s': PgSampler.INTERVAL, 'pool_limit': pool_limit, 'applications': applications}
 
 
+def stop_pg_sampler(sampler, *arguments):
+    """sampler.stop(...) that cannot fail the member: a sampler that cannot be stopped is written into the manifest instead (status STOP_FAILED) and the member goes on."""
+    try:
+        return sampler.stop(*arguments)
+    except Exception as error:
+        return {'status': 'STOP_FAILED', 'error_type': type(error).__name__}
+
+
 def start_pg_sampler(sampler, manifest):
     """Starts a sampler for a member. One that cannot start is written into the member's manifest and the load runs on: the pool reading is then
     unknown, the load result is unaffected."""
@@ -174,6 +182,9 @@ class NativeStack:
             raise ValueError('core_layout workers or phase2; db_pool_limit an integer from 4 to 8')
         if (core_layout, db_pool_limit) != ('workers', 4) and (cqrs_configuration is not None or dataset_profile != 'pcn'):
             raise ValueError('core_layout phase2 and db_pool_limit above 4 only for the pcn profile without a CQRS configuration')
+        # Every instance holds its own pool: with a pool above 4 only one Core, one Clinic and one Notification worker, or the connections come close to the 100 of Postgres (about 97 for two of each at 8).
+        if db_pool_limit > DB_POOL_LIMITS[0] and (core_replicas, replicas, notification_workers) != (1, 1, 1):
+            raise ValueError('db_pool_limit above 4 only with one Core, one Clinic and one Notification worker')
         # Bridge VM study (K9): one or two Notification workers on the notification queue, and the gateway topology (stack.mjs: the CQRS studies run the direct one only).
         if type(notification_workers) is not int or notification_workers not in NOTIFICATION_WORKERS or gateway_topology not in GATEWAY_TOPOLOGIES:
             raise ValueError('notification_workers 1 or 2; gateway_topology direct or core-ingress')
