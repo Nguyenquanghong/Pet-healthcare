@@ -1,0 +1,12 @@
+{
+  "study": "bridge-m-h-kaggle-v1",
+  "notebook": "bridge-m-h-kaggle-v1.ipynb",
+  "notebookBytes": 831883,
+  "notebookSha256": "77b121572a090391522d0172b2ff402f42c9c111fae7bce8ca0595f8a48076eb",
+  "sourceArchiveSha256": "19dfd581f1a9eab2090fc900f335cdeb2fed3a961dbbcceb2736ebd6351e4cfb",
+  "archiveBytes": 605098,
+  "mCommit": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+  "hCommit": "e0e8937712d486bb0e4993541cca0255b4993e1e",
+  "files": 363,
+  "execution": "NOT_RUN"
+}

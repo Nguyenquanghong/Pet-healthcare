@@ -1,0 +1,12 @@
+{
+  "study": "bridge-m-h-vm-v1",
+  "bundle": "bridge-m-h-vm-v1.zip",
+  "bundleBytes": 1081894,
+  "sha256": "e137a3ac575f852722edfebc814895a8fa27fa2a0bd7625342d84c29bc0888ed",
+  "mCommit": "48d01c3c95d136f808b846a66a75fe08aacd92be",
+  "h0Commit": "e0e8937712d486bb0e4993541cca0255b4993e1e",
+  "h1Commit": "2841d1b9dd97b700b62baba9cb204735683f134e",
+  "harnessFromWorktree": false,
+  "files": 639,
+  "execution": "NOT_RUN"
+}
