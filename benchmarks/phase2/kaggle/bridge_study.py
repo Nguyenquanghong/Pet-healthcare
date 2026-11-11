@@ -293,6 +293,7 @@ def v2_extension(directory, settings, manifest, rows, series, generator, require
     """The metrics the v2 study adds to member_metrics; appends to `reasons` what makes the member invalid."""
     config, at = v2['config'], v2.get('burst_at', 120)
     reads = [r['response_time_ms'] for r in rows if r['name'].startswith('GET ')]
+    reads_ok = [r['response_time_ms'] for r in rows if r['name'].startswith('GET ') and not r['failed']]   # a failed read is often a fast 429/503: it can pull the p95 down
     components = {name: sum(values) / len(values) for name, values in sorted(series.items())}
     generator_cores = sum(generator) / len(generator) if generator else None
     if require_cpu:
@@ -320,7 +321,7 @@ def v2_extension(directory, settings, manifest, rows, series, generator, require
             reasons.append('burst: ' + ('; '.join(burst.get('reasons') or []) or str(burst.get('status'))))
     elif (Path(directory) / 'burst.json').is_file():
         reasons.append('burst.json present although no burst was asked for')
-    return {'config': config, 'read_requests': len(reads), 'read_p95_ms': percentile(reads, 95),
+    return {'config': config, 'read_requests': len(reads), 'read_p95_ms': percentile(reads, 95), 'read_p95_ok_ms': percentile(reads_ok, 95),
             'read_p95_segments': {'before': segment_p95(rows, 'GET ', BEFORE_START, at), 'after': segment_p95(rows, 'GET ', at, at + AFTER_LENGTH, closed_high=True)},
             'generator_cores': generator_cores, 'components': components, 'groups': component_groups(components), 'http': http,
             'pool': pool_evidence(manifest), 'outbox': manifest.get('outbox'), 'gateway': manifest.get('gateway'), 'burst': burst}
@@ -738,7 +739,7 @@ BURST_ORDER = ('H3b', 'H3bnw2', 'H3bnw2', 'H3b')
 TIER_ORDER = ('M', 'H3', 'H3x2', 'H3x2', 'H3', 'M')
 TOP_ORDER = ('M', 'H3', 'H3cl2', 'H3x2', 'H3x2cl2', 'H3x2cl2', 'H3x2', 'H3cl2', 'H3', 'M')
 POOL_ORDER = ('H3', 'H3p8', 'H3p8', 'H3')
-VM2_SMOKE_ORDER = ('M', 'H1', 'H3', 'H3c', 'H3x2', 'H3p8', 'H3x2cl2', 'H3bnw2')
+VM2_SMOKE_ORDER = ('M', 'H1', 'H3', 'H3c', 'H3x2', 'H3p8', 'H3cl2', 'H3x2cl2', 'H3bnw2')   # every configuration but H3b (H3bnw2 has the burst machinery)
 STEPS = (200, 400, 800)   # the users of Part 2; the highest one is TOP_FALLBACK when the generator is too busy at the first member (K10)
 TOP_FALLBACK = 600
 BURST_FULL, BURST_SMOKE, BURST_LOCAL = {'count': 6000, 'at_s': 120}, {'count': 200, 'at_s': 5}, {'count': 2000, 'at_s': 20}
@@ -746,7 +747,7 @@ LOCAL_WINDOW = {'seconds': 60, 'warmup': 10}
 # What the study calls saturated (design section 5): throughput that grows by less than 1.5x when the users double, a read p95 above 750 ms (QS-10), errors above 1%.
 SATURATION_GROWTH, SATURATION_READ_P95_MS, SATURATION_ERROR = 1.5, 750.0, 0.01
 SATURATION_CONFIGS = ('M', 'H3', 'H3x2')   # H3x2 has no 100-user point (K6): its first step has no growth sign
-RATIO_KEYS = ('success_rps', 'read_p95_ms', 'p95_ms', 'p50_ms', 'cpu_ms_per_success', 'server_cores', 'server_rss_mb')
+RATIO_KEYS = ('success_rps', 'read_p95_ms', 'read_p95_ok_ms', 'p95_ms', 'p50_ms', 'cpu_ms_per_success', 'server_cores', 'server_rss_mb')
 # (label, baseline, compared): each ratio is compared/baseline.
 PART1_COMPARISONS = (('H3/H1', 'H1', 'H3'), ('H3c/H3', 'H3', 'H3c'), ('H3/M', 'M', 'H3'), ('H1/M', 'M', 'H1'))
 TIER_COMPARISONS = (('H3x2/H3', 'H3', 'H3x2'), ('H3/M', 'M', 'H3'))
@@ -754,9 +755,16 @@ SCALE_OUT_COMPARISONS = (('H3cl2/H3', 'H3', 'H3cl2'), ('H3x2/H3', 'H3', 'H3x2'),
                          ('H3x2cl2/H3cl2', 'H3cl2', 'H3x2cl2'), ('H3x2cl2/H3', 'H3', 'H3x2cl2'), ('H3/M', 'M', 'H3'))
 POOL_COMPARISONS = (('H3p8/H3', 'H3', 'H3p8'),)
 BURST_COMPARISON = ('H3bnw2/H3b', 'H3b', 'H3bnw2')
-# The estimate of the time the VM is on (calibrated on the design: about 3.5 h for the 26 measured members of the plan without the scale-out and burst blocks, +32 min for the
-# four members added to the highest step, +30 for the burst block, +5 and +15 for the smoke and the dry run; the v1 handoff gives 20-30 min of setup).
-SETUP_MIN, MEMBER_OVERHEAD_MIN, DRAIN_S, BURST_WAIT_MIN = 25.0, 2.0, 15, 0.5
+# The estimate of the time the VM is on, calibrated on the real VM v1 run of 28/10 (benchmarks/phase2/Results/bridge vm-v1/, evaluation.json stages of the full and the local run).
+# MEASURED: a member of 100 users, ramp 10 s + warmup 30 s + window 300 s, took 355.4-356.6 s for the six H members and 345.1-345.2 s for the two M members, so 16 s (H) or 5 s (M)
+# more than the 340 s it runs: stack start, fixture, the drain at the end and teardown, drain included (MEMBER_OVERHEAD_MIN, the H figure for every member); a smoke member
+# (2 users, 15 s + 2 s warmup) took 31-36 s (H) and 21 s (M), which the same formula gives within 3 s; the local run (60 s windows) took 84.5 s (M) and 95.5-98.2 s (H).
+# ESTIMATED, not measured: SETUP_MIN (the stages of the first v1 run, prerequisites 57 s + build 26 s = 1.4 min, plus apt, unzip, venv and pip in vm_run.sh, which are not timed: the
+# handoff has the first run past its first smoke member 3 min after the start; 4 min with a margin; an empty npm cache and a slower mirror would add to it), SETUP_S_PER_USER (fixture,
+# 801 logins at the setup, the read-back of the 40 000 appointments at 800 users: 0.1 s a user above the 100 of the measurement; 800 users have never been run) and BURST_WAIT_MIN
+# (6000 events at 150-300 per second drain in 20-40 s). The first member of the dry run at 800 users measures the first two; decide --cut from the real time of the local run.
+SETUP_MIN, MEMBER_OVERHEAD_MIN, SETUP_S_PER_USER, BURST_WAIT_MIN = 4.0, 16 / 60, 0.1, 0.5
+CALIBRATION_USERS = 100   # the users of the v1 run the overhead was measured with
 VM2_HARNESS_CHANGES = (
     'stack.mjs has two gateway topologies, `direct` (appointments, medical-records and dashboard/clinic to Clinic, notifications to Notification, the rest to Core: the topology of '
     'deploy/phase2/nginx.split.conf.example) and `core-ingress` (every /api path to Core). H1 and H3 run `direct`, H3c runs `core-ingress`. Compared with v1 the difference is only '
@@ -796,7 +804,7 @@ def pool_block(users, window=None):
     return block_spec('pool', users, POOL_ORDER, window=window, pg_sampler=True)
 
 
-CUTS = ('x2-200', 'burst-short')   # S9: what to cut when the VM time would pass 6 h, in this order (about -16 and -8 min)
+CUTS = ('x2-200', 'burst-short')   # S9: what to cut when the VM time would pass 6 h, in this order (about -12 and -8 min)
 
 
 def burst_moment(cuts=()):
@@ -806,7 +814,8 @@ def burst_moment(cuts=()):
 
 def vm2_blocks(mode, cuts=()):
     """The blocks of a mode that are known before the run (the pool block is added during it). full: Part 1, the burst block, the steps of Part 2. local: a dry run of every kind of
-    block at reduced size, 60 s windows (the figures are not results): the 200-user step, the highest step's new member H3x2cl2 alone, and one member of each burst configuration.
+    block at reduced size, 60 s windows (the figures are not results): the 200-user step, a probe of the highest step (M, which opens that step in a full run, so that the dry run tells
+    whether the generator at 800 users would move the step to 600 (K10), and the new member H3x2cl2), and one member of each burst configuration.
     cuts (S9, only for full): 'x2-200' drops the H3x2 pair of the 200-user step (M,H3,H3,M), 'burst-short' makes the burst block a 180 s window with the burst at second 60."""
     if cuts and (mode != 'full' or any(c not in CUTS for c in cuts)):
         raise ValueError(f'cuts {CUTS} only for the full mode, got {cuts!r} for {mode}')
@@ -818,7 +827,7 @@ def vm2_blocks(mode, cuts=()):
                 *[block_spec('tier', users, TIER_ORDER, pg_sampler=True) for users in STEPS[1:-1]], top_block(STEPS[-1])]
     if mode == 'local':
         return [block_spec('tier', STEPS[0], TIER_ORDER, window=LOCAL_WINDOW, pg_sampler=True),
-                block_spec('probe', STEPS[-1], ('H3x2cl2',), window=LOCAL_WINDOW, pg_sampler=True, top=True),
+                block_spec('probe', STEPS[-1], ('M', 'H3x2cl2'), window=LOCAL_WINDOW, pg_sampler=True, top=True),
                 block_spec('probe', 100, ('H3b', 'H3bnw2'), window=LOCAL_WINDOW, burst=BURST_LOCAL, errors_invalidate=True)]
     return []
 
@@ -829,8 +838,10 @@ def member_name(index, users, config):
 
 
 def member_minutes(settings, burst=False):
-    """Minutes one member takes: stack start and teardown, ramp, warmup, window and the 15 s drain, and the wait for a burst to drain."""
-    return MEMBER_OVERHEAD_MIN + (settings['users'] / settings['spawn_rate'] + settings['warmup'] + settings['seconds'] + DRAIN_S) / 60 + (BURST_WAIT_MIN if burst else 0)
+    """Minutes one member takes: ramp, warmup and window, the measured overhead (stack start, fixture, drain, teardown) and, above the 100 users it was measured with, the estimated
+    setup time per user; plus the wait for a burst to drain."""
+    extra_users = max(0, settings['users'] - CALIBRATION_USERS)
+    return MEMBER_OVERHEAD_MIN + (settings['users'] / settings['spawn_rate'] + settings['warmup'] + settings['seconds'] + SETUP_S_PER_USER * extra_users) / 60 + (BURST_WAIT_MIN if burst else 0)
 
 
 def block_minutes(block):
@@ -838,7 +849,7 @@ def block_minutes(block):
 
 
 def estimate_minutes(mode, install=True, cuts=()):
-    """Minutes of a run of `mode`: setup (apt, Node, three npm ci and builds), the smoke of eight members, the measured members, and, for a full run, the dry run before it (a local
+    """Minutes of a run of `mode`: setup (apt, Node, three npm ci and builds), the smoke of nine members, the measured members, and, for a full run, the dry run before it (a local
     run without the setup it already did) and the pool block that runs only when H3 is saturated by its pool."""
     smoke = sum(member_minutes(SMOKE, bool(VM2_CONFIGS[c].get('burst'))) for c in VM2_SMOKE_ORDER)
     members = sum(block_minutes(block) for block in vm2_blocks(mode, cuts))
@@ -852,19 +863,22 @@ def estimate_minutes(mode, install=True, cuts=()):
 
 
 VM_ON_LIMIT_MIN = 360   # S9: the VM time above which the cuts are advised
+CUT_ADVICE = 'quyết định --cut theo thời gian thật của lượt local'   # the estimate has estimated parts (SETUP_MIN, SETUP_S_PER_USER): the real time of the local run replaces it
 
 
 def estimate_text(mode, install=True, cuts=()):
     e = estimate_minutes(mode, install, cuts)
     hours = lambda minutes: f'{minutes / 60:.1f} h'
     text = f"estimated time of the {mode} run: {hours(e['run'])} (setup {e['setup']:.0f} min, smoke {e['smoke']:.0f} min" + (f", measured members {e['members']:.0f} min)" if mode != 'smoke' else ')')
+    text += '; calibrated on the VM v1 run (member overhead and smoke measured, setup and the time per user above 100 estimated)'
     if mode == 'full':
         text += f"; with the local dry run before it ({e['dry_run']:.0f} min) the VM is on about {hours(e['vm_on'])}, and the pool block adds {e['pool_block']:.0f} min if it runs"
         if cuts:
             text += f"; cuts applied: {', '.join(cuts)}"
         elif e['vm_on'] > VM_ON_LIMIT_MIN:
-            text += '; over 6 h: ' + '; '.join(f"{'with' if n else 'pass'} --cut {c}{' as well' if n else ''}: {hours(estimate_minutes(mode, install, CUTS[:n + 1])['vm_on'])}"
+            text += f'; over {VM_ON_LIMIT_MIN // 60} h: ' + '; '.join(f"{'with' if n else 'pass'} --cut {c}{' as well' if n else ''}: {hours(estimate_minutes(mode, install, CUTS[:n + 1])['vm_on'])}"
                                               for n, c in enumerate(CUTS))
+        text += '; ' + CUT_ADVICE
     return text
 
 
@@ -915,7 +929,8 @@ def ratio_entry(members, order, base, other, *, readable=True, operations=False)
 def pool_point(items):
     """The pool evidence of the members of one configuration in one step: the share of samples with every connection of an API process busy (mean over the members), the P2024
     lines and the 503s (sums). `bound` is True when an API process had its whole pool busy in at least half of the samples or a P2024 was logged, False when the sampler read and
-    neither held, None when there is no sampler reading and no P2024 (K4)."""
+    neither held, None when there is no sampler reading and no P2024, or when no API process of the members has a pool limit to compare with (M: m-api uses Prisma's default pool, so it has
+    no share) (K4)."""
     pools = [m.get('pool') or {} for m in items]
     available = all(p.get('available') for p in pools)
     apps = {}
@@ -927,7 +942,7 @@ def pool_point(items):
     p2024 = sum(p.get('p2024_log_lines') or 0 for p in pools)
     full = top[1] is not None and top[1] >= POOL_FULL_SHARE
     return {'available': available, 'at_pool_limit_share': shares, 'share_max': top[1], 'share_max_app': top[0], 'p2024_log_lines': p2024,
-            'http_503': sum(p.get('http_503') or 0 for p in pools), 'bound': True if full or p2024 > 0 else False if available else None}
+            'http_503': sum(p.get('http_503') or 0 for p in pools), 'bound': True if full or p2024 > 0 else False if available and shares else None}
 
 
 def config_point(items):
@@ -939,7 +954,7 @@ def config_point(items):
     requests = sum(m['requests'] for m in items)
     generators = [m['generator_cores'] for m in items if m.get('generator_cores') is not None]
     return {'members': len(items), 'valid': all(m['valid'] for m in items), 'success_rps': mean_of([m.get('success_rps') for m in items]),
-            'read_p95_ms': mean_of([m.get('read_p95_ms') for m in items]), 'p95_ms': mean_of([m.get('p95_ms') for m in items]),
+            'read_p95_ms': mean_of([m.get('read_p95_ms') for m in items]), 'read_p95_ok_ms': mean_of([m.get('read_p95_ok_ms') for m in items]), 'p95_ms': mean_of([m.get('p95_ms') for m in items]),
             'cpu_ms_per_success': mean_of([m.get('cpu_ms_per_success') for m in items]), 'server_cores': mean_of([m.get('server_cores') for m in items]),
             'error_rate': sum(m['failures'] for m in items) / requests if requests else None,
             'rate_429': max(((m.get('http') or {}).get('rate_429') or 0.0 for m in items), default=0.0), 'generator_cores': max(generators) if generators else None,
@@ -951,8 +966,8 @@ def config_point(items):
 def bottleneck(point):
     """Pool or CPU (K4): pool when an API process had its whole Prisma pool busy in at least half of the samples (or a P2024 was logged), CPU when a Node API process used 0.85 core or more."""
     pool, cpu = point['pool']['bound'], bool(point['hot'])
-    label = ('pool + CPU' if pool and cpu else 'pool' if pool else 'CPU' if cpu else 'không đọc được (không có mẫu pg_stat_activity)' if pool is None
-             else 'không phải pool hay CPU của Node (Postgres, RabbitMQ hay cả máy)')
+    label = ('pool + CPU' if pool and cpu else 'pool' if pool else 'CPU' if cpu else 'không đọc được (không có mẫu pg_stat_activity, hoặc không có pool_limit để so: M dùng pool mặc định của Prisma)'
+             if pool is None else 'không phải pool hay CPU của Node (Postgres, RabbitMQ hay cả máy)')
     return {'pool': pool, 'cpu': cpu, 'hot': point['hot'], 'label': label}
 
 
@@ -1023,7 +1038,7 @@ def saturation(points, tier_ok):
             if point['error_rate'] is not None and point['error_rate'] > SATURATION_ERROR:
                 signs.append('errors')
             series.append({'users': users, 'readable': True, 'saturated': bool(signs), 'signs': signs, 'success_rps': point['success_rps'], 'previous_users': before_users if before else None,
-                           'growth': growth, 'required_growth': required, 'read_p95_ms': point['read_p95_ms'], 'error_rate': point['error_rate'],
+                           'growth': growth, 'required_growth': required, 'read_p95_ms': point['read_p95_ms'], 'read_p95_ok_ms': point['read_p95_ok_ms'], 'error_rate': point['error_rate'],
                            'bottleneck': bottleneck(point)})
             if signs and first is None:
                 first = users
@@ -1049,41 +1064,58 @@ def pool_trigger(records, users):
 
 
 SCALE_OUT_READINGS = {
+    'AC': 'Nhân Core và nhân Clinic đều có lợi: cả hai là giới hạn ở bậc này, nhân thành phần nào cũng tăng throughput (H3x2cl2/H3x2 và H3x2cl2/H3cl2 cho biết nhân cả hai còn cộng dồn không).',
     'A': 'Core là nút cổ chai, nhân Clinic không giúp vì mỗi request Clinic vẫn hỏi Core authorize: nhân Core có lợi, nhân Clinic một mình thì không '
          '(ADR-P13 đạt điều kiện (a); ADR-P14 §3 sửa thành "có lợi khi nhân Core; nhân Clinic một mình không").',
-    'B': 'Hai nút cổ chai lần lượt: nhân Core xong thì Clinic (hoặc ngược lại) mới là giới hạn; phải nhân cả hai.',
-    'C': 'Clinic nóng trước: nhân Clinic có lợi, nên tách Clinic khỏi Core có lý do chứng minh được (một lượt đo).',
-    'D': 'Mọi tỷ lệ ≈ 1 và CPU thấp: chưa bão hòa ở bậc này, không kết luận.',
-    'E': 'Mọi tỷ lệ ≈ 1 nhưng server gần hết lõi hoặc Postgres nóng: giới hạn nằm ở máy hoặc ở cơ sở dữ liệu, không ở số instance.',
-    'F': 'Có tỷ lệ ≤ 0,9: instance thêm tốn hơn lợi (tranh lõi và kết nối với phần còn lại).'}
-POSTGRES_HOT_SHARE = 0.5   # Postgres at half of the server CPUs or more counts as hot for reading D against E
-BUSY_SERVER_SHARE = 6 / 7   # the processes of the stack together at 6/7 of the server CPUs or more: the machine is the limit
+    'B': 'Hai nút cổ chai lần lượt: nhân Core có lợi, và khi Core đã nhân đôi thì Clinic mới là giới hạn (nhân thêm Clinic còn có lợi); phải nhân cả hai.',
+    'C': 'Clinic nóng trước: nhân Clinic có lợi (nhân Core một mình thì không), nên tách Clinic khỏi Core có lý do chứng minh được (một lượt đo).',
+    'D': 'Không tỷ lệ nào có lợi hay có hại, H3 chưa bão hòa ở bậc này và không API nào nóng: chưa bão hòa, không kết luận.',
+    'E': 'Không tỷ lệ nào có lợi hay có hại, nhưng H3 đã bão hòa, hoặc một API đã nóng, hoặc chưa xác định được: giới hạn nằm ngoài số instance (máy, DB hoặc chưa xác định).',
+    'F': 'Có tỷ lệ ≤ 0,9 và không tỷ lệ nào ≥ 1,1: instance thêm tốn hơn lợi (tranh lõi và kết nối với phần còn lại).',
+    'G': 'Chỉ nhân gộp có lợi: nhân Core hay nhân Clinic một mình đều dưới 1,1, nhưng nhân cả hai (so với bản đã nhân một bên) đạt 1,1. Hai lợi ích nhỏ dưới ngưỡng không cộng dồn '
+         'thành một kết luận.'}
+POSTGRES_HOT_SHARE = 0.5   # information only: Postgres at half of the server CPUs or more (no longer a condition of D or E)
+BUSY_SERVER_SHARE = 6 / 7   # the processes of the stack together at 6/7 of the server CPUs or more: the machine is the limit (not D)
+SCALE_OUT_LABELS = ('H3cl2/H3', 'H3x2/H3', 'H3x2cl2/H3x2', 'H3x2cl2/H3cl2', 'H3x2cl2/H3')
 
 
-def scale_out_conclusion(entries, points, server_cpus=7):
-    """The sample conclusion A-F of the highest step, from the throughput ratios of the five comparisons (1.1 and 0.9 bands). Order of reading: F (a ratio at or under 0.9), C (Clinic
-    alone helps), B (Clinic is the next bottleneck once Core is doubled: H3x2cl2/H3x2 helps), A (Core alone helps), B again when only the combination helps (H3x2cl2 over H3 or over
-    H3cl2 while no single doubling does), then D or E (nothing moves; E when the stack is nearly out of server cores or Postgres is hot). None when a ratio cannot be read."""
-    labels = ('H3cl2/H3', 'H3x2/H3', 'H3x2cl2/H3x2', 'H3x2cl2/H3cl2', 'H3x2cl2/H3')
-    ratios = {label: ((entries.get(label) or {}).get('ratios') or {}).get('success_rps') for label in labels}
-    if any(v is None for v in ratios.values()):
-        return {'code': None, 'reading': 'không đọc được', 'ratios': ratios}
+def saturated_at(report, config, users):
+    """True / False when `report` (saturation()) read `config` at `users` and found it saturated / not; None when that step is not readable or has no such point."""
+    entry = next((e for e in ((report or {}).get('configs', {}).get(config) or {}).get('series', []) if e['users'] == users), None)
+    return entry.get('saturated') if entry else None
+
+
+def scale_out_conclusion(entries, points, server_cpus=7, h3_saturated=None):
+    """The conclusion of the highest step from the throughput ratios of the five comparisons (SCALE_OUT_LABELS; 1.1 and 0.9 bands). c = H3cl2/H3 and x = H3x2/H3 are the main ratios,
+    xcx = H3x2cl2/H3x2 and xcc = H3x2cl2/H3cl2 the conditional ones, H3x2cl2/H3 the combined one (reported, never a reason by itself: two small gains below the band do not add up).
+    In order: AC (c and x help), C (c helps), B (x helps and so does xcx) or A (x helps alone), G (only the combination helps: xcc or xcx reaches 1.1 and so does the combined ratio, while neither c nor x does; xcc alone can come from a Clinic doubling that
+    made H3cl2 worse), then,
+    when nothing helps, F (a ratio at or under 0.9), D (H3 is not saturated at this step, `h3_saturated` False, no H3 API process is at 0.85 core and no H3 configuration uses 6/7 of the
+    server cores) or E (anything else: saturated, hot, busy or not known). `harmful` always lists the ratios at or under 0.9, whatever the code. Only the H3 configurations are looked at
+    for hot and busy, never M. Postgres at half of the server cores is reported in machine_or_database_busy and decides nothing. None when a ratio cannot be read."""
+    ratios = {label: ((entries.get(label) or {}).get('ratios') or {}).get('success_rps') for label in SCALE_OUT_LABELS}
     low, high = BANDS
+    harmful = [label for label, v in ratios.items() if v is not None and v <= low]
+    if any(v is None for v in ratios.values()):
+        return {'code': None, 'reading': 'không đọc được', 'ratios': ratios, 'harmful': harmful}
     helps = lambda label: ratios[label] >= high
-    busy = [name for name, p in points.items() if (p['server_cores'] or 0) >= BUSY_SERVER_SHARE * server_cpus or (p['components'].get('postgres') or 0) >= POSTGRES_HOT_SHARE * server_cpus]
-    if any(v <= low for v in ratios.values()):
-        code = 'F'
+    h3_points = {name: p for name, p in points.items() if name.startswith('H3')}
+    hot = {name: p['hot'] for name, p in h3_points.items()}
+    stack_full = [name for name, p in h3_points.items() if (p['server_cores'] or 0) >= BUSY_SERVER_SHARE * server_cpus]
+    busy = [name for name, p in h3_points.items() if name in stack_full or (p['components'].get('postgres') or 0) >= POSTGRES_HOT_SHARE * server_cpus]
+    if helps('H3cl2/H3') and helps('H3x2/H3'):
+        code = 'AC'
     elif helps('H3cl2/H3'):
         code = 'C'
-    elif helps('H3x2cl2/H3x2'):
-        code = 'B'
     elif helps('H3x2/H3'):
-        code = 'A'
-    elif helps('H3x2cl2/H3') or helps('H3x2cl2/H3cl2'):
-        code = 'B'
+        code = 'B' if helps('H3x2cl2/H3x2') else 'A'
+    elif (helps('H3x2cl2/H3cl2') or helps('H3x2cl2/H3x2')) and helps('H3x2cl2/H3'):
+        code = 'G'
+    elif harmful:
+        code = 'F'
     else:
-        code = 'E' if busy else 'D'
-    return {'code': code, 'reading': SCALE_OUT_READINGS[code], 'ratios': ratios, 'hot_processes': {name: p['hot'] for name, p in points.items()},
+        code = 'D' if h3_saturated is False and not any(hot.values()) and not stack_full else 'E'
+    return {'code': code, 'reading': SCALE_OUT_READINGS[code], 'ratios': ratios, 'harmful': harmful, 'h3_saturated': h3_saturated, 'hot_processes': hot,
             'machine_or_database_busy': busy}
 
 
@@ -1129,7 +1161,8 @@ def read_ratio(metrics):
 
 def analyze_burst(members, order, control):
     """The burst block. drain(nw2)/drain(nw1) is the main figure (geometric mean of the forward and the reverse pair), the efficiency of the doubling 1/(2 x ratio). The effect on the
-    load I = read ratio of the member / geometric mean of the read ratios of the two H3 members of Part 1 (`control`, the same ratio without a burst), per configuration and nw2/nw1."""
+    load I = read ratio of the member / geometric mean of the read ratios of the two H3 members of Part 1 (`control`, the same ratio without a burst), per configuration and nw2/nw1.
+    The control must be both H3 members of Part 1 and both valid: otherwise I is 'không đọc được' (an invalid member measured something else than the product)."""
     label, base, other = BURST_COMPARISON
     positions = pair_indices(order, base, other)
     pairs = [(members[a], members[b]) for a, b in positions]
@@ -1138,7 +1171,8 @@ def analyze_burst(members, order, control):
     ratio, pair_ratios = balanced(pairs, drain) if readable else (None, [])
     relay_shares = [b['relay_drain_s'] / b['drain_s'] for m in members if (b := m.get('burst') or {}).get('drain_s') and b.get('relay_drain_s') is not None]
     relay_share = sum(relay_shares) / len(relay_shares) if relay_shares else None
-    control_ratio = geometric_mean([read_ratio(m) for m in control])
+    control_readable = len(control) == 2 and all(m['valid'] for m in control)
+    control_ratio = geometric_mean([read_ratio(m) for m in control]) if control_readable else None
     configs, disturbance = {}, {}
     for config in (base, other):
         items = [m for m, c in zip(members, order) if c == config]
@@ -1156,7 +1190,7 @@ def analyze_burst(members, order, control):
     return {'readable': readable, 'configs': configs,
             'drain': {'comparison': label, 'ratio': ratio, 'pair_ratios': pair_ratios, 'efficiency': 1 / (2 * ratio) if ratio else None, 'relay_share_of_drain': relay_share,
                       'reading': drain_reading(ratio, relay_share)},
-            'disturbance': {'control_read_ratio': control_ratio, 'I': disturbance, 'I_nw2_over_nw1': i_ratio, 'reading': disturbance_reading(disturbance[other]),
+            'disturbance': {'control_read_ratio': control_ratio, 'control_readable': control_readable, 'I': disturbance, 'I_nw2_over_nw1': i_ratio, 'reading': disturbance_reading(disturbance[other]),
                             'control': 'the read ratio of the two H3 members of Part 1 (same segments, no burst)'},
             'background_notifications': {'delay_during_over_before': dict(zip((base, other), delay)),
                                          'reading': 'trễ thông báo nền tăng: thông báo thường xếp sau đợt dồn (đề xuất ưu tiên queue để sau)'
@@ -1169,7 +1203,12 @@ ANALYSIS_LIMITATIONS = (
     "The pg_stat_activity sampler counts a connection as busy when its state is not 'idle': a pooled connection that is checked out but waiting between statements does not count, so "
     'the share of samples with the whole pool busy is a lower bound and the pool threshold of K4 (half of the samples) can under-report a pool that is the limit. P2024 is a lower '
     'bound as well: the services answer a pool timeout with a 503 and log nothing.',
-    'H3c (gateway -> Core -> Clinic) is an upper bound of the price at compose, where Core calls Clinic directly.')
+    'H3c (gateway -> Core -> Clinic) is an upper bound of the price at compose, where Core calls Clinic directly.',
+    'The growth sign of saturation requires 1.5 ** log2(users ratio): 1.5x when the users double, and 1.27x for 600 users after 400 (ratio 1.5). That is 84.5% of linear growth for the '
+    '600-user step against 75% for a doubling step, so the sign is stricter at 600 than at the doubling steps and a 600-user step is called saturated sooner.',
+    'The growth from 100 to 200 users compares Part 1 (no pg_stat_activity sampler) with the 200-user step (sampler on): two different blocks, so the drift of the host between blocks '
+    'does not cancel as it does inside a block, and the sampler costs the servers a little in one of the two. The growth from 200 to 400 and from 400 to 800 is between steps that both '
+    'have the sampler, but still between blocks.')
 
 
 def analyze_v2(records, *, stopped=None, top=None, pool=None, server_cpus=7):
@@ -1181,7 +1220,7 @@ def analyze_v2(records, *, stopped=None, top=None, pool=None, server_cpus=7):
                         'position cancels exactly, other shapes only to first order. One VM session, two pairs per ratio: a descriptive comparison, not a capacity or equal-budget '
                         'acceptance. H3c/H3 is an upper bound of the price at compose (the hop gateway -> Core -> Clinic is not the one of the compose files).'}
     points, tier_ok = collect_points(records)
-    part1 = [r['metrics'] for r in records if r['block'] == 'part1']
+    sat = saturation(points, tier_ok) if points else None
     for name, members in block_groups(records).items():
         kind, users = members[0]['kind'], members[0]['users']
         order, planned = tuple(r['config'] for r in members), tuple(members[0].get('planned_order') or ())
@@ -1204,6 +1243,8 @@ def analyze_v2(records, *, stopped=None, top=None, pool=None, server_cpus=7):
             analysis['burst']['block'] = name
             if not analysis['burst']['readable']:
                 analysis['unreadable'].append(f'{name}: a member is invalid, the drain is not readable')
+            if not analysis['burst']['disturbance']['control_readable']:
+                analysis['unreadable'].append(f'{name}: the two H3 members of Part 1 (the control of I) are not both there and valid, I is not readable')
             continue
         if kind == 'pool':
             analysis['pool'] = analyze_pool(metrics, order, readable)
@@ -1216,8 +1257,8 @@ def analyze_v2(records, *, stopped=None, top=None, pool=None, server_cpus=7):
         block['balance'] = {c: flags for c in block['configs'] if (flags := balance_flags(block['configs'][c]))}
         analysis['unreadable'] += [f'{name}: {label}' for label, entry in block['comparisons'].items() if not entry['readable'] and readable]
         if order == TOP_ORDER:
-            analysis['scale_out'] = {'block': name, **scale_out_conclusion(block['comparisons'], block['configs'], server_cpus), 'balance': block['balance']}
-    analysis['saturation'] = saturation(points, tier_ok) if points else None
+            analysis['scale_out'] = {'block': name, **scale_out_conclusion(block['comparisons'], block['configs'], server_cpus, saturated_at(sat, 'H3', users)), 'balance': block['balance']}
+    analysis['saturation'] = sat
     readable_ratios = [e for b in analysis['blocks'].values() for e in (b.get('comparisons') or {}).values() if e['readable']]
     if analysis['decision'] == 'COMPARED' and not readable_ratios and not (analysis['burst'] or {}).get('readable'):
         analysis['decision'] = 'INVALID'
@@ -1274,7 +1315,7 @@ class VmStudy2(VmStudy):
                                                                                 'burst_at': burst_moment(self.cuts)})
 
     def smoke_members(self):
-        """The eight smoke members (VM2_SMOKE_ORDER, 2 users, 15 s); H3bnw2 fires a burst of 200 at second 5."""
+        """The nine smoke members (VM2_SMOKE_ORDER, 2 users, 15 s); H3bnw2 fires a burst of 200 at second 5."""
         results = []
         for i, c in enumerate(self.smoke_order):
             burst = BURST_SMOKE if VM2_CONFIGS[c].get('burst') else None
@@ -1302,8 +1343,12 @@ class VmStudy2(VmStudy):
                 return False
             if position == 0 and block['top']:
                 cores = record['metrics'].get('generator_cores')
-                self.top.update(probe=record['name'], generator_cores=cores)
-                if self.mode == 'full' and block['users'] == STEPS[-1] and cores is not None and cores > GENERATOR_SHIFT:
+                would_shift = block['users'] == STEPS[-1] and cores is not None and cores > GENERATOR_SHIFT
+                self.top.update(probe=record['name'], generator_cores=cores, would_shift=would_shift)
+                if self.mode == 'local' and block['users'] == STEPS[-1] and cores is not None:   # the dry run says in advance what the full run will do (K10)
+                    self.progress(f'[{record["name"]}] generator {cores:.2f} core at {block["users"]} users: a full run would ' + (f'move the highest step to {TOP_FALLBACK} users' if would_shift
+                                  else f'keep the highest step at {block["users"]} users') + f' (threshold {GENERATOR_SHIFT:.2f})')
+                if self.mode == 'full' and would_shift:
                     self.top.update(used=TOP_FALLBACK, shifted=True, reason=f'the generator of the first member at {block["users"]} users used {cores:.2f} core, above {GENERATOR_SHIFT:.2f} (K10)')
                     record['abandoned'] = True
                     self.progress(f'[{record["name"]}] generator {cores:.2f} core above {GENERATOR_SHIFT:.2f}: the highest step runs at {TOP_FALLBACK} users')

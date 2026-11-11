@@ -8,12 +8,12 @@
 # --study only states what you expect and stops the run when the bundle is the other one. Results go to bridge-vm-v2-<UTC>(.tar.gz) for v2
 # and to bridge-vm-<UTC> for v1.
 #
-# v2 (bridge-m-h-vm-v2, K9; the harness prints its own estimate at the start):
-#   smoke  the eight smoke members M,H1,H3,H3c,H3x2,H3p8,H3x2cl2,H3bnw2 (2 users, 15 s; the last one fires a burst of 200 events), about 20 min after setup
-#   local  smoke, then a dry run of every kind of block with 60 s windows: not a result (about 55 min after setup)
-#   full   smoke, then Part 1, the burst block, the steps of 200, 400 and 800 users and, when H3 is saturated by its pool, the pool block (about 5 h
-#          after setup; with the local dry run before it the VM is on about 6.2 h). --cut x2-200 and --cut burst-short (full only, in this order) take
-#          about 16 and 8 minutes off when that passes 6 h.
+# v2 (bridge-m-h-vm-v2, K9; the harness prints its own estimate at the start, calibrated on the VM v1 run, and the real time of the local run decides --cut):
+#   smoke  the nine smoke members of the study (M,H1,H3,H3c,H3x2,H3p8,H3cl2,H3x2cl2,H3bnw2: 2 users, 15 s; the last one fires a burst of 200 events), about 5 min after setup
+#   local  smoke, then a dry run of every kind of block with 60 s windows, not a result (about 26 min after setup, an 800-user probe of M and H3x2cl2 included)
+#   full   smoke, then Part 1, the burst block, the steps of 200, 400 and 800 users and, when H3 is saturated by its pool, the pool block (about 3.8 h after setup,
+#          4.2 h with the local dry run before it, 26 min more if the pool block runs). --cut x2-200 and --cut burst-short (full only, in this order) take about 12 and
+#          8 minutes off, for a run that would pass 6 h.
 # v1:
 #   full   smoke of M,H0,H1,H2 (2 users, 15 s), then M,H0,H1,H2,H2,H1,H0,M with 30 s warmup + 300 s each (about 70 min after setup)
 #   smoke  the smoke gate only (about 20 min after setup)

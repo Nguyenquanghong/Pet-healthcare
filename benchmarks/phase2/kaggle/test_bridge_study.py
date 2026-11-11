@@ -1898,12 +1898,13 @@ class Archive(unittest.TestCase):
 
 
 # ---- bridge-m-h-vm-v2 (K9 C3) ----------------------------------------------------------------------------------------------------------
-def v2m(config='H3', *, rps=100.0, read=50.0, p95=80.0, cpu=10.0, cores=1.0, failures=0, requests=1000, generator=0.3, components=None, rate_429=0.0, shares=None,
+def v2m(config='H3', *, rps=100.0, read=50.0, read_ok=None, p95=80.0, cpu=10.0, cores=1.0, failures=0, requests=1000, generator=0.3, components=None, rate_429=0.0, shares=None,
         p2024=0, http_503=0, available=True, valid=True, burst=None, segments=None):
     """The metrics a v2 member has, without the files: what the analysis reads."""
     components = {'core': 0.4, 'clinic-0': 0.3, 'postgres': 0.8} if components is None else components
     ops = {name: {'p95_ms': p95, 'p50_ms': p95 / 2, 'mean_response_bytes': 100} for name in ('GET pets', 'POST appointment')}
     return {'valid': valid, 'reasons': [] if valid else ['x'], 'operations': ops, 'requests': requests, 'failures': failures, 'success_rps': rps, 'read_p95_ms': read,
+            'read_p95_ok_ms': read if read_ok is None else read_ok,
             'p95_ms': p95, 'p50_ms': p95 / 2, 'cpu_ms_per_success': cpu, 'server_cores': cores, 'server_rss_mb': 300.0, 'generator_cores': generator, 'components': components,
             'groups': bs.component_groups(components), 'http': {'http_429': int(rate_429 * requests), 'rate_429': rate_429, 'rate_503': 0.0},
             'pool': {'available': available, 'at_pool_limit_share': shares or {}, 'p2024_log_lines': p2024, 'http_503': http_503}, 'outbox': None, 'burst': burst,
@@ -2045,7 +2046,7 @@ class VmV2Plan(unittest.TestCase):
         self.assertEqual(bs.BURST_ORDER, ('H3b', 'H3bnw2', 'H3bnw2', 'H3b'))
         self.assertEqual(bs.TIER_ORDER, ('M', 'H3', 'H3x2', 'H3x2', 'H3', 'M'))
         self.assertEqual(bs.POOL_ORDER, ('H3', 'H3p8', 'H3p8', 'H3'))
-        self.assertEqual(bs.VM2_SMOKE_ORDER, ('M', 'H1', 'H3', 'H3c', 'H3x2', 'H3p8', 'H3x2cl2', 'H3bnw2'))
+        self.assertEqual(bs.VM2_SMOKE_ORDER, ('M', 'H1', 'H3', 'H3c', 'H3x2', 'H3p8', 'H3cl2', 'H3x2cl2', 'H3bnw2'))   # every configuration but H3b
         self.assertEqual((bs.STEPS, bs.TOP_FALLBACK), ((200, 400, 800), 600))
         self.assertEqual((bs.BURST_FULL, bs.BURST_SMOKE), ({'count': 6000, 'at_s': 120}, {'count': 200, 'at_s': 5}))
         for order in (bs.PART1_ORDER, bs.BURST_ORDER, bs.TIER_ORDER, bs.TOP_ORDER, bs.POOL_ORDER):
@@ -2081,7 +2082,7 @@ class VmV2Plan(unittest.TestCase):
     def test_the_local_plan_is_a_reduced_dry_run_of_every_kind_of_block(self):
         blocks = bs.vm2_blocks('local')
         self.assertEqual([(b['name'], b['kind'], b['order']) for b in blocks],
-                         [('tier-200', 'tier', bs.TIER_ORDER), ('probe-800', 'probe', ('H3x2cl2',)), ('probe-100', 'probe', ('H3b', 'H3bnw2'))])
+                         [('tier-200', 'tier', bs.TIER_ORDER), ('probe-800', 'probe', ('M', 'H3x2cl2')), ('probe-100', 'probe', ('H3b', 'H3bnw2'))])   # M@800 opens the probe as it opens the full step (K10)
         for block in blocks:
             self.assertEqual((block['settings']['seconds'], block['settings']['warmup']), (60, 10))
         self.assertEqual(blocks[2]['burst'], {'count': 2000, 'at_s': 20})
@@ -2102,30 +2103,53 @@ class VmV2Plan(unittest.TestCase):
     def test_a_measured_member_is_named_after_its_position_its_users_and_its_configuration(self):
         self.assertEqual(bs.member_name(7, 400, 'H3x2cl2'), 'full-7-400-H3x2cl2')
 
-    def test_the_time_the_vm_is_on_is_the_one_the_design_gives_and_the_cuts_bring_it_under_six_hours(self):
+    def test_the_estimate_is_calibrated_on_the_real_vm_v1_run_and_the_cuts_still_take_what_s9_says_off(self):
+        # Measured (VM v1, 28/10): a member of 100 users ran 355.4-356.6 s (H) and 345.1 s (M) for 340 s of ramp, warmup and window; a smoke member 21-36 s; a local member 84.5-98.2 s.
+        self.assertAlmostEqual(bs.member_minutes(bs.FULL) * 60, 356, delta=1)
+        self.assertAlmostEqual(bs.member_minutes(bs.SMOKE) * 60, 33, delta=3)
+        self.assertAlmostEqual(bs.member_minutes(bs.load_settings(100, bs.LOCAL_WINDOW)) * 60, 96, delta=2)
+        self.assertEqual(bs.member_minutes(bs.load_settings(100)), bs.member_minutes(bs.FULL))
+        # Estimated: the time per user above the 100 of the measurement (800 users have never been run), the setup, the wait for a burst to drain.
+        self.assertAlmostEqual(bs.member_minutes(bs.load_settings(800)) - bs.member_minutes(bs.FULL), bs.SETUP_S_PER_USER * 700 / 60)
+        self.assertGreater(bs.member_minutes(bs.load_settings(100), True), bs.member_minutes(bs.load_settings(100)))
         full = bs.estimate_minutes('full')
-        self.assertTrue(5.8 <= full['vm_on'] / 60 <= 6.3, full['vm_on'] / 60)         # the appendix: about 5.8-6.3 h
-        self.assertTrue(4.4 <= full['members'] / 60 <= 4.9, full['members'] / 60)      # 3.5 h of the base plan plus the 80 min the appendix adds
-        self.assertEqual(round(full['pool_block']), 32)                                # about +30 min, only if H3 is saturated by its pool
-        self.assertGreater(full['vm_on'], bs.VM_ON_LIMIT_MIN)
+        self.assertTrue(3.2 <= full['members'] / 60 <= 4.0, full['members'] / 60)       # 34 members of 5.9 to 7.1 min
+        self.assertTrue(4.0 <= full['vm_on'] / 60 <= 4.5, full['vm_on'] / 60)           # with the setup, the smoke and the local dry run before it
+        self.assertEqual(round(full['pool_block']), 26)                                  # only if H3 is saturated by its pool
+        self.assertLess(full['vm_on'], bs.VM_ON_LIMIT_MIN)                               # the real member time puts the run well under the 6 h of S9
         first, both = bs.estimate_minutes('full', cuts=('x2-200',)), bs.estimate_minutes('full', cuts=bs.CUTS)
-        self.assertAlmostEqual(full['members'] - first['members'], 16.0, delta=1.5)     # S9: -16 min
-        self.assertAlmostEqual(first['members'] - both['members'], 8.0, delta=1.5)      # S9: -8 min
-        self.assertLessEqual(first['vm_on'], bs.VM_ON_LIMIT_MIN)
+        self.assertAlmostEqual(full['members'] - first['members'], 12.2, delta=1.0)      # the H3x2 pair of the 200 step: two members of 6.1 min
+        self.assertAlmostEqual(first['members'] - both['members'], 8.0, delta=1.0)       # four members, 2 min of window each
         local, smoke = bs.estimate_minutes('local'), bs.estimate_minutes('smoke')
-        self.assertTrue(30 <= local['members'] <= 40 and 15 <= smoke['smoke'] <= 25)
+        self.assertTrue(15 <= local['members'] <= 25 and 4 <= smoke['smoke'] <= 7, (local['members'], smoke['smoke']))
         self.assertEqual(smoke['run'], smoke['setup'] + smoke['smoke'])
         self.assertEqual(bs.estimate_minutes('full', install=False)['setup'], 0.0)
-        # The estimate is the sum over the plan, member by member.
+        # The estimate is the sum over the plan, member by member; the dry run adds the smoke and the local members.
         self.assertAlmostEqual(full['members'], sum(bs.member_minutes(b['settings'], bool(b['burst'] and bs.VM2_CONFIGS[c].get('burst'))) for b in bs.vm2_blocks('full') for c in b['order']))
-        self.assertGreater(bs.member_minutes(bs.load_settings(100), True), bs.member_minutes(bs.load_settings(100)))
+        self.assertAlmostEqual(full['dry_run'], full['smoke'] + local['members'])
+        self.assertAlmostEqual(full['vm_on'], full['run'] + full['dry_run'])
+
+    def test_every_constant_of_the_estimate_says_whether_it_was_measured_or_estimated(self):
+        source = (HERE / 'bridge_study.py').read_text(encoding='utf-8')
+        comment = source[source.index('# The estimate of the time the VM is on'):source.index('SETUP_MIN, MEMBER_OVERHEAD_MIN')]
+        for needle in ('MEASURED', 'ESTIMATED', 'MEMBER_OVERHEAD_MIN', 'SETUP_MIN', 'SETUP_S_PER_USER', 'BURST_WAIT_MIN', 'bridge vm-v1', '355.4-356.6', '345.1', '800 users have never been run'):
+            self.assertIn(needle, comment)
+        self.assertFalse(hasattr(bs, 'DRAIN_S'))   # the drain is part of the measured overhead
 
     def test_the_estimate_is_printed_when_the_study_starts_with_the_dry_run_the_pool_block_and_the_cuts(self):
         text = bs.estimate_text('full')
-        for needle in ('estimated time of the full run', '5.3 h', 'local dry run', 'about 6.2 h', 'pool block adds 32 min', '--cut x2-200: 5.9 h', '--cut burst-short as well: 5.8 h'):
+        for needle in ('estimated time of the full run', '3.8 h', 'local dry run', 'about 4.2 h', 'pool block adds 26 min', 'calibrated on the VM v1 run', bs.CUT_ADVICE):
             self.assertIn(needle, text)
+        self.assertEqual(bs.CUT_ADVICE, 'quyết định --cut theo thời gian thật của lượt local')
+        self.assertNotIn('over 6 h', text)   # 4.2 h: no cut is advised by the estimate
+        with patch.object(bs, 'VM_ON_LIMIT_MIN', 240):   # a limit under the estimate brings the advice back: each cut with the time it leaves
+            advised = bs.estimate_text('full')
+        for needle in ('over 4 h: pass --cut x2-200: 4.0 h', 'with --cut burst-short as well: 3.9 h', bs.CUT_ADVICE):
+            self.assertIn(needle, advised)
         self.assertIn('cuts applied: x2-200', bs.estimate_text('full', cuts=('x2-200',)))
+        self.assertIn(bs.CUT_ADVICE, bs.estimate_text('full', cuts=('x2-200',)))
         self.assertNotIn('over 6 h', bs.estimate_text('full', cuts=('x2-200',)))
+        self.assertNotIn(bs.CUT_ADVICE, bs.estimate_text('local'))   # the advice is for the full run
         self.assertNotIn('dry run', bs.estimate_text('smoke'))
         lines = []
         study = bs.VmStudy2('/nowhere', '/nowhere/private', '/nowhere/results', 'run-1', mode='full', progress=lines.append)
@@ -2162,8 +2186,8 @@ class VmV2Member(unittest.TestCase):
         seen = [(c.args[0].name, c.kwargs['core_replicas'], c.kwargs['replicas'], c.kwargs['db_pool_limit'], c.kwargs['core_layout'], c.kwargs['gateway_topology'],
                  c.kwargs['notification_workers'], c.kwargs['burst']) for c in pcn.call_args_list]
         self.assertEqual(seen, [('H1', 1, 1, 4, 'phase2', 'direct', 1, None), ('H3', 1, 1, 4, 'workers', 'direct', 1, None), ('H3', 1, 1, 4, 'workers', 'core-ingress', 1, None),
-                                ('H3', 2, 1, 4, 'workers', 'direct', 1, None), ('H3', 1, 1, 8, 'workers', 'direct', 1, None), ('H3', 2, 2, 4, 'workers', 'direct', 1, None),
-                                ('H3', 1, 1, 4, 'workers', 'direct', 2, bs.BURST_SMOKE)])
+                                ('H3', 2, 1, 4, 'workers', 'direct', 1, None), ('H3', 1, 1, 8, 'workers', 'direct', 1, None), ('H3', 1, 2, 4, 'workers', 'direct', 1, None),
+                                ('H3', 2, 2, 4, 'workers', 'direct', 1, None), ('H3', 1, 1, 4, 'workers', 'direct', 2, bs.BURST_SMOKE)])
         for call in pcn.call_args_list:
             self.assertEqual((call.kwargs['service_env'], call.kwargs['pinning'], call.kwargs['vm'], call.kwargs['core_proxy'], call.kwargs['locustfile'], call.kwargs['mode']),
                              (bs.H_LIMITS, self.study.pinning, True, True, bs.LOCUSTFILE, 'smoke'))
@@ -2211,7 +2235,7 @@ class V2Files:
     SETTINGS = {'users': 2, 'seconds': 30, 'warmup': 2, 'spawn_rate': 10}
 
     def write(self, directory, config='H3', *, status='COMPLETE', error_rate=0.0, generator=0.4, burst=None, manifest=None, http=None, read_ms=None, seconds=200, resources=True,
-              sampler=None):
+              sampler=None, read_failed=None):
         d = Path(directory)
         plan = bs.VM2_CONFIGS[config]
         base = {'status': status, 'process_sample_errors': 0, 'configuration': 'M' if config == 'M' else 'O', 'failed_stage': 'load'}
@@ -2231,7 +2255,7 @@ class V2Files:
         read_ms = read_ms or (lambda second: 100.0)
         rows = []
         for second in range(1, seconds + 1):
-            rows.append({'started_seconds': float(second), 'name': 'GET pets', 'response_time_ms': read_ms(second), 'failed': False, 'response_bytes': 50})
+            rows.append({'started_seconds': float(second), 'name': 'GET pets', 'response_time_ms': read_ms(second), 'failed': bool(read_failed and read_failed(second)), 'response_bytes': 50})
             rows.append({'started_seconds': float(second), 'name': 'POST appointment', 'response_time_ms': 9000.0, 'failed': False, 'response_bytes': 50})
         (d / 'requests.jsonl').write_text('\n'.join(json.dumps(r) for r in rows) + '\n')
         if http is not False:
@@ -2280,6 +2304,18 @@ class VmV2MemberMetrics(unittest.TestCase):
         short = self.member(seconds=20)
         self.assertEqual(short['read_p95_segments'], {'before': {'n': 0, 'p95_ms': None}, 'after': {'n': 0, 'p95_ms': None}})
         self.assertIsNone(bs.read_ratio(short))
+
+    def test_the_read_p95_of_the_successful_reads_is_reported_next_to_the_one_of_all_reads(self):
+        # The last 20 of 200 reads failed and were slow (1000 ms), the 180 that succeeded took 100 ms: the p95 of all reads is the failures', the one of the successful ones is not.
+        m = self.member(read_ms=lambda second: 1000.0 if second > 180 else 100.0, read_failed=lambda second: second > 180)
+        self.assertEqual((m['read_p95_ms'], m['read_p95_ok_ms']), (1000.0, 100.0))
+        # A failed read can also be fast (a 429 or a 503 refused at once) and pull the p95 of all reads down: 100 fast failures (5 ms), and among the 100 that succeeded 90 took
+        # 100 ms and 10 took 1000 ms. The slow ones are 5% of all reads (the p95 falls on a 100 ms one) and 10% of the successful ones (their p95 is 1000 ms).
+        m = self.member(read_ms=lambda second: 1000.0 if 91 <= second <= 100 else 5.0 if second > 100 else 100.0, read_failed=lambda second: second > 100)
+        self.assertEqual((m['read_p95_ms'], m['read_p95_ok_ms']), (100.0, 1000.0))
+        # Nothing succeeded: no figure rather than a wrong one.
+        m = self.member(read_failed=lambda second: True)
+        self.assertEqual((m['read_p95_ms'], m['read_p95_ok_ms']), (100.0, None))
 
     def test_cpu_is_kept_per_process_and_per_group_and_the_generator_is_not_a_server(self):
         m = self.member('H3x2cl2')
@@ -2411,6 +2447,15 @@ class VmV2Ratios(unittest.TestCase):
                         for key in ('success_rps', 'read_p95_ms', 'p95_ms', 'cpu_ms_per_success'):
                             self.assertAlmostEqual(entry['ratios'][key], truth, places=9, msg=(order, drift, base, other, key))
 
+    def test_the_read_p95_of_the_successful_reads_has_its_own_ratio_and_the_configuration_point_carries_it(self):
+        self.assertIn('read_p95_ok_ms', bs.RATIO_KEYS)
+        order = bs.TIER_ORDER
+        members = [v2m(c, read=100.0, read_ok=40.0 if c == 'H3x2' else 80.0) for c in order]
+        entry = bs.ratio_entry(members, order, 'H3', 'H3x2')
+        self.assertAlmostEqual(entry['ratios']['read_p95_ok_ms'], 0.5)
+        self.assertAlmostEqual(entry['ratios']['read_p95_ms'], 1.0)
+        self.assertEqual(bs.config_point([v2m(read=100.0, read_ok=40.0), v2m(read=300.0, read_ok=60.0)])['read_p95_ok_ms'], 50.0)
+
     def test_a_ratio_names_its_pairs_and_reads_throughput_with_the_gain_bands_and_the_latencies_with_the_v1_bands(self):
         order = bs.TIER_ORDER
         members = [v2m(c, rps=r, read=p, p95=p * 2, cpu=10.0 * (1 + r / 1000)) for c, r, p in zip(order, (100.0, 100.0, 120.0, 130.0, 100.0, 100.0), (50.0, 100.0, 50.0, 50.0, 100.0, 50.0))]
@@ -2463,6 +2508,12 @@ class VmV2Saturation(unittest.TestCase):
             entry = series[1]
             self.assertEqual((entry['readable'], entry.get('signs'), entry['saturated']), (True, signs, bool(signs)), kwargs)
         self.assertEqual((bs.SATURATION_GROWTH, bs.SATURATION_READ_P95_MS, bs.SATURATION_ERROR), (1.5, 750.0, 0.01))
+
+    def test_the_read_sign_keeps_the_p95_of_all_reads_and_the_report_adds_the_one_of_the_successful_reads(self):
+        points = self.points({100: {'H3': {'rps': 90.0}}, 200: {'H3': {'rps': 180.0, 'read': 751.0, 'read_ok': 100.0}}, 400: {'H3': {'rps': 360.0, 'read': 700.0, 'read_ok': 900.0}}})
+        series = bs.saturation(points, {100: True, 200: True, 400: True})['configs']['H3']['series']
+        self.assertEqual((series[1]['signs'], series[1]['read_p95_ms'], series[1]['read_p95_ok_ms']), (['read_p95'], 751.0, 100.0))   # the threshold is the p95 of all reads
+        self.assertEqual((series[2]['signs'], series[2]['read_p95_ms'], series[2]['read_p95_ok_ms']), ([], 700.0, 900.0))             # a slow served read alone is not the sign
 
     def test_growth_is_compared_with_the_step_before_and_scaled_for_a_step_that_is_not_double(self):
         self.assertEqual(bs.required_growth(200, 100), 1.5)
@@ -2522,6 +2573,27 @@ class VmV2Bottleneck(unittest.TestCase):
         self.assertEqual(bs.pool_point([v2m(shares={'p8-core': 0.7}), v2m(shares={'p8-core': 0.3}, p2024=3, http_503=5)])['p2024_log_lines'], 3)
         self.assertEqual(bs.pool_point([v2m(shares={'p8-core': 0.7}), v2m(available=False)])['available'], False)
 
+    def test_m_has_no_pool_limit_to_compare_with_so_its_pool_is_not_readable_and_never_not_pool_or_cpu(self):
+        # M: the sampler read (available) but m-api has no pool_limit, so there is no share: unknown, not False.
+        m_point = point_of(config='M', components={'api': 0.5, 'postgres': 2.0}, shares={}, available=True)
+        self.assertEqual((m_point['pool']['available'], m_point['pool']['share_max'], m_point['pool']['bound']), (True, None, None))
+        verdict = bs.bottleneck(m_point)
+        self.assertIsNone(verdict['pool'])
+        self.assertTrue(verdict['label'].startswith('không đọc được'))
+        self.assertIn('M dùng pool mặc định của Prisma', verdict['label'])
+        self.assertNotIn('không phải pool hay CPU', verdict['label'])
+        # A hot m-api is CPU; a P2024 or a share still decide for the processes that have a limit.
+        self.assertEqual(bs.bottleneck(point_of(config='M', components={'api': 0.9, 'postgres': 2.0}, shares={}, available=True))['label'], 'CPU')
+        self.assertEqual(bs.bottleneck(point_of(config='M', components={'api': 0.5}, shares={}, available=True, p2024=1))['pool'], True)
+        # H3 with the sampler and a share below half is still "not pool"; with no share at all (no p8- connection read) it is unknown too.
+        self.assertEqual(bs.bottleneck(point_of(shares={'p8-core': 0.2}, available=True))['pool'], False)
+        self.assertIsNone(bs.bottleneck(point_of(shares={}, available=True))['pool'])
+        # The step of M in the saturation report says so too, and the pool block is never triggered by it.
+        points = {100: {'M': point_of(config='M', rps=90.0, shares={}, available=True)}, 200: {'M': point_of(config='M', rps=100.0, shares={}, available=True)}}
+        entry = bs.saturation(points, {100: True, 200: True})['configs']['M']['series'][1]
+        self.assertEqual((entry['saturated'], entry['bottleneck']['pool']), (True, None))
+        self.assertNotIn('không phải pool hay CPU', entry['bottleneck']['label'])
+
     def test_cpu_when_a_node_api_process_uses_0_85_core_and_the_label_tells_which(self):
         hot, cool = {'core': 0.9, 'postgres': 2.0}, {'core': 0.5, 'postgres': 2.0}
         full = {'p8-core': 0.9}
@@ -2569,53 +2641,134 @@ class VmV2PoolTrigger(unittest.TestCase):
 
 
 class VmV2ScaleOut(unittest.TestCase):
-    """The sample conclusions A-F of the highest step, from the throughput of the six configurations."""
+    """The conclusions of the highest step (AC, A, B, C, G, then D, E, F) from the throughput of the five configurations, in the order of the rule: AC (Core and Clinic both
+    help), C (Clinic helps), B / A (Core helps, with or without Clinic helping after it), G (only the combination helps), then F, D, E when nothing helps. `harmful` is a side flag."""
+    CALM = {'core': 0.4, 'clinic-0': 0.2, 'postgres': 0.8}
 
-    def conclusion(self, rps, components=None, server_cpus=7, order=bs.TOP_ORDER):
+    def conclusion(self, rps, components=None, server_cpus=7, order=bs.TOP_ORDER, saturated=None):
         components = components or {}
-        members = [v2m(c, rps=rps[c], components=components.get(c, {'core': 0.5, 'clinic-0': 0.3, 'postgres': 1.0}), cores=sum(components.get(c, {'x': 2.0}).values())) for c in order]
+        members = [v2m(c, rps=rps[c], components=components.get(c, self.CALM), cores=sum(components.get(c, {'x': 2.0}).values())) for c in order]
         entries = {label: bs.ratio_entry(members, order, base, other) for label, base, other in bs.SCALE_OUT_COMPARISONS}
         points = {c: bs.config_point([m for m, cfg in zip(members, order) if cfg == c]) for c in dict.fromkeys(order)}
-        return bs.scale_out_conclusion(entries, points, server_cpus)
+        return bs.scale_out_conclusion(entries, points, server_cpus, saturated)
+
+    def throughput(self, c=1.0, x=1.0, xc=1.0):
+        """Throughput of the five configurations from the ratios to H3 (300 requests per second): H3cl2/H3 = c, H3x2/H3 = x, H3x2cl2/H3 = xc."""
+        return {'M': 500.0, 'H3': 300.0, 'H3cl2': 300.0 * c, 'H3x2': 300.0 * x, 'H3x2cl2': 300.0 * xc}
 
     def test_a_core_is_the_bottleneck_and_clinic_does_not_help(self):
         got = self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 300.0, 'H3x2': 420.0, 'H3x2cl2': 430.0})
         self.assertEqual(got['code'], 'A')
         self.assertIn('Core là nút cổ chai', got['reading'])
-        self.assertEqual(sorted(got['ratios']), ['H3cl2/H3', 'H3x2/H3', 'H3x2cl2/H3', 'H3x2cl2/H3cl2', 'H3x2cl2/H3x2'])
+        self.assertEqual(sorted(got['ratios']), sorted(bs.SCALE_OUT_LABELS))
         self.assertAlmostEqual(got['ratios']['H3x2/H3'], 1.4)
+        self.assertEqual(got['harmful'], [])
 
-    def test_b_the_two_bottlenecks_come_one_after_the_other(self):
+    def test_a_with_a_harmful_ratio_keeps_the_conclusion_and_flags_the_ratio(self):
+        # The case the review tried: x = 1.40, H3x2cl2/H3 = 1.30, H3x2cl2/H3cl2 = 1.48, c = 0.88. Core helps, H3x2cl2/H3x2 = 0.93 does not: A, and F is a flag.
+        got = self.conclusion(self.throughput(c=0.88, x=1.40, xc=1.30))
+        self.assertEqual(got['code'], 'A')
+        self.assertEqual(got['harmful'], ['H3cl2/H3'])
+        self.assertAlmostEqual(got['ratios']['H3x2cl2/H3cl2'], 1.30 / 0.88)
+        self.assertAlmostEqual(got['ratios']['H3x2cl2/H3x2'], 1.30 / 1.40)
+        # The flag does not change B or C either.
+        got = self.conclusion(self.throughput(c=1.0, x=1.30, xc=1.50))
+        self.assertEqual((got['code'], got['harmful']), ('B', []))
+        got = self.conclusion(self.throughput(c=1.5, x=0.9, xc=1.6))
+        self.assertEqual((got['code'], got['harmful']), ('C', ['H3x2/H3']))
+
+    def test_ac_core_and_clinic_both_help(self):
+        got = self.conclusion(self.throughput(c=1.11, x=1.50, xc=1.60))
+        self.assertEqual((got['code'], got['harmful']), ('AC', []))
+        self.assertIn('Nhân Core và nhân Clinic đều có lợi', got['reading'])
+        self.assertEqual(self.conclusion(self.throughput(c=1.10, x=1.10, xc=1.2))['code'], 'AC')   # the bands are closed at 1.1
+        # c alone is not enough, and neither is x alone: those are C and A (B when Clinic helps once Core is doubled).
+        self.assertEqual(self.conclusion(self.throughput(c=1.11, x=1.09, xc=1.2))['code'], 'C')
+        self.assertEqual(self.conclusion(self.throughput(c=1.09, x=1.50, xc=1.60))['code'], 'A')   # H3x2cl2/H3x2 = 1.07 is below the band
+        self.assertEqual(self.conclusion(self.throughput(c=1.09, x=1.50, xc=1.70))['code'], 'B')   # 1.13
+
+    def test_b_core_helps_and_then_clinic_is_the_next_bottleneck(self):
         got = self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 305.0, 'H3x2': 400.0, 'H3x2cl2': 480.0})
         self.assertEqual((got['code'], round(got['ratios']['H3x2cl2/H3x2'], 2)), ('B', 1.2))
-        # Only the pair helps: no single doubling moves the throughput and the pair gains 1.12x.
-        self.assertEqual(self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 309.0, 'H3x2': 309.0, 'H3x2cl2': 336.0})['code'], 'B')
-        # Core only helps once Clinic is doubled too.
-        self.assertEqual(self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 300.0, 'H3x2': 300.0, 'H3x2cl2': 345.0})['code'], 'B')
+        self.assertIn('nhân thêm Clinic còn có lợi', got['reading'])
+        # B needs Core to help first: Clinic helping once Core is doubled while Core alone does not is G, not B.
+        self.assertEqual(self.conclusion(self.throughput(c=1.0, x=1.0, xc=1.2))['code'], 'G')
 
     def test_c_clinic_is_hot_first(self):
         got = self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 345.0, 'H3x2': 300.0, 'H3x2cl2': 350.0})
         self.assertEqual(got['code'], 'C')
-        self.assertEqual(self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 345.0, 'H3x2': 400.0, 'H3x2cl2': 500.0})['code'], 'C')   # both help: Clinic is still the one that was hot
+        self.assertEqual(self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 345.0, 'H3x2': 400.0, 'H3x2cl2': 500.0})['code'], 'AC')   # both help: not C any more
 
-    def test_d_and_e_nothing_moves_and_the_cpu_says_why(self):
-        flat = {'M': 500.0, 'H3': 300.0, 'H3cl2': 303.0, 'H3x2': 303.0, 'H3x2cl2': 306.0}
-        low = {c: {'core': 0.4, 'clinic-0': 0.2, 'postgres': 0.8} for c in flat}
-        self.assertEqual(self.conclusion(flat, low)['code'], 'D')
-        self.assertIn('chưa bão hòa', bs.SCALE_OUT_READINGS['D'])
-        busy = {**low, 'H3x2cl2': {'core-0': 0.9, 'core-1': 0.9, 'clinic-0': 0.9, 'clinic-1': 0.9, 'postgres': 2.5}}   # 6.1 cores of 7: at 6/7
-        got = self.conclusion(flat, busy)
-        self.assertEqual((got['code'], got['machine_or_database_busy']), ('E', ['H3x2cl2']))
-        hot_db = {**low, 'H3': {'core': 0.5, 'clinic-0': 0.3, 'postgres': 3.5}}
-        self.assertEqual(self.conclusion(flat, hot_db)['machine_or_database_busy'], ['H3'])   # Postgres at half of the server CPUs
-        self.assertEqual(self.conclusion(flat, hot_db, server_cpus=8)['code'], 'D')
-        self.assertEqual(self.conclusion(flat, hot_db)['code'], 'E')
+    def test_g_only_the_combination_helps_and_two_small_gains_are_not_a_combination(self):
+        # Neither doubling reaches 1.1 (1.03 each); both together beat each of them by 1.12: only the combination helps.
+        got = self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 309.0, 'H3x2': 309.0, 'H3x2cl2': 345.0})
+        self.assertEqual(got['code'], 'G')
+        self.assertIn('Chỉ nhân gộp có lợi', got['reading'])
+        # Clinic helps only when Core is doubled (H3x2cl2/H3x2 = 1.12, H3x2cl2/H3cl2 = 1.09): still G.
+        self.assertEqual(self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 312.0, 'H3x2': 303.0, 'H3x2cl2': 340.0})['code'], 'G')
+        # H3x2cl2/H3cl2 = 1.11 alone is not G: H3cl2 is the one that got worse (0.90) and the combination does not beat H3 (1.00): F.
+        rps = {'M': 500.0, 'H3': 300.0, 'H3cl2': 270.0, 'H3x2': 300.0, 'H3x2cl2': 300.0}
+        got = self.conclusion(rps, saturated=False)
+        self.assertEqual((got['code'], round(got['ratios']['H3x2cl2/H3cl2'], 2)), ('F', 1.11))
+        # 336 / 309 = 1.087: under the band, so the old reading (B, from H3x2cl2/H3 = 1.12) is gone.
+        self.assertNotEqual(self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 309.0, 'H3x2': 309.0, 'H3x2cl2': 336.0}, saturated=False)['code'], 'B')
 
-    def test_f_an_extra_instance_costs_more_than_it_earns(self):
-        for rps in ({'H3cl2': 270.0, 'H3x2': 300.0, 'H3x2cl2': 300.0}, {'H3cl2': 300.0, 'H3x2': 330.0, 'H3x2cl2': 295.0}, {'H3cl2': 300.0, 'H3x2': 270.0, 'H3x2cl2': 330.0}):
-            got = self.conclusion({'M': 500.0, 'H3': 300.0, **rps})
+    def test_two_gains_below_the_band_do_not_compound_into_b_the_case_the_review_tried(self):
+        # x = 1.08, H3x2cl2/H3x2 = 1.05 (H3x2cl2/H3 = 1.134, which the old rule read as B), c = 1.04, H3x2cl2/H3cl2 = 1.09.
+        rps = {'M': 500.0, 'H3': 300.0, 'H3cl2': 312.0, 'H3x2': 324.0, 'H3x2cl2': 340.2}
+        for saturated, expected in ((False, 'D'), (True, 'E'), (None, 'E')):
+            got = self.conclusion(rps, saturated=saturated)
+            self.assertEqual(got['code'], expected, saturated)
+            self.assertNotIn(got['code'], ('A', 'B', 'C', 'AC', 'G'))
+        self.assertAlmostEqual(self.conclusion(rps)['ratios']['H3x2cl2/H3'], 1.134)   # reported, not a reason
+
+    def test_f_an_extra_instance_costs_more_than_it_earns_when_nothing_helps(self):
+        for rps in ({'H3cl2': 270.0, 'H3x2': 300.0, 'H3x2cl2': 300.0}, {'H3cl2': 300.0, 'H3x2': 270.0, 'H3x2cl2': 300.0}, {'H3cl2': 300.0, 'H3x2': 300.0, 'H3x2cl2': 260.0}):
+            got = self.conclusion({'M': 500.0, 'H3': 300.0, **rps}, saturated=False)
             self.assertEqual(got['code'], 'F', rps)
-        self.assertEqual(self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 270.1, 'H3x2': 300.0, 'H3x2cl2': 290.0})['code'], 'D')   # 0.9003 is within the band
+            self.assertTrue(got['harmful'], rps)
+        got = self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 270.0, 'H3x2': 300.0, 'H3x2cl2': 300.0}, saturated=False)
+        self.assertEqual(got['harmful'], ['H3cl2/H3'])
+        self.assertIn('Có tỷ lệ ≤ 0,9', got['reading'])
+        self.assertEqual(self.conclusion({'M': 500.0, 'H3': 300.0, 'H3cl2': 270.1, 'H3x2': 300.0, 'H3x2cl2': 290.0}, saturated=False)['code'], 'D')   # 0.9003 is within the band
+
+    def test_d_nothing_moves_the_cpu_is_low_and_h3_is_not_saturated(self):
+        flat = self.throughput(c=1.01, x=1.01, xc=1.02)
+        got = self.conclusion(flat, saturated=False)
+        self.assertEqual((got['code'], got['harmful'], got['h3_saturated']), ('D', [], False))
+        self.assertIn('chưa bão hòa', bs.SCALE_OUT_READINGS['D'])
+        self.assertEqual(sorted(got['hot_processes']), ['H3', 'H3cl2', 'H3x2', 'H3x2cl2'])   # the H3 configurations only
+        self.assertTrue(all(not hot for hot in got['hot_processes'].values()))
+
+    def test_e_is_everything_else_a_saturated_h3_a_hot_api_or_an_unknown(self):
+        flat = self.throughput(c=1.01, x=1.01, xc=1.02)
+        for label, saturated in (('H3 saturated at this step', True), ('not known', None)):
+            got = self.conclusion(flat, saturated=saturated)
+            self.assertEqual(got['code'], 'E', label)
+            self.assertIn('giới hạn nằm ngoài số instance (máy, DB hoặc chưa xác định)', got['reading'])
+        # The case the review tried: every ratio about 1 and Core at 0.95 core is not D, even when H3 is not saturated.
+        hot = {**{c: self.CALM for c in flat}, 'H3': {'core': 0.95, 'clinic-0': 0.2, 'postgres': 0.8}}
+        got = self.conclusion(flat, hot, saturated=False)
+        self.assertEqual((got['code'], got['hot_processes']['H3']), ('E', ['core']))
+        # The machine itself nearly full (6.1 of 7 cores) in one H3 configuration is not D either.
+        full = {**{c: self.CALM for c in flat}, 'H3x2cl2': {'core-0': 0.8, 'core-1': 0.8, 'clinic-0': 0.8, 'clinic-1': 0.8, 'postgres': 2.9}}
+        got = self.conclusion(flat, full, saturated=False)
+        self.assertEqual((got['code'], got['machine_or_database_busy']), ('E', ['H3x2cl2']))
+
+    def test_postgres_at_half_the_cpus_is_information_and_no_longer_a_reason_for_e(self):
+        flat = self.throughput(c=1.01, x=1.01, xc=1.02)
+        hot_db = {**{c: self.CALM for c in flat}, 'H3': {'core': 0.5, 'clinic-0': 0.3, 'postgres': 3.5}}
+        got = self.conclusion(flat, hot_db, saturated=False)
+        self.assertEqual((got['code'], got['machine_or_database_busy']), ('D', ['H3']))   # reported, decides nothing
+        self.assertEqual(self.conclusion(flat, hot_db, server_cpus=8, saturated=False)['machine_or_database_busy'], [])
+
+    def test_hot_and_busy_are_read_in_the_h3_configurations_only_never_in_m(self):
+        flat = self.throughput(c=1.01, x=1.01, xc=1.02)
+        components = {**{c: self.CALM for c in flat}, 'M': {'api': 0.97, 'postgres': 4.0}}   # M at 4.97 of 7 cores, its API above 0.85
+        got = self.conclusion(flat, components, saturated=False)
+        self.assertEqual(got['code'], 'D')
+        self.assertNotIn('M', got['hot_processes'])
+        self.assertNotIn('M', got['machine_or_database_busy'])
 
     def test_the_conclusion_is_not_readable_without_the_five_ratios_and_every_code_has_a_text(self):
         order = bs.TOP_ORDER
@@ -2623,7 +2776,15 @@ class VmV2ScaleOut(unittest.TestCase):
         entries = {label: bs.ratio_entry(members, order, base, other) for label, base, other in bs.SCALE_OUT_COMPARISONS}
         got = bs.scale_out_conclusion(entries, {}, 7)
         self.assertEqual((got['code'], got['reading']), (None, 'không đọc được'))
-        self.assertEqual(sorted(bs.SCALE_OUT_READINGS), list('ABCDEF'))
+        self.assertEqual(sorted(bs.SCALE_OUT_READINGS), sorted(['AC', 'A', 'B', 'C', 'D', 'E', 'F', 'G']))
+        self.assertTrue(all(text for text in bs.SCALE_OUT_READINGS.values()))
+
+    def test_saturated_at_reads_the_step_of_the_block_and_nothing_else(self):
+        report = {'configs': {'H3': {'series': [{'users': 400, 'saturated': False}, {'users': 800, 'saturated': True}, {'users': 600, 'readable': False, 'saturated': None}]}}}
+        self.assertEqual((bs.saturated_at(report, 'H3', 400), bs.saturated_at(report, 'H3', 800), bs.saturated_at(report, 'H3', 600)), (False, True, None))
+        self.assertIsNone(bs.saturated_at(report, 'H3', 200))
+        self.assertIsNone(bs.saturated_at(report, 'M', 800))
+        self.assertIsNone(bs.saturated_at(None, 'H3', 800))
 
     def test_the_block_reports_the_scale_out_with_the_balance_flags_and_the_control_ratio(self):
         world = World(capacity={'M': 700.0, 'H3': 300.0, 'H3x2': 520.0, 'H3cl2': 300.0, 'H3x2cl2': 520.0})
@@ -2726,6 +2887,23 @@ class VmV2Burst(unittest.TestCase):
         self.assertEqual((result['disturbance']['control_read_ratio'], result['disturbance']['I'], result['disturbance']['I_nw2_over_nw1']), (None, {'H3b': None, 'H3bnw2': None}, None))
         self.assertEqual(result['drain']['ratio'], 0.5)
 
+    def test_an_invalid_or_missing_control_member_leaves_I_unreadable_and_the_drain_stands(self):
+        members = [burst_member('H3b', 20.0, after=55.0), burst_member('H3bnw2', 10.0, after=75.0), burst_member('H3bnw2', 10.0, after=75.0), burst_member('H3b', 20.0, after=55.0)]
+        segments = {'before': {'n': 90, 'p95_ms': 50.0}, 'after': {'n': 60, 'p95_ms': 50.0}}
+        for label, control in (('one of the two is invalid', [v2m('H3', segments=segments), v2m('H3', segments=segments, valid=False)]),
+                               ('both are invalid', [v2m('H3', segments=segments, valid=False)] * 2),
+                               ('one is missing', [v2m('H3', segments=segments)]),
+                               ('none', [])):
+            result = self.analyze(members, control)
+            disturbance = result['disturbance']
+            self.assertFalse(disturbance['control_readable'], label)
+            self.assertEqual((disturbance['control_read_ratio'], disturbance['I'], disturbance['I_nw2_over_nw1'], disturbance['reading']),
+                             (None, {'H3b': None, 'H3bnw2': None}, None, 'không đọc được'), label)
+            self.assertEqual((result['configs']['H3b']['I_reading'], result['configs']['H3bnw2']['I_reading']), ('không đọc được', 'không đọc được'), label)
+            self.assertEqual((result['readable'], result['drain']['ratio']), (True, 0.5), label)   # the drain does not depend on the control
+        self.assertTrue(self.analyze(members)['disturbance']['control_readable'])
+        self.assertAlmostEqual(self.analyze(members)['disturbance']['I']['H3b'], 1.1)
+
     def test_the_notifications_of_the_background_are_late_when_their_p95_during_the_burst_is_1_1x_the_one_before(self):
         slow = [burst_member('H3b', 20.0, background=(100.0, 400.0)), burst_member('H3bnw2', 10.0, background=(100.0, 150.0)), burst_member('H3bnw2', 10.0, background=(100.0, 150.0)),
                 burst_member('H3b', 20.0, background=(100.0, 400.0))]
@@ -2790,6 +2968,56 @@ class VmV2Analysis(unittest.TestCase):
         self.assertTrue(comparisons['H3/M']['readable'])
         self.assertEqual(analysis['unreadable'], ['part1: H3c/H3'])
         self.assertEqual(analysis['decision'], 'COMPARED')
+
+    def test_a_part_1_h3_member_that_is_invalid_makes_I_unreadable_and_says_so(self):
+        records = self.full_records()
+        first_h3 = next(r for r in records if r['block'] == 'part1' and r['config'] == 'H3')
+        first_h3['metrics'] = {**first_h3['metrics'], 'valid': False, 'reasons': ['error rate above 1%']}
+        analysis = bs.analyze_v2(records)
+        self.assertEqual(analysis['decision'], 'COMPARED')
+        self.assertFalse(analysis['burst']['disturbance']['control_readable'])
+        self.assertEqual(analysis['burst']['disturbance']['I'], {'H3b': None, 'H3bnw2': None})
+        self.assertIsNotNone(analysis['burst']['drain']['ratio'])
+        self.assertIn('burst: the two H3 members of Part 1 (the control of I) are not both there and valid, I is not readable', analysis['unreadable'])
+        # With both valid the control is readable and nothing is said.
+        analysis = bs.analyze_v2(self.full_records())
+        self.assertTrue(analysis['burst']['disturbance']['control_readable'])
+        self.assertFalse([line for line in analysis['unreadable'] if 'control of I' in line])
+
+    def test_the_scale_out_conclusion_gets_the_saturation_of_h3_at_the_step_of_its_block(self):
+        flat = {c: 9000.0 for c in World.CAPACITY}
+        analysis = bs.analyze_v2(self.full_records(World(capacity=flat)))
+        sat = analysis['saturation']['configs']['H3']['series']
+        at_800 = next(entry for entry in sat if entry['users'] == 800)
+        self.assertEqual(analysis['scale_out']['h3_saturated'], at_800['saturated'])
+        self.assertIs(analysis['scale_out']['h3_saturated'], False)   # 720 requests per second asked for, 720 served: no sign
+        # Every ratio is about 1 and H3 is not saturated, but its Core and Clinic are at one core in the world's CPU model: hot, so E and not D.
+        self.assertEqual((analysis['scale_out']['code'], analysis['scale_out']['hot_processes']['H3']), ('E', ['clinic-0', 'core']))
+        self.assertNotIn('M', analysis['scale_out']['hot_processes'])
+        # A saturated H3 at the step: the flag is True.
+        analysis = bs.analyze_v2(self.full_records(World(capacity={'H3': 300.0, 'H3x2': 520.0, 'H3cl2': 300.0, 'H3x2cl2': 520.0})))
+        self.assertIs(analysis['scale_out']['h3_saturated'], True)
+        self.assertEqual(analysis['scale_out']['code'], 'A')
+        self.assertEqual(analysis['scale_out']['harmful'], [])
+
+    def test_the_limitations_name_the_growth_rule_for_a_step_that_is_not_double_and_the_two_blocks_of_the_100_to_200_growth(self):
+        text = ' '.join(bs.ANALYSIS_LIMITATIONS)
+        # 1.5 ** log2(ratio): 84.5% of linear at 600 after 400 against 75% at a doubling.
+        self.assertIn('1.5 ** log2(users ratio)', text)
+        self.assertIn('84.5% of linear growth', text)
+        self.assertIn('75% for a doubling step', text)
+        self.assertAlmostEqual(bs.required_growth(600, 400) / 1.5, 0.845, places=3)
+        self.assertAlmostEqual(bs.required_growth(200, 100) / 2.0, 0.75)
+        self.assertIn('stricter at 600', text)
+        self.assertIn('Part 1 (no pg_stat_activity sampler) with the 200-user step (sampler on)', text)
+        self.assertIn('two different blocks', text)
+        self.assertIn('drift of the host between blocks does not cancel', text)
+        # The earlier limitations are still there, and the analysis carries all of them.
+        self.assertIn('control of the effect I', text)
+        self.assertIn('upper bound of the price at compose', text)
+        analysis = bs.analyze_v2(self.full_records())
+        self.assertEqual(analysis['limitations'], list(bs.ANALYSIS_LIMITATIONS))
+        self.assertEqual(len(analysis['limitations']), 5)
 
     def test_a_step_with_more_than_1_percent_of_429_is_not_readable_at_all(self):
         records = self.full_records(World(rate_429={('H3x2', 400): 0.05}))
@@ -2887,10 +3115,10 @@ class VmV2Flow(unittest.TestCase):
         self.private, self.output = Path(self.directory.name) / 'private', Path(self.directory.name) / 'results'
         self.private.mkdir()
 
-    def run_study(self, mode='full', world=None, *, fail=None, smoke_valid=True, cuts=(), invalid=None):
-        """fail: name of the member that FAILED; invalid: names of members that are invalid for a reason other than failing."""
+    def run_study(self, mode='full', world=None, *, fail=None, smoke_valid=True, cuts=(), invalid=None, progress=None):
+        """fail: name of the member that FAILED; invalid: names of members that are invalid for a reason other than failing; progress: where the lines of the run go."""
         world = world or World()
-        study = bs.VmStudy2(self.root, self.private, self.output, 'run-1', mode=mode, progress=lambda text: None, cuts=cuts)
+        study = bs.VmStudy2(self.root, self.private, self.output, 'run-1', mode=mode, progress=progress or (lambda text: None), cuts=cuts)
         study.pinning = {'generator': [0], 'server': [1, 2, 3, 4, 5, 6, 7]}
         calls, positions = [], {'full': 0}
 
@@ -2917,20 +3145,21 @@ class VmV2Flow(unittest.TestCase):
             result = study.execute(install=False)
         return result, calls, study
 
-    def test_smoke_runs_the_eight_members_with_a_burst_only_for_the_burst_configuration(self):
+    def test_smoke_runs_the_nine_members_with_a_burst_only_for_the_burst_configuration(self):
         result, calls, study = self.run_study('smoke')
         self.assertEqual((result['status'], result['comparison']), ('SMOKE_PASSED', {'decision': 'NOT_RUN'}))
         self.assertEqual([c['config'] for c in calls], list(bs.VM2_SMOKE_ORDER))
-        self.assertEqual([(c['label'], c['users']) for c in calls], [('smoke', 2)] * 8)
-        self.assertEqual([c['burst'] for c in calls], [None] * 7 + [{'count': 200, 'at_s': 5}])
-        self.assertEqual([c['burst_asked'] for c in calls], [False] * 7 + [True])
+        self.assertEqual([(c['label'], c['users']) for c in calls], [('smoke', 2)] * 9)
+        self.assertEqual([c['burst'] for c in calls], [None] * 8 + [{'count': 200, 'at_s': 5}])
+        self.assertEqual([c['burst_asked'] for c in calls], [False] * 8 + [True])
+        self.assertIn('H3cl2', [c['config'] for c in calls])   # a second Clinic instance is smoked before it is measured
         self.assertTrue(all(c['settings'] == bs.SMOKE and not c['pg_sampler'] for c in calls))
         self.assertEqual([s['configuration'] for s in result['smoke']], list(bs.VM2_SMOKE_ORDER))
 
     def test_a_failed_smoke_blocks_the_measured_members(self):
         result, calls, study = self.run_study('full', smoke_valid=False)
         self.assertEqual(result['status'], 'SMOKE_FAILED')
-        self.assertEqual(len(calls), 8)
+        self.assertEqual(len(calls), 9)
         self.assertEqual(result['comparison'], {'decision': 'NOT_RUN'})
 
     def test_full_runs_the_blocks_in_order_with_their_names_users_burst_and_sampler(self):
@@ -2950,7 +3179,8 @@ class VmV2Flow(unittest.TestCase):
         self.assertEqual(measured[0]['settings'], bs.FULL)
         self.assertEqual((result['comparison']['decision'], result['study'], result['mode']), ('COMPARED', bs.VM2_STUDY, 'full'))
         self.assertEqual([m['name'] for m in result['members']], [c['name'] for c in measured])
-        self.assertEqual(result['settings']['top_tier'], {'planned': 800, 'used': 800, 'shifted': False, 'probe': 'full-24-800-M', 'generator_cores': result['settings']['top_tier']['generator_cores'], 'reason': None})
+        self.assertEqual(result['settings']['top_tier'], {'planned': 800, 'used': 800, 'shifted': False, 'probe': 'full-24-800-M', 'generator_cores': result['settings']['top_tier']['generator_cores'], 'reason': None,
+                                                           'would_shift': False})
         self.assertEqual(result['settings']['pool_block'], {'ran': False, 'users': None})
         self.assertEqual(result['settings']['burst'], bs.BURST_FULL)
         self.assertEqual(result['vm']['steps'], [200, 400, 800])
@@ -3075,16 +3305,33 @@ class VmV2Flow(unittest.TestCase):
         self.assertEqual(result['settings']['burst'], {'count': 6000, 'at_s': 60})
         self.assertEqual(result['comparison']['decision'], 'COMPARED')
 
-    def test_local_runs_the_reduced_plan_and_reports_the_generator_of_the_probe_without_moving_anything(self):
-        result, calls, study = self.run_study('local', World(generator={('H3x2cl2', 800): 0.9}))
+    def test_local_runs_the_reduced_plan_and_says_in_advance_whether_the_full_run_would_move_the_highest_step(self):
+        lines = []
+        result, calls, study = self.run_study('local', World(generator={('M', 800): 0.9, ('H3x2cl2', 800): 0.2}), progress=lines.append)
         measured = [c for c in calls if c['label'] == 'full']
-        self.assertEqual([(c['config'], c['users']) for c in measured], [(c, 200) for c in bs.TIER_ORDER] + [('H3x2cl2', 800), ('H3b', 100), ('H3bnw2', 100)])
-        self.assertEqual([c['burst'] for c in measured], [None] * 7 + [bs.BURST_LOCAL] * 2)
+        # M at 800 users opens the probe as it opens the highest step of a full run; H3x2cl2, the member added to that step, follows.
+        self.assertEqual([(c['config'], c['users']) for c in measured], [(c, 200) for c in bs.TIER_ORDER] + [('M', 800), ('H3x2cl2', 800), ('H3b', 100), ('H3bnw2', 100)])
+        self.assertEqual([c['burst'] for c in measured], [None] * 8 + [bs.BURST_LOCAL] * 2)
         self.assertEqual((measured[0]['settings']['seconds'], measured[0]['settings']['warmup']), (60, 10))
-        self.assertEqual((result['settings']['top_tier']['shifted'], result['settings']['top_tier']['used'], result['settings']['top_tier']['generator_cores']), (False, 800, 0.9))
+        top = result['settings']['top_tier']
+        # The generator of M decides K10 (0.90 core is above 0.70); the dry run moves nothing and the probe is M, not the member that follows it.
+        self.assertEqual((top['shifted'], top['used'], top['generator_cores'], top['would_shift'], top['probe']), (False, 800, 0.9, True, 'full-6-800-M'))
+        self.assertTrue(any('0.90 core at 800 users: a full run would move the highest step to 600 users' in line for line in lines), lines)
         self.assertEqual(result['comparison']['decision'], 'COMPARED')
         self.assertFalse(result['settings']['pool_block']['ran'])
-        self.assertEqual(len(calls), 8 + 9)
+        self.assertEqual(len(calls), 9 + 10)
+        self.assertEqual(result['comparison']['blocks']['probe-800']['order'], ['M', 'H3x2cl2'])
+
+    def test_a_dry_run_whose_generator_is_not_busy_at_800_users_says_the_step_stays(self):
+        lines = []
+        result, calls, study = self.run_study('local', World(generator={('M', 800): 0.5, ('H3x2cl2', 800): 0.95}), progress=lines.append)
+        top = result['settings']['top_tier']
+        self.assertEqual((top['would_shift'], top['generator_cores'], top['used']), (False, 0.5, 800))   # the busy generator of the member after M decides nothing
+        self.assertTrue(any('0.50 core at 800 users: a full run would keep the highest step at 800 users' in line for line in lines), lines)
+        self.assertFalse(any('would move' in line for line in lines))
+        full_lines = []
+        self.run_study('full', World(generator={('M', 800): 0.5}), progress=full_lines.append)
+        self.assertFalse(any('a full run would' in line for line in full_lines))   # the full run decides, it does not forecast
 
     def test_the_v1_study_is_untouched_by_the_split_of_execute(self):
         # KaggleStudyFlow and VmStudyFlow run the v1 orders through the same execute; here only that VmStudy has no measure of its own.
