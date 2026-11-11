@@ -10,6 +10,7 @@ import math
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -3122,6 +3123,384 @@ class VmV2Cli(unittest.TestCase):
             for decision, expected in (('COMPARED', 0), ('INCOMPLETE', 1), ('INVALID', 1)):
                 with patch.object(bs, 'run_vm_study2', return_value={'status': 'COMPLETE', 'comparison': {'decision': decision}, 'download': 'x'}), patch('builtins.print'):
                     self.assertEqual(bs.main(['--platform', 'vm', '--study', 'v2', '--root', directory, '--results', directory]), expected)
+
+
+# ---- bridge-m-h-vm-v2: the bundle, the export and vm_run.sh (K9 C4) ---------------------------------------------------------------------
+def v2_files(layout):
+    return {path: b'source ' + path.encode() for path in nb.CORE_LAYOUT_SOURCES[layout]}
+
+
+class VmV2Bundle(unittest.TestCase):
+    """pack_vm2 on made-up trees (nb.git and nb.tree patched): what goes into the bundle, the layout check, the manifest."""
+    SCRIPT = 'benchmarks/phase2/kaggle/vm_run.sh'
+
+    def harness(self):
+        return {**{name: b'harness ' + name.encode() for name in nb.VM_HARNESS}, self.SCRIPT: b'#!/usr/bin/env bash\r\necho x\r\n'}
+
+    def patches(self, h1_layout='phase2', h3_layout='workers', status=b'', harness=True):
+        trees = {nb.M_COMMIT: {'backend/m.ts': b'm'}, 'h1': {**v2_files(h1_layout), 'backend/h1.ts': b'h1'}, 'h3': {**v2_files(h3_layout), 'backend/h3.ts': b'h3'}}
+        trees['HEAD'] = trees['h3']   # `git rev-parse HEAD` of the fake repository is `HEAD` itself, whose tree is that of h3
+        harness_files = self.harness()
+
+        def tree(commit, paths):
+            if paths == nb.VM_HARNESS:
+                if not harness:
+                    raise subprocess.CalledProcessError(128, 'git archive')
+                return dict(harness_files)
+            return dict(trees[commit])
+
+        def git(*args):
+            return {'rev-parse': (args[1] + '\n').encode(), 'status': status, 'log': b'4f1c0de\n'}[args[0]]
+        return patch.object(nb, 'tree', tree), patch.object(nb, 'git', git)
+
+    def pack(self, *args, **kwargs):
+        first, second = self.patches(**{k: kwargs.pop(k) for k in ('h1_layout', 'h3_layout', 'status', 'harness') if k in kwargs})
+        with first, second:
+            return nb.pack_vm2(*(args or ('h3', 'h1')), **kwargs)
+
+    def test_the_constants_name_the_study_the_harness_runs(self):
+        self.assertEqual((nb.VM2_STUDY, nb.VM2_GROUPS), (bs.VM2_STUDY, bs.VM2_GROUPS))
+        self.assertEqual(nb.VM2_GROUPS, ('M', 'H1', 'H3'))
+        self.assertNotEqual(nb.VM2_FORMAT, nb.VM_FORMAT)
+        self.assertEqual(nb.VM_FORMATS, {nb.VM_FORMAT: nb.VM_GROUPS, nb.VM2_FORMAT: nb.VM2_GROUPS})
+        self.assertTrue(nb.H1_COMMIT.startswith('2841d1b') and len(nb.H1_COMMIT) == 40)
+        self.assertEqual(nb.VM2_TARGET.name, 'bridge-m-h-vm-v2.zip')
+        self.assertEqual(nb.VM_TARGET.name, 'bridge-m-h-vm-v1.zip')   # v1 stays what it was
+        # The layout each tree is checked for is the one the study tells stack.mjs to build.
+        self.assertEqual(nb.VM2_LAYOUTS, {tree: bs.VM2_CONFIGS[tree]['layout'] for tree in ('H1', 'H3')})
+        self.assertEqual({layout for layout in nb.CORE_LAYOUT_SOURCES}, {'phase2', 'workers'})
+        stack = (HERE / 'stack.mjs').read_text(encoding='utf-8')
+        for layout, sources in nb.CORE_LAYOUT_SOURCES.items():
+            for source in sources:   # backend/src/x.ts is built to backend/dist/src/x.js, which is what stack.mjs starts
+                self.assertIn(source.replace('backend/src/', 'backend/dist/src/').replace('.ts', '.js'), stack, layout)
+
+    def test_assemble_gives_three_trees_one_harness_and_lf_scripts(self):
+        harness = self.harness()
+        payload = nb.assemble_vm2({'backend/a.sh': b'a\r\nb\r\n'}, {'backend/a.ts': b'h1', 'benchmarks/phase2/kaggle/stack.mjs': b'stack-old'}, {'backend/a.ts': b'h3'}, harness)
+        self.assertEqual({name.partition('/')[0] for name in payload}, {'M', 'H1', 'H3'})
+        self.assertEqual(payload['H1/benchmarks/phase2/kaggle/stack.mjs'], harness['benchmarks/phase2/kaggle/stack.mjs'])
+        self.assertEqual(payload['H3/benchmarks/phase2/kaggle/stack.mjs'], harness['benchmarks/phase2/kaggle/stack.mjs'])
+        self.assertEqual((payload['H1/backend/a.ts'], payload['H3/backend/a.ts']), (b'h1', b'h3'))
+        self.assertEqual(payload['M/benchmarks/kaggle/pcn_checks.mjs'], harness['benchmarks/kaggle/pcn_checks.mjs'])
+        self.assertEqual(payload['M/backend/a.sh'], b'a\nb\n')
+        for group in ('H1', 'H3'):
+            self.assertEqual(payload[f'{group}/{self.SCRIPT}'], b'#!/usr/bin/env bash\necho x\n')
+        self.assertFalse(any(b'\r' in value for name, value in payload.items() if name.endswith('.sh')))
+        with self.assertRaises(ValueError):
+            nb.assemble_vm2({'benchmarks/kaggle/pcn_checks.mjs': b'x'}, {}, {}, harness)
+
+    def test_the_packed_bundle_verifies_and_says_what_it_holds(self):
+        raw, manifest = self.pack()
+        sha = hashlib.sha256(raw).hexdigest()
+        checked, values = nb.verified_members(raw, sha, nb.VM2_GROUPS, nb.VM2_FORMAT)
+        self.assertEqual(checked, manifest)
+        self.assertEqual(manifest['format'], nb.VM2_FORMAT)
+        for key, expected in (('study', 'bridge-m-h-vm-v2'), ('mCommit', nb.M_COMMIT), ('h1Commit', 'h1'), ('h3Commit', 'h3'), ('h3ProductCommit', '4f1c0de'),
+                              ('harnessFromWorktree', False), ('coreLayouts', {'H1': 'phase2', 'H3': 'workers'})):
+            self.assertEqual(manifest[key], expected, key)
+        # annotate() writes these keys of the manifest into evaluation.json (the in-bundle manifest cannot hold the hash of its own zip).
+        self.assertTrue({'mCommit', 'h1Commit', 'h3Commit', 'h3ProductCommit', 'harnessFromWorktree', 'treeSha256'} <= set(manifest))
+        self.assertIn('H1/backend/src/phase2/notificationWorker.ts', values)
+        self.assertIn('H3/backend/src/workers/notification.ts', values)
+        self.assertNotIn('H1/backend/src/workers/notification.ts', values)
+        self.assertNotIn('H3/backend/src/phase2/notificationWorker.ts', values)
+        self.assertEqual(values['H1/benchmarks/phase2/kaggle/stack.mjs'], values['H3/benchmarks/phase2/kaggle/stack.mjs'])
+        for group in ('H1', 'H3'):
+            self.assertEqual(values[f'{group}/{self.SCRIPT}'], b'#!/usr/bin/env bash\necho x\n')   # LF whatever the checkout did
+        self.assertEqual(raw, self.pack()[0])   # the same inputs, the same bytes
+        with self.assertRaises(ValueError):
+            nb.verified_members(raw, sha, nb.VM_GROUPS, nb.VM_FORMAT)   # not a v1 bundle
+
+    def test_a_tree_with_the_wrong_core_worker_layout_is_refused_with_BRIDGE_VM2_LAYOUT(self):
+        for label, kwargs in (('H1 with the workers layout', {'h1_layout': 'workers'}), ('H3 with the phase2 layout', {'h3_layout': 'phase2'}),
+                              ('both swapped', {'h1_layout': 'workers', 'h3_layout': 'phase2'})):
+            with self.assertRaisesRegex(ValueError, 'BRIDGE_VM2_LAYOUT', msg=label):
+                self.pack(**kwargs)
+        with self.assertRaisesRegex(ValueError, r'BRIDGE_VM2_LAYOUT: H1 must have the phase2 .*found workers'):
+            self.pack(h1_layout='workers')
+        both = {**v2_files('phase2'), **v2_files('workers')}
+        none = {'backend/a.ts': b'x'}
+        for label, h3 in (('both layouts', both), ('no layout', none)):
+            with self.assertRaisesRegex(ValueError, 'BRIDGE_VM2_LAYOUT', msg=label):
+                nb.check_vm2_layouts({'H1': v2_files('phase2'), 'H3': h3})
+        with self.assertRaisesRegex(ValueError, 'BRIDGE_VM2_LAYOUT'):   # one source of a layout is not the layout
+            nb.check_vm2_layouts({'H1': {nb.CORE_LAYOUT_SOURCES['phase2'][0]: b''}, 'H3': v2_files('workers')})
+        nb.check_vm2_layouts({'H1': v2_files('phase2'), 'H3': set(v2_files('workers'))})   # paths work as well as files
+
+    def test_build_writes_the_bundle_and_a_record_that_was_not_run_and_refuses_a_bad_tree_before_writing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'bridge-m-h-vm-v2.zip'
+            first, second = self.patches()
+            with first, second:
+                record = nb.build_vm2(target, 'h3', 'h1')
+            raw = target.read_bytes()
+            self.assertEqual((record['sha256'], record['bundleBytes'], record['execution']), (hashlib.sha256(raw).hexdigest(), len(raw), 'NOT_RUN'))
+            self.assertEqual((record['study'], record['mCommit'], record['h1Commit'], record['h3Commit'], record['h3ProductCommit'], record['harnessFromWorktree']),
+                             ('bridge-m-h-vm-v2', nb.M_COMMIT, 'h1', 'h3', '4f1c0de', False))
+            self.assertEqual(json.loads(target.with_suffix('.manifest.json').read_text()), record)
+            bad = Path(directory) / 'bad.zip'
+            first, second = self.patches(h3_layout='phase2')
+            with first, second, self.assertRaisesRegex(ValueError, 'BRIDGE_VM2_LAYOUT'):
+                nb.build_vm2(bad, 'h3', 'h1')
+            self.assertFalse(bad.exists() or bad.with_suffix('.manifest.json').exists())
+
+    def test_the_worktree_must_match_head_unless_it_is_markdown_or_the_harness_asked_for(self):
+        with self.assertRaisesRegex(ValueError, 'BRIDGE_H_WORKTREE_DIFFERS_FROM_HEAD'):
+            self.pack('HEAD', 'h1', status=b' M backend/src/index.ts\n')
+        raw, manifest = self.pack('HEAD', 'h1', status=b' M backend/README.md\n?? services/clinic/README.md\n')
+        self.assertEqual((manifest['h3Commit'], manifest['harnessFromWorktree']), ('HEAD', False))
+        # A harness file that differs from HEAD is the point of --worktree-harness (and says so in the manifest); a harness that is not in the commit is refused without it.
+        raw, manifest = self.pack('HEAD', 'h1', status=b' M benchmarks/phase2/kaggle/stack.mjs\n', worktree_harness=True)
+        self.assertTrue(manifest['harnessFromWorktree'])
+        with self.assertRaisesRegex(ValueError, 'BRIDGE_H_WORKTREE_DIFFERS_FROM_HEAD'):
+            self.pack('HEAD', 'h1', status=b' M benchmarks/phase2/kaggle/stack.mjs\n')
+        with self.assertRaisesRegex(ValueError, 'BRIDGE_VM_HARNESS_NOT_IN_H3'):
+            self.pack(harness=False)
+
+    def test_the_real_tree_packs_with_both_layouts_when_the_commits_are_here(self):
+        try:
+            raw, manifest = nb.pack_vm2('HEAD', worktree_harness=True)
+        except (ValueError, OSError, nb.subprocess.CalledProcessError) as error:
+            self.skipTest('cannot pack here: ' + str(error)[:80])
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            names = set(archive.namelist())
+            for group in ('H1', 'H3'):
+                script = archive.read(f'{group}/{self.SCRIPT}')
+                self.assertTrue(script.startswith(b'#!/usr/bin/env bash\n'))
+                self.assertNotIn(b'\r', script)
+        self.assertIn('H1/backend/src/phase2/notificationWorker.ts', names)
+        self.assertIn('H3/backend/src/workers/notification.ts', names)
+        self.assertEqual((manifest['format'], manifest['harnessFromWorktree'], manifest['h1Commit'][:7]), (nb.VM2_FORMAT, True, '2841d1b'))
+        self.assertTrue(re.fullmatch(r'[0-9a-f]{40}', manifest['h3ProductCommit']))
+
+    def test_the_product_commit_is_the_last_one_that_changed_the_product(self):
+        try:
+            product = nb.product_commit('HEAD')
+            later = nb.git('diff', '--name-only', product, 'HEAD', '--', *nb.PRODUCT_PATHS, *nb.NOT_PRODUCT).decode().split()
+        except (OSError, nb.subprocess.CalledProcessError):
+            self.skipTest('no git here')
+        self.assertRegex(product, r'^[0-9a-f]{40}$')
+        self.assertEqual(later, [])   # nothing the bundle runs changed after it (harness and test commits do not move it)
+
+
+class VmV2Verify(unittest.TestCase):
+    """verify_tree reads the format of the bundle: v2 allows M, H1, H3, checks the layout of each H tree and is not a v1 check."""
+
+    def tree(self, directory, files, fmt=None, **extra):
+        listing = [{'path': k, 'bytes': len(v), 'sha256': hashlib.sha256(v).hexdigest()} for k, v in sorted(files.items())]
+        header = {'format': fmt or nb.VM2_FORMAT, 'files': listing, 'mCommit': 'm', 'h1Commit': 'h1', 'h3Commit': 'h3', 'h3ProductCommit': 'p',
+                  'treeSha256': hashlib.sha256(json.dumps(listing, separators=(',', ':')).encode()).hexdigest(), **extra}
+        root = Path(directory)
+        (root / 'bundle-manifest.json').write_text(json.dumps(header))
+        for name, value in files.items():
+            (root / name).parent.mkdir(parents=True, exist_ok=True)
+            (root / name).write_bytes(value)
+        return root
+
+    def good(self):
+        return {'M/backend/a.ts': b'a', **{'H1/' + k: v for k, v in v2_files('phase2').items()}, **{'H3/' + k: v for k, v in v2_files('workers').items()}}
+
+    def test_a_v2_tree_is_verified_by_its_format(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manifest = nb.verify_tree(self.tree(directory, self.good()))
+            self.assertEqual((manifest['format'], manifest['h3Commit']), (nb.VM2_FORMAT, 'h3'))
+            self.assertEqual(nb.verify_tree(directory, fmt=nb.VM2_FORMAT)['h1Commit'], 'h1')
+            with self.assertRaisesRegex(ValueError, 'BRIDGE_FORMAT'):
+                nb.verify_tree(directory, fmt=nb.VM_FORMAT)
+
+    def test_a_v2_tree_with_a_group_of_v1_or_without_the_layout_is_refused(self):
+        files = self.good()
+        for label, items, fmt, error in (
+                ('H0 group in v2', {**files, 'H0/backend/a.ts': b'x'}, None, 'BRIDGE_UNSAFE_PATH'),
+                ('H3 group in v1', {'M/backend/a.ts': b'a', 'H3/backend/a.ts': b'x'}, nb.VM_FORMAT, 'BRIDGE_UNSAFE_PATH'),
+                ('H3 has the phase2 layout', {k: v for k, v in files.items() if not k.startswith('H3/')} | {'H3/' + k: v for k, v in v2_files('phase2').items()}, None, 'BRIDGE_VM2_LAYOUT'),
+                ('H1 has no layout', {k: v for k, v in files.items() if not k.startswith('H1/')}, None, 'BRIDGE_VM2_LAYOUT'),
+                ('unknown format', files, 'bridge-m-h-vm-source-3', 'BRIDGE_FORMAT'),
+                ('the Kaggle format', files, nb.FORMAT, 'BRIDGE_FORMAT')):
+            with tempfile.TemporaryDirectory() as directory, self.assertRaisesRegex(ValueError, error, msg=label):
+                nb.verify_tree(self.tree(directory, items, fmt))
+
+    def test_a_tampered_or_padded_v2_tree_is_refused_like_a_v1_one(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.tree(directory, self.good())
+            (root / 'H3/backend/src/workers/billing.ts').write_bytes(b'changed')
+            with self.assertRaisesRegex(ValueError, 'BRIDGE_FILE_HASH'):
+                nb.verify_tree(root)
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.tree(directory, self.good())
+            (root / 'H1/backend/extra.js').write_bytes(b'x')
+            with self.assertRaisesRegex(ValueError, 'BRIDGE_INVENTORY'):
+                nb.verify_tree(root)
+
+
+class VmV2BuilderCli(unittest.TestCase):
+    """make_bridge_notebook.main: --vm builds the v2 bundle, --vm-study v1 the v1 one as before, the notebook stays the default."""
+
+    def run_main(self, argv):
+        with patch.object(nb, 'build_vm2', return_value={'study': 'v2'}) as v2, patch.object(nb, 'build_vm', return_value={'study': 'v1'}) as v1, \
+                patch.object(nb, 'build', return_value={'study': 'notebook'}) as notebook, patch.object(nb, 'verify_tree') as verify, patch('builtins.print'):
+            result = nb.main(argv)
+        return result, v2, v1, notebook, verify
+
+    def test_vm_builds_v2_with_h_commit_as_h3_and_the_2841d1b_default_for_h1(self):
+        result, v2, v1, notebook, verify = self.run_main(['--vm'])
+        self.assertEqual(result, {'study': 'v2'})
+        v2.assert_called_once_with(nb.VM2_TARGET, 'HEAD', nb.H1_COMMIT, False)
+        v1.assert_not_called(); notebook.assert_not_called()
+        result, v2, v1, notebook, verify = self.run_main(['--vm', '--h-commit', 'abc', '--h1-commit', 'def', '--target', 'x.zip', '--worktree-harness'])
+        v2.assert_called_once_with(Path('x.zip'), 'abc', 'def', True)
+
+    def test_vm_study_v1_builds_v1_as_before(self):
+        for argv in (['--vm', '--vm-study', 'v1'], ['--vm-study', 'v1']):
+            result, v2, v1, notebook, verify = self.run_main(argv)
+            self.assertEqual(result, {'study': 'v1'})
+            v1.assert_called_once_with(nb.VM_TARGET, 'HEAD', nb.H0_COMMIT, False)
+            v2.assert_not_called()
+        result, v2, v1, notebook, verify = self.run_main(['--vm-study', 'v1', '--h-commit', 'abc', '--h0-commit', 'def'])
+        v1.assert_called_once_with(nb.VM_TARGET, 'abc', 'def', False)
+        self.assertEqual(self.run_main(['--vm', '--vm-study', 'v2'])[0], {'study': 'v2'})
+
+    def test_the_commits_of_the_other_study_are_refused_and_the_notebook_is_untouched(self):
+        with patch('sys.stderr', io.StringIO()):
+            for argv in (['--vm', '--h0-commit', 'x'], ['--vm-study', 'v1', '--h1-commit', 'x'], ['--h1-commit', 'x'], ['--h0-commit', 'x'], ['--vm-study', 'v3']):
+                with self.assertRaises(SystemExit, msg=argv):
+                    self.run_main(argv)
+        result, v2, v1, notebook, verify = self.run_main([])
+        self.assertEqual(result, {'study': 'notebook'})
+        notebook.assert_called_once_with(nb.TARGET, nb.V1_H_COMMIT, False, False)
+        v1.assert_not_called(); v2.assert_not_called()
+
+    def test_verify_extracted_prints_what_the_bundle_says_for_either_study(self):
+        with patch.object(nb, 'verify_tree', return_value={'format': nb.VM2_FORMAT, 'files': [1, 2, 3], 'mCommit': 'm', 'h1Commit': 'a', 'h3Commit': 'b', 'h3ProductCommit': 'c'}), \
+                patch('builtins.print') as printed:
+            result = nb.main(['--verify-extracted', 'somewhere'])
+        self.assertEqual(result, {'verified': True, 'format': nb.VM2_FORMAT, 'files': 3, 'mCommit': 'm', 'h1Commit': 'a', 'h3Commit': 'b', 'h3ProductCommit': 'c'})
+        with patch.object(nb, 'verify_tree', return_value={'format': nb.VM_FORMAT, 'files': [1], 'mCommit': 'm', 'h0Commit': 'x', 'h1Commit': 'y'}), patch('builtins.print'):
+            self.assertEqual(nb.main(['--verify-extracted', 'somewhere']), {'verified': True, 'format': nb.VM_FORMAT, 'files': 1, 'mCommit': 'm', 'h0Commit': 'x', 'h1Commit': 'y'})
+
+
+class VmV2Export(unittest.TestCase):
+    def test_the_export_carries_the_burst_files_and_nothing_private(self):
+        for name in ('burst.json', 'burst.jsonl', 'manifest.json', 'resources.jsonl', 'requests.jsonl', 'http.csv'):
+            self.assertIn(name, bs.EXPORT)
+        for private in ('pg-activity.txt', 'context.json', 'ready.json', 'pcn-fixture.json', 'api.log', 'cqrs.jsonl'):
+            self.assertNotIn(private, bs.EXPORT)
+        with tempfile.TemporaryDirectory() as directory:
+            root, private = Path(directory) / 'src', Path(directory) / 'private'
+            member = private / 'members' / 'full-3-100-H3b'
+            member.mkdir(parents=True)
+            for name in ('manifest.json', 'burst.json', 'burst.jsonl', 'pg-activity.txt', 'ready.json', 'core.log'):
+                (member / name).write_text('{}')
+            (private / 'reports').mkdir()
+            (private / 'reports' / 'evaluation.json').write_text('{}')
+            (root / 'H3').mkdir(parents=True)
+            (root / 'bundle-manifest.json').write_text('{}')
+            study = bs.VmStudy2(root, private, Path(directory) / 'out', 'run-1', mode='smoke', progress=lambda text: None)
+            exported = {name for source, name in study.exported()}
+        self.assertEqual(exported, {'reports/evaluation.json', 'members/full-3-100-H3b/manifest.json', 'members/full-3-100-H3b/burst.json',
+                                    'members/full-3-100-H3b/burst.jsonl', 'bundle-manifest.json'})
+
+    def test_the_harness_changes_of_v2_name_what_the_study_changed_about_the_stack(self):
+        text = ' '.join(bs.VM2_HARNESS_CHANGES)
+        for needle in ('max_fails=0', 'proxy_next_upstream off', 'Notification worker', 'burst', 'pg_stat_activity', 'application_name', 'upstream clinic', 'worker_connections 4096'):
+            self.assertIn(needle, text)
+
+
+class VmRunScriptV2(unittest.TestCase):
+    """vm_run.sh takes the v2 bundle: the study from its format, --study and --cut, the compare with the bundled copy, the network settings of the VM. The part that needs
+    root and apt is not run here; this reads the script and runs only the argument checks, which stop before anything is installed."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.raw = (HERE / 'vm_run.sh').read_bytes()
+        cls.text = cls.raw.decode('utf-8')
+
+    def test_it_is_lf_and_has_the_checks_of_v1_untouched(self):
+        self.assertNotIn(b'\r', self.raw)
+        self.assertTrue(self.raw.startswith(b'#!/usr/bin/env bash\n'))
+        self.assertIn('set -Eeuo pipefail', self.text)
+        self.assertEqual(self.text.count('sha256sum -c'), 1)
+        self.assertLess(self.text.index('sha256sum -c'), self.text.index('apt-get'))
+        self.assertLess(self.text.index('apt-get'), self.text.index('unzip -q "$WORK/bundle.zip"'))
+
+    def test_the_study_follows_the_format_of_the_bundle_and_v2_needs_M_H1_H3(self):
+        self.assertIn(f'{nb.VM_FORMAT}) BUNDLE_STUDY=v1; TREES=(M H0 H1); HARNESS_TREE=H1; PREFIX=bridge-vm;;', self.text)
+        self.assertIn(f'{nb.VM2_FORMAT}) BUNDLE_STUDY=v2; TREES=(M H1 H3); HARNESS_TREE=H3; PREFIX=bridge-vm-v2;;', self.text)
+        self.assertEqual(tuple(re.search(rf'{nb.VM2_FORMAT}\) .*TREES=\(([^)]*)\)', self.text).group(1).split()), nb.VM2_GROUPS)
+        self.assertEqual(tuple(re.search(rf'{nb.VM_FORMAT}\) .*TREES=\(([^)]*)\)', self.text).group(1).split()), nb.VM_GROUPS)
+        self.assertIn('"$WORK/src/bundle-manifest.json"', self.text)
+        self.assertIn('--study $STUDY, but the bundle is the $BUNDLE_STUDY study', self.text)
+        self.assertIn('bundle lacks $part', self.text)
+        self.assertIn('unknown bundle format', self.text)
+        # The default name of the results is decided once the study is known; the re-exec through sudo passes --out only when it was given.
+        self.assertLess(self.text.index('FORMAT=$(python3 -I'), self.text.index('OUT=$(readlink -m "${OUT:-$PWD/$PREFIX-$STAMP}")'))
+        self.assertIn('[ -z "$OUT" ] || ARGS+=(--out "$OUT")', self.text)
+        self.assertIn('exec sudo bash "$(readlink -f "$0")" "${ARGS[@]}"', self.text)
+
+    def test_v2_asks_bridge_study_for_study_v2_with_the_cuts_and_v1_stays_flag_free(self):
+        self.assertIn('STUDY_ARGS=(--study v2)', self.text)
+        self.assertIn('STUDY_ARGS+=(--cut "$cut")', self.text)
+        self.assertIn('"${STUDY_ARGS[@]}"', self.text)
+        self.assertLess(self.text.index('if [ "$BUNDLE_STUDY" = v2 ]; then\n  STUDY_ARGS=(--study v2)'), self.text.index('"$PY" "$WORK/src/$HARNESS_TREE/benchmarks/phase2/kaggle/bridge_study.py"'))
+        self.assertNotIn('--study v1', self.text.replace('--study auto|v1|v2', ''))   # v1 bundles carry a bridge_study.py that does not know --study
+        self.assertIn('--platform vm --root "$WORK/src"', self.text)
+        self.assertLess(self.text.index('--verify-extracted'), self.text.index('bridge_study.py'))
+        self.assertIn('make_bridge_notebook.py" --verify-extracted "$WORK/src"', self.text)
+        self.assertIn('$WORK/src/$HARNESS_TREE/benchmarks/phase2/kaggle/make_bridge_notebook.py', self.text)
+
+    def test_the_cuts_are_the_ones_the_study_knows_and_only_for_v2_full(self):
+        listed = re.search(r'case "\$cut" in ([^)]*)\) ;;', self.text).group(1).split('|')
+        self.assertEqual(tuple(listed), bs.CUTS)
+        self.assertIn('[ "$MODE" = full ] || { echo "--cut is for --mode full" >&2; usage; }', self.text)
+        self.assertIn('[ "$STUDY" != v1 ] || { echo "--cut is for the v2 study" >&2; usage; }', self.text)
+        self.assertIn('--cut is for the v2 study; the bundle is $BUNDLE_STUDY', self.text)
+        self.assertIn('[--cut x2-200] [--cut burst-short]', self.text)
+
+    def test_results_of_v2_are_named_bridge_vm_v2_and_v1_ones_as_before(self):
+        self.assertIn('PREFIX=bridge-vm-v2', self.text)
+        self.assertIn('PREFIX=bridge-vm;', self.text)
+        self.assertIn('TAR=$OUT.tar.gz', self.text)
+        self.assertIn('$PWD/$PREFIX-$STAMP', self.text)
+
+    def test_the_script_that_runs_is_compared_with_the_copy_in_the_bundle(self):
+        self.assertIn('cmp -s "$0" "$WORK/src/$HARNESS_TREE/benchmarks/phase2/kaggle/vm_run.sh"', self.text)
+        self.assertLess(self.text.index('--verify-extracted'), self.text.index('cmp -s "$0"'))   # the copy it is compared with has been verified
+        self.assertLess(self.text.index('cmp -s "$0"'), self.text.index('python3 -m venv'))
+        self.assertIn('if [ "$SCRIPT_MATCH" = no ] && [ "$BUNDLE_STUDY" = v2 ]; then', self.text)
+        self.assertIn('exit 1', self.text[self.text.index('if [ "$SCRIPT_MATCH" = no ]'):self.text.index('python3 -m venv')])
+        self.assertIn('vm_run_sh_is_the_bundled_copy=$SCRIPT_MATCH', self.text)
+        self.assertIn('[ -f "$0" ]', self.text)   # a pipe has no copy to compare
+
+    def test_vm_info_records_the_network_settings_that_matter_at_800_users(self):
+        self.assertIn('sysctl net.ipv4.tcp_tw_reuse net.ipv4.ip_local_port_range', self.text)
+        info = self.text[self.text.index('{\n  echo "started_utc='):self.text.index('} > "$OUT/vm-info.txt"')]
+        for needle in ('sysctl net.ipv4.tcp_tw_reuse net.ipv4.ip_local_port_range', 'ss -s', 'study=$BUNDLE_STUDY', 'cuts=', 'bundle_sha256=$SHA'):
+            self.assertIn(needle, info)
+        self.assertIn('>> "$OUT/vm-info.txt"', self.text)   # and ss -s again after the study
+        self.assertIn('procps iproute2', self.text)   # sysctl and ss exist in a minimal container too
+
+    def run_arguments(self, *argv):
+        bash = shutil.which('bash')
+        if not bash:
+            self.skipTest('no bash here')
+        script = (HERE / 'vm_run.sh').as_posix()
+        probe = subprocess.run([bash, '-c', 'test -f "$1"', 'probe', script], capture_output=True)
+        if probe.returncode:
+            self.skipTest('this bash does not read the path of the script')
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory) / 'bundle.zip'
+            bundle.write_bytes(b'not a bundle')
+            return subprocess.run([bash, script, '--bundle', bundle.as_posix(), '--sha256', '0' * 64, *argv], capture_output=True, text=True, timeout=60, cwd=directory)
+
+    def test_bad_arguments_stop_with_usage_before_anything_runs(self):
+        for argv, message in ((['--cut', 'nothing', '--mode', 'full'], 'unknown --cut nothing'), (['--cut', 'x2-200', '--mode', 'local'], '--cut is for --mode full'),
+                              (['--cut', 'x2-200', '--mode', 'smoke'], '--cut is for --mode full'), (['--cut', 'x2-200', '--study', 'v1'], '--cut is for the v2 study'),
+                              (['--study', 'v3'], 'usage:'), (['--cut'], 'usage:'), (['--study'], 'usage:')):
+            result = self.run_arguments(*argv)
+            self.assertEqual(result.returncode, 2, (argv, result.stderr))
+            self.assertIn(message, result.stderr)
+            self.assertIn('usage: sudo bash vm_run.sh', result.stderr)
+            self.assertIn('[--study auto|v1|v2] [--cut x2-200] [--cut burst-short]', result.stderr)
 
 
 if __name__ == '__main__':

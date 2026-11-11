@@ -100,7 +100,8 @@ PIP = ('locust==2.44.4', 'psutil==7.0.0')
 NODE = 'v24.16.0'
 NOT_SERVER = ('generator', 'controller', 'stack-supervisor')
 EXPORT = ('manifest.json', 'pcn-report.json', 'load-final.json', 'http-summary.json', 'reconciliation.json',
-          'generator.json', 'resources.jsonl', 'requests.jsonl', 'http.csv')
+          'generator.json', 'resources.jsonl', 'requests.jsonl', 'http.csv',
+          'burst.json', 'burst.jsonl')   # v2 burst members (the pg_stat_activity summary and the pool evidence are in manifest.json)
 
 
 def digest(data):
@@ -762,11 +763,12 @@ VM2_HARNESS_CHANGES = (
     '/api/dashboard/clinic, which the PCN load never calls. nginx runs with worker_connections 4096 and worker_rlimit_nofile 8192 in both.',
     'The Core worker layout is a property of the tree: H1 (2841d1b) has backend/dist/src/phase2/{notificationWorker,billingWorker}.js, H3 has backend/dist/src/workers; stack.mjs builds '
     'exactly the layout the member names (context.coreLayout) and records it in ready.json.gateway.',
-    'Every service gets the same DB_POOL_LIMIT (4, or 8 in H3p8) and names its database connections p8-<process> (m-api for the monolith); a psql \\watch 0.2 sampler of '
+    'Every service gets the same DB_POOL_LIMIT (4, or 8 in H3p8) and names its database connections with application_name p8-<process> (m-api for the monolith); a psql \\watch 0.2 sampler of '
     'pg_stat_activity runs in Part 2 and in the pool block only, and costs the servers a little.',
     'The fixture takes up to 800 owners; Part 1 keeps the v1 settings (100 users, 300 s window, 30 s warmup, spawn rate 10) and Part 2 uses spawn rate users/10.',
-    'Clinic runs one or two API instances behind `upstream clinic`; with Core proxied no upstream server is put aside (max_fails=0) and no location retries on another instance, '
-    'for Core and for Clinic alike, so a second instance changes capacity and not the error policy. clinic-worker, the Notification API, core-outbox and billing-worker stay at one.',
+    'Clinic runs one or two API instances behind `upstream clinic`; with Core proxied no upstream server is put aside (max_fails=0) and no location retries on another instance '
+    '(proxy_next_upstream off), for Core and for Clinic alike, so a second instance changes capacity and not the error policy. clinic-worker, the Notification API, core-outbox and '
+    'billing-worker stay at one.',
     'The Notification worker runs once or twice on the one queue (prefetch 1 each, inbox idempotent), and a notification burst of N notification.requested.v1 events is written into '
     'the Clinic outbox in one transaction at a set second of the window, sampled every second until the Notification inbox holds them all (burst.json).',
     'The harness files of the three trees (M, H1, H3) are the same bytes, taken from the harness commit, so H1 runs 2841d1b product code with today\'s harness.',
