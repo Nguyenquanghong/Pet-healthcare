@@ -1,0 +1,50 @@
+{
+  "label": "after-20261029",
+  "startedAt": "2026-10-28T19:48:36.805Z",
+  "commit": "f13766f",
+  "dirty": true,
+  "retrySettings": "default",
+  "queues": [
+    "notification",
+    "identity",
+    "clinic"
+  ],
+  "directoryOutage": [
+    {
+      "events": 1,
+      "outageMs": 5000,
+      "settled": true,
+      "settledAfterMs": 6144,
+      "applied": 1,
+      "deadLettered": 0,
+      "coreCalls": 3
+    },
+    {
+      "events": 50,
+      "outageMs": 10000,
+      "settled": true,
+      "settledAfterMs": 36837,
+      "applied": 50,
+      "deadLettered": 0,
+      "coreCalls": 200
+    }
+  ],
+  "revocation": {
+    "aloneMs": [
+      37,
+      35,
+      31,
+      32,
+      31
+    ],
+    "behind500NotificationsMs": [
+      28,
+      19,
+      18
+    ],
+    "behindFailingMessageMs": 20,
+    "twentyBehindFailingMessageMs": 245,
+    "failingMessageInDlqAfterMs": "not in DLQ 15250 ms after publish"
+  },
+  "finishedAt": "2026-10-28T19:49:53.718Z"
+}
