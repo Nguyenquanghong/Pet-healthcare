@@ -27,6 +27,10 @@ const coreReplicas=context.coreReplicas??1;
 assert.ok([1,2].includes(coreReplicas));
 assert.ok(context.coreProxy===undefined||typeof context.coreProxy==='boolean');
 const coreProxy=context.coreProxy===true||coreReplicas>1;
+// Bridge VM study (K9), Notification workers on the one notification queue: 1 or 2, never with a CQRS configuration. RabbitMQ deals the messages round-robin (prefetch 1 per worker);
+// a message redelivered to the other worker is applied once, as InboxEvent(consumerName,eventId) is inserted in the effect's own transaction. Absent in every older context: one.
+const notificationWorkers=context.notificationWorkers??1;
+assert.ok([1,2].includes(notificationWorkers),'context.notificationWorkers must be 1 or 2, got '+JSON.stringify(notificationWorkers));
 // Bridge VM study: how the gateway reaches the services. `direct` (the default, and the only one the CQRS studies use) sends each prefix of
 // gatewayRoutes straight to its service, as deploy/phase2/nginx.split.conf.example does; `core-ingress` sends every /api path to Core, which
 // forwards the owned prefixes itself, as compose, the demo and E2E do (one more hop for Clinic and Notification traffic; K9 H3c).
@@ -96,7 +100,7 @@ try{
   const cqrsMode=context.cqrsConfiguration;
   let cqrs,cqrsTools;
   if(cqrsMode!==undefined&&cqrsMode!==null){
-    assert.equal(context.replicas,1);assert.equal(coreReplicas,1);assert.ok(!coreProxy);assert.equal(gatewayTopology,'direct');assert.equal(coreLayout,'workers');assert.equal(dbPoolLimit,4);assert.ok(['pcn','query-heavy'].includes(profile));
+    assert.equal(context.replicas,1);assert.equal(coreReplicas,1);assert.ok(!coreProxy);assert.equal(gatewayTopology,'direct');assert.equal(coreLayout,'workers');assert.equal(dbPoolLimit,4);assert.equal(notificationWorkers,1);assert.ok(['pcn','query-heavy'].includes(profile));
     cqrsTools=await import('./cqrs_runtime.mjs');
     cqrs=await cqrsTools.prepareReadModel(cqrsMode,context.urls.clinic,context);
   }
@@ -146,19 +150,24 @@ try{
   for(let i=0;i<clinicPorts.length;i++)await child('clinic-'+i,'services/clinic/dist/index.js',{...credentials,...cqrsEnv,CORE_NOTIFICATION_SEND_TOKEN:'',DATABASE_URL:context.urls.clinic,PORT:String(clinicPorts[i]),SERVICE_INSTANCE_ID:'p8-clinic-'+i},clinicPorts[i]);
   await child('notification','services/notification/dist/index.js',{CORE_NOTIFICATION_SEND_TOKEN:credentials.CORE_NOTIFICATION_SEND_TOKEN,DATABASE_URL:context.urls.notification,PORT:String(ports.notification)},ports.notification);
   mkdirSync(resolve(dir,'nginx-temp'));
-  const headers='proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Request-ID $request_id; proxy_connect_timeout 1s; proxy_read_timeout 15s; proxy_next_upstream error timeout http_502 http_503 http_504;';
-  // The gateway's Core location: with coreProxy no retry on another instance either (one policy for one Core or two, as on the internal hop); otherwise `headers` as ever.
-  const coreGateway=coreProxy?headers.replace('proxy_next_upstream error timeout http_502 http_503 http_504;','proxy_next_upstream off;'):headers;
+  const retryHeaders='proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Request-ID $request_id; proxy_connect_timeout 1s; proxy_read_timeout 15s; proxy_next_upstream error timeout http_502 http_503 http_504;';
+  // With coreProxy (every H configuration of the bridge VM study, and two Core instances) no location retries on another instance and no upstream server is put aside after a failure,
+  // for Core and for Clinic alike (K9 S2): one policy for one instance or two, so a second Clinic changes the capacity and nothing about how errors are handled. `headers` is what the
+  // gateway's Clinic and Notification locations and the listener on ports.clinic use, `coreGateway` the gateway's Core location; the two templates below name them and stay as they are.
+  // Without coreProxy (the CQRS studies, every older context) both are the plain `retryHeaders` and the upstreams keep nginx's defaults, as ever.
+  const headers=coreProxy?retryHeaders.replace('proxy_next_upstream error timeout http_502 http_503 http_504;','proxy_next_upstream off;'):retryHeaders;
+  const coreGateway=headers;
   const coreServers=corePorts.map(p=>'server 127.0.0.1:'+p+' max_fails=0;').join(' ');
+  const clinicServers=clinicPorts.map(p=>'server 127.0.0.1:'+p+(coreProxy?' max_fails=0':'')+';').join(' ');
   // Clinic and Notification reach Core here (coreProxy): HTTP/1.1 with upstream keepalive (idle 4 s, below Core's 5 s keepAliveTimeout), the caller's request id kept,
   // no retry on another instance (one policy for one Core or two). The gateway's own path to Core (upstream core) has no keepalive, as before.
   const coreEdge=coreProxy?`map $http_x_request_id $core_req_id { default $http_x_request_id; "" $request_id; } upstream core_internal { ${coreServers} keepalive 16; keepalive_timeout 4s; } server { listen 127.0.0.1:${ports.core}; location / { proxy_http_version 1.1; proxy_set_header Connection ""; proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Request-ID $core_req_id; proxy_connect_timeout 1s; proxy_read_timeout 15s; proxy_next_upstream off; proxy_pass http://core_internal; } } `:'';
   // Two full templates, one per gateway topology, that differ only in the gateway server (tools/phase2/gateway-routing.mjs reads each against gatewayRoutes
   // and keeps them apart). Both raise the nginx descriptors and connections so the gateway is not the ceiling at 800 users.
   // direct: appointments, medical-records and dashboard/clinic go to Clinic, notifications to Notification, the rest to Core.
-  const directConfig=`pid ${dir}/nginx.pid; error_log ${dir}/nginx.log; worker_rlimit_nofile 8192; events { worker_connections 4096; } http { access_log off; client_body_temp_path ${dir}/nginx-temp; proxy_temp_path ${dir}/nginx-temp; upstream clinic { ${clinicPorts.map(p=>'server 127.0.0.1:'+p+';').join(' ')} } upstream core { ${coreServers} } server { listen 127.0.0.1:${ports.clinic}; location / { ${headers} proxy_pass http://clinic; } } ${coreEdge}server { listen 127.0.0.1:${ports.gateway}; location ~ ^/(internal|metrics|health) { return 404; } location ~ ^/api/(appointments|medical-records|dashboard/clinic)(/|$) { ${headers} proxy_pass http://clinic; } location ~ ^/api/notifications(/|$) { ${headers} proxy_pass ${origins.notification}; } location /api/ { ${coreGateway} proxy_pass http://core; } location / { return 404; } } }`;
+  const directConfig=`pid ${dir}/nginx.pid; error_log ${dir}/nginx.log; worker_rlimit_nofile 8192; events { worker_connections 4096; } http { access_log off; client_body_temp_path ${dir}/nginx-temp; proxy_temp_path ${dir}/nginx-temp; upstream clinic { ${clinicServers} } upstream core { ${coreServers} } server { listen 127.0.0.1:${ports.clinic}; location / { ${headers} proxy_pass http://clinic; } } ${coreEdge}server { listen 127.0.0.1:${ports.gateway}; location ~ ^/(internal|metrics|health) { return 404; } location ~ ^/api/(appointments|medical-records|dashboard/clinic)(/|$) { ${headers} proxy_pass http://clinic; } location ~ ^/api/notifications(/|$) { ${headers} proxy_pass ${origins.notification}; } location /api/ { ${coreGateway} proxy_pass http://core; } location / { return 404; } } }`;
   // core-ingress: every /api path goes to Core.
-  const coreIngressConfig=`pid ${dir}/nginx.pid; error_log ${dir}/nginx.log; worker_rlimit_nofile 8192; events { worker_connections 4096; } http { access_log off; client_body_temp_path ${dir}/nginx-temp; proxy_temp_path ${dir}/nginx-temp; upstream clinic { ${clinicPorts.map(p=>'server 127.0.0.1:'+p+';').join(' ')} } upstream core { ${coreServers} } server { listen 127.0.0.1:${ports.clinic}; location / { ${headers} proxy_pass http://clinic; } } ${coreEdge}server { listen 127.0.0.1:${ports.gateway}; location ~ ^/(internal|metrics|health) { return 404; } location /api/ { ${coreGateway} proxy_pass http://core; } location / { return 404; } } }`;
+  const coreIngressConfig=`pid ${dir}/nginx.pid; error_log ${dir}/nginx.log; worker_rlimit_nofile 8192; events { worker_connections 4096; } http { access_log off; client_body_temp_path ${dir}/nginx-temp; proxy_temp_path ${dir}/nginx-temp; upstream clinic { ${clinicServers} } upstream core { ${coreServers} } server { listen 127.0.0.1:${ports.clinic}; location / { ${headers} proxy_pass http://clinic; } } ${coreEdge}server { listen 127.0.0.1:${ports.gateway}; location ~ ^/(internal|metrics|health) { return 404; } location /api/ { ${coreGateway} proxy_pass http://core; } location / { return 404; } } }`;
   const config=gatewayTopology==='core-ingress'?coreIngressConfig:directConfig;
   writeFileSync(resolve(dir,'nginx.conf'),config);
   // Fail fast with nginx's own message when the generated config is wrong (skipped only when there is no nginx binary, which the spawn below reports).
@@ -170,12 +179,17 @@ try{
   const workerBase={JWT_PRIVATE_KEY:'',JWT_PUBLIC_KEY:'',JWT_KEY_ID:'',JWT_ISSUER:'',JWT_AUDIENCE:'',REDIS_URL:'',RATE_LIMIT_KEY_SECRET:'',OBSERVABILITY_TOKEN:''};
   await child('core-outbox',CORE_LAYOUTS[coreLayout].notification,{...workerBase,DATABASE_URL:context.urls.core});
   await child('clinic-worker','services/clinic/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.clinic,CORE_DIRECTORY_TOKEN:credentials.CORE_DIRECTORY_TOKEN});
-  const notificationWorker=()=>child('notification-worker','services/notification/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.notification});
-  let consumer=await notificationWorker();
+  // One worker is `notification-worker`, two are `notification-worker-0/1` (each its own log, application_name and instance id, as Core's and Clinic's instances); pause and resume act on all of them.
+  const notificationWorker=i=>{const name=notificationWorkers===1?'notification-worker':'notification-worker-'+i;return child(name,'services/notification/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.notification,SERVICE_INSTANCE_ID:'p8-'+name});};
+  const startNotificationWorkers=async()=>{const started=[];for(let i=0;i<notificationWorkers;i++)started.push(await notificationWorker(i));return started;};
+  let consumers=await startNotificationWorkers();
   await child('billing-worker',CORE_LAYOUTS[coreLayout].billing,{...credentials,JWT_PRIVATE_KEY:privateKey,DATABASE_URL:context.urls.core});
   dump('ready.json',{run:context.run,cqrs,password,accounts:dataset.accounts,admin:{id:admin.id,username:admin.username},dataset:dataset.description,baseUrl:origins.gateway,metrics,metricsToken:common.OBSERVABILITY_TOKEN,processes:handles.map(h=>({name:h.name,pid:h.child.pid})),clinicReplicas:context.replicas,coreReplicas,
+    // The process layout of the member: Clinic API instances (clinic-0, clinic-1), Notification workers on the one queue, and the single Clinic worker (relay and consumer), which no configuration multiplies.
+    clinicInstances:handles.filter(h=>/^clinic-\d+$/.test(h.name)).map(h=>h.name),notificationWorkers,clinicWorkers:1,
     // direct: /api/notifications goes straight to Notification as in deploy/phase2/nginx.split.conf.example; core-ingress and the Kaggle bridge v1 harness send it through Core.
-    gateway:{topology:gatewayTopology,notificationsRoute:gatewayTopology==='direct'?'direct-to-notification':'through-core',coreLayout,dbPoolLimit,coreUpstream:coreProxy?'Clinic and Notification reach Core through nginx upstream core_internal (keepalive 16); gateway through upstream core':'one Core, called directly',coreInstances:handles.filter(h=>/^core(-\d+)?$/.test(h.name)).map(h=>h.name)},dbCrossConnectDenied:6});
+    gateway:{topology:gatewayTopology,notificationsRoute:gatewayTopology==='direct'?'direct-to-notification':'through-core',coreLayout,dbPoolLimit,coreUpstream:coreProxy?'Clinic and Notification reach Core through nginx upstream core_internal (keepalive 16); gateway through upstream core':'one Core, called directly',coreInstances:handles.filter(h=>/^core(-\d+)?$/.test(h.name)).map(h=>h.name),
+      clinicUpstream:{servers:clinicPorts.length,maxFails:coreProxy?0:null,proxyNextUpstream:coreProxy?'off':'error timeout http_502 http_503 http_504'}},dbCrossConnectDenied:6});
   const lines=createInterface({input:process.stdin});
   for await(const line of lines){
     const command=JSON.parse(line);
@@ -189,8 +203,8 @@ try{
         const {collectQueryPlans}=await import('./cqrs_query_plans.mjs');
         response=await collectQueryPlans(db.clinic,context.urls.clinic,context);
       }
-      else if(command.action==='pause-notification'){await stop(consumer);response={paused:true};}
-      else if(command.action==='resume-notification'){consumer=await notificationWorker();response={resumed:true};}
+      else if(command.action==='pause-notification'){for(const worker of consumers)await stop(worker);response={paused:true};}
+      else if(command.action==='resume-notification'){assert.ok(consumers.every(worker=>worker.child.exitCode!==null||worker.child.signalCode!==null),'resume-notification while a worker runs');consumers=await startNotificationWorkers();response={resumed:true};}
       else if(command.action==='query-snapshot'||command.action==='query-observe'){
         assert.equal(profile,'query-heavy');
         const {querySnapshot,queryObserve}=await import('./query_dataset.mjs');

@@ -19,6 +19,9 @@ import uuid
 # Bridge VM study: the worker layouts of the trees it runs (stack.mjs CORE_LAYOUTS), the Prisma pool sizes (DB_POOL_LIMIT) and the most owners per profile.
 CORE_LAYOUTS = ('workers', 'phase2')
 DB_POOL_LIMITS = (4, 8)
+# Bridge VM study (K9): Notification workers on the one queue, and how the gateway reaches the services (stack.mjs gatewayTopology).
+NOTIFICATION_WORKERS = (1, 2)
+GATEWAY_TOPOLOGIES = ('direct', 'core-ingress')
 MAX_ACCOUNTS = {'deep': 40, 'pcn': 800, 'query-heavy': 100}
 
 
@@ -154,7 +157,7 @@ def count_pool_timeouts(private):
 
 class NativeStack:
     def __init__(self, repo, accounts=40, replicas=1, dataset_profile='deep', *, cqrs_configuration=None, service_env=None, core_replicas=1, core_proxy=False, server_cpus=None,
-                 core_layout='workers', db_pool_limit=4):
+                 core_layout='workers', db_pool_limit=4, notification_workers=1, gateway_topology='direct'):
         if platform.system() != 'Linux':
             raise RuntimeError('Native stack requires Linux (Kaggle CPU notebook)')
         maximum = MAX_ACCOUNTS.get(dataset_profile, 40)
@@ -171,6 +174,11 @@ class NativeStack:
             raise ValueError('core_layout workers or phase2; db_pool_limit an integer from 4 to 8')
         if (core_layout, db_pool_limit) != ('workers', 4) and (cqrs_configuration is not None or dataset_profile != 'pcn'):
             raise ValueError('core_layout phase2 and db_pool_limit above 4 only for the pcn profile without a CQRS configuration')
+        # Bridge VM study (K9): one or two Notification workers on the notification queue, and the gateway topology (stack.mjs: the CQRS studies run the direct one only).
+        if type(notification_workers) is not int or notification_workers not in NOTIFICATION_WORKERS or gateway_topology not in GATEWAY_TOPOLOGIES:
+            raise ValueError('notification_workers 1 or 2; gateway_topology direct or core-ingress')
+        if (notification_workers, gateway_topology) != (1, 'direct') and (cqrs_configuration is not None or dataset_profile != 'pcn'):
+            raise ValueError('two notification workers and the core-ingress gateway only for the pcn profile without a CQRS configuration')
         if dataset_profile == 'query-heavy' and (accounts != 100 or replicas != 1):
             raise ValueError('query-heavy requires 100 accounts and exactly one Clinic')
         if cqrs_configuration is not None and (cqrs_configuration not in ('O', 'A', 'B', 'F')
@@ -191,6 +199,7 @@ class NativeStack:
         self.pg_started = False
         self.accounts, self.replicas, self.core_replicas, self.core_proxy = accounts, replicas, core_replicas, core_proxy
         self.core_layout, self.db_pool_limit = core_layout, db_pool_limit
+        self.notification_workers, self.gateway_topology = notification_workers, gateway_topology
         # Every process the stack starts (databases, broker, services) runs on these CPUs when given; the controller is elsewhere.
         self.server_prefix = ['taskset', '-c', ','.join(str(c) for c in server_cpus)] if server_cpus else []
         self.application = None
@@ -270,6 +279,7 @@ class NativeStack:
         context = {'kind': 'phase2-kaggle-native-v1', 'run': self.run, 'directory': str(self.private),
             'urls': urls, 'pgData': str(data), 'pgPort': pg, 'accounts': self.accounts, 'replicas': self.replicas,
             'coreReplicas': self.core_replicas, 'coreProxy': self.core_proxy, 'coreLayout': self.core_layout, 'dbPoolLimit': self.db_pool_limit,
+            'notificationWorkers': self.notification_workers, 'gatewayTopology': self.gateway_topology,
             'datasetProfile': self.dataset_profile,
             'cqrsConfiguration': self.cqrs_configuration, 'serviceEnv': self.service_env,
             'broker': f'amqp://p8:{rabbit_password}@127.0.0.1:{rabbit}', 'redis': f'redis://127.0.0.1:{redis}'}

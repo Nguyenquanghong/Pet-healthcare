@@ -566,8 +566,8 @@ class HarnessSource(unittest.TestCase):
         # The name is the one of the process (p8-core, or p8-core-0 and p8-core-1; p8-clinic-0, p8-clinic-1; p8-notification-worker ...), never one per kind of service.
         calls = re.findall(r"child\(((?:'[a-z-]+'|coreReplicas===1\?'core':'core-'\+i|'clinic-'\+i)),", self.text)
         self.assertEqual(calls, ["'clinic-read-worker'", "coreReplicas===1?'core':'core-'+i", "'clinic-'+i", "'notification'", "'core-outbox'",
-                                 "'clinic-worker'", "'notification-worker'", "'billing-worker'"])
-        self.assertEqual(self.text.count('DATABASE_URL:context.urls.'), len(calls))  # every one of them is given a database URL to name
+                                 "'clinic-worker'", "'billing-worker'"])  # the Notification workers pass `name` (notificationWorker(i)): see their own test
+        self.assertEqual(self.text.count('DATABASE_URL:context.urls.'), len(calls) + 1)  # every one of them, and the Notification workers, is given a database URL to name
         self.assertEqual(self.text.count('withApplicationName('), 1)  # one call, in child(), for every process
         self.assertEqual(native_stack.PgSampler.QUERY.count("'^(p8-|m-api$)'"), 1)  # what the sampler looks for: these names and the monolith's
 
@@ -588,6 +588,7 @@ class HarnessSource(unittest.TestCase):
 
     def test_core_upstreams_instances_and_the_internal_hop(self):
         self.assertEqual(self.text.count('upstream core { ${coreServers} }'), 2)  # one per template
+        self.assertEqual(self.text.count('upstream clinic { ${clinicServers} }'), 2)
         self.assertEqual(self.text.count(self.CORE_LOCATION), 2)
         self.assertIn("const coreServers=corePorts.map(p=>'server 127.0.0.1:'+p+' max_fails=0;').join(' ');", self.text)
         # coreProxy (set by the VM study for every H configuration, forced by two instances): ports.core is an nginx listener in front of
@@ -603,29 +604,93 @@ class HarnessSource(unittest.TestCase):
         # No keepalive and no HTTP/1.1 upstream on the gateway path (or anywhere else).
         self.assertEqual(self.text.count('keepalive 16;'), 1)
         self.assertEqual(self.text.count('proxy_http_version'), 1)
-        self.assertNotIn('keepalive', self.text[self.text.index("const headers='"):self.text.index('const coreServers=')])
+        self.assertNotIn('keepalive', self.text[self.text.index("const retryHeaders='"):self.text.index('const coreServers=')])
         self.assertIn("SERVICE_INSTANCE_ID:coreReplicas===1?'p8-core':'p8-core-'+i", self.text)
         self.assertIn("...(coreReplicas>1?{HASH_CONCURRENCY:'1'}:{})", self.text)
         self.assertIn('const coreReplicas=context.coreReplicas??1;', self.text)
         self.assertIn('assert.equal(coreReplicas,1);assert.ok(!coreProxy);', self.text)  # the CQRS studies keep one, direct Core
         self.assertIn('the 28/10 handoff plan; resilience.test.mjs itself uses 2 per instance', self.text)
 
-    def test_gateway_core_location_does_not_retry_when_core_is_proxied(self):
-        headers = re.search(r"const headers='([^']*)';", self.text).group(1)
-        self.assertEqual(headers, 'proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Request-ID $request_id; '
-                                  'proxy_connect_timeout 1s; proxy_read_timeout 15s; proxy_next_upstream error timeout http_502 http_503 http_504;')
-        needle = "headers.replace('proxy_next_upstream error timeout http_502 http_503 http_504;','proxy_next_upstream off;')"
-        self.assertIn('const coreGateway=coreProxy?' + needle + ':headers;', self.text)
-        self.assertIn('proxy_next_upstream error timeout http_502 http_503 http_504;', headers)  # the replace really finds its text
-        replaced = headers.replace('proxy_next_upstream error timeout http_502 http_503 http_504;', 'proxy_next_upstream off;')
+    def test_no_location_retries_on_another_instance_when_core_is_proxied(self):
+        retry = re.search(r"const retryHeaders='([^']*)';", self.text).group(1)
+        self.assertEqual(retry, 'proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Request-ID $request_id; '
+                                'proxy_connect_timeout 1s; proxy_read_timeout 15s; proxy_next_upstream error timeout http_502 http_503 http_504;')
+        needle = "retryHeaders.replace('proxy_next_upstream error timeout http_502 http_503 http_504;','proxy_next_upstream off;')"
+        # K9 S2: one policy for every proxied location, for Core and for Clinic, whether there is one instance or two; only coreProxy changes it.
+        self.assertIn('const headers=coreProxy?' + needle + ':retryHeaders;', self.text)
+        self.assertIn('const coreGateway=headers;', self.text)
+        self.assertIn('proxy_next_upstream error timeout http_502 http_503 http_504;', retry)  # the replace really finds its text
+        replaced = retry.replace('proxy_next_upstream error timeout http_502 http_503 http_504;', 'proxy_next_upstream off;')
         self.assertEqual(replaced.count('proxy_next_upstream'), 1)  # one directive per location: nginx rejects a duplicate
         self.assertTrue(replaced.endswith('proxy_next_upstream off;'))
-        # Only the Core location uses it; clinic and notification locations keep `headers` and the non-proxied gateway is the old string.
+        self.assertEqual(self.text.count('const headers='), 1)
+        self.assertEqual(self.text.count('const retryHeaders='), 1)
+        # Every location of the gateway and of the Clinic listener names headers or coreGateway, so the two definitions cover them: the Core location of each template, the Clinic
+        # and Notification locations of the direct one and the Clinic edge server of each.
         self.assertEqual(self.text.count(self.CORE_LOCATION), 2)
         self.assertEqual(self.text.count('${coreGateway}'), 2)  # the Core location of each template, nowhere else
         self.assertEqual(self.text.count('location / { ${headers} '), 2)  # the Clinic edge server of each template
         self.assertEqual(self.text.count('/api/(appointments|medical-records|dashboard/clinic)(/|$) { ${headers} '), 1)  # direct only
         self.assertEqual(self.text.count('/api/notifications(/|$) { ${headers} '), 1)  # direct only
+
+    def test_clinic_servers_are_never_put_aside_when_core_is_proxied(self):
+        self.assertIn("const clinicServers=clinicPorts.map(p=>'server 127.0.0.1:'+p+(coreProxy?' max_fails=0':'')+';').join(' ');", self.text)
+        # Defined next to the Core servers, before the first template that names it; nothing else builds an `upstream clinic`.
+        self.assertLess(self.text.index('const coreServers='), self.text.index('const clinicServers='))
+        self.assertLess(self.text.index('const clinicServers='), self.text.index('const coreEdge='))
+        self.assertEqual(self.text.count('upstream clinic'), 2)
+        self.assertEqual(self.text.count('${clinicServers}'), 2)
+        self.assertEqual(self.text.count('clinicPorts.map'), 1)  # the definition above
+        self.assertIn("clinicUpstream:{servers:clinicPorts.length,maxFails:coreProxy?0:null,proxyNextUpstream:coreProxy?'off':'error timeout http_502 http_503 http_504'}", self.text)
+
+    def test_the_two_gateway_servers_name_only_what_the_routing_rule_lists(self):
+        # tools/phase2/gateway-routing.mjs trusts these names without reading the JS that builds them (ROUTING_PLACES interp): the gateway server of each template may name nothing
+        # else, so the retry policy and the Clinic upstream above change what the names hold and leave the gateway servers of the templates as they were.
+        direct, ingress = self.template('directConfig'), self.template('coreIngressConfig')
+        for config, used in ((direct, {'ports.gateway', 'headers', 'coreGateway', 'origins.notification'}), (ingress, {'ports.gateway', 'coreGateway'})):
+            server = config[config.index('server { listen 127.0.0.1:${ports.gateway};'):]
+            self.assertTrue(server.startswith('server { listen 127.0.0.1:${ports.gateway}; location ~ ^/(internal|metrics|health) { return 404; } '))
+            self.assertTrue(server.endswith(' location / { return 404; } } }'))
+            self.assertEqual(set(re.findall(r'\$\{([^}]*)\}', server)), used)
+        rule = REPO / 'tools/phase2/gateway-routing.mjs'
+        if rule.is_file():
+            text = rule.read_text(encoding='utf-8')
+            self.assertIn("interp:[{expr:'ports.gateway'},{expr:'headers',as:''},{expr:'coreGateway',as:''},{expr:'origins.notification'}]", text)
+            self.assertIn("interp:[{expr:'ports.gateway'},{expr:'headers',as:''},{expr:'coreGateway',as:''}]", text)
+
+    def test_notification_workers_are_one_or_two_and_never_with_cqrs(self):
+        self.assertIn('const notificationWorkers=context.notificationWorkers??1;', self.text)  # absent in every older context: one
+        self.assertIn('assert.ok([1,2].includes(notificationWorkers),', self.text)
+        self.assertLess(self.text.index('const notificationWorkers='), self.text.index('const clients='))  # refused before any database is touched
+        cqrs = re.search(r'if\(cqrsMode!==undefined&&cqrsMode!==null\)\{(.*?)cqrsTools=await import', self.text, re.S).group(1)
+        self.assertIn('assert.equal(notificationWorkers,1);', cqrs)
+
+    def test_each_notification_worker_has_its_own_name_log_and_instance_id(self):
+        self.assertIn("const name=notificationWorkers===1?'notification-worker':'notification-worker-'+i;", self.text)
+        self.assertIn("return child(name,'services/notification/dist/worker.js',{...workerBase,DATABASE_URL:context.urls.notification,SERVICE_INSTANCE_ID:'p8-'+name});", self.text)
+        self.assertIn('for(let i=0;i<notificationWorkers;i++)started.push(await notificationWorker(i));', self.text)
+        self.assertEqual(self.text.count('services/notification/dist/worker.js'), 1)
+        # application_name follows the process name (child), so the pg_stat_activity sampler reads p8-notification-worker or p8-notification-worker-0/1.
+        self.assertIn('if(env.DATABASE_URL)env.DATABASE_URL=withApplicationName(env.DATABASE_URL,name);', self.text)
+        # The same naming as the other instances: core or core-0/1, and clinic-0/1.
+        self.assertIn("coreReplicas===1?'core':'core-'+i", self.text)
+
+    def test_pause_and_resume_act_on_every_notification_worker_and_can_repeat(self):
+        self.assertIn("else if(command.action==='pause-notification'){for(const worker of consumers)await stop(worker);response={paused:true};}", self.text)
+        self.assertIn("else if(command.action==='resume-notification'){assert.ok(consumers.every(worker=>worker.child.exitCode!==null||worker.child.signalCode!==null),", self.text)
+        self.assertIn('consumers=await startNotificationWorkers();response={resumed:true};}', self.text)
+        self.assertEqual(self.text.count('startNotificationWorkers'), 3)  # the definition, the first start and the resume
+        self.assertIn('let consumers=await startNotificationWorkers();', self.text)  # `let`: a resume replaces the handles
+        self.assertNotRegex(self.text, r'\blet consumer\b|\bstop\(consumer\)|\bconsumer=')  # no single-handle variable is left
+        # stop() of a worker that already ended does nothing, so a second pause is harmless.
+        self.assertIn('if(handle.child.exitCode!==null){if(handle.child.exitCode!==0)failed=true;return;}', self.text)
+
+    def test_ready_json_records_the_process_layout_of_the_member(self):
+        self.assertIn(r"clinicInstances:handles.filter(h=>/^clinic-\d+$/.test(h.name)).map(h=>h.name),notificationWorkers,clinicWorkers:1,", self.text)
+        self.assertIn('clinicReplicas:context.replicas,coreReplicas,', self.text)
+        # The gateway entry is what the manifest keeps (pcn_runner: manifest['gateway']).
+        self.assertLess(self.text.index('clinicWorkers:1,'), self.text.index('gateway:{topology:gatewayTopology,'))
+        self.assertLess(self.text.index('clinicUpstream:{servers:'), self.text.index('dbCrossConnectDenied:6'))
 
     def test_upstream_keepalive_stays_below_cores(self):
         core = HERE.parents[2] / 'backend/src/index.ts'
@@ -719,10 +784,33 @@ class OwnedStackOptions(unittest.TestCase):
                 self.stack(**{'accounts': 2, **kwargs})
         self.stack(accounts=2, dataset_profile='pcn', cqrs_configuration='O', core_layout='workers', db_pool_limit=4)
 
+    def test_notification_workers_and_the_gateway_topology_default_to_today_and_are_validated(self):
+        plain = self.stack(accounts=2, dataset_profile='pcn')
+        self.assertEqual((plain.notification_workers, plain.gateway_topology), (1, 'direct'))
+        for workers, topology in ((2, 'direct'), (1, 'core-ingress'), (2, 'core-ingress')):
+            built = self.stack(accounts=2, dataset_profile='pcn', core_proxy=True, replicas=2, notification_workers=workers, gateway_topology=topology)
+            self.assertEqual((built.notification_workers, built.gateway_topology), (workers, topology))
+        for kwargs in ({'notification_workers': 3}, {'notification_workers': 0}, {'notification_workers': True}, {'notification_workers': 2.0},
+                       {'notification_workers': '2'}, {'notification_workers': None}, {'gateway_topology': 'other'}, {'gateway_topology': None},
+                       {'gateway_topology': 'Direct'}):
+            with self.assertRaises(ValueError, msg=str(kwargs)):
+                self.stack(**{'accounts': 2, 'dataset_profile': 'pcn', **kwargs})
+        # Only the bridge study (pcn profile, no CQRS configuration) leaves the defaults; the CQRS studies run one worker behind the direct gateway.
+        for kwargs in ({'dataset_profile': 'pcn', 'cqrs_configuration': 'O', 'notification_workers': 2},
+                       {'dataset_profile': 'pcn', 'cqrs_configuration': 'F', 'gateway_topology': 'core-ingress'},
+                       {'dataset_profile': 'deep', 'notification_workers': 2}, {'dataset_profile': 'deep', 'gateway_topology': 'core-ingress'},
+                       {'dataset_profile': 'query-heavy', 'accounts': 100, 'notification_workers': 2}):
+            with self.assertRaises(ValueError, msg=str(kwargs)):
+                self.stack(**{'accounts': 2, **kwargs})
+        self.stack(accounts=2, dataset_profile='pcn', cqrs_configuration='O', notification_workers=1, gateway_topology='direct')
+        self.assertEqual(native_stack.NOTIFICATION_WORKERS, (1, 2))
+        self.assertEqual(native_stack.GATEWAY_TOPOLOGIES, ('direct', 'core-ingress'))
+
     def test_the_context_stack_mjs_reads_carries_both(self):
         import inspect
         start = inspect.getsource(native_stack.NativeStack.start)
         self.assertIn("'coreLayout': self.core_layout, 'dbPoolLimit': self.db_pool_limit", start)
+        self.assertIn("'notificationWorkers': self.notification_workers, 'gatewayTopology': self.gateway_topology", start)
 
     def test_the_sampler_connects_to_the_cluster_of_the_stack(self):
         stack = self.stack(accounts=2, dataset_profile='pcn')
@@ -900,6 +988,20 @@ class PoolEvidenceInAMember(unittest.TestCase):
         self.assertEqual(manifest['pg_activity'], {'status': 'COMPLETE', 'samples': 7})
         self.assertEqual(manifest['pool_timeouts'], {'p2024_log_lines': 2, 'by_log': {'core.log': 2}, 'http_503': 2})
         self.assertEqual(manifest['outbox'], {'pending_before': {'core': 3, 'clinic': 1}, 'pending_after': {'core': 7, 'clinic': 0}})
+
+    def test_the_scale_out_axes_reach_the_stack_only_off_the_default_and_every_manifest_records_them(self):
+        manifest, native, stack, sampler, private = self.run_member('axes', replicas=2, notification_workers=2, gateway_topology='core-ingress')
+        self.assertEqual(manifest['status'], 'COMPLETE', manifest)
+        kwargs = native.call_args.kwargs
+        self.assertEqual((kwargs['replicas'], kwargs['notification_workers'], kwargs['gateway_topology']), (2, 2, 'core-ingress'))
+        self.assertEqual((manifest['clinic_replicas'], manifest['notification_workers'], manifest['gateway_topology']), (2, 2, 'core-ingress'))
+        manifest, native, stack, sampler, private = self.run_member('axes-default')
+        for key in ('notification_workers', 'gateway_topology'):
+            self.assertNotIn(key, native.call_args.kwargs)  # a context without the keys is the context of every older member
+        self.assertEqual((manifest['clinic_replicas'], manifest['notification_workers'], manifest['gateway_topology']), (1, 1, 'direct'))
+        import inspect
+        parameters = inspect.signature(runner.run_pcn).parameters
+        self.assertEqual((parameters['notification_workers'].default, parameters['gateway_topology'].default), (1, 'direct'))
 
     def test_without_the_flag_no_sampler_runs_and_the_stack_keeps_its_defaults(self):
         manifest, native, stack, sampler, private = self.run_member('off')

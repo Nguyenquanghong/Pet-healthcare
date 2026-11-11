@@ -134,7 +134,8 @@ def stop_load(child):
 
 def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_configuration=None,
             settings=None, locustfile='benchmarks/phase2/kaggle/pcn_locust.py', service_env=None,
-            core_replicas=1, core_proxy=False, pinning=None, vm=False, core_layout=None, db_pool_limit=None, pg_sampler=False):
+            core_replicas=1, core_proxy=False, pinning=None, vm=False, core_layout=None, db_pool_limit=None, pg_sampler=False,
+            notification_workers=1, gateway_topology='direct'):
     # settings/locustfile/service_env: the M/H bridge study (bridge_study.py) runs a
     # shorter window, its own booking grid and raised per-IP limiter thresholds.
     # core_replicas/core_proxy/pinning/vm: the bridge VM study runs outside Kaggle, with
@@ -142,6 +143,8 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
     # the generator and the controller pinned to their own CPU and the servers to the others.
     # core_layout/db_pool_limit: the Core worker layout of the tree and the Prisma pool of every service (NativeStack, stack.mjs). pg_sampler: the pg_stat_activity
     # sampler and the P2024 count for the pool question (bridge VM study, Part 2 and the pool block); it adds a psql process and a query every 0.2 s, so other members run without.
+    # replicas (Clinic API instances), notification_workers (Notification workers on the one queue) and gateway_topology (direct or core-ingress) are the K9 scale-out axes: each goes to
+    # NativeStack, and so to stack.mjs, only when it leaves the default, and every member's manifest records all three.
     if cqrs_configuration not in (None, 'O', 'A', 'B'): raise ValueError('Unknown CQRS configuration')
     settings = configuration(mode) if settings is None else dict(settings)
     repo, output = Path(repo).resolve(), Path(output).resolve()
@@ -150,6 +153,7 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
     if mode == 'full' and not kaggle and not vm:
         raise RuntimeError('Full PCN acceptance requires a Kaggle session; use smoke for local validation')
     manifest = {'protocol': PROTOCOL, 'mode': mode, **settings, 'clinic_replicas': replicas, 'core_replicas': core_replicas,
+                'notification_workers': notification_workers, 'gateway_topology': gateway_topology,
                 'core_proxy': core_proxy, 'configuration': cqrs_configuration or 'O',
                 'kaggle': kaggle, 'python': sys.version, 'platform': platform.platform(),
                 'cpu_count': os.cpu_count(), 'hashes': {}, 'status': 'STARTING',
@@ -204,6 +208,10 @@ def run_pcn(repo, output, *, mode='full', replicas=1, progress=print, cqrs_confi
             options['core_layout'] = core_layout
         if db_pool_limit is not None:
             options['db_pool_limit'] = db_pool_limit
+        if notification_workers != 1:
+            options['notification_workers'] = notification_workers
+        if gateway_topology != 'direct':
+            options['gateway_topology'] = gateway_topology
         if pinning:
             options['server_cpus'] = pinning['server']
         stack = NativeStack(repo, accounts=settings['users'], replicas=replicas, dataset_profile='pcn', **options)
