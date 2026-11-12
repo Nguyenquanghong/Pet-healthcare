@@ -57,6 +57,7 @@ Tài liệu này tổng hợp trạng thái hiện tại của kiến trúc 3 se
 
 ## 4. Hướng dẫn tiếp theo cho các thành viên nhóm
 
+- Đọc [báo cáo tiến độ họp nhóm](meeting-report-20261112.md) (12/11) để nắm việc đã làm, đối chiếu với 9 mục tiêu ban đầu và các việc cần nhóm quyết.
 - Đọc [RECEIVER-START.md](RECEIVER-START.md) để dựng môi trường thử độc lập và chạy bộ lệnh kiểm chứng tương ứng với vai trò của mình.
 - Xem [POST-H-TASKS.md](POST-H-TASKS.md) để nhận phần việc cụ thể của từng thành viên (**Clinic**, **Notification/UI**, **Core**).
 - Tra cứu toàn bộ sơ đồ kiến trúc và kịch bản demo 10 phút tại [`docs/phase2-architecture/README.md`](../docs/phase2-architecture/README.md).
