@@ -1,6 +1,6 @@
 # ADR-P14: Giữ kiến trúc tách service dù đã đo được cái giá
 
-Ngày 31/10/2026. Trạng thái: **ACCEPTED**, đã chốt ngày 31/10, gồm cả các điều kiện ở mục 5. Bổ sung §4.1 ở K5, đã chốt ngày 6/11. Cập nhật §2, §3, §4.1, §5, §7 ngày 12/11 sau lượt VM v2 (K9); D4 chưa chốt lại. Tiếp nối ADR-01, [ADR-P12](adr-p12-deferred-list-authorization.md), [ADR-P13](adr-p13-local-read-authorization.md).
+Ngày 31/10/2026. Trạng thái: **ACCEPTED**, đã chốt ngày 31/10, gồm cả các điều kiện ở mục 5. Bổ sung §4.1 ở K5, đã chốt ngày 6/11. Cập nhật §2, §3, §4.1, §5, §7 ngày 12/11 sau lượt VM v2 (K9); D4 quyết lại cùng ngày: giữ đi qua Core, hướng đi thẳng ghi ở §4.1. Tiếp nối ADR-01, [ADR-P12](adr-p12-deferred-list-authorization.md), [ADR-P13](adr-p13-local-read-authorization.md).
 
 ## 1. Bối cảnh
 
@@ -66,7 +66,14 @@ Mục này thêm vào, không đổi quyết định ở mục 3. đã chốt ng
 - **Compose, demo, E2E, dev và diễn tập P7 đi qua Core** (`frontend/nginx/default.conf.template:10-13`, `tools/phase2/e2e-server.mjs:119-122`):
   - mọi request tới Clinic và Notification có thêm một chặng proxy;
   - một request Clinic chạm Core hai lần: một lần proxy, một lần Clinic gọi `/internal/directory/authorize`;
-  - giá của chặng này đã đo ở K9 (12/11) bằng H3c/H3 ở 100 user: p95 đọc 1,175 (hai cặp 1,138 và 1,213), CPU mỗi request 1,134 (1,134 và 1,135), throughput 0,999. Đây là **cận trên** của giá ở compose, vì harness có thêm một chặng nginx mà compose không có (Core gọi Clinic trực tiếp), và chỉ đo ở 100 user. Cả hai tỷ lệ vượt 1,1, nên điều kiện mở lại D4 (đi qua Core hay đi thẳng) đã xảy ra; **D4 giữ nguyên, chờ chốt**. Số ở mục 2 là cận dưới của giá ở compose.
+  - giá của chặng này đã đo ở K9 (12/11) bằng H3c/H3 ở 100 user: p95 đọc 1,175 (hai cặp 1,138 và 1,213), CPU mỗi request 1,134 (1,134 và 1,135), throughput 0,999. Đây là **cận trên** của giá ở compose, vì harness có thêm một chặng nginx mà compose không có (Core gọi Clinic trực tiếp), và chỉ đo ở 100 user. Cả hai tỷ lệ vượt 1,1, nên điều kiện mở lại D4 (đi qua Core hay đi thẳng) đã xảy ra. Số ở mục 2 là cận dưới của giá ở compose.
+- **D4 quyết lại ngày 12/11/2026: giữ đi qua Core.**
+  - Lợi của đi thẳng nhỏ: khoảng 1,3 ms mỗi lần đọc ở 100 user (17,5% của 7,3 ms), là cận trên, xa ngưỡng QS-10 750 ms. Đi thẳng cũng không bỏ Core khỏi đường của Clinic, vì Clinic vẫn gọi `authorize` cho mọi request.
+  - Giá của đi thẳng hiện nay: khoảng trống bảo mật của Notification (mục dưới), và phải đổi compose, demo, E2E, dev và diễn tập P7 cùng lúc.
+  - **Hướng đi thẳng được ghi nhận là một cách làm tiếp**, theo hai bước:
+    1. Notification tự biết tài khoản bị xóa hoặc hạ quyền: Core phát sự kiện qua queue ưu tiên `identity.sessions-revoked` ([ADR-P03](adr-p03-messaging-retry.md)), giống thu hồi khi đổi mật khẩu.
+    2. Đưa `/api/appointments`, `/api/medical-records`, `/api/notifications` thẳng tới Clinic và Notification ở gateway (một nguồn định tuyến đã có ở `gatewayRoutes.ts`), rồi đo lại H3c/H3 ở 800 user, nơi Core là chỗ xếp hàng đầu tiên.
+  - Chỉ đổi D4 khi bước 1 xong và lượt đo bước 2 cho thấy lợi ở tải cao.
 - **Ranh giới dữ liệu ở compose:**
   - từ K4 ([ADR-P08c](adr-p08c-core-legacy.md)), khi có `CLINIC_SERVICE_URL`, Core không mount router lâm sàng và không nạp nguồn đọc bảng lâm sàng (`servesClinical`, `backend/src/composition/config.ts`);
   - rule `legacy-isolated` cấm code ngoài `legacy/` đọc các bảng đó;

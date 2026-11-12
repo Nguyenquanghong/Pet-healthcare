@@ -48,10 +48,10 @@ Tài liệu này tổng hợp trạng thái hiện tại của kiến trúc 3 se
   - **Chưa bậc nào bão hòa tới 800 người dùng:** p95 đọc cao nhất 148 ms (ngưỡng QS-10 là 750 ms), 0 lỗi. Chưa biết điểm gãy.
   - **Core là chỗ xếp hàng đầu tiên.** Ở 800 người dùng, nhân Core hạ p95 đọc 58% (H3x2/H3 0,420), nhân Clinic không có lợi (H3cl2/H3 1,204). Chỉ số chính chốt trước (throughput) không đủ nhạy ở tải closed-loop này nên harness ghi mã E; kết luận trên dựa vào chỉ số phụ (p95 đọc, CPU, pool).
   - **Giá của bản tách tăng theo tải:** p95 đọc H3/M từ 3,7× ở 100 người dùng lên 26,5× ở 800; CPU mỗi request 3,8–4,3× ở mọi bậc ([ADR-P14](architecture-work/adr-p14-keep-service-split.md) mục 2).
-  - **Chặng gateway, Core, Clinic (H3c/H3, 100 người dùng):** p95 đọc 1,175, CPU mỗi request 1,134, là cận trên của giá ở compose. Điều kiện mở lại D4 (đi qua Core hay đi thẳng) đã xảy ra; **chờ nhóm chốt** ([ADR-P14](architecture-work/adr-p14-keep-service-split.md) mục 4.1).
+  - **Chặng gateway, Core, Clinic (H3c/H3, 100 người dùng):** p95 đọc 1,175, CPU mỗi request 1,134, là cận trên của giá ở compose. Điều kiện mở lại D4 (đi qua Core hay đi thẳng) đã xảy ra; **đã quyết lại 12/11: giữ đi qua Core**. Đi thẳng tới Clinic là hướng làm tiếp, sau khi Notification tự biết tài khoản bị xóa hoặc hạ quyền ([ADR-P14](architecture-work/adr-p14-keep-service-split.md) mục 4.1).
   - **Đột biến 6.000 thông báo:** không mất event; hai worker xả nhanh hơn khoảng 37% (không phải 50%); thông báo thường sinh trong lúc xả bị xếp sau, p95 từ khoảng 245 ms lên 5–9 s, rồi trở lại bình thường.
 - **Khi trình bày, nói kèm:** một phiên VM, hai cặp mỗi tỷ lệ (so sánh mô tả, không phải nghiệm thu công suất); chưa tách được tác động của pool kết nối khỏi tác động của thêm một event loop (khối pool chưa chạy vì không bậc nào bão hòa); 11 trong 34 member có vài dòng lịch hẹn trong DB mà client không ghi nhận phản hồi, chưa rõ nguyên nhân; số VM không so với số Kaggle.
-- **Việc kế tiếp:** chốt lại D4; nếu cần biết điểm gãy thì thêm bậc (1.200 và 1.600 người dùng) hoặc tải open-loop; chạy khối pool để tách pool khỏi event loop; kiểm limiter IP ở tải cao.
+- **Việc kế tiếp:** (tùy chọn) đi thẳng tới Clinic theo hai bước ở ADR-P14 mục 4.1; nếu cần biết điểm gãy thì thêm bậc (1.200 và 1.600 người dùng) hoặc tải open-loop; chạy khối pool để tách pool khỏi event loop; kiểm limiter IP ở tải cao.
 
 ---
 
