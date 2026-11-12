@@ -40,12 +40,18 @@ Tài liệu này tổng hợp trạng thái hiện tại của kiến trúc 3 se
 
 ---
 
-## 3. Đang thực hiện: đo sức chịu tải và nhân rộng (K9)
+## 3. Đo sức chịu tải và nhân rộng (K9): đã có số đo đầu tiên
 
-- **Vì sao:** lý do chính để tách service là nhân riêng phần nóng (Clinic, worker thông báo) khi tải tăng đột biến, nhưng việc này chưa từng được đo. Lần đo VM trước chỉ có 100 người dùng và server dùng khoảng 8–9% CPU.
-- **Đã có (cập nhật 11/11):** bộ đo `bridge-m-h-vm-v2` gồm bậc 200/400/800 người dùng, bảng 2×2 (1 hoặc 2 Core × 1 hoặc 2 Clinic) và khối 6000 thông báo đột biến (1 so với 2 `notification-worker`). Smoke Linux (Ubuntu 24.04, 9 cấu hình) **PASS** trên bundle `f65e53b8…`; bản dùng cho VM được build lại sau commit `eb78c85` (chỉ khác `package.json` ở một dòng script kiểm thử, mã sản phẩm không đổi), sha256 `e03f980391ebb88bb8c7bdb2a1f63cf16582a6e476f3a8e28f2bafdb1d576268`.
-- **Lượt chạy thử `local` trên VM (10 member, 22 phút) đã đạt** (12/11): 10/10 member hợp lệ, không lỗi, khối thông báo đột biến xả hết với 1 và 2 worker.
-- **Chưa có số đo chính thức nào.** Kết luận "nhân rộng có đáng không" chờ lượt đo trên VM; khi có, [ADR-P14](architecture-work/adr-p14-keep-service-split.md) sẽ được cập nhật theo kết quả.
+- **Vì sao:** lý do chính để tách service là nhân riêng phần nóng (Clinic, worker thông báo) khi tải tăng, nhưng việc này chưa từng được đo. Lần đo VM trước chỉ có 100 người dùng và server dùng khoảng 8–9% CPU.
+- **Đã đo (12/11):** lượt `full` của `bridge-m-h-vm-v2` trên VM, 34 member, từ 100 đến 800 người dùng, bảng 2×2 (1 hoặc 2 Core × 1 hoặc 2 Clinic) và khối 6.000 thông báo đột biến (1 so với 2 `notification-worker`). Cả 34 member hợp lệ, 0 lỗi trên 3,76 triệu request; số liệu được hai agent tính lại độc lập từ dữ liệu thô và khớp harness. Mã sản phẩm đo là `b02350d` (cộng một dòng script kiểm thử trong `package.json`). Chi tiết, bảng số và giới hạn: [báo cáo bridge](bridge/README-20261028.md), mục "Kết quả VM v2".
+- **Kết quả chính:**
+  - **Chưa bậc nào bão hòa tới 800 người dùng:** p95 đọc cao nhất 148 ms (ngưỡng QS-10 là 750 ms), 0 lỗi. Chưa biết điểm gãy.
+  - **Core là chỗ xếp hàng đầu tiên.** Ở 800 người dùng, nhân Core hạ p95 đọc 58% (H3x2/H3 0,420), nhân Clinic không có lợi (H3cl2/H3 1,204). Chỉ số chính chốt trước (throughput) không đủ nhạy ở tải closed-loop này nên harness ghi mã E; kết luận trên dựa vào chỉ số phụ (p95 đọc, CPU, pool).
+  - **Giá của bản tách tăng theo tải:** p95 đọc H3/M từ 3,7× ở 100 người dùng lên 26,5× ở 800; CPU mỗi request 3,8–4,3× ở mọi bậc ([ADR-P14](architecture-work/adr-p14-keep-service-split.md) mục 2).
+  - **Chặng gateway, Core, Clinic (H3c/H3, 100 người dùng):** p95 đọc 1,175, CPU mỗi request 1,134, là cận trên của giá ở compose. Điều kiện mở lại D4 (đi qua Core hay đi thẳng) đã xảy ra; **chờ nhóm chốt** ([ADR-P14](architecture-work/adr-p14-keep-service-split.md) mục 4.1).
+  - **Đột biến 6.000 thông báo:** không mất event; hai worker xả nhanh hơn khoảng 37% (không phải 50%); thông báo thường sinh trong lúc xả bị xếp sau, p95 từ khoảng 245 ms lên 5–9 s, rồi trở lại bình thường.
+- **Khi trình bày, nói kèm:** một phiên VM, hai cặp mỗi tỷ lệ (so sánh mô tả, không phải nghiệm thu công suất); chưa tách được tác động của pool kết nối khỏi tác động của thêm một event loop (khối pool chưa chạy vì không bậc nào bão hòa); 11 trong 34 member có vài dòng lịch hẹn trong DB mà client không ghi nhận phản hồi, chưa rõ nguyên nhân; số VM không so với số Kaggle.
+- **Việc kế tiếp:** chốt lại D4; nếu cần biết điểm gãy thì thêm bậc (1.200 và 1.600 người dùng) hoặc tải open-loop; chạy khối pool để tách pool khỏi event loop; kiểm limiter IP ở tải cao.
 
 ---
 

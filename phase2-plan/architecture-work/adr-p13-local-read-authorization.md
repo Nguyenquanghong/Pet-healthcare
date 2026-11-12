@@ -72,6 +72,7 @@ Hoãn thì hệ thống giữ được hai bất biến đơn giản: **thu hồ
 Chỉ làm khi có **một** trong ba điều kiện:
 
 - (a) một lượt đo có bậc tải (study VM v2) cho thấy Core bão hòa trước Clinic ở tải cần phục vụ;
+  - _Cập nhật 12/11 (K9, lượt VM v2):_ **chưa đạt.** Core nóng trước Clinic (0,85 lõi ở 400 user, 1,87 ở 800; Clinic 0,49 và 0,96) và là chỗ hẹp (nhân Core hạ p95 đọc 58% ở 800 user), nhưng không bậc nào bão hòa theo luật chốt trước: p95 đọc cao nhất 148 ms so với ngưỡng 750 ms. Chưa đo phần Core tốn cho các lời gọi `authorize` của Clinic, nên chưa biết bỏ lời gọi này giảm được bao nhiêu. Quyết định hoãn giữ nguyên.
 - (b) Core phải chạy ở vùng hoặc máy khác Clinic, nên độ trễ mạng làm lời gọi đồng bộ đắt lên;
 - (c) yêu cầu nghiệp vụ chấp nhận cửa sổ thu hồi ≤ 2 s và việc Clinic giữ bản sao DTO.
 

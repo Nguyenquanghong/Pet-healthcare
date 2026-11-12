@@ -200,10 +200,10 @@ try { $t = (Invoke-WebRequest ($item.url -replace 'X-Amz-Signature=[0-9a-f]{4}',
 | Câu hỏi                            | Trả lời ngắn                                                                             | Nguồn                                                                        |
 | ---------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Sao không quay lại monolith?       | Được về hiệu năng; giữ vì các lý do khác, có điều kiện quay lại                          | [ADR-P14](../../phase2-plan/architecture-work/adr-p14-keep-service-split.md) |
-| Core chạy 2 instance có lợi không? | Ở tải đã đo thì không (H2/H1 0,980 và 1,027), máy mới dùng 8–9% CPU. Chưa đo khi bão hòa | [Bridge](../../phase2-plan/bridge/README-20261028.md)                        |
+| Core chạy 2 instance có lợi không? | Có khi tải cao: ở 800 user, 2 instance Core hạ p95 đọc từ 117 xuống 49 ms (0,420); ở 100–400 user thì không đổi. Nhân Clinic không có lợi. Một phiên, chưa bậc nào bão hòa | [Bridge](../../phase2-plan/bridge/README-20261028.md)                        |
 | Sao số VM khác số Kaggle (4,96)?   | Khác môi trường và cấu hình; không chia cho nhau                                         | [Bridge](../../phase2-plan/bridge/README-20261028.md)                        |
 | Sao gỡ CQRS?                       | Đo thấy không có lợi cho danh sách này                                                   | [12](12-pattern-tradeoffs-20261028.md) dòng 10                               |
-| Code hiện tại đã đo chưa?          | Chưa. Số VM là của `2841d1b`, các thay đổi sau đó chưa đo                                | [12](12-pattern-tradeoffs-20261028.md)                                       |
+| Code hiện tại đã đo chưa?          | Đã đo gộp ở lượt VM v2 (mã `b02350d`): p95 đọc H3/H1 0,835, CPU mỗi request 0,942. Chưa đo riêng từng thay đổi                                | [12](12-pattern-tradeoffs-20261028.md)                                       |
 
 ## 4. Khi có sự cố và kết thúc
 

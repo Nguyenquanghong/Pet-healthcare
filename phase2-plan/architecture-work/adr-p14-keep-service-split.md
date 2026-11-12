@@ -1,6 +1,6 @@
 # ADR-P14: Giữ kiến trúc tách service dù đã đo được cái giá
 
-Ngày 31/10/2026. Trạng thái: **ACCEPTED**, đã chốt ngày 31/10, gồm cả các điều kiện ở mục 5. Bổ sung §4.1 ở K5, đã chốt ngày 6/11. Tiếp nối ADR-01, [ADR-P12](adr-p12-deferred-list-authorization.md), [ADR-P13](adr-p13-local-read-authorization.md).
+Ngày 31/10/2026. Trạng thái: **ACCEPTED**, đã chốt ngày 31/10, gồm cả các điều kiện ở mục 5. Bổ sung §4.1 ở K5, đã chốt ngày 6/11. Cập nhật §2, §3, §4.1, §5, §7 ngày 12/11 sau lượt VM v2 (K9); D4 chưa chốt lại. Tiếp nối ADR-01, [ADR-P12](adr-p12-deferred-list-authorization.md), [ADR-P13](adr-p13-local-read-authorization.md).
 
 ## 1. Bối cảnh
 
@@ -20,10 +20,22 @@ Lượt VM `bridge-m-h-vm-v1`, cùng máy, 100 user closed-loop, khoảng 99 req
 
 - H0/M gộp cả việc tách lẫn các tính năng thêm sau M (ma trận quyền, trigger P10/AQ-10, audit, DTO giàu hơn), nên không phải toàn bộ là giá của việc tách.
 - Lượt VM chạy loopback trên một máy, môi trường có lợi cho H. Chi phí tách ở triển khai thật ít nhất bằng con số này.
-- Chỉ có một lượt VM, chưa đo khi bão hòa. Không suy ra năng lực chịu tải từ các tỷ lệ trên.
+- Lượt v1 chỉ có một phiên VM ở 100 user, chưa đo khi bão hòa. Không suy ra năng lực chịu tải từ các tỷ lệ trên; lượt v2 ở bên dưới đo thêm ở bậc cao.
 - Số VM không so với số Kaggle bằng phép chia.
 
 **Về giá trị tuyệt đối:** ở tải đã đo, p95 của H1 khoảng 10 ms, còn ngưỡng read p95 của QS-10 là 750 ms ([08](../../docs/phase2-architecture/08-quality-scenarios.md)). Giá tương đối lớn nhưng chưa đụng ngưỡng chất lượng ở tải này. So sánh này chỉ để thấy bậc độ lớn, vì hai phép đo khác điều kiện.
+
+**Lượt VM v2 (12/11, `bridge-m-h-vm-v2`, mã sản phẩm `b02350d` gọi là H3, cùng máy, 100 đến 800 user closed-loop, một phiên; chi tiết ở [báo cáo bridge](../bridge/README-20261028.md)):**
+
+| Chỉ số                  | 100 user | 200 user | 400 user | 800 user |
+| ----------------------- | -------- | -------- | -------- | -------- |
+| M: p95 đọc (ms)         | 2,0      | 2,0      | 2,4      | 4,4      |
+| H3: p95 đọc (ms)        | 7,3      | 7,9      | 12,8     | 116,7    |
+| H3/M: CPU mỗi request   | 4,34     | 3,77     | 3,83     | 4,14     |
+| H3/M: throughput        | 0,996    | 0,997    | 0,994    | 0,958    |
+
+- Giá tương đối vẫn lớn và **tăng theo tải**: M gần như phẳng, H3 bắt đầu xếp hàng ở 800 user (p95 đọc gấp 26,5 lần M). Ở 800 user H3 dùng 4,2 lõi trên 7 lõi server cho khoảng 764 req/s, M dùng 1,06 lõi cho khoảng 797 req/s.
+- Giá tuyệt đối vẫn xa ngưỡng: p95 đọc cao nhất đo được là 148 ms ở 800 user, ngưỡng QS-10 là 750 ms, và không bậc nào bão hòa theo ba dấu hiệu chốt trước. **Chưa biết điểm gãy**; không ngoại suy.
 
 **Cái giá ngoài hiệu năng:** hai pha prepare/commit cho hóa đơn, retry và DLQ, nhiều credential, nhiều migration, và phải chạy Postgres, RabbitMQ, Redis, bucket.
 
@@ -37,7 +49,7 @@ Giữ ba service. Hiệu năng **không** phải lý do giữ: về hiệu năng
 | **Lỗi ở phần phụ không kéo sập phần chính:** Notification API tắt mà đặt lịch và xác nhận lịch vẫn thành công; bucket ảnh lỗi thì chỉ thao tác ảnh trả 503      | Diễn tập 31/10 ([13](../../docs/phase2-architecture/13-demo-10-phut.md)), E2E `resilience.spec.ts`, [06](../../docs/phase2-architecture/06-deployment.md) | Đã chạy thật                                                          |
 | **Không mất event khi service hoặc broker gián đoạn:** outbox, inbox, delay queue                                                                               | `billing.test.mjs` (kill Core thật), `proof.test.mjs` (dừng broker thật), probe [ADR-P03](adr-p03-messaging-retry.md) (Core giả trả 503)                  | Đã chạy thật một phần, probe là giả lập                               |
 | **Đơn vị bàn giao:** sau mốc H, thành viên Clinic và thành viên Notification/UI nhận phần riêng, Người tích hợp giữ Core và tích hợp ([HANDOFF](../HANDOFF.md)) | Kế hoạch bàn giao                                                                                                                                         | **Chưa kiểm chứng.** Mốc H còn IN_PROGRESS, chưa có ai nhận việc thật |
-| **Mở rộng từng phần:** Clinic và Core chạy được nhiều instance sau gateway                                                                                      | NFR06, P6 (≥ 2 replica Clinic); H2 trong lượt VM                                                                                                          | **Chưa chứng minh được lợi ích.** H2/H1 ≈ 1 vì máy chưa bão hòa       |
+| **Mở rộng từng phần:** Clinic và Core chạy được nhiều instance sau gateway                                                                                      | NFR06, P6 (≥ 2 replica Clinic); H2 (v1), H3x2, H3cl2 và H3x2cl2 (v2) trong lượt VM                                                                                                          | **Một phần.** Ở 800 user nhân Core có lợi (p95 đọc 0,420, throughput 1,027, CPU mỗi request 1,003), nhân Clinic thì không (H3cl2/H3 p95 đọc 1,204). Ở 100–400 user không đổi. Chưa tách được pool khỏi event loop, chưa bậc nào bão hòa       |
 
 ## 4. Điều không che giấu
 
@@ -54,7 +66,7 @@ Mục này thêm vào, không đổi quyết định ở mục 3. đã chốt ng
 - **Compose, demo, E2E, dev và diễn tập P7 đi qua Core** (`frontend/nginx/default.conf.template:10-13`, `tools/phase2/e2e-server.mjs:119-122`):
   - mọi request tới Clinic và Notification có thêm một chặng proxy;
   - một request Clinic chạm Core hai lần: một lần proxy, một lần Clinic gọi `/internal/directory/authorize`;
-  - giá của chặng này chưa đo, K9 sẽ đo bằng H3c/H3. Trước khi có số, số ở mục 2 là cận dưới của giá ở compose.
+  - giá của chặng này đã đo ở K9 (12/11) bằng H3c/H3 ở 100 user: p95 đọc 1,175 (hai cặp 1,138 và 1,213), CPU mỗi request 1,134 (1,134 và 1,135), throughput 0,999. Đây là **cận trên** của giá ở compose, vì harness có thêm một chặng nginx mà compose không có (Core gọi Clinic trực tiếp), và chỉ đo ở 100 user. Cả hai tỷ lệ vượt 1,1, nên điều kiện mở lại D4 (đi qua Core hay đi thẳng) đã xảy ra; **D4 giữ nguyên, chờ chốt**. Số ở mục 2 là cận dưới của giá ở compose.
 - **Ranh giới dữ liệu ở compose:**
   - từ K4 ([ADR-P08c](adr-p08c-core-legacy.md)), khi có `CLINIC_SERVICE_URL`, Core không mount router lâm sàng và không nạp nguồn đọc bảng lâm sàng (`servesClinical`, `backend/src/composition/config.ts`);
   - rule `legacy-isolated` cấm code ngoài `legacy/` đọc các bảng đó;
@@ -77,7 +89,7 @@ Mục này thêm vào, không đổi quyết định ở mục 3. đã chốt ng
 Xem xét lại khi có **một** trong các điều kiện sau:
 
 1. **Ranh giới không dùng để chia việc được:** sau bàn giao H, các thay đổi nghiệp vụ thường phải sửa cùng lúc nhiều service, hoặc không có người nhận sở hữu riêng.
-2. **Không đạt ngưỡng ở tải cần phục vụ:** một lượt đo có bậc tải cho thấy vượt ngưỡng QS-10, và đã thử hết các cách giảm: ADR-P13, Core nhiều instance, chỉnh pool kết nối.
+2. **Không đạt ngưỡng ở tải cần phục vụ:** một lượt đo có bậc tải cho thấy vượt ngưỡng QS-10, và đã thử hết các cách giảm: ADR-P13, Core nhiều instance, chỉnh pool kết nối. _Cập nhật 12/11 (K9):_ lượt v2 tới 800 user chưa vượt ngưỡng (p95 đọc cao nhất 148 ms so với 750 ms), và Core nhiều instance đã đo và có lợi ở 800 user (p95 đọc 0,420), nên điều kiện này chưa xảy ra.
 3. **Đòi hỏi Clinic đọc được khi Core ngừng,** mà nghiệp vụ không chấp nhận điều kiện (c) của ADR-P13 (cửa sổ thu hồi ≤ 2 s, Clinic giữ bản sao DTO).
 4. **Chi phí vận hành vượt khả năng người vận hành:** không ai duy trì được broker, nhiều DB, bucket, runbook và alert khi triển khai thật.
 
@@ -92,5 +104,5 @@ Quay lại không phải là revert về `48d01c3`, vì bản đó thiếu các 
 ## 7. Hệ quả
 
 - Trình bày kiến trúc này như một đánh đổi đã đo, không phải một cải tiến hiệu năng.
-- Nên nói rõ khi trình bày: chỉ có một lượt VM; lợi ích mở rộng chưa chứng minh; lý do bàn giao chưa kiểm chứng.
+- Nên nói rõ khi trình bày: mỗi lượt VM chỉ một phiên; nhân Core có lợi ở 800 user nhưng chưa biết điểm gãy và chưa tách pool khỏi event loop; nhân Clinic không có lợi; lý do bàn giao chưa kiểm chứng.
 - Khi có lượt đo mới hoặc khi bàn giao H xảy ra, cập nhật bảng ở mục 3.
