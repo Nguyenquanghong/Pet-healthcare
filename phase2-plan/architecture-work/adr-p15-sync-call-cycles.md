@@ -1,6 +1,6 @@
 # ADR-P15: Chu trình gọi đồng bộ Core ⇄ Clinic, Core ⇄ Notification là cái giá có chủ ý
 
-Ngày 6/11/2026. Trạng thái: **ACCEPTED** ngày 7/11/2026: K5 xong, hai rule `gateway-routes-single-source` (`3323189`) và `service-calls-declared` (`e1dc1fa`, thay `clinic-core-calls-confined`) đã có trong `arch:check`. Danh sách lời gọi: `deploy/phase2/service-calls.json`. Ngoại lệ timeout lồng (finalize 1.800 ms bọc evidence 2.000 ms) hết hạn 30/11/2026, sửa sau K9 (Q7). Thực hiện ở K5 của lộ trình cải thiện kiến trúc, thiết kế ở k5-design (`k5-design-20261106.md`). Liên quan: [ADR-P13](adr-p13-local-read-authorization.md), [ADR-P14](adr-p14-keep-service-split.md) §4.1, [ADR-P08c](adr-p08c-core-legacy.md).
+Ngày 6/11/2026. Trạng thái: **ACCEPTED** ngày 7/11/2026: K5 xong, hai rule `gateway-routes-single-source` (`3323189`) và `service-calls-declared` (`e1dc1fa`, thay `clinic-core-calls-confined`) đã có trong `arch:check`. Danh sách lời gọi: `deploy/phase2/service-calls.json`. Ngoại lệ timeout lồng (finalize 1.800 ms bọc evidence 2.000 ms, Q7) đã gỡ ngày 12/11/2026: evidence còn 1.500 ms, `timeoutExceptions` rỗng. Thực hiện ở K5 của lộ trình cải thiện kiến trúc, thiết kế ở k5-design (`k5-design-20261106.md`). Liên quan: [ADR-P13](adr-p13-local-read-authorization.md), [ADR-P14](adr-p14-keep-service-split.md) §4.1, [ADR-P08c](adr-p08c-core-legacy.md).
 
 ## Bối cảnh
 
@@ -37,15 +37,15 @@ Ba service gọi nhau đồng bộ theo cả hai chiều. Thiết kế K5 §5.1 
 
 - Mọi lời gọi HTTP trong `src` của ba service đều đã khai, hoặc có trong danh sách hệ thống ngoài (S3, VNPay).
 - Path đã khai khớp route thật của callee và có trong `packages/contracts/internal/openapi.json`. Route `/internal/` không ai gọi phải khai lý do.
-- Timeout của lời gọi bên trong nhỏ hơn của lời gọi bọc ngoài, trừ ngoại lệ có hạn.
+- Timeout của lời gọi bên trong nhỏ hơn của lời gọi bọc ngoài, trừ ngoại lệ có hạn (hiện không có ngoại lệ nào).
 - Mỗi endpoint nội bộ một credential riêng (`backend/src/composition/config.ts`), và route nhận lời gọi có gate kiểm credential đó.
 - Breaker tách theo chiều gọi: `clinic-gateway`, `notification-gateway`, `core-directory`.
 
-**Ngoại lệ đang mở:**
+**Ngoại lệ đã đóng (Q7, 12/11/2026):**
 
-- Core gọi commit/release với 1.800 ms, nhưng bên trong Clinic gọi evidence với 2.000 ms. Evidence còn dùng chung breaker `core-directory` với các lượt đọc quyền.
-- đã chốt 6/11 không sửa trong K5, để số đo K9 lấy trên code như hiện tại. Ngoại lệ có hạn 30/11/2026.
-- Sau K9, sửa trong commit riêng (evidence 1.500 ms) và kiểm reconcile của Clinic còn idempotent khi bị retry.
+- Trước đó Core gọi commit/release với 1.800 ms, nhưng bên trong Clinic gọi evidence với 2.000 ms, nên lời gọi bọc ngoài có thể dừng trước. Evidence vẫn dùng chung breaker `core-directory` với các lượt đọc quyền.
+- Đã chốt 6/11 không sửa trong K5, để số đo K9 lấy trên code như hiện tại, kèm ngoại lệ có hạn 30/11/2026.
+- Đã sửa 12/11: evidence 1.500 ms, nằm trong 1.800 ms, và xóa ngoại lệ khỏi `service-calls.json`. Reconcile của Clinic idempotent khi bị retry (`applyBillingTerminal` khóa dòng lịch hẹn bằng `SELECT … FOR UPDATE`; terminal khớp và reservation đã INVOICED/RELEASED thì trả về, không đổi), nên commit/release gọi lại vẫn an toàn.
 
 ## Rủi ro chấp nhận
 

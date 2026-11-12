@@ -43,7 +43,7 @@ export class CoreDirectory {
           {
             headers: { ...traceHeaders(), 'X-Service-Token': this.scopes?.evidence ?? this.credential },
             redirect: 'error',
-            signal: AbortSignal.timeout(2000),
+            signal: AbortSignal.timeout(1500),
           },
         );
         if (res.status !== 200) throw res.status >= 500 ? new Error() : new CoreResponded();

@@ -108,7 +108,7 @@
       "match": "/internal/billing-operations/",
       "file": "services/clinic/src/infrastructure/core/directory.ts",
       "credential": { "header": "x-service-token", "token": "CORE_BILLING_EVIDENCE_TOKEN", "actor": "none", "wiring": { "caller": "services/clinic/src/index.ts", "callee": "backend/src/composition/config.ts" } },
-      "timeoutMs": 2000,
+      "timeoutMs": 1500,
       "nestedIn": "core-clinic-billing-finalize",
       "receiver": { "file": "backend/src/routes/internal/billing.ts", "gate": "acceptsCredential" },
       "reason": "Clinic does not trust the caller of commit or release; it reads the terminal state of the operation from Core before it reconciles."
@@ -168,14 +168,5 @@
       "reason": "Diagnostic read of a reservation that no service calls; tools/phase2/clinic-scope.test.mjs uses it. It sits behind the same service-token gate as the other billing routes."
     }
   ],
-  "timeoutExceptions": [
-    {
-      "outer": "core-clinic-billing-finalize",
-      "inner": "clinic-core-billing-evidence",
-      "outerMs": 1800,
-      "innerMs": 2000,
-      "until": "2026-11-30",
-      "reason": "Core gives commit or release 1800 ms, and Clinic's handler then waits up to 2000 ms for the evidence call, so the outer call can stop first. Not changed in K5 (behaviour); the fix after K9 is an evidence timeout of 1500 ms, with reconcile checked to be idempotent under retry."
-    }
-  ]
+  "timeoutExceptions": []
 }

@@ -544,9 +544,10 @@ const callsCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.re
     assert.deepEqual(findings,[],'service calls differ from deploy/phase2/service-calls.json: '+findings.join('; '));
     // the calls of the first rule: outbound HTTP outside the declared files, now in any of the three services
     const declaration=JSON.parse(real.read(DECLARATION)),allowed=new Set([...declaration.calls.map(c=>c.file),...declaration.external.map(x=>x.file)]);
-    // The days of the fixtures come from the exception in the declaration (24 days before its last day), so renewing it does not turn a fixture red.
+    // The days of the fixtures come from today, not from the declaration (which has no exception now): the exceptions the fixtures need are built
+    // below (`exception`, ending UNTIL = 24 days after FIXED), so no real date can turn a fixture red.
     const addDays=(day,n)=>new Date(Date.parse(day)+n*864e5).toISOString().slice(0,10);
-    const UNTIL=declaration.timeoutExceptions[0].until,FIXED=addDays(UNTIL,-24);
+    const FIXED=today,UNTIL=addDays(FIXED,24);
     const CLINIC='services/clinic/src/';
     const at=(file,source)=>unconfinedHttpCalls([{file:CLINIC+file,source}],allowed).map(f=>f.slice(CLINIC.length));
     assert.deepEqual(at('app.ts', "const r = await fetch(new URL('/internal/directory/authorize', origin));"), ['app.ts']);
@@ -595,6 +596,13 @@ const callsCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.re
     const append=(path,text)=>({[path]:real.read(path)+'\n'+text+'\n'});
     const change=fn=>{const d=structuredClone(declaration);fn(d);return {[DECL]:JSON.stringify(d)};};
     const callOf=(id,fn)=>change(d=>fn(d.calls.find(c=>c.id===id)));
+    // The real tree has no timeout exception (the evidence call is 1500 ms inside finalize 1800 ms). The fixtures of point (7) build the inversion
+    // that the exception once covered: `evidenceAt(ms)` sets the evidence timeout in the code (edit) and in the declaration (change), `inverted`
+    // is 2000 ms inside 1800 ms with no exception, `excepted` adds a synthetic exception that is valid on FIXED; `fn` then mutates the declaration.
+    const exception=()=>({outer:FINALIZE,inner:EVIDENCE,outerMs:1800,innerMs:2000,until:UNTIL,reason:'A fixture exception: the evidence call outlasts the finalize call that runs around it.'});
+    const evidenceAt=(ms,fn)=>({...edit(DIR,'AbortSignal.timeout(1500)','AbortSignal.timeout('+ms+')'),...change(d=>{d.calls.find(c=>c.id===EVIDENCE).timeoutMs=ms;if(fn)fn(d);})});
+    const inverted=fn=>evidenceAt(2000,fn);
+    const excepted=fn=>inverted(d=>{d.timeoutExceptions=[exception()];if(fn)fn(d);});
     const specChange=fn=>{const s=JSON.parse(real.read(SPEC));fn(s.paths);return {[SPEC]:JSON.stringify(s)};};
     const fails=[
       // (0) the declaration is read or the rule fails
@@ -673,7 +681,7 @@ const callsCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.re
       ['an uncalled entry for the wrong callee',/^\(5\) uncalledRoutes .*\(core\): stale, no receiver/,run(change(d=>{d.uncalledRoutes[0].callee='core';}))],
       ['an uncalled entry with no reason',/^\(0\) .*uncalledRoutes\[0\] needs callee, method, path and a reason/,run(change(d=>{d.uncalledRoutes[0].reason='';}))],
       // (6) the declared timeout is the one of the code
-      ['the evidence timeout changed in the code',/^\(6\) clinic-core-billing-evidence: declared timeout 2000 ms, the code says 1500 ms/,run(edit(DIR,'AbortSignal.timeout(2000)','AbortSignal.timeout(1500)'))],
+      ['the evidence timeout changed in the code',/^\(6\) clinic-core-billing-evidence: declared timeout 1500 ms, the code says 2000 ms/,run(edit(DIR,'AbortSignal.timeout(1500)','AbortSignal.timeout(2000)'))],
       ['the directory timeout changed in the code',/^\(6\) clinic-core-directory: declared timeout 2000 ms, the code says 2500 ms/,run(editLast(DIR,'AbortSignal.timeout(2000)','AbortSignal.timeout(2500)'))],
       ['the billing default timeout changed',/^\(6\) core-clinic-billing-source: declared timeout 1800 ms, the code says 2500 ms \(default of timeout\)/,run(edit(CB,'private readonly timeout = 1800,','private readonly timeout = 2500,'))],
       ['the Clinic proxy timeout changed',/^\(6\) core-clinic-proxy: declared timeout 6000 ms, the code says 7000 ms/,run(edit(ROUTES,'timeoutMs: 6000,','timeoutMs: 7000,'))],
@@ -685,18 +693,19 @@ const callsCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.re
       ['a timeout the reader cannot read',/^\(6\) clinic-core-directory-export: cannot read the timeout from AbortSignal\.timeout\(LIMIT\)/,run(edit(SYNC,'AbortSignal.timeout(2000)','AbortSignal.timeout(LIMIT)'))],
       ['a serviceProxy that is not in the config file',/^\(6\) core-clinic-proxy: .* holds 0 serviceProxy/,run(callOf('core-clinic-proxy',c=>{c.config.proxy='archive';}))],
       // (7) nested timeouts
-      ['an exception past its date',new RegExp('^\\(7\\) exception core-clinic-billing-finalize > clinic-core-billing-evidence: expired on '+UNTIL),run({},addDays(UNTIL,1))],
-      ['an exception that no longer applies',/^\(7\) exception .*stale, the inner timeout/,run(callOf(EVIDENCE,c=>{c.timeoutMs=1500;}))],
-      ['the exception was written for other timeouts (the evidence timeout grew)',/^\(7\) exception .*written for 2000 ms inside 1800 ms, the timeouts are now 2500 ms inside 1800 ms/,run({...edit(DIR,'AbortSignal.timeout(2000)','AbortSignal.timeout(2500)'),...callOf(EVIDENCE,c=>{c.timeoutMs=2500;})})],
-      ['an exception with no pinned timeouts',/^\(0\) .*timeoutExceptions\[0\] needs outer and inner ids and the timeouts/,run(change(d=>{delete d.timeoutExceptions[0].innerMs;}))],
+      ['an exception past its date',new RegExp('^\\(7\\) exception core-clinic-billing-finalize > clinic-core-billing-evidence: expired on '+UNTIL),run(excepted(),addDays(UNTIL,1))],
+      ['an exception that no longer applies (the declared evidence timeout shortened)',/^\(7\) exception .*stale, the inner timeout/,run(excepted(d=>{d.calls.find(c=>c.id===EVIDENCE).timeoutMs=1500;}))],
+      ['the old exception put back after the fix (1500 ms inside 1800 ms)',/^\(7\) exception core-clinic-billing-finalize > clinic-core-billing-evidence: stale, the inner timeout \(1500 ms\) is now shorter than the outer \(1800 ms\) \(remove the exception\)/,run(change(d=>{d.timeoutExceptions=[exception()];}))],
+      ['the exception was written for other timeouts (the evidence timeout grew)',/^\(7\) exception .*written for 2000 ms inside 1800 ms, the timeouts are now 2500 ms inside 1800 ms/,run(evidenceAt(2500,d=>{d.timeoutExceptions=[exception()];}))],
+      ['an exception with no pinned timeouts',/^\(0\) .*timeoutExceptions\[0\] needs outer and inner ids and the timeouts/,run(excepted(d=>{delete d.timeoutExceptions[0].innerMs;}))],
       ['a call to another service from an external file, written after a host',/^\(3\) .*blobStore\.ts holds a literal/,run(append(BLOB,"export const sneak = () => send('http://core/internal/directory/export');"))],
-      ['an exception with no reason',/^\(7\) exception .*no reason/,run(change(d=>{d.timeoutExceptions[0].reason='';}))],
-      ['an exception more than 60 days ahead',/^\(7\) exception .*more than 60 days/,run(change(d=>{d.timeoutExceptions[0].until=addDays(FIXED,61);}))],
-      ['an exception with a day that does not exist',/^\(7\) exception .*until is not a date/,run(change(d=>{d.timeoutExceptions[0].until='2026-02-30';}))],
-      ['an exception for a call that is not declared',/^\(7\) exception .*a call id is not declared/,run(change(d=>{d.timeoutExceptions[0].inner='ghost';}))],
-      ['an exception listed twice',/^\(7\) exception .*duplicate exception/,run(change(d=>{d.timeoutExceptions.push(structuredClone(d.timeoutExceptions[0]));}))],
-      ['an exception for a pair that is not nested',/^\(7\) exception .* is not nested in/,run(change(d=>{d.timeoutExceptions[0].inner='clinic-core-directory-export';}))],
-      ['a nested call with no exception',/^\(7\) clinic-core-billing-evidence: timeout 2000 ms is not shorter than core-clinic-billing-finalize \(1800 ms\)/,run(change(d=>{d.timeoutExceptions=[];}))],
+      ['an exception with no reason',/^\(7\) exception .*no reason/,run(excepted(d=>{d.timeoutExceptions[0].reason='';}))],
+      ['an exception more than 60 days ahead',/^\(7\) exception .*more than 60 days/,run(excepted(d=>{d.timeoutExceptions[0].until=addDays(FIXED,61);}))],
+      ['an exception with a day that does not exist',/^\(7\) exception .*until is not a date/,run(excepted(d=>{d.timeoutExceptions[0].until='2026-02-30';}))],
+      ['an exception for a call that is not declared',/^\(7\) exception .*a call id is not declared/,run(excepted(d=>{d.timeoutExceptions[0].inner='ghost';}))],
+      ['an exception listed twice',/^\(7\) exception .*duplicate exception/,run(excepted(d=>{d.timeoutExceptions.push(structuredClone(d.timeoutExceptions[0]));}))],
+      ['an exception for a pair that is not nested',/^\(7\) exception .* is not nested in/,run(excepted(d=>{d.timeoutExceptions[0].inner='clinic-core-directory-export';}))],
+      ['a nested call with no exception (evidence 2000 ms inside finalize 1800 ms)',/^\(7\) clinic-core-billing-evidence: timeout 2000 ms is not shorter than core-clinic-billing-finalize \(1800 ms\)/,run(inverted())],
       ['nested timeouts reversed: the directory call outlasts its proxy',/^\(7\) clinic-core-directory: timeout 2000 ms is not shorter than core-clinic-proxy \(1500 ms\)/,run(callOf('core-clinic-proxy',c=>{c.timeoutMs=1500;}))],
       ['a call nested in a call that does not reach its caller',/^\(7\) clinic-core-directory: nested in core-notification-proxy/,run(callOf('clinic-core-directory',c=>{c.nestedIn='core-notification-proxy';}))],
       ['a call nested in an id that is not declared',/^\(7\) clinic-core-directory: nestedIn ghost is not a declared call/,run(callOf('clinic-core-directory',c=>{c.nestedIn='ghost';}))],
@@ -762,8 +771,9 @@ const callsCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.re
       'a type-only import of node:http in a call file':run(append(NA,"import type { Server } from 'node:http';")),
       'a fetch in <src>/generated (the Prisma client)':run({'services/clinic/src/generated/x.ts':'export const r = (u: string) => fetch(u);'}),
       'a router mounted once with a prefix, and routes on app and router':run(append(DIR_ROUTE,"export const unrelated = (app: Express) => app.get('/api/x', h);")),
-      'the exception on its last day':run({},UNTIL),
-      'the exception 60 days ahead (the last day that is not too far)':run(change(d=>{d.timeoutExceptions[0].until=addDays(FIXED,60);})),
+      'an inverted nest with a valid exception (the base of the exception fixtures)':run(excepted()),
+      'the exception on its last day':run(excepted(),UNTIL),
+      'the exception 60 days ahead (the last day that is not too far)':run(excepted(d=>{d.timeoutExceptions[0].until=addDays(FIXED,60);})),
       'a route that is only used as a setting (app.get with a string)':run(append(DIR_ROUTE,"const setting = app.get('trust proxy');")),
     };
     for(const [reason,found] of Object.entries(passes))assert.deepEqual(found,[],'must pass: '+reason+': '+found.join('; '));
@@ -777,8 +787,9 @@ const callsCheck=(existsSync(built)?import(pathToFileURL(built).href):Promise.re
     assert.deepEqual([metric({'backend/src/application/x.ts':'export const f = (u: string) => fetch(u);'}).uncheckedDirections,metric({'backend/src/application/x.ts':'export const f = (u: string) => fetch(u);'}).undeclaredCallSites],[0,1],'an undeclared call site');
     assert.equal(metric(edit(NA,'private readonly timeoutMs = 2000,','private readonly timeoutMs = 2500,')).uncheckedDirections,1,'a finding on one call leaves its direction unchecked');
     assert.deepEqual([metric({[DECL]:null}).uncheckedDirections,metric({[DECL]:null}).undeclaredCallSites],[4,7],'no declaration: every direction unchecked, every call site undeclared');
-    assert.equal(metric({},addDays(UNTIL,1)).uncheckedDirections,0,'an expired exception does not move the metric');
-    return declaration.calls.length+' calls in '+serviceCallMetrics(routes,today,real).detail.directions.filter(d=>d.calls.length).length+' directions, '+declaration.external.length+' external, '+declaration.uncalledRoutes.length+' uncalled route, '+declaration.timeoutExceptions.length+' timeout exception ('+callExceptionDays(today,real).join('; ')+'); '+fails.length+' must-fail, '+Object.keys(passes).length+' must-pass, the call-site fixtures of the first rule and 3 reader fixtures';
+    assert.equal(metric(excepted(),addDays(UNTIL,1)).uncheckedDirections,0,'an expired exception does not move the metric');
+    const exceptions=declaration.timeoutExceptions.length?declaration.timeoutExceptions.length+' timeout exception ('+callExceptionDays(today,real).join('; ')+')':'no timeout exception';
+    return declaration.calls.length+' calls in '+serviceCallMetrics(routes,today,real).detail.directions.filter(d=>d.calls.length).length+' directions, '+declaration.external.length+' external, '+declaration.uncalledRoutes.length+' uncalled route, '+exceptions+'; '+fails.length+' must-fail, '+Object.keys(passes).length+' must-pass, the call-site fixtures of the first rule and 3 reader fixtures';
   }),error=>rule('service-calls-declared',()=>{throw error;}));
 
 // ---- 13. Shared packages carry no business route -------------------------------------------
